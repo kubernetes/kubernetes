@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
@@ -80,7 +80,7 @@ func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
 func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)
 	delegateConfig.ExternalAddress = "192.168.10.4:443"
-	delegateConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
 	clientset := fake.NewSimpleClientset()
@@ -112,7 +112,7 @@ func TestNewWithDelegate(t *testing.T) {
 
 	wrappingConfig := NewConfig(codecs)
 	wrappingConfig.ExternalAddress = "192.168.10.4:443"
-	wrappingConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	wrappingConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
 

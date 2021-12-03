@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
@@ -281,7 +282,7 @@ func (op *updateOp) updateAliasFromNode(ctx context.Context, sync *NodeSync, nod
 		return fmt.Errorf("cannot sync to cloud in mode %q", sync.mode)
 	}
 
-	_, aliasRange, err := net.ParseCIDR(node.Spec.PodCIDR)
+	_, aliasRange, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
 	if err != nil {
 		klog.Errorf("Could not parse PodCIDR (%q) for node %q: %v",
 			node.Spec.PodCIDR, node.Name, err)
@@ -364,7 +365,7 @@ func (op *deleteOp) run(sync *NodeSync) error {
 		return nil
 	}
 
-	_, cidrRange, err := net.ParseCIDR(op.node.Spec.PodCIDR)
+	_, cidrRange, err := netutils.ParseCIDRSloppy(op.node.Spec.PodCIDR)
 	if err != nil {
 		klog.Errorf("Deleted node %q has an invalid podCIDR %q: %v",
 			op.node.Name, op.node.Spec.PodCIDR, err)

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
 
@@ -143,7 +144,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 		} else {
 			// Something went wrong splitting the host/port, could just be a missing port so check if the
 			// existing value is a valid IP address. If so, use that with the default scheduler port
-			if host := net.ParseIP(*obj.HealthzBindAddress); host != nil {
+			if host := netutils.ParseIPSloppy(*obj.HealthzBindAddress); host != nil {
 				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.HealthzBindAddress = &hostPort
 			} else {
@@ -165,7 +166,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 		} else {
 			// Something went wrong splitting the host/port, could just be a missing port so check if the
 			// existing value is a valid IP address. If so, use that with the default scheduler port
-			if host := net.ParseIP(*obj.MetricsBindAddress); host != nil {
+			if host := netutils.ParseIPSloppy(*obj.MetricsBindAddress); host != nil {
 				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.MetricsBindAddress = &hostPort
 			} else {

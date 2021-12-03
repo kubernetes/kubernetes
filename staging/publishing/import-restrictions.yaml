@@ -35,6 +35,7 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
+  - k8s.io/utils/net
   - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/api/"
@@ -150,6 +151,7 @@
   - k8s.io/component-base
   - k8s.io/kube-openapi
   - k8s.io/sample-apiserver
+  - k8s.io/utils/net
   - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/apiextensions-apiserver/"
@@ -274,5 +276,5 @@
   - k8s.io/pod-security-admission
   - k8s.io/component-base/featuregate
   - k8s.io/component-base/logs
-  - k8s.io/component-base/cli/flag 
+  - k8s.io/component-base/cli/flag
   - k8s.io/utils

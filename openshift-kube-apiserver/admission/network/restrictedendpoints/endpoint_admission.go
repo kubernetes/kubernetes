@@ -13,6 +13,7 @@ import (
 	"k8s.io/klog/v2"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	netutils "k8s.io/utils/net"
 
 	"github.com/openshift/library-go/pkg/config/helpers"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/network/apis/restrictedendpoints"
@@ -71,7 +72,7 @@ var _ = admission.ValidationInterface(&restrictedEndpointsAdmission{})
 // ParseSimpleCIDRRules parses a list of CIDR strings
 func ParseSimpleCIDRRules(rules []string) (networks []*net.IPNet, err error) {
 	for _, s := range rules {
-		_, cidr, err := net.ParseCIDR(s)
+		_, cidr, err := netutils.ParseCIDRSloppy(s)
 		if err != nil {
 			return nil, err
 		}
@@ -107,12 +108,12 @@ var (
 	}
 	defaultRestrictedNetworks = []*net.IPNet{
 		// IPv4 link-local range 169.254.0.0/16 (including cloud metadata IP)
-		{IP: net.ParseIP("169.254.0.0"), Mask: net.CIDRMask(16, 32)},
+		{IP: netutils.ParseIPSloppy("169.254.0.0"), Mask: net.CIDRMask(16, 32)},
 	}
 )
 
 func checkRestrictedIP(ipString string, restricted []*net.IPNet) error {
-	ip := net.ParseIP(ipString)
+	ip := netutils.ParseIPSloppy(ipString)
 	if ip == nil {
 		return nil
 	}

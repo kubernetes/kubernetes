@@ -49,7 +49,7 @@ import (
 	"k8s.io/klog/v2"
 	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 
 	"github.com/PuerkitoBio/purell"
 	"github.com/pkg/errors"
@@ -431,7 +431,7 @@ func (hst HTTPProxyCheck) Name() string {
 func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
 	u := &url.URL{Scheme: hst.Proto, Host: hst.Host}
-	if utilsnet.IsIPv6String(hst.Host) {
+	if netutils.IsIPv6String(hst.Host) {
 		u.Host = net.JoinHostPort(hst.Host, "1234")
 	}
 
@@ -473,12 +473,12 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 		return nil, nil
 	}
 
-	_, cidr, err := net.ParseCIDR(subnet.CIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(subnet.CIDR)
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "error parsing CIDR %q", subnet.CIDR)}
 	}
 
-	testIP, err := utilsnet.GetIndexedIP(cidr, 1)
+	testIP, err := netutils.GetIndexedIP(cidr, 1)
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", cidr.String())}
 	}
@@ -936,8 +936,8 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
-		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if utilsnet.IsIPv6(ip) {
+		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
+			if netutils.IsIPv6(ip) {
 				checks = append(checks,
 					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -1001,8 +1001,8 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			checks = append(checks,
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
-			if ip := net.ParseIP(ipstr); ip != nil {
-				if utilsnet.IsIPv6(ip) {
+			if ip := netutils.ParseIPSloppy(ipstr); ip != nil {
+				if netutils.IsIPv6(ip) {
 					addIPv6Checks = true
 				}
 			}

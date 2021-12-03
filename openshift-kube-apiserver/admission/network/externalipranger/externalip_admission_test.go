@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 
@@ -48,23 +49,23 @@ func TestAdmission(t *testing.T) {
 	}
 	var oldSvc *kapi.Service
 
-	_, ipv4, err := net.ParseCIDR("172.0.0.0/16")
+	_, ipv4, err := netutils.ParseCIDRSloppy("172.0.0.0/16")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, ipv4subset, err := net.ParseCIDR("172.0.1.0/24")
+	_, ipv4subset, err := netutils.ParseCIDRSloppy("172.0.1.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, ipv4offset, err := net.ParseCIDR("172.200.0.0/24")
+	_, ipv4offset, err := netutils.ParseCIDRSloppy("172.200.0.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, none, err := net.ParseCIDR("0.0.0.0/32")
+	_, none, err := netutils.ParseCIDRSloppy("0.0.0.0/32")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, all, err := net.ParseCIDR("0.0.0.0/0")
+	_, all, err := netutils.ParseCIDRSloppy("0.0.0.0/0")
 	if err != nil {
 		t.Fatal(err)
 	}

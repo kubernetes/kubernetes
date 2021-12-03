@@ -66,7 +66,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
 	}
 
-	if net.ParseIP(config.BindAddress) == nil {
+	if netutils.ParseIPSloppy(config.BindAddress) == nil {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
 	}
 
@@ -94,7 +94,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
 		// if we are here means that len(cidrs) == 1, we need to validate it
 		default:
-			if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
+			if _, _, err := netutils.ParseCIDRSloppy(config.ClusterCIDR); err != nil {
 				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
 			}
 		}
@@ -228,7 +228,7 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 		return allErrs
 	}
 
-	if ip := net.ParseIP(hostIP); ip == nil {
+	if ip := netutils.ParseIPSloppy(hostIP); ip == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, hostIP, "must be a valid IP"))
 	}
 
@@ -275,7 +275,7 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 	allErrs := field.ErrorList{}
 
 	for i := range nodePortAddresses {
-		if _, _, err := net.ParseCIDR(nodePortAddresses[i]); err != nil {
+		if _, _, err := netutils.ParseCIDRSloppy(nodePortAddresses[i]); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "must be a valid CIDR"))
 		}
 	}
@@ -305,7 +305,7 @@ func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.
 	allErrs := field.ErrorList{}
 
 	for i := range excludeCIDRs {
-		if _, _, err := net.ParseCIDR(excludeCIDRs[i]); err != nil {
+		if _, _, err := netutils.ParseCIDRSloppy(excludeCIDRs[i]); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), excludeCIDRs[i], "must be a valid CIDR"))
 		}
 	}

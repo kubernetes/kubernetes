@@ -19,13 +19,13 @@ package nosnat
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/component-base/logs"
+	netutils "k8s.io/utils/net"
 )
 
 // CmdNoSnatTest is used by agnhost Cobra.
@@ -83,10 +83,10 @@ func (m *masqTester) Run() error {
 	}
 
 	// validate that pip and nip are ip addresses.
-	if net.ParseIP(pip) == nil {
+	if netutils.ParseIPSloppy(pip) == nil {
 		return fmt.Errorf("POD_IP env var contained %q, which is not an IP address", pip)
 	}
-	if net.ParseIP(nip) == nil {
+	if netutils.ParseIPSloppy(nip) == nil {
 		return fmt.Errorf("NODE_IP env var contained %q, which is not an IP address", nip)
 	}
 

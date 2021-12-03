@@ -24,6 +24,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -974,7 +975,10 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		// options that allow the csr to pass validation
 		lenientOpts certificateValidationOptions
 
-		// expected errors when validating strictly
+		// regexes matching expected errors when validating strictly
+		strictRegexes []regexp.Regexp
+
+		// expected errors (after filtering out errors matched by strictRegexes) when validating strictly
 		strictErrs []string
 	}{
 		// valid strict cases
@@ -1127,8 +1131,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 					Certificate: invalidCertificateNonASN1Data,
 				},
 			},
-			lenientOpts: certificateValidationOptions{allowArbitraryCertificate: true},
-			strictErrs:  []string{`status.certificate: Invalid value: "<certificate data>": asn1: structure error: sequence tag mismatch`},
+			lenientOpts:   certificateValidationOptions{allowArbitraryCertificate: true},
+			strictRegexes: []regexp.Regexp{*regexp.MustCompile(`status.certificate: Invalid value: "\<certificate data\>": (asn1: structure error: sequence tag mismatch|x509: invalid RDNSequence)`)},
 		},
 	}
 
@@ -1144,12 +1148,27 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 			for _, err := range validateCertificateSigningRequest(tt.csr, certificateValidationOptions{}) {
 				gotErrs.Insert(err.Error())
 			}
+
+			// filter errors matching strictRegexes and ensure every strictRegex matches at least one error
+			for _, expectedRegex := range tt.strictRegexes {
+				matched := false
+				for _, err := range gotErrs.List() {
+					if expectedRegex.MatchString(err) {
+						gotErrs.Delete(err)
+						matched = true
+					}
+				}
+				if !matched {
+					t.Errorf("missing expected error matching: %s", expectedRegex.String())
+				}
+			}
+
 			wantErrs := sets.NewString(tt.strictErrs...)
 			for _, missing := range wantErrs.Difference(gotErrs).List() {
 				t.Errorf("missing expected strict error: %s", missing)
 			}
 			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
-				t.Errorf("unexpected strict error: %s", unexpected)
+				t.Errorf("unexpected errors: %s", unexpected)
 			}
 		})
 	}

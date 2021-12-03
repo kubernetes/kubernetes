@@ -48,7 +48,7 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // NodePortRange should match whatever the default/configured range is
@@ -820,7 +820,7 @@ func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, exec
 
 func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
 	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
-	if net.ParseIP(clusterIP) == nil {
+	if netutils.ParseIPSloppy(clusterIP) == nil {
 		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
 	}
 	return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
@@ -832,7 +832,7 @@ func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPo
 
 func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string, externalIPs bool) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-	isClusterIPV4 := utilsnet.IsIPv4String(clusterIP)
+	isClusterIPV4 := netutils.IsIPv4String(clusterIP)
 
 	for _, internalAddr := range internalAddrs {
 		// If the node's internal address points to localhost, then we are not
@@ -842,7 +842,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			continue
 		}
 		// Check service reachability on the node internalIP which is same family as clusterIP
-		if isClusterIPV4 != utilsnet.IsIPv4String(internalAddr) {
+		if isClusterIPV4 != netutils.IsIPv4String(internalAddr) {
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
 			continue
 		}
@@ -855,7 +855,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 	if externalIPs {
 		externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
 		for _, externalAddr := range externalAddrs {
-			if isClusterIPV4 != utilsnet.IsIPv4String(externalAddr) {
+			if isClusterIPV4 != netutils.IsIPv4String(externalAddr) {
 				framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
 				continue
 			}
@@ -871,7 +871,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 // isInvalidOrLocalhostAddress returns `true` if the provided `ip` is either not
 // parsable or the loopback address. Otherwise it will return `false`.
 func isInvalidOrLocalhostAddress(ip string) bool {
-	parsedIP := net.ParseIP(ip)
+	parsedIP := netutils.ParseIPSloppy(ip)
 	if parsedIP == nil || parsedIP.IsLoopback() {
 		return true
 	}

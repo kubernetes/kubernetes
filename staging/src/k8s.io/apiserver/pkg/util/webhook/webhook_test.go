@@ -197,7 +197,7 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 				},
 			},
 			user:     &defaultUser,
-			errRegex: "unable to load root certificates: failed to parse certificate: asn1: syntax error: data truncated",
+			errRegex: "unable to load root certificates: failed to parse certificate: (asn1: syntax error: data truncated|x509: malformed certificate)",
 		},
 		{
 			test:    "user with invalid client certificate path",

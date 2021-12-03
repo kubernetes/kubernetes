@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"net"
 	"strings"
 	"testing"
 
@@ -32,11 +31,12 @@ import (
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	netutils "k8s.io/utils/net"
 )
 
 func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interface, allocator.Interface, storage.Interface, factory.DestroyFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interfa
 }
 
 func validNewRangeAllocation() *api.RangeAllocation {
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
+	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	return &api.RangeAllocation{
 		Range: cidr.String(),
 	}
@@ -79,7 +79,7 @@ func key() string {
 func TestEmpty(t *testing.T) {
 	_, storage, _, _, destroyFunc := newStorage(t)
 	defer destroyFunc()
-	if err := storage.Allocate(net.ParseIP("192.168.1.2")); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocations at this time") {
+	if err := storage.Allocate(netutils.ParseIPSloppy("192.168.1.2")); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocations at this time") {
 		t.Fatal(err)
 	}
 }
@@ -87,7 +87,7 @@ func TestEmpty(t *testing.T) {
 func TestErrors(t *testing.T) {
 	_, storage, _, _, destroyFunc := newStorage(t)
 	defer destroyFunc()
-	err := storage.Allocate(net.ParseIP("192.168.0.0"))
+	err := storage.Allocate(netutils.ParseIPSloppy("192.168.0.0"))
 	if _, ok := err.(*ipallocator.ErrNotInRange); !ok {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestStore(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := storage.Allocate(net.ParseIP("192.168.1.2")); err != nil {
+	if err := storage.Allocate(netutils.ParseIPSloppy("192.168.1.2")); err != nil {
 		t.Fatal(err)
 	}
 	ok, err := backing.Allocate(1)
@@ -110,7 +110,7 @@ func TestStore(t *testing.T) {
 	if ok {
 		t.Fatal("Expected allocation to fail")
 	}
-	if err := storage.Allocate(net.ParseIP("192.168.1.2")); err != ipallocator.ErrAllocated {
+	if err := storage.Allocate(netutils.ParseIPSloppy("192.168.1.2")); err != ipallocator.ErrAllocated {
 		t.Fatal(err)
 	}
 }

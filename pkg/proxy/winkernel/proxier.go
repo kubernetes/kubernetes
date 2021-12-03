@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -52,7 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/util/async"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -424,7 +425,7 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.
 		ip:         baseInfo.IP(),
 		port:       uint16(portNumber),
 		isLocal:    baseInfo.GetIsLocal(),
-		macAddress: conjureMac("02-11", net.ParseIP(baseInfo.IP())),
+		macAddress: conjureMac("02-11", netutils.ParseIPSloppy(baseInfo.IP())),
 		refCount:   new(uint16),
 		hnsID:      "",
 		hns:        proxier.hns,
@@ -510,7 +511,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	}
 
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
-		if net.ParseIP(ingress.IP) != nil {
+		if netutils.ParseIPSloppy(ingress.IP) != nil {
 			info.loadBalancerIngressIPs = append(info.loadBalancerIngressIPs, &loadBalancerIngressInfo{ip: ingress.IP})
 		}
 	}
@@ -520,11 +521,11 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 func (network hnsNetworkInfo) findRemoteSubnetProviderAddress(ip string) string {
 	var providerAddress string
 	for _, rs := range network.remoteSubnets {
-		_, ipNet, err := net.ParseCIDR(rs.destinationPrefix)
+		_, ipNet, err := netutils.ParseCIDRSloppy(rs.destinationPrefix)
 		if err != nil {
 			klog.ErrorS(err, "Failed to parse CIDR")
 		}
-		if ipNet.Contains(net.ParseIP(ip)) {
+		if ipNet.Contains(netutils.ParseIPSloppy(ip)) {
 			providerAddress = rs.providerAddress
 		}
 		if ip == rs.providerAddress {
@@ -634,7 +635,7 @@ func NewProxier(
 
 	if nodeIP == nil {
 		klog.InfoS("invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = net.ParseIP("127.0.0.1")
+		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
 
 	if len(clusterCIDR) == 0 {
@@ -705,7 +706,7 @@ func NewProxier(
 		for _, inter := range interfaces {
 			addresses, _ := inter.Addrs()
 			for _, addr := range addresses {
-				addrIP, _, _ := net.ParseCIDR(addr.String())
+				addrIP, _, _ := netutils.ParseCIDRSloppy(addr.String())
 				if addrIP.String() == nodeIP.String() {
 					klog.V(2).InfoS("record Host MAC address", "addr", inter.HardwareAddr.String())
 					hostMac = inter.HardwareAddr.String()
@@ -717,7 +718,7 @@ func NewProxier(
 		}
 	}
 
-	isIPv6 := utilnet.IsIPv6(nodeIP)
+	isIPv6 := netutils.IsIPv6(nodeIP)
 	proxier := &Proxier{
 		endPointsRefCount:   make(endPointsReferenceCountMap),
 		serviceMap:          make(proxy.ServiceMap),
@@ -1179,7 +1180,7 @@ func (proxier *Proxier) syncProxyRules() {
 					hnsEndpoint := &endpointsInfo{
 						ip:              ep.ip,
 						isLocal:         false,
-						macAddress:      conjureMac("02-11", net.ParseIP(ep.ip)),
+						macAddress:      conjureMac("02-11", netutils.ParseIPSloppy(ep.ip)),
 						providerAddress: providerAddress,
 					}
 

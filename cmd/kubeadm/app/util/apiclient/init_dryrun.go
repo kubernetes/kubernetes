@@ -17,7 +17,6 @@ limitations under the License.
 package apiclient
 
 import (
-	"net"
 	"strings"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -28,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 
 	"github.com/pkg/errors"
 )
@@ -88,12 +87,12 @@ func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (boo
 		return false, nil, nil
 	}
 
-	_, svcSubnet, err := net.ParseCIDR(idr.serviceSubnet)
+	_, svcSubnet, err := netutils.ParseCIDRSloppy(idr.serviceSubnet)
 	if err != nil {
 		return true, nil, errors.Wrapf(err, "error parsing CIDR %q", idr.serviceSubnet)
 	}
 
-	internalAPIServerVirtualIP, err := utilnet.GetIndexedIP(svcSubnet, 1)
+	internalAPIServerVirtualIP, err := netutils.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
 		return true, nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
 	}

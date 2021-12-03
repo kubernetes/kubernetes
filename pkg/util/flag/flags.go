@@ -30,7 +30,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // TODO(mikedanese): remove these flag wrapper types when we remove command line flags
@@ -53,7 +53,7 @@ func (v IPVar) Set(s string) error {
 		v.Val = nil
 		return nil
 	}
-	if net.ParseIP(s) == nil {
+	if netutils.ParseIPSloppy(s) == nil {
 		return fmt.Errorf("%q is not a valid IP address", s)
 	}
 	if v.Val == nil {
@@ -96,7 +96,7 @@ func (v IPPortVar) Set(s string) error {
 
 	// Both IP and IP:port are valid.
 	// Attempt to parse into IP first.
-	if net.ParseIP(s) != nil {
+	if netutils.ParseIPSloppy(s) != nil {
 		*v.Val = s
 		return nil
 	}
@@ -106,10 +106,10 @@ func (v IPPortVar) Set(s string) error {
 	if err != nil {
 		return fmt.Errorf("%q is not in a valid format (ip or ip:port): %v", s, err)
 	}
-	if net.ParseIP(host) == nil {
+	if netutils.ParseIPSloppy(host) == nil {
 		return fmt.Errorf("%q is not a valid IP address", host)
 	}
-	if _, err := utilsnet.ParsePort(port, true); err != nil {
+	if _, err := netutils.ParsePort(port, true); err != nil {
 		return fmt.Errorf("%q is not a valid number", port)
 	}
 	*v.Val = s

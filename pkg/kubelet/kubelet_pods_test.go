@@ -42,6 +42,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	netutils "k8s.io/utils/net"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
@@ -3515,7 +3516,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
 			if tc.nodeIP != "" {
-				kl.nodeIPs = []net.IP{net.ParseIP(tc.nodeIP)}
+				kl.nodeIPs = []net.IP{netutils.ParseIPSloppy(tc.nodeIP)}
 			}
 
 			pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
@@ -3619,7 +3620,7 @@ func TestSortPodIPs(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
 			if tc.nodeIP != "" {
-				kl.nodeIPs = []net.IP{net.ParseIP(tc.nodeIP)}
+				kl.nodeIPs = []net.IP{netutils.ParseIPSloppy(tc.nodeIP)}
 			}
 
 			podIPs := kl.sortPodIPs(tc.podIPs)

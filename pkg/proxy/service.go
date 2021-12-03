@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -155,7 +156,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
 	info := &BaseServiceInfo{
-		clusterIP:             net.ParseIP(clusterIP),
+		clusterIP:             netutils.ParseIPSloppy(clusterIP),
 		port:                  int(port.Port),
 		protocol:              port.Protocol,
 		nodePort:              int(port.NodePort),

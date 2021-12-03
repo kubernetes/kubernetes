@@ -38,6 +38,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -660,7 +661,7 @@ func parseAddresses(addresses string) ([]string, error) {
 	res := make([]string, 0)
 	split := strings.Split(addresses, ",")
 	for _, address := range split {
-		netAddr := net.ParseIP(address)
+		netAddr := netutils.ParseIPSloppy(address)
 		if netAddr == nil {
 			return nil, fmt.Errorf("parseAddress: invalid address %s", address)
 		}

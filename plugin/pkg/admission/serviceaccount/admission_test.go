@@ -748,6 +748,11 @@ func TestAddImagePullSecrets(t *testing.T) {
 			{Name: "bar"},
 		},
 	}
+	originalSA := sa.DeepCopy()
+	expected := []api.LocalObjectReference{
+		{Name: "foo"},
+		{Name: "bar"},
+	}
 	// Add the default service account for the ns with a secret reference into the cache
 	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(sa)
 
@@ -758,10 +763,10 @@ func TestAddImagePullSecrets(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	assert.EqualValues(t, sa.ImagePullSecrets, pod.Spec.ImagePullSecrets, "expected %v, got %v", sa.ImagePullSecrets, pod.Spec.ImagePullSecrets)
+	assert.EqualValues(t, expected, pod.Spec.ImagePullSecrets, "expected %v, got %v", expected, pod.Spec.ImagePullSecrets)
 
 	pod.Spec.ImagePullSecrets[1] = api.LocalObjectReference{Name: "baz"}
-	if reflect.DeepEqual(sa.ImagePullSecrets, pod.Spec.ImagePullSecrets) {
+	if !reflect.DeepEqual(originalSA, sa) {
 		t.Errorf("accidentally mutated the ServiceAccount.ImagePullSecrets: %v", sa.ImagePullSecrets)
 	}
 }

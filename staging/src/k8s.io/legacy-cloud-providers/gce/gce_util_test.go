@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -20,12 +21,12 @@ package gce
 
 import (
 	"context"
-	"net"
 	"reflect"
 	"testing"
 
 	compute "google.golang.org/api/compute/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	netutils "k8s.io/utils/net"
 )
 
 func TestLastIPInRange(t *testing.T) {
@@ -42,7 +43,7 @@ func TestLastIPInRange(t *testing.T) {
 		{"::0/126", "::3"},
 		{"::0/120", "::ff"},
 	} {
-		_, c, err := net.ParseCIDR(tc.cidr)
+		_, c, err := netutils.ParseCIDRSloppy(tc.cidr)
 		if err != nil {
 			t.Errorf("net.ParseCIDR(%v) = _, %v, %v; want nil", tc.cidr, c, err)
 			continue

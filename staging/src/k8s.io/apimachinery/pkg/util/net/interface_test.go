@@ -23,6 +23,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	netutils "k8s.io/utils/net"
 )
 
 const gatewayfirst = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT                                                       
@@ -119,8 +121,8 @@ var (
 )
 
 var (
-	ipv4Route = Route{Interface: "eth3", Destination: net.ParseIP("0.0.0.0"), Gateway: net.ParseIP("10.254.0.1"), Family: familyIPv4}
-	ipv6Route = Route{Interface: "eth3", Destination: net.ParseIP("::"), Gateway: net.ParseIP("2001:1::1"), Family: familyIPv6}
+	ipv4Route = Route{Interface: "eth3", Destination: netutils.ParseIPSloppy("0.0.0.0"), Gateway: netutils.ParseIPSloppy("10.254.0.1"), Family: familyIPv4}
+	ipv6Route = Route{Interface: "eth3", Destination: netutils.ParseIPSloppy("::"), Gateway: netutils.ParseIPSloppy("2001:1::1"), Family: familyIPv6}
 )
 
 var (
@@ -282,8 +284,8 @@ func TestFinalIP(t *testing.T) {
 		{"loopbackv6", []net.Addr{addrStruct{val: "::1/128"}}, familyIPv6, nil},
 		{"link local v4", []net.Addr{addrStruct{val: "169.254.1.10/16"}}, familyIPv4, nil},
 		{"link local v6", []net.Addr{addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}}, familyIPv6, nil},
-		{"ip4", []net.Addr{addrStruct{val: "10.254.12.132/17"}}, familyIPv4, net.ParseIP("10.254.12.132")},
-		{"ip6", []net.Addr{addrStruct{val: "2001::5/64"}}, familyIPv6, net.ParseIP("2001::5")},
+		{"ip4", []net.Addr{addrStruct{val: "10.254.12.132/17"}}, familyIPv4, netutils.ParseIPSloppy("10.254.12.132")},
+		{"ip6", []net.Addr{addrStruct{val: "2001::5/64"}}, familyIPv6, netutils.ParseIPSloppy("2001::5")},
 
 		{"no addresses", []net.Addr{}, familyIPv4, nil},
 	}
@@ -556,8 +558,8 @@ func TestGetIPFromInterface(t *testing.T) {
 		expected   net.IP
 		errStrFrag string
 	}{
-		{"ipv4", "eth3", familyIPv4, validNetworkInterface{}, net.ParseIP("10.254.71.145"), ""},
-		{"ipv6", "eth3", familyIPv6, ipv6NetworkInterface{}, net.ParseIP("2001::200"), ""},
+		{"ipv4", "eth3", familyIPv4, validNetworkInterface{}, netutils.ParseIPSloppy("10.254.71.145"), ""},
+		{"ipv6", "eth3", familyIPv6, ipv6NetworkInterface{}, netutils.ParseIPSloppy("2001::200"), ""},
 		{"no ipv4", "eth3", familyIPv4, ipv6NetworkInterface{}, nil, ""},
 		{"no ipv6", "eth3", familyIPv6, validNetworkInterface{}, nil, ""},
 		{"I/F down", "eth3", familyIPv4, downNetworkInterface{}, nil, ""},
@@ -587,8 +589,8 @@ func TestGetIPFromLoopbackInterface(t *testing.T) {
 		expected   net.IP
 		errStrFrag string
 	}{
-		{"ipv4", familyIPv4, linkLocalLoopbackNetworkInterface{}, net.ParseIP("10.1.1.1"), ""},
-		{"ipv6", familyIPv6, linkLocalLoopbackNetworkInterface{}, net.ParseIP("fd00:1:1::1"), ""},
+		{"ipv4", familyIPv4, linkLocalLoopbackNetworkInterface{}, netutils.ParseIPSloppy("10.1.1.1"), ""},
+		{"ipv6", familyIPv6, linkLocalLoopbackNetworkInterface{}, netutils.ParseIPSloppy("fd00:1:1::1"), ""},
 		{"no global ipv4", familyIPv4, loopbackNetworkInterface{}, nil, ""},
 		{"no global ipv6", familyIPv6, loopbackNetworkInterface{}, nil, ""},
 	}
@@ -614,21 +616,21 @@ func TestChooseHostInterfaceFromRoute(t *testing.T) {
 		order    AddressFamilyPreference
 		expected net.IP
 	}{
-		{"single-stack ipv4", routeV4, validNetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145")},
-		{"single-stack ipv4, prefer v6", routeV4, validNetworkInterface{}, preferIPv6, net.ParseIP("10.254.71.145")},
-		{"single-stack ipv6", routeV6, ipv6NetworkInterface{}, preferIPv4, net.ParseIP("2001::200")},
-		{"single-stack ipv6, prefer v6", routeV6, ipv6NetworkInterface{}, preferIPv6, net.ParseIP("2001::200")},
-		{"dual stack", bothRoutes, v4v6NetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145")},
-		{"dual stack, prefer v6", bothRoutes, v4v6NetworkInterface{}, preferIPv6, net.ParseIP("2001::10")},
-		{"LLA and loopback with global, IPv4", routeV4, linkLocalLoopbackNetworkInterface{}, preferIPv4, net.ParseIP("10.1.1.1")},
-		{"LLA and loopback with global, IPv6", routeV6, linkLocalLoopbackNetworkInterface{}, preferIPv6, net.ParseIP("fd00:1:1::1")},
-		{"LLA and loopback with global, dual stack prefer IPv4", bothRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv4, net.ParseIP("10.1.1.1")},
-		{"LLA and loopback with global, dual stack prefer IPv6", bothRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv6, net.ParseIP("fd00:1:1::1")},
+		{"single-stack ipv4", routeV4, validNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.254.71.145")},
+		{"single-stack ipv4, prefer v6", routeV4, validNetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("10.254.71.145")},
+		{"single-stack ipv6", routeV6, ipv6NetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("2001::200")},
+		{"single-stack ipv6, prefer v6", routeV6, ipv6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::200")},
+		{"dual stack", bothRoutes, v4v6NetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.254.71.145")},
+		{"dual stack, prefer v6", bothRoutes, v4v6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::10")},
+		{"LLA and loopback with global, IPv4", routeV4, linkLocalLoopbackNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.1.1.1")},
+		{"LLA and loopback with global, IPv6", routeV6, linkLocalLoopbackNetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("fd00:1:1::1")},
+		{"LLA and loopback with global, dual stack prefer IPv4", bothRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.1.1.1")},
+		{"LLA and loopback with global, dual stack prefer IPv6", bothRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("fd00:1:1::1")},
 		{"LLA and loopback with global, no routes", noRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv6, nil},
-		{"interface and loopback with global, IPv4", routeV4, globalsNetworkInterface{}, preferIPv4, net.ParseIP("192.168.1.1")},
-		{"interface and loopback with global, IPv6", routeV6, globalsNetworkInterface{}, preferIPv6, net.ParseIP("fd00::200")},
-		{"interface and loopback with global, dual stack prefer IPv4", bothRoutes, globalsNetworkInterface{}, preferIPv4, net.ParseIP("192.168.1.1")},
-		{"interface and loopback with global, dual stack prefer IPv6", bothRoutes, globalsNetworkInterface{}, preferIPv6, net.ParseIP("fd00::200")},
+		{"interface and loopback with global, IPv4", routeV4, globalsNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("192.168.1.1")},
+		{"interface and loopback with global, IPv6", routeV6, globalsNetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("fd00::200")},
+		{"interface and loopback with global, dual stack prefer IPv4", bothRoutes, globalsNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("192.168.1.1")},
+		{"interface and loopback with global, dual stack prefer IPv6", bothRoutes, globalsNetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("fd00::200")},
 		{"interface and loopback with global, no routes", noRoutes, globalsNetworkInterface{}, preferIPv6, nil},
 		{"all LLA", routeV4, networkInterfaceWithOnlyLinkLocals{}, preferIPv4, nil},
 		{"no routes", noRoutes, validNetworkInterface{}, preferIPv4, nil},
@@ -649,10 +651,10 @@ func TestMemberOf(t *testing.T) {
 		family   AddressFamily
 		expected bool
 	}{
-		{"ipv4 is 4", net.ParseIP("10.20.30.40"), familyIPv4, true},
-		{"ipv4 is 6", net.ParseIP("10.10.10.10"), familyIPv6, false},
-		{"ipv6 is 4", net.ParseIP("2001::100"), familyIPv4, false},
-		{"ipv6 is 6", net.ParseIP("2001::100"), familyIPv6, true},
+		{"ipv4 is 4", netutils.ParseIPSloppy("10.20.30.40"), familyIPv4, true},
+		{"ipv4 is 6", netutils.ParseIPSloppy("10.10.10.10"), familyIPv6, false},
+		{"ipv6 is 4", netutils.ParseIPSloppy("2001::100"), familyIPv4, false},
+		{"ipv6 is 6", netutils.ParseIPSloppy("2001::100"), familyIPv6, true},
 	}
 	for _, tc := range testCases {
 		if memberOf(tc.ip, tc.family) != tc.expected {
@@ -678,12 +680,12 @@ func TestGetIPFromHostInterfaces(t *testing.T) {
 		{"no addresses", networkInterfaceWithNoAddrs{}, preferIPv4, nil, "no acceptable"},
 		{"invalid addr", networkInterfaceWithInvalidAddr{}, preferIPv4, nil, "invalid CIDR"},
 		{"no matches", networkInterfaceWithOnlyLinkLocals{}, preferIPv4, nil, "no acceptable"},
-		{"single-stack ipv4", validNetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145"), ""},
-		{"single-stack ipv4, prefer ipv6", validNetworkInterface{}, preferIPv6, net.ParseIP("10.254.71.145"), ""},
-		{"single-stack ipv6", ipv6NetworkInterface{}, preferIPv4, net.ParseIP("2001::200"), ""},
-		{"single-stack ipv6, prefer ipv6", ipv6NetworkInterface{}, preferIPv6, net.ParseIP("2001::200"), ""},
-		{"dual stack", v4v6NetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145"), ""},
-		{"dual stack, prefer ipv6", v4v6NetworkInterface{}, preferIPv6, net.ParseIP("2001::10"), ""},
+		{"single-stack ipv4", validNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.254.71.145"), ""},
+		{"single-stack ipv4, prefer ipv6", validNetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("10.254.71.145"), ""},
+		{"single-stack ipv6", ipv6NetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("2001::200"), ""},
+		{"single-stack ipv6, prefer ipv6", ipv6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::200"), ""},
+		{"dual stack", v4v6NetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.254.71.145"), ""},
+		{"dual stack, prefer ipv6", v4v6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::10"), ""},
 	}
 
 	for _, tc := range testCases {
