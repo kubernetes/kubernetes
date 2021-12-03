@@ -27,13 +27,15 @@ import (
 	"io"
 	"math"
 	"time"
+	"unsafe"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtimeapiv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
@@ -123,7 +125,14 @@ func (ds *dockerService) Exec(_ context.Context, req *runtimeapi.ExecRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	return ds.streamingServer.GetExec(req)
+	// This conversion has been copied from the functions in
+	// pkg/kubelet/cri/remote/conversion.go
+	r := (*runtimeapiv1.ExecRequest)(unsafe.Pointer(req))
+	resp, err := ds.streamingServer.GetExec(r)
+	if err != nil {
+		return nil, err
+	}
+	return (*runtimeapi.ExecResponse)(unsafe.Pointer(resp)), nil
 }
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
@@ -135,7 +144,14 @@ func (ds *dockerService) Attach(_ context.Context, req *runtimeapi.AttachRequest
 	if err != nil {
 		return nil, err
 	}
-	return ds.streamingServer.GetAttach(req)
+	// This conversion has been copied from the functions in
+	// pkg/kubelet/cri/remote/conversion.go
+	r := (*runtimeapiv1.AttachRequest)(unsafe.Pointer(req))
+	resp, err := ds.streamingServer.GetAttach(r)
+	if err != nil {
+		return nil, err
+	}
+	return (*runtimeapi.AttachResponse)(unsafe.Pointer(resp)), nil
 }
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
@@ -148,7 +164,14 @@ func (ds *dockerService) PortForward(_ context.Context, req *runtimeapi.PortForw
 		return nil, err
 	}
 	// TODO(tallclair): Verify that ports are exposed.
-	return ds.streamingServer.GetPortForward(req)
+	// This conversion has been copied from the functions in
+	// pkg/kubelet/cri/remote/conversion.go
+	r := (*runtimeapiv1.PortForwardRequest)(unsafe.Pointer(req))
+	resp, err := ds.streamingServer.GetPortForward(r)
+	if err != nil {
+		return nil, err
+	}
+	return (*runtimeapi.PortForwardResponse)(unsafe.Pointer(resp)), nil
 }
 
 func checkContainerStatus(client libdocker.Interface, containerID string) (*dockertypes.ContainerJSON, error) {
