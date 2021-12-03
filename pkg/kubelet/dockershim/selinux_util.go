@@ -22,7 +22,7 @@ package dockershim
 import (
 	"fmt"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // selinuxLabelUser returns the fragment of a Docker security opt that

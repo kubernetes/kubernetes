@@ -24,7 +24,7 @@ import (
 	"errors"
 	"fmt"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 var ErrNotImplemented = errors.New("Not implemented")
