@@ -46,7 +46,7 @@ const (
 	DefaultBurst int     = 10
 )
 
-var ErrNotInCluster = errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
+var ErrNotInCluster = errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined, and service account file must exist")
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
@@ -518,6 +518,14 @@ func InClusterConfig() (*Config, error) {
 	if len(host) == 0 || len(port) == 0 {
 		return nil, ErrNotInCluster
 	}
+	// check whether tokenFile exists
+	if _, err := os.Stat(tokenFile); os.IsNotExist(err) {
+		return nil, ErrNotInCluster
+	}
+	// check whether rootCAFile exists
+	if _, err := os.Stat(rootCAFile); os.IsNotExist(err) {
+		return nil, ErrNotInCluster
+	}
 
 	token, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
@@ -544,8 +552,16 @@ func InClusterConfig() (*Config, error) {
 // InClusterNamespace return the default namespace to be used
 // for namespaced API operations in the pod
 func InClusterNamespace() (string, error) {
+	// This way assumes you've set the POD_NAMESPACE environment variable using the downward API.
+	// This check has to be done first for backwards compatibility with the way InClusterConfig was originally set up
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns, nil
+	}
 	//return the namespace associated with the service account of the pod, if available
 	nsFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	if _, err := os.Stat(nsFile); os.IsNotExist(err) {
+		return "", ErrNotInCluster
+	}
 	data, err := ioutil.ReadFile(nsFile)
 	if err != nil {
 		klog.Errorf("Expected to get namespace from %s, but got err: %v", nsFile, err)

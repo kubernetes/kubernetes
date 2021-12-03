@@ -577,13 +577,7 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 }
 
 func (config *inClusterClientConfig) Namespace() (string, bool, error) {
-	// This way assumes you've set the POD_NAMESPACE environment variable using the downward API.
-	// This check has to be done first for backwards compatibility with the way InClusterConfig was originally set up
-	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
-		return ns, false, nil
-	}
-
-	//get the namespace associated with the service account of current pod, if available
+	//get the namespace of current pod, if available
 	namespace, err := restclient.InClusterNamespace()
 	if err != nil {
 		klog.Error("Fail to get in-cluster namespace: ", err)
