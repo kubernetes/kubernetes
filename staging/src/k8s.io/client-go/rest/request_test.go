@@ -2995,7 +2995,7 @@ func TestHTTP1DoNotReuseRequestAfterTimeout(t *testing.T) {
 			config := &Config{
 				Host:      ts.URL,
 				Transport: utilnet.SetTransportDefaults(transport),
-				Timeout:   100 * time.Millisecond,
+				Timeout:   1 * time.Second,
 				// These fields are required to create a REST client.
 				ContentConfig: ContentConfig{
 					GroupVersion:         &schema.GroupVersion{},

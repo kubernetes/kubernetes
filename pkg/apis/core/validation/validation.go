@@ -2882,10 +2882,10 @@ func validateHandler(handler commonHandler, fldPath *field.Path) field.ErrorList
 	}
 	if handler.GRPC != nil {
 		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("gRPC"), "may not specify more than 1 handler type"))
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("grpc"), "may not specify more than 1 handler type"))
 		} else {
 			numHandlers++
-			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("gRPC"))...)
+			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("grpc"))...)
 		}
 	}
 	if numHandlers == 0 {

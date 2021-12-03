@@ -5984,7 +5984,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failureThreshold
       type:
         scalar: numeric
-    - name: gRPC
+    - name: grpc
       type:
         namedType: io.k8s.api.core.v1.GRPCAction
     - name: httpGet
