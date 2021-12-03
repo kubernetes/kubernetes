@@ -215,6 +215,48 @@ func TestParseQuantityString(t *testing.T) {
 	}
 }
 
+func TestQuantityToInt64(t *testing.T) {
+	table := []struct {
+		name                 string
+		v                    string
+		notOverflow          bool
+		expectedDecimalValue int64
+	}{
+		{"decimalSI to int64 not overflow",
+			"1000000000G",
+			true,
+			1000000000000000000,
+		},
+		{"binarySI to int64 not overflow",
+			"100000000Gi",
+			true,
+			107374182400000000,
+		},
+		{"decimalSI to int64 overflow",
+			// MaxInt64
+			"9223372036854775807",
+			false,
+			0,
+		},
+		{"binarySI to int64 overflow",
+			// less than MaxInt64, but it's enough for most cases
+			"1000000000Gi",
+			false,
+			0,
+		},
+	}
+	for i := range table {
+		v := MustParse(table[i].v)
+		res, ok := v.AsInt64()
+		if table[i].notOverflow != ok {
+			t.Errorf("%s error,expected %v but %v", table[i].name, table[i].notOverflow, ok)
+		}
+		if table[i].expectedDecimalValue != res {
+			t.Errorf("%s error,expected %v but %v", table[i].name, table[i].expectedDecimalValue, res)
+		}
+	}
+}
+
 func TestQuantityParse(t *testing.T) {
 	if _, err := ParseQuantity(""); err == nil {
 		t.Errorf("expected empty string to return error")

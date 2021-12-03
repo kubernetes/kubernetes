@@ -293,7 +293,7 @@ func ParseQuantity(str string) (Quantity, error) {
 			// only handle positive binary numbers with the fast path
 			mantissa = int64(int64(mantissa) << uint64(exponent))
 			// 1Mi (2^20) has ~6 digits of decimal precision, so exponent*3/10 -1 is roughly the precision
-			precision = 15 - int32(len(num)) - int32(float32(exponent)*3/10) - 1
+			precision = maxInt64Factors - int32(len(num)) - int32(float32(exponent)*3/10)
 		default:
 			precision = -1
 		}
