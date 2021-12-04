@@ -1367,9 +1367,11 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 
 func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
-	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
+	if zone == "" {
+		framework.Fail("could not determine suitable zone for volume")
+	}
+	if volType == storageframework.InlineVolume || volType == storageframework.PreprovisionedPV {
+		// Schedule pod in same volume as PD, so Pod can mount Volume (can't mount zonal disks across zones)
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
 				v1.LabelFailureDomainBetaZone: zone,
@@ -1772,9 +1774,11 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 
 func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
-	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
+	if zone == "" {
+		framework.Fail("could not determine suitable zone for volume")
+	}
+	if volType == storageframework.InlineVolume || volType == storageframework.PreprovisionedPV {
+		// Schedule pod in same volume as PD, so Pod can mount Volume (can't mount EBS volumes across zones)
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
 				v1.LabelTopologyZone: zone,
