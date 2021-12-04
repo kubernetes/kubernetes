@@ -17,7 +17,9 @@ limitations under the License.
 package expose
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,16 +27,17 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -82,6 +85,7 @@ var (
 		kubectl expose deployment nginx --port=80 --target-port=8000`))
 )
 
+// ExposeServiceOptions holds the options for kubectl expose command
 type ExposeServiceOptions struct {
 	cmdutil.OverrideOptions
 
@@ -90,13 +94,31 @@ type ExposeServiceOptions struct {
 	PrintFlags      *genericclioptions.PrintFlags
 	PrintObj        printers.ResourcePrinterFunc
 
+	Name        string
+	DefaultName string
+	Selector    string
+	// Port will be used if a user specifies --port OR the exposed object as one port
+	Port string
+	// Ports will be used iff a user doesn't specify --port AND the exposed object has multiple ports
+	Ports          string
+	Labels         string
+	ExternalIP     string
+	LoadBalancerIP string
+	Type           string
+	Protocol       string
+	// Protocols will be used to keep port-protocol mapping derived from exposed object
+	Protocols       string
+	TargetPort      string
+	PortName        string
+	SessionAffinity string
+	ClusterIP       string
+
 	DryRunStrategy   cmdutil.DryRunStrategy
 	DryRunVerifier   *resource.DryRunVerifier
 	EnforceNamespace bool
 
 	fieldManager string
 
-	Generators                func(string) map[string]generate.Generator
 	CanBeExposed              polymorphichelpers.CanBeExposedFunc
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
@@ -112,6 +134,8 @@ type ExposeServiceOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewExposeServiceOptions creates a new ExposeServiceOptions and return a pointer to the
+// struct
 func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
 	return &ExposeServiceOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -122,6 +146,7 @@ func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServi
 	}
 }
 
+// NewCmdExposeService is a command to expose the service from user's input
 func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewExposeServiceOptions(streams)
 
@@ -147,20 +172,17 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.Flags().String("generator", "service/v2", i18n.T("The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."))
-	cmd.Flags().String("protocol", "", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
-	cmd.Flags().String("port", "", i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
-	cmd.Flags().String("type", "", i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
-	cmd.Flags().String("load-balancer-ip", "", i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
-	cmd.Flags().String("selector", "", i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
-	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
-	cmd.Flags().String("container-port", "", i18n.T("Synonym for --target-port"))
-	cmd.Flags().MarkDeprecated("container-port", "--container-port will be removed in the future, please use --target-port instead")
-	cmd.Flags().String("target-port", "", i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
-	cmd.Flags().String("external-ip", "", i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
-	cmd.Flags().String("name", "", i18n.T("The name for the newly created object."))
-	cmd.Flags().String("session-affinity", "", i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
-	cmd.Flags().String("cluster-ip", "", i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
+	cmd.Flags().StringVar(&o.Protocol, "protocol", o.Protocol, i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
+	cmd.Flags().StringVar(&o.Port, "port", o.Port, i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
+	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
+	cmd.Flags().StringVar(&o.LoadBalancerIP, "load-balancer-ip", o.LoadBalancerIP, i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
+	cmd.Flags().StringVar(&o.Selector, "selector", o.Selector, i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
+	cmd.Flags().StringVarP(&o.Labels, "labels", "l", o.Labels, "Labels to apply to the service created by this call.")
+	cmd.Flags().StringVar(&o.TargetPort, "target-port", o.TargetPort, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
+	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
+	cmd.Flags().StringVar(&o.Name, "name", o.Name, i18n.T("The name for the newly created object."))
+	cmd.Flags().StringVar(&o.SessionAffinity, "session-affinity", o.SessionAffinity, i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
+	cmd.Flags().StringVar(&o.ClusterIP, "cluster-ip", o.ClusterIP, i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-expose")
 	o.AddOverrideFlags(cmd)
 
@@ -171,6 +193,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
+// Complete loads data from the command line environment
 func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
@@ -196,7 +219,6 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 		return err
 	}
 
-	o.Generators = generateversioned.GeneratorFn
 	o.Builder = f.NewBuilder()
 	o.ClientForMapping = f.ClientForMapping
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
@@ -217,6 +239,8 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	return err
 }
 
+// RunExpose retrieves the Kubernetes Object from the API server and expose it to a
+// Kubernetes Service
 func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
 	r := o.Builder.
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
@@ -228,17 +252,8 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		Do()
 	err := r.Err()
 	if err != nil {
-		return cmdutil.UsageErrorf(cmd, err.Error())
+		return err
 	}
-
-	// Get the generator, setup and validate all required parameters
-	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generators := o.Generators("expose")
-	generator, found := generators[generatorName]
-	if !found {
-		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
-	}
-	names := generator.ParamNames()
 
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -250,98 +265,90 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 
-		params := generate.MakeParams(cmd, names)
 		name := info.Name
 		if len(name) > validation.DNS1035LabelMaxLength {
 			name = name[:validation.DNS1035LabelMaxLength]
 		}
-		params["default-name"] = name
+		o.DefaultName = name
 
 		// For objects that need a pod selector, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --selector
-		if s, found := params["selector"]; found && generate.IsZero(s) {
+		if len(o.Selector) == 0 {
 			s, err := o.MapBasedSelectorForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
+				return fmt.Errorf("couldn't retrieve selectors via --selector flag or introspection: %v", err)
 			}
-			params["selector"] = s
+			o.Selector = s
 		}
 
-		isHeadlessService := params["cluster-ip"] == "None"
+		isHeadlessService := o.ClusterIP == "None"
 
 		// For objects that need a port, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --port
-		if port, found := params["port"]; found && generate.IsZero(port) {
+		if len(o.Port) == 0 {
 			ports, err := o.PortsForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
+				return fmt.Errorf("couldn't find port via --port flag or introspection: %v", err)
 			}
 			switch len(ports) {
 			case 0:
 				if !isHeadlessService {
-					return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection")
+					return fmt.Errorf("couldn't find port via --port flag or introspection")
 				}
 			case 1:
-				params["port"] = ports[0]
+				o.Port = ports[0]
 			default:
-				params["ports"] = strings.Join(ports, ",")
+				o.Ports = strings.Join(ports, ",")
 			}
 		}
 
 		// Always try to derive protocols from the exposed object, may use
 		// different protocols for different ports.
-		if _, found := params["protocol"]; found {
-			protocolsMap, err := o.ProtocolsForObject(info.Object)
-			if err != nil {
-				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
-			}
-			if protocols := generate.MakeProtocols(protocolsMap); !generate.IsZero(protocols) {
-				params["protocols"] = protocols
-			}
+		protocolsMap, err := o.ProtocolsForObject(info.Object)
+		if err != nil {
+			return fmt.Errorf("couldn't find protocol via introspection: %v", err)
+		}
+		if protocols := generate.MakeProtocols(protocolsMap); !generate.IsZero(protocols) {
+			o.Protocols = protocols
 		}
 
-		if generate.IsZero(params["labels"]) {
+		if len(o.Labels) == 0 {
 			labels, err := meta.NewAccessor().Labels(info.Object)
 			if err != nil {
 				return err
 			}
-			params["labels"] = polymorphichelpers.MakeLabels(labels)
-		}
-		if err = generate.ValidateParams(names, params); err != nil {
-			return err
-		}
-		// Check for invalid flags used against the present generator.
-		if err := generate.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
-			return err
+			o.Labels = polymorphichelpers.MakeLabels(labels)
 		}
 
 		// Generate new object
-		object, err := generator.Generate(params)
+		service, err := o.createService()
+
 		if err != nil {
 			return err
 		}
 
-		object, err = o.NewOverrider(&corev1.Service{}).Apply(object)
+		overrideService, err := o.NewOverrider(&corev1.Service{}).Apply(service)
+
 		if err != nil {
 			return err
 		}
 
-		if err := o.Recorder.Record(object); err != nil {
+		if err := o.Recorder.Record(overrideService); err != nil {
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {
-			if meta, err := meta.Accessor(object); err == nil && o.EnforceNamespace {
+			if meta, err := meta.Accessor(overrideService); err == nil && o.EnforceNamespace {
 				meta.SetNamespace(o.Namespace)
 			}
-			return o.PrintObj(object, o.Out)
+			return o.PrintObj(overrideService, o.Out)
 		}
-		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, scheme.DefaultJSONEncoder()); err != nil {
+		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), overrideService, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 
 		asUnstructured := &unstructured.Unstructured{}
-		if err := scheme.Scheme.Convert(object, asUnstructured, nil); err != nil {
+		if err := scheme.Scheme.Convert(overrideService, asUnstructured, nil); err != nil {
 			return err
 		}
 		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
@@ -377,4 +384,187 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		return err
 	}
 	return nil
+}
+
+func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
+	if len(o.Selector) == 0 {
+		return nil, fmt.Errorf("selector must be specified")
+	}
+	selector, err := parseLabels(o.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	var labels map[string]string
+	if len(o.Labels) > 0 {
+		labels, err = parseLabels(o.Labels)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	name := o.Name
+	if len(name) == 0 {
+		name = o.DefaultName
+		if len(name) == 0 {
+			return nil, fmt.Errorf("name must be specified")
+		}
+	}
+
+	var portProtocolMap map[string]string
+	if o.Protocols != "" {
+		portProtocolMap, err = parseProtocols(o.Protocols)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// ports takes precedence over port since it will be
+	// specified only when the user hasn't specified a port
+	// via --port and the exposed object has multiple ports.
+	var portString string
+	portString = o.Ports
+	if len(o.Ports) == 0 {
+		portString = o.Port
+	}
+
+	ports := []corev1.ServicePort{}
+	if len(portString) != 0 {
+		portStringSlice := strings.Split(portString, ",")
+		servicePortName := o.PortName
+		for i, stillPortString := range portStringSlice {
+			port, err := strconv.Atoi(stillPortString)
+			if err != nil {
+				return nil, err
+			}
+			name := servicePortName
+			// If we are going to assign multiple ports to a service, we need to
+			// generate a different name for each one.
+			if len(portStringSlice) > 1 {
+				name = fmt.Sprintf("port-%d", i+1)
+			}
+			protocol := o.Protocol
+
+			switch {
+			case len(protocol) == 0 && len(portProtocolMap) == 0:
+				// Default to TCP, what the flag was doing previously.
+				protocol = "TCP"
+			case len(protocol) > 0 && len(portProtocolMap) > 0:
+				// User has specified the --protocol while exposing a multiprotocol resource
+				// We should stomp multiple protocols with the one specified ie. do nothing
+			case len(protocol) == 0 && len(portProtocolMap) > 0:
+				// no --protocol and we expose a multiprotocol resource
+				protocol = "TCP" // have the default so we can stay sane
+				if exposeProtocol, found := portProtocolMap[stillPortString]; found {
+					protocol = exposeProtocol
+				}
+			}
+			ports = append(ports, corev1.ServicePort{
+				Name:     name,
+				Port:     int32(port),
+				Protocol: corev1.Protocol(protocol),
+			})
+		}
+	}
+
+	service := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: selector,
+			Ports:    ports,
+		},
+	}
+	targetPortString := o.TargetPort
+	if len(targetPortString) > 0 {
+		var targetPort intstr.IntOrString
+		if portNum, err := strconv.Atoi(targetPortString); err != nil {
+			targetPort = intstr.FromString(targetPortString)
+		} else {
+			targetPort = intstr.FromInt(portNum)
+		}
+		// Use the same target-port for every port
+		for i := range service.Spec.Ports {
+			service.Spec.Ports[i].TargetPort = targetPort
+		}
+	} else {
+		// If --target-port or --container-port haven't been specified, this
+		// should be the same as Port
+		for i := range service.Spec.Ports {
+			port := service.Spec.Ports[i].Port
+			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
+		}
+	}
+	if len(o.ExternalIP) > 0 {
+		service.Spec.ExternalIPs = []string{o.ExternalIP}
+	}
+	if len(o.Type) != 0 {
+		service.Spec.Type = corev1.ServiceType(o.Type)
+	}
+	if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		service.Spec.LoadBalancerIP = o.LoadBalancerIP
+	}
+	if len(o.SessionAffinity) != 0 {
+		switch corev1.ServiceAffinity(o.SessionAffinity) {
+		case corev1.ServiceAffinityNone:
+			service.Spec.SessionAffinity = corev1.ServiceAffinityNone
+		case corev1.ServiceAffinityClientIP:
+			service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
+		default:
+			return nil, fmt.Errorf("unknown session affinity: %s", o.SessionAffinity)
+		}
+	}
+	if len(o.ClusterIP) != 0 {
+		if o.ClusterIP == "None" {
+			service.Spec.ClusterIP = corev1.ClusterIPNone
+		} else {
+			service.Spec.ClusterIP = o.ClusterIP
+		}
+	}
+	return &service, nil
+}
+
+// parseLabels turns a string representation of a label set into a map[string]string
+func parseLabels(labelSpec string) (map[string]string, error) {
+	if len(labelSpec) == 0 {
+		return nil, fmt.Errorf("no label spec passed")
+	}
+	labels := map[string]string{}
+	labelSpecs := strings.Split(labelSpec, ",")
+	for ix := range labelSpecs {
+		labelSpec := strings.Split(labelSpecs[ix], "=")
+		if len(labelSpec) != 2 {
+			return nil, fmt.Errorf("unexpected label spec: %s", labelSpecs[ix])
+		}
+		if len(labelSpec[0]) == 0 {
+			return nil, fmt.Errorf("unexpected empty label key")
+		}
+		labels[labelSpec[0]] = labelSpec[1]
+	}
+	return labels, nil
+}
+
+// parseProtocols turns a string representation of a protocols set into a map[string]string
+func parseProtocols(protocols string) (map[string]string, error) {
+	if len(protocols) == 0 {
+		return nil, fmt.Errorf("no protocols passed")
+	}
+	portProtocolMap := map[string]string{}
+	protocolsSlice := strings.Split(protocols, ",")
+	for ix := range protocolsSlice {
+		portProtocol := strings.Split(protocolsSlice[ix], "/")
+		if len(portProtocol) != 2 {
+			return nil, fmt.Errorf("unexpected port protocol mapping: %s", protocolsSlice[ix])
+		}
+		if len(portProtocol[0]) == 0 {
+			return nil, fmt.Errorf("unexpected empty port")
+		}
+		if len(portProtocol[1]) == 0 {
+			return nil, fmt.Errorf("unexpected empty protocol")
+		}
+		portProtocolMap[portProtocol[0]] = portProtocol[1]
+	}
+	return portProtocolMap, nil
 }
