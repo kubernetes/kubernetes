@@ -246,7 +246,7 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 
 // DeletePD deletes a persistent volume
 func (p *Provider) DeletePD(pdName string) error {
-	err := p.gceCloud.DeleteDisk(pdName)
+	err := p.gceCloud.DeleteDiskUnknownZone(pdName)
 
 	if err != nil {
 		if gerr, ok := err.(*googleapi.Error); ok && len(gerr.Errors) > 0 && gerr.Errors[0].Reason == "notFound" {

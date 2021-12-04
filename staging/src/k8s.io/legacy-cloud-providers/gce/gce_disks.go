@@ -457,8 +457,12 @@ type Disks interface {
 	// serialized as JSON into Description field.
 	CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*Disk, error)
 
-	// DeleteDisk deletes PD.
-	DeleteDisk(diskToDelete string) error
+	// DeleteDiskUnknownZone deletes the referenced persistent disk.
+	// Deprecated: prefer DeleteZonalDisk if the zone is known.
+	DeleteDiskUnknownZone(diskToDelete string) error
+
+	// DeleteZonalDisk deletes the referenced zonal persistent disk.
+	DeleteZonalDisk(diskToDelete string, zone string) error
 
 	// ResizeDisk resizes PD and returns new disk size
 	ResizeDisk(diskToResize string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
@@ -546,7 +550,7 @@ func (g *Cloud) getDiskByNameAndOptionalLabelZones(name, labelZone string) (*Dis
 		// Regional PD
 		return g.getRegionalDiskByName(name)
 	}
-	return g.getDiskByName(name, labelZone)
+	return g.getZonalDiskByName(name, labelZone)
 }
 
 // AttachDisk attaches given disk to the node with the specified NodeName.
@@ -568,7 +572,7 @@ func (g *Cloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bo
 		}
 		mc = newDiskMetricContextRegional("attach", g.region)
 	} else {
-		disk, err = g.getDiskByName(diskName, instance.Zone)
+		disk, err = g.getZonalDiskByName(diskName, instance.Zone)
 		if err != nil {
 			return err
 		}
@@ -792,9 +796,19 @@ func getDiskType(diskType string) (string, error) {
 	}
 }
 
-// DeleteDisk deletes rgw referenced persistent disk.
-func (g *Cloud) DeleteDisk(diskToDelete string) error {
-	err := g.doDeleteDisk(diskToDelete)
+// DeleteDiskUnknownZone deletes the referenced persistent disk.
+// Deprecated: prefer DeleteZonalDisk if the zone is known.
+func (g *Cloud) DeleteDiskUnknownZone(diskToDelete string) error {
+	disk, err := g.GetDiskByNameUnknownZone(diskToDelete)
+	if err == cloudprovider.DiskNotFound {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = g.doDeleteDisk(disk)
 	if isGCEError(err, "resourceInUseByAnotherResource") {
 		return volerr.NewDeletedVolumeInUseError(err.Error())
 	}
@@ -802,6 +816,29 @@ func (g *Cloud) DeleteDisk(diskToDelete string) error {
 	if err == cloudprovider.DiskNotFound {
 		return nil
 	}
+	return err
+}
+
+// DeleteZonalDisk deletes the referenced zonal persistent disk.
+func (g *Cloud) DeleteZonalDisk(diskToDelete string, zone string) error {
+	disk, err := g.getZonalDiskByName(diskToDelete, zone)
+	if err == cloudprovider.DiskNotFound {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	err = g.doDeleteDisk(disk)
+	if isGCEError(err, "resourceInUseByAnotherResource") {
+		return volerr.NewDeletedVolumeInUseError(err.Error())
+	}
+
+	if err == cloudprovider.DiskNotFound {
+		return nil
+	}
+
 	return err
 }
 
@@ -897,8 +934,8 @@ func (g *Cloud) findDiskByName(diskName string, zone string) (*Disk, error) {
 	return nil, mc.Observe(nil)
 }
 
-// Like findDiskByName, but returns an error if the disk is not found
-func (g *Cloud) getDiskByName(diskName string, zone string) (*Disk, error) {
+// getZonalDiskByName is like findDiskByName, but returns an error if the disk is not found
+func (g *Cloud) getZonalDiskByName(diskName string, zone string) (*Disk, error) {
 	disk, err := g.findDiskByName(diskName, zone)
 	if disk == nil && err == nil {
 		return nil, fmt.Errorf("GCE persistent disk not found: diskName=%q zone=%q", diskName, zone)
@@ -998,12 +1035,7 @@ func (g *Cloud) encodeDiskTags(tags map[string]string) (string, error) {
 	return string(enc), nil
 }
 
-func (g *Cloud) doDeleteDisk(diskToDelete string) error {
-	disk, err := g.GetDiskByNameUnknownZone(diskToDelete)
-	if err != nil {
-		return err
-	}
-
+func (g *Cloud) doDeleteDisk(disk *Disk) error {
 	var mc *metricContext
 
 	switch zoneInfo := disk.ZoneInfo.(type) {
