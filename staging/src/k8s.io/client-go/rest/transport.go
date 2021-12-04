@@ -87,6 +87,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		Transport:          c.Transport,
 		WrapTransport:      c.WrapTransport,
 		DisableCompression: c.DisableCompression,
+		EnableHTTP3:        c.EnableHTTP3,
 		TLS: transport.TLSConfig{
 			Insecure:   c.Insecure,
 			ServerName: c.ServerName,

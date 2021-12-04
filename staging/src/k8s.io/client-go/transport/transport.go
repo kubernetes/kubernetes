@@ -29,6 +29,9 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/klog/v2"
+
+	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go/http3"
 )
 
 // New returns an http.RoundTripper that will provide the authentication
@@ -46,6 +49,18 @@ func New(config *Config) (http.RoundTripper, error) {
 
 	if config.Transport != nil {
 		rt = config.Transport
+	} else if config.EnableHTTP3 {
+		// Get the TLS options for this client config
+		tlsConfig, err := TLSConfigFor(config)
+		if err != nil {
+			return nil, err
+		}
+		rt = &http3.RoundTripper{
+			TLSClientConfig: tlsConfig,
+			QuicConfig: &quic.Config{
+				KeepAlive: true,
+			},
+		}
 	} else {
 		rt, err = tlsCache.get(config)
 		if err != nil {

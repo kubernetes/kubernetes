@@ -33,6 +33,9 @@ type Config struct {
 	// The base TLS configuration for this transport.
 	TLS TLSConfig
 
+	// Use HTTP3
+	EnableHTTP3 bool
+
 	// Username and password for basic authentication
 	Username string
 	Password string `datapolicy:"password"`

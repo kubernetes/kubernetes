@@ -99,6 +99,9 @@ type Config struct {
 	// server.
 	DisableCompression bool
 
+	//
+	EnableHTTP3 bool
+
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options. Use WrapTransport
 	// to provide additional per-server middleware behavior.
