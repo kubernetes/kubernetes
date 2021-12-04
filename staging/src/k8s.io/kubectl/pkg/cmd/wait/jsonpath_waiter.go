@@ -36,11 +36,6 @@ func (j JSONPathWaiter) VisitResource(info *resource.Info, o *WaitOptions) (runt
 	return getObjAndCheckCondition(info, o, j.isJSONPathConditionMet, j.checkCondition)
 }
 
-// IsJSONPathConditionMet fulfills the requirements of the interface ConditionFunc which provides condition check
-//func (j JSONPathWaiter) IsJSONPathConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-//	return getObjAndCheckCondition(info, o, j.isJSONPathConditionMet, j.checkCondition)
-//}
-
 func (j JSONPathWaiter) OnWaitLoopCompletion(visitedCount int, err error) error {
 	if visitedCount == 0 {
 		return errNoMatchingResources
