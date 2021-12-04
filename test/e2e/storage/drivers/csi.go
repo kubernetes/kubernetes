@@ -618,10 +618,10 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 	} else {
 		// When using the mock driver inside the cluster it has to be reconfigured
 		// via command line parameters.
-		containerArgs = append(containerArgs, "--name=csi-mock-"+f.UniqueName)
+		containerArgs = append(containerArgs, "--drivername=csi-mock-"+f.UniqueName)
 
-		if !m.attachable {
-			containerArgs = append(containerArgs, "--disable-attach")
+		if m.attachable {
+			containerArgs = append(containerArgs, "--enable-attach")
 		}
 
 		if m.enableTopology {

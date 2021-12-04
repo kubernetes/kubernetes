@@ -218,7 +218,7 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.7.1
+          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.7.3
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
@@ -260,24 +260,8 @@ spec:
             - mountPath: /dev
               name: dev-dir
 
-        - name: csi-external-health-monitor-agent
-          image: k8s.gcr.io/sig-storage/csi-external-health-monitor-agent:v0.2.0
-          args:
-            - "--v=5"
-            - "--csi-address=$(ADDRESS)"
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: ADDRESS
-              value: /csi/csi.sock
-          imagePullPolicy: "IfNotPresent"
-          volumeMounts:
-            - name: socket-dir
-              mountPath: /csi
         - name: csi-external-health-monitor-controller
-          image: k8s.gcr.io/sig-storage/csi-external-health-monitor-controller:v0.3.0
+          image: k8s.gcr.io/sig-storage/csi-external-health-monitor-controller:v0.4.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -291,7 +275,7 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.2.0
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -325,7 +309,7 @@ spec:
           - --health-port=9898
 
         - name: csi-attacher
-          image: k8s.gcr.io/sig-storage/csi-attacher:v3.2.1
+          image: k8s.gcr.io/sig-storage/csi-attacher:v3.3.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -339,7 +323,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v2.2.1
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -354,7 +338,7 @@ spec:
               name: socket-dir
 
         - name: csi-resizer
-          image: k8s.gcr.io/sig-storage/csi-resizer:v1.2.0
+          image: k8s.gcr.io/sig-storage/csi-resizer:v1.3.0
           args:
             - -v=5
             - -csi-address=/csi/csi.sock
@@ -368,7 +352,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshotter
-          image: k8s.gcr.io/sig-storage/csi-snapshotter:v4.1.1
+          image: k8s.gcr.io/sig-storage/csi-snapshotter:v4.2.1
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
