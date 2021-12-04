@@ -53,10 +53,10 @@ type Interface interface {
 	MountSensitiveWithoutSystemdWithMountFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error
 	// Unmount unmounts given target.
 	Unmount(target string) error
-	// List returns a list of all mounted filesystems.  This can be large.
-	// On some platforms, reading mounts directly from the OS is not guaranteed
-	// consistent (i.e. it could change between chunked reads). This is guaranteed
-	// to be consistent.
+	// List returns a list of all mounted filesystems. This can be large.
+	//
+	// Note that Linux kernels < 5.8 had a bug resulting in occasional
+	// incomplete list of mounts. This method tries to workaround this bug.
 	List() ([]MountPoint, error)
 	// IsLikelyNotMountPoint uses heuristics to determine if a directory
 	// is not a mountpoint.

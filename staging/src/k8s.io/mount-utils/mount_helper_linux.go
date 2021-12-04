@@ -83,7 +83,15 @@ type MountInfo struct { // nolint: golint
 
 // ParseMountInfo parses /proc/xxx/mountinfo.
 func ParseMountInfo(filename string) ([]MountInfo, error) {
-	content, err := utilio.ConsistentRead(filename, maxListTries)
+	var (
+		content []byte
+		err     error
+	)
+	if kernelHasMountinfoBug() {
+		content, err = utilio.ConsistentRead(filename, maxListTries)
+	} else {
+		content, err = os.ReadFile(filename)
+	}
 	if err != nil {
 		return []MountInfo{}, err
 	}

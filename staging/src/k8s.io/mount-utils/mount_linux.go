@@ -20,6 +20,7 @@ limitations under the License.
 package mount
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -27,9 +28,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	utilio "k8s.io/utils/io"
@@ -541,7 +544,15 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 
 // ListProcMounts is shared with NsEnterMounter
 func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
-	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
+	var (
+		content []byte
+		err     error
+	)
+	if kernelHasMountinfoBug() {
+		content, err = utilio.ConsistentRead(mountFilePath, maxListTries)
+	} else {
+		content, err = os.ReadFile(mountFilePath)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -666,4 +677,42 @@ func forceUmount(path string) error {
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
 	}
 	return nil
+}
+
+var (
+	miBug     bool
+	miBugOnce sync.Once
+)
+
+// kernelHasMountinfoBug checks if the kernel bug that can lead to incomplete
+// mountinfo being read is fixed. It does so by checking the kernel version.
+//
+// The bug was fixed by kernel commit 9f6c61f96f2d97, which is in Linux 5.8.
+// Alas, there is no better way to check if the bug is fixed other than to
+// rely on the kernel version returned by uname.
+func kernelHasMountinfoBug() bool {
+	miBugOnce.Do(func() {
+		// Assume old kernel.
+		miBug = true
+
+		uname := unix.Utsname{}
+		err := unix.Uname(&uname)
+		if err != nil {
+			return
+		}
+
+		end := bytes.IndexByte(uname.Release[:], 0)
+		v := bytes.SplitN(uname.Release[:end], []byte{'.'}, 3)
+		if len(v) != 3 {
+			return
+		}
+		major, _ := strconv.Atoi(string(v[0]))
+		minor, _ := strconv.Atoi(string(v[1]))
+
+		if major > 5 || (major == 5 && minor >= 8) {
+			miBug = false
+		}
+	})
+
+	return miBug
 }
