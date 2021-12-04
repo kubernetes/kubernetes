@@ -664,10 +664,10 @@ func createPDWithRetry(zone string) (string, error) {
 	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
 		newDiskName, err = createPD(zone)
 		if err != nil {
-			framework.Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
+			framework.Logf("Couldn't create a new PD in zone %q, sleeping 5 seconds: %v", zone, err)
 			continue
 		}
-		framework.Logf("Successfully created a new PD: %q.", newDiskName)
+		framework.Logf("Successfully created a new PD in zone %q: %q.", zone, newDiskName)
 		return newDiskName, nil
 	}
 	return "", err
