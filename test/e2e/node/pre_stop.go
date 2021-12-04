@@ -189,22 +189,28 @@ var _ = SIGDescribe("PreStop", func() {
 
 		// wait for less than the gracePeriod termination ensuring the
 		// preStop hook is still executing.
-		time.Sleep(15 * time.Second)
+		time.Sleep(10 * time.Second)
 
 		ginkgo.By("verifying the pod is running while in the graceful period termination")
 		result := &v1.PodList{}
-		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
+		err = wait.Poll(time.Second*3, time.Second*18, func() (bool, error) {
 			client, err := e2ekubelet.ProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
-			framework.ExpectNoError(err, "failed to get the pods of the node")
+			if err != nil {
+				framework.ExpectNoError(err, "failed to get the pods of the node")
+				return false, err
+			}
 			err = client.Into(result)
-			framework.ExpectNoError(err, "failed to parse the pods of the node")
+			if err != nil {
+				framework.ExpectNoError(err, "failed to parse the pods of the node")
+				return false, err
+			}
 
 			for _, kubeletPod := range result.Items {
 				if pod.Name != kubeletPod.Name {
 					continue
 				} else if kubeletPod.Status.Phase == v1.PodRunning {
 					framework.Logf("pod is running")
-					return true, err
+					return true, nil
 				}
 			}
 			return false, err
