@@ -184,6 +184,7 @@ var _ = SIGDescribe("PreStop", func() {
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
+		start := time.Now()
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
 		framework.ExpectNoError(err, "failed to delete pod")
 
@@ -193,7 +194,10 @@ var _ = SIGDescribe("PreStop", func() {
 
 		ginkgo.By("verifying the pod is running while in the graceful period termination")
 		result := &v1.PodList{}
+		var pollIteration int = 0
+
 		err = wait.Poll(time.Second*3, time.Second*18, func() (bool, error) {
+			pollIteration++
 			client, err := e2ekubelet.ProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
 			if err != nil {
 				framework.ExpectNoError(err, "failed to get the pods of the node")
@@ -211,6 +215,8 @@ var _ = SIGDescribe("PreStop", func() {
 				} else if kubeletPod.Status.Phase == v1.PodRunning {
 					framework.Logf("pod is running")
 					return true, nil
+				} else {
+					framework.Logf("Run #%d: pod state is %s. Time elapsed: %s", pollIteration, kubeletPod.Status.Phase, time.Since(start))
 				}
 			}
 			return false, err
