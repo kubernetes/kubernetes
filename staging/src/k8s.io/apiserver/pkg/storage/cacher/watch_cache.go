@@ -636,3 +636,9 @@ func (w *watchCache) Resync() error {
 	// Nothing to do
 	return nil
 }
+
+// isIndexValidLocked checks if a given index is still valid.
+// This assumes that the lock is held.
+func (w *watchCache) isIndexValidLocked(index int) bool {
+	return index >= w.startIndex
+}
