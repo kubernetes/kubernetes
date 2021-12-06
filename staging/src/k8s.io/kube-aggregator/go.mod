@@ -6,7 +6,7 @@ go 1.16
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/emicklei/go-restful/v3 v3.7.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5

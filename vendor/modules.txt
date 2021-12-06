@@ -270,9 +270,12 @@ github.com/dustin/go-humanize
 ## explicit
 github.com/elazarl/goproxy
 # github.com/emicklei/go-restful v2.9.5+incompatible => github.com/emicklei/go-restful v2.9.5+incompatible
-## explicit
 github.com/emicklei/go-restful
 github.com/emicklei/go-restful/log
+# github.com/emicklei/go-restful/v3 v3.7.3 => github.com/emicklei/go-restful/v3 v3.7.3
+## explicit
+github.com/emicklei/go-restful/v3
+github.com/emicklei/go-restful/v3/log
 # github.com/euank/go-kmsg-parser v2.0.0+incompatible => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 github.com/euank/go-kmsg-parser/kmsgparser
 # github.com/evanphx/json-patch v4.12.0+incompatible => github.com/evanphx/json-patch v4.12.0+incompatible
@@ -2547,6 +2550,7 @@ sigs.k8s.io/yaml
 # github.com/dustin/go-humanize => github.com/dustin/go-humanize v1.0.0
 # github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 # github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.9.5+incompatible
+# github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.7.3
 # github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0
 # github.com/envoyproxy/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v0.1.0
 # github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible

@@ -27,7 +27,7 @@ import (
 	"net/url"
 	"testing"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 	"github.com/google/go-cmp/cmp"
 	jose "gopkg.in/square/go-jose.v2"
 

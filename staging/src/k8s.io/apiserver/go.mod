@@ -9,7 +9,8 @@ require (
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/davecgh/go-spew v1.1.1
-	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/emicklei/go-restful/v3 v3.7.3
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-openapi/jsonreference v0.19.5 // indirect

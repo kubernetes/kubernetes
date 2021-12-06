@@ -5,7 +5,7 @@ module k8s.io/apiextensions-apiserver
 go 1.16
 
 require (
-	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/emicklei/go-restful/v3 v3.7.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.9.0
 	github.com/google/go-cmp v0.5.5

@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"

@@ -36,7 +36,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
-	github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/emicklei/go-restful/v3 v3.7.3
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
@@ -229,6 +229,7 @@ replace (
 	github.com/dustin/go-humanize => github.com/dustin/go-humanize v1.0.0
 	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153 // 947c36da3153 is the SHA for git tag v1.11
 	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.9.5+incompatible
+	github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.7.3
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0
 	github.com/envoyproxy/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v0.1.0
 	github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
