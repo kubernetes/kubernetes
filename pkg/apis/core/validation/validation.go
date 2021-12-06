@@ -3398,8 +3398,6 @@ type PodValidationOptions struct {
 	AllowExpandedDNSConfig bool
 	// Allow OSField to be set in the pod spec
 	AllowOSField bool
-	// Allow sysctl name to contain a slash
-	AllowSysctlRegexContainSlash bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4058,9 +4056,6 @@ const (
 	// a sysctl segment regex, concatenated with dots to form a sysctl name
 	SysctlSegmentFmt string = "[a-z0-9]([-_a-z0-9]*[a-z0-9])?"
 
-	// a sysctl name regex
-	SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
-
 	// a sysctl name regex with slash allowed
 	SysctlContainSlashFmt string = "(" + SysctlSegmentFmt + "[\\./])*" + SysctlSegmentFmt
 
@@ -4068,41 +4063,28 @@ const (
 	SysctlMaxLength int = 253
 )
 
-var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
-
 var sysctlContainSlashRegexp = regexp.MustCompile("^" + SysctlContainSlashFmt + "$")
 
 // IsValidSysctlName checks that the given string is a valid sysctl name,
-// i.e. matches SysctlFmt (or SysctlContainSlashFmt if canContainSlash is true).
+// i.e. matches SysctlContainSlashFmt.
 // More info:
 //   https://man7.org/linux/man-pages/man8/sysctl.8.html
 //   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
-func IsValidSysctlName(name string, canContainSlash bool) bool {
+func IsValidSysctlName(name string) bool {
 	if len(name) > SysctlMaxLength {
 		return false
 	}
-	if canContainSlash {
-		return sysctlContainSlashRegexp.MatchString(name)
-	}
-	return sysctlRegexp.MatchString(name)
+	return sysctlContainSlashRegexp.MatchString(name)
 }
 
-func getSysctlFmt(canContainSlash bool) string {
-	if canContainSlash {
-		// use relaxed validation everywhere in 1.24
-		return SysctlContainSlashFmt
-	}
-	// Will be removed in 1.24
-	return SysctlFmt
-}
-func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path, allowSysctlRegexContainSlash bool) field.ErrorList {
+func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	names := make(map[string]struct{})
 	for i, s := range sysctls {
 		if len(s.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("name"), ""))
-		} else if !IsValidSysctlName(s.Name, allowSysctlRegexContainSlash) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, fmt.Sprintf("must have at most %d characters and match regex %s", SysctlMaxLength, getSysctlFmt(allowSysctlRegexContainSlash))))
+		} else if !IsValidSysctlName(s.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, fmt.Sprintf("must have at most %d characters and match regex %s", SysctlMaxLength, sysctlContainSlashRegexp)))
 		} else if _, ok := names[s.Name]; ok {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("name"), s.Name))
 		}
@@ -4142,7 +4124,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 		}
 
 		if len(securityContext.Sysctls) != 0 {
-			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"), opts.AllowSysctlRegexContainSlash)...)
+			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
 		}
 
 		if securityContext.FSGroupChangePolicy != nil {

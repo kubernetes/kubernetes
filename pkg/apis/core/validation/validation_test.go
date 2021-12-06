@@ -18261,6 +18261,8 @@ func TestIsValidSysctlName(t *testing.T) {
 		"a-b",
 		"abc",
 		"abc.def",
+		"a/b/c/d",
+		"a/b.c",
 	}
 	invalid := []string{
 		"",
@@ -18285,6 +18287,10 @@ func TestIsValidSysctlName(t *testing.T) {
 		"a.abc*",
 		"a.b.*",
 		"Abc",
+		"/",
+		"/a",
+		"a/abc*",
+		"a/b/*",
 		func(n int) string {
 			x := make([]byte, n)
 			for i := range x {
@@ -18294,34 +18300,13 @@ func TestIsValidSysctlName(t *testing.T) {
 		}(256),
 	}
 
-	containSlashesValid := []string{
-		"a/b/c/d",
-		"a/b.c",
-	}
-
-	containSlashesInvalid := []string{
-		"/",
-		"/a",
-		"a/abc*",
-		"a/b/*",
-	}
 	for _, s := range valid {
-		if !IsValidSysctlName(s, false) {
+		if !IsValidSysctlName(s) {
 			t.Errorf("%q expected to be a valid sysctl name", s)
 		}
 	}
 	for _, s := range invalid {
-		if IsValidSysctlName(s, false) {
-			t.Errorf("%q expected to be an invalid sysctl name", s)
-		}
-	}
-	for _, s := range containSlashesValid {
-		if !IsValidSysctlName(s, true) {
-			t.Errorf("%q expected to be a valid sysctl name", s)
-		}
-	}
-	for _, s := range containSlashesInvalid {
-		if IsValidSysctlName(s, true) {
+		if IsValidSysctlName(s) {
 			t.Errorf("%q expected to be an invalid sysctl name", s)
 		}
 	}
@@ -18331,6 +18316,8 @@ func TestValidateSysctls(t *testing.T) {
 	valid := []string{
 		"net.foo.bar",
 		"kernel.shmmax",
+		"net.ipv4.conf.enp3s0/200.forwarding",
+		"net/ipv4/conf/enp3s0.200/forwarding",
 	}
 	invalid := []string{
 		"i..nvalid",
@@ -18342,16 +18329,11 @@ func TestValidateSysctls(t *testing.T) {
 		"kernel.shmmax",
 	}
 
-	containSlashes := []string{
-		"net.ipv4.conf.enp3s0/200.forwarding",
-		"net/ipv4/conf/enp3s0.200/forwarding",
-	}
-
 	sysctls := make([]core.Sysctl, len(valid))
 	for i, sysctl := range valid {
 		sysctls[i].Name = sysctl
 	}
-	errs := validateSysctls(sysctls, field.NewPath("foo"), false)
+	errs := validateSysctls(sysctls, field.NewPath("foo"))
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -18360,7 +18342,7 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range invalid {
 		sysctls[i].Name = sysctl
 	}
-	errs = validateSysctls(sysctls, field.NewPath("foo"), false)
+	errs = validateSysctls(sysctls, field.NewPath("foo"))
 	if len(errs) != 2 {
 		t.Errorf("expected 2 validation errors. Got: %v", errs)
 	} else {
@@ -18376,20 +18358,11 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range duplicates {
 		sysctls[i].Name = sysctl
 	}
-	errs = validateSysctls(sysctls, field.NewPath("foo"), false)
+	errs = validateSysctls(sysctls, field.NewPath("foo"))
 	if len(errs) != 1 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
-	}
-
-	sysctls = make([]core.Sysctl, len(containSlashes))
-	for i, sysctl := range containSlashes {
-		sysctls[i].Name = sysctl
-	}
-	errs = validateSysctls(sysctls, field.NewPath("foo"), true)
-	if len(errs) != 0 {
-		t.Errorf("unexpected validation errors: %v", errs)
 	}
 }
 
