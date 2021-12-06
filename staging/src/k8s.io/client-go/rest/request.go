@@ -365,10 +365,10 @@ func (r *Request) SpecificallyVersionedParams(obj runtime.Object, codec runtime.
 		r.err = err
 		return r
 	}
+	if r.params == nil {
+		r.params = make(url.Values)
+	}
 	for k, v := range params {
-		if r.params == nil {
-			r.params = make(url.Values)
-		}
 		r.params[k] = append(r.params[k], v...)
 	}
 	return r
