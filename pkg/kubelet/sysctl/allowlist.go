@@ -48,7 +48,7 @@ func NewAllowlist(patterns []string) (*patternAllowlist, error) {
 	}
 
 	for _, s := range patterns {
-		if !policyvalidation.IsValidSysctlPattern(s, true) {
+		if !policyvalidation.IsValidSysctlPattern(s) {
 			return nil, fmt.Errorf("sysctl %q must have at most %d characters and match regex %s",
 				s,
 				validation.SysctlMaxLength,
