@@ -157,7 +157,8 @@ func TestSyncClusterRole(t *testing.T) {
 			},
 			clusterRoleToSync:        "combined",
 			expectedClusterRoleApply: nil,
-		}}
+		},
+	}
 
 	for _, serverSideApplyEnabled := range []bool{true, false} {
 		for _, test := range tests {

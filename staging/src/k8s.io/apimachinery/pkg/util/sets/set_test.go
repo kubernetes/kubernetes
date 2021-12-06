@@ -79,7 +79,6 @@ func TestStringSetDeleteMultiples(t *testing.T) {
 	if !s.Has("b") {
 		t.Errorf("Missing contents: %#v", s)
 	}
-
 }
 
 func TestNewStringSet(t *testing.T) {

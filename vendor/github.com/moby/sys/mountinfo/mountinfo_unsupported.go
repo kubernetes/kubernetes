@@ -1,3 +1,4 @@
+//go:build (!windows && !linux && !freebsd && !openbsd) || (freebsd && !cgo) || (openbsd && !cgo)
 // +build !windows,!linux,!freebsd,!openbsd freebsd,!cgo openbsd,!cgo
 
 package mountinfo

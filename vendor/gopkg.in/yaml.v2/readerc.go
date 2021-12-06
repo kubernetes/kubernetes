@@ -95,7 +95,7 @@ func yaml_parser_update_buffer(parser *yaml_parser_t, length int) bool {
 
 	// [Go] This function was changed to guarantee the requested length size at EOF.
 	// The fact we need to do this is pretty awful, but the description above implies
-	// for that to be the case, and there are tests 
+	// for that to be the case, and there are tests
 
 	// If the EOF flag is set and the raw buffer is empty, do nothing.
 	if parser.eof && parser.raw_buffer_pos == len(parser.raw_buffer) {
@@ -104,7 +104,7 @@ func yaml_parser_update_buffer(parser *yaml_parser_t, length int) bool {
 		// given length in the buffer. Not doing that means every single
 		// check that calls this function to make sure the buffer has a
 		// given length is Go) panicking; or C) accessing invalid memory.
-		//return true
+		// return true
 	}
 
 	// Return if the buffer contains enough characters.

@@ -39,25 +39,23 @@ const (
 	noSNATTestName = "no-snat-test"
 )
 
-var (
-	testPod = v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: noSNATTestName,
-			Labels: map[string]string{
-				noSNATTestName: "",
+var testPod = v1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		GenerateName: noSNATTestName,
+		Labels: map[string]string{
+			noSNATTestName: "",
+		},
+	},
+	Spec: v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name:  noSNATTestName,
+				Image: imageutils.GetE2EImage(imageutils.Agnhost),
+				Args:  []string{"netexec", "--http-port", testPodPort},
 			},
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  noSNATTestName,
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", "--http-port", testPodPort},
-				},
-			},
-		},
-	}
-)
+	},
+}
 
 // This test verifies that a Pod on each node in a cluster can talk to Pods on every other node without SNAT.
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.

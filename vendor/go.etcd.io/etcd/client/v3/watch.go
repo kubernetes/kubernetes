@@ -214,8 +214,7 @@ type watchRequest struct {
 }
 
 // progressRequest is issued by the subscriber to request watch progress
-type progressRequest struct {
-}
+type progressRequest struct{}
 
 // watcherStream represents a registered watcher
 type watcherStream struct {
@@ -723,7 +722,6 @@ func (w *watchGrpcStream) dispatchEvent(pbresp *pb.WatchResponse) bool {
 	}
 
 	return w.unicastResponse(wr, pbresp.WatchId)
-
 }
 
 // broadcastResponse send a watch response to all watch substreams.

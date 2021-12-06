@@ -269,5 +269,4 @@ func TestMatchImageIDOnly(t *testing.T) {
 		match := matchImageIDOnly(testCase.Inspected, testCase.Image)
 		assert.Equal(t, testCase.Output, match, fmt.Sprintf("%s is not a match (%d)", testCase.Image, i))
 	}
-
 }

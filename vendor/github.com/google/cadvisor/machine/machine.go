@@ -53,8 +53,10 @@ var (
 	maxFreqFile        = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
 )
 
-const memTypeFileName = "dimm_mem_type"
-const sizeFileName = "size"
+const (
+	memTypeFileName = "dimm_mem_type"
+	sizeFileName    = "size"
+)
 
 // GetCPUVendorID returns "vendor_id" reading /proc/cpuinfo file.
 func GetCPUVendorID(procInfo []byte) string {

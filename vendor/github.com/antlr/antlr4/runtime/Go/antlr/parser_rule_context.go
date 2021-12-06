@@ -11,21 +11,15 @@ import (
 
 type ParserRuleContext interface {
 	RuleContext
-
 	SetException(RecognitionException)
-
 	AddTokenNode(token Token) *TerminalNodeImpl
 	AddErrorNode(badToken Token) *ErrorNodeImpl
-
 	EnterRule(listener ParseTreeListener)
 	ExitRule(listener ParseTreeListener)
-
 	SetStart(Token)
 	GetStart() Token
-
 	SetStop(Token)
 	GetStop() Token
-
 	AddChild(child RuleContext) RuleContext
 	RemoveLastChild()
 }
@@ -131,12 +125,10 @@ func (prc *BaseParserRuleContext) RemoveLastChild() {
 }
 
 func (prc *BaseParserRuleContext) AddTokenNode(token Token) *TerminalNodeImpl {
-
 	node := NewTerminalNodeImpl(token)
 	prc.addTerminalNodeChild(node)
 	node.parentCtx = prc
 	return node
-
 }
 
 func (prc *BaseParserRuleContext) AddErrorNode(badToken Token) *ErrorNodeImpl {
@@ -202,7 +194,6 @@ func (prc *BaseParserRuleContext) GetStop() Token {
 }
 
 func (prc *BaseParserRuleContext) GetToken(ttype int, i int) TerminalNode {
-
 	for j := 0; j < len(prc.children); j++ {
 		child := prc.children[j]
 		if c2, ok := child.(TerminalNode); ok {
@@ -301,14 +292,13 @@ func (prc *BaseParserRuleContext) GetSourceInterval() *Interval {
 	return NewInterval(prc.start.GetTokenIndex(), prc.stop.GetTokenIndex())
 }
 
-//need to manage circular dependencies, so export now
+// need to manage circular dependencies, so export now
 
 // Print out a whole tree, not just a node, in LISP format
 // (root child1 .. childN). Print just a node if b is a leaf.
 //
 
 func (prc *BaseParserRuleContext) String(ruleNames []string, stop RuleContext) string {
-
 	var p ParserRuleContext = prc
 	s := "["
 	for p != nil && p != stop {
@@ -351,7 +341,6 @@ type BaseInterpreterRuleContext struct {
 }
 
 func NewBaseInterpreterRuleContext(parent BaseInterpreterRuleContext, invokingStateNumber, ruleIndex int) *BaseInterpreterRuleContext {
-
 	prc := new(BaseInterpreterRuleContext)
 
 	prc.BaseParserRuleContext = NewBaseParserRuleContext(parent, invokingStateNumber)

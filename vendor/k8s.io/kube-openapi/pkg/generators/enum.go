@@ -26,8 +26,10 @@ import (
 	"k8s.io/gengo/types"
 )
 
-const tagEnumType = "enum"
-const enumTypeDescriptionHeader = "Possible enum values:"
+const (
+	tagEnumType               = "enum"
+	enumTypeDescriptionHeader = "Possible enum values:"
+)
 
 type enumValue struct {
 	Name    string

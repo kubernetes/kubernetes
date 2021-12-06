@@ -93,7 +93,6 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 }
 
 var _ = utils.SIGDescribe("PersistentVolumes", func() {
-
 	// global vars for the ginkgo.Context()s and ginkgo.It()'s below
 	f := framework.NewDefaultFramework("pv")
 	var (
@@ -119,7 +118,6 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
 	ginkgo.Describe("NFS", func() {
-
 		var (
 			nfsServerPod *v1.Pod
 			serverHost   string
@@ -209,7 +207,6 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		//   a) pre-binding, b) create pvcs before pvs, c) create pvcs and pods
 		//   in different namespaces.
 		ginkgo.Context("with multiple PVs and PVCs all in same ns", func() {
-
 			// scope the pv and pvc maps to be available in the AfterEach
 			// note: these maps are created fresh in CreatePVsPVCs()
 			var pvols e2epv.PVMap
@@ -322,7 +319,6 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 	// default StorageClass
 	ginkgo.Describe("Default StorageClass [LinuxOnly]", func() {
 		ginkgo.Context("pods that use multiple volumes", func() {
-
 			ginkgo.AfterEach(func() {
 				e2estatefulset.DeleteAllStatefulSets(c, ns)
 			})

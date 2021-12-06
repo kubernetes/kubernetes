@@ -21,7 +21,7 @@ import (
 )
 
 type singleNumaNodePolicy struct {
-	//List of NUMA Nodes available on the underlying machine
+	// List of NUMA Nodes available on the underlying machine
 	numaNodes []int
 }
 

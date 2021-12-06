@@ -211,7 +211,6 @@ func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (*network.Transpor
 	default:
 		return &transportProto, &securityProto, &probeProto, fmt.Errorf("only TCP and UDP are supported for Azure LoadBalancers")
 	}
-
 }
 
 // This returns the full identifier of the primary NIC for the given VM.
@@ -430,7 +429,7 @@ outer:
 
 var polyTable = crc32.MakeTable(crc32.Koopman)
 
-//MakeCRC32 : convert string to CRC32 format
+// MakeCRC32 : convert string to CRC32 format
 func MakeCRC32(str string) string {
 	crc := crc32.New(polyTable)
 	crc.Write([]byte(str))

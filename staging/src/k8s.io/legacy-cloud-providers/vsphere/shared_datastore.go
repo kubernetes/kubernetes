@@ -206,5 +206,4 @@ func (shared *sharedDatastore) getAttachedHosts(ctx context.Context, datastore *
 		hosts = append(hosts, hostInfo{hostUUID: h.Summary.Hardware.Uuid, hostMOID: h.Summary.Host.String()})
 	}
 	return hosts, nil
-
 }

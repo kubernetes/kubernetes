@@ -166,9 +166,11 @@ var _ kmsgparser.Logger = glogAdapter{}
 func (glogAdapter) Infof(format string, args ...interface{}) {
 	klog.V(4).Infof(format, args...)
 }
+
 func (glogAdapter) Warningf(format string, args ...interface{}) {
 	klog.V(2).Infof(format, args...)
 }
+
 func (glogAdapter) Errorf(format string, args ...interface{}) {
 	klog.Warningf(format, args...)
 }

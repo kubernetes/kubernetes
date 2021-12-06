@@ -39,7 +39,7 @@ func main() {
 	}
 
 	dir := filepath.Dir(os.Args[2])
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		log.Fatalf("unable to create directory [%s]: %q", dir, err)
 	}
 	df, err := os.Create(os.Args[2])

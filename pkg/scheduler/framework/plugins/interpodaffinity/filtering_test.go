@@ -34,9 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
-var (
-	defaultNamespace = ""
-)
+var defaultNamespace = ""
 
 func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]string, affinity, antiAffinity []v1.PodAffinityTerm) *v1.Pod {
 	return &v1.Pod{
@@ -56,7 +54,6 @@ func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]st
 			},
 		},
 	}
-
 }
 
 func TestRequiredAffinitySingleNode(t *testing.T) {
@@ -1897,15 +1894,15 @@ func TestPreFilterDisabled(t *testing.T) {
 }
 
 func TestPreFilterStateAddRemovePod(t *testing.T) {
-	var label1 = map[string]string{
+	label1 := map[string]string{
 		"region": "r1",
 		"zone":   "z11",
 	}
-	var label2 = map[string]string{
+	label2 := map[string]string{
 		"region": "r1",
 		"zone":   "z12",
 	}
-	var label3 = map[string]string{
+	label3 := map[string]string{
 		"region": "r2",
 		"zone":   "z21",
 	}
@@ -1998,11 +1995,13 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec:       v1.PodSpec{NodeName: "nodeA"},
 				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-					Spec: v1.PodSpec{NodeName: "nodeC"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec:       v1.PodSpec{NodeName: "nodeC"},
 				},
 			},
 			addedPod: &v1.Pod{
@@ -2028,10 +2027,12 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec:       v1.PodSpec{NodeName: "nodeA"},
 				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p2"},
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
 						Affinity: &v1.Affinity{
@@ -2070,10 +2071,12 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec:       v1.PodSpec{NodeName: "nodeA"},
 				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p2"},
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
 						Affinity: &v1.Affinity{
@@ -2114,10 +2117,12 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec:       v1.PodSpec{NodeName: "nodeA"},
 				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "p2"},
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
 						Affinity: &v1.Affinity{

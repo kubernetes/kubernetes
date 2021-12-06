@@ -74,5 +74,4 @@ func Convert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s conver
 	out.CreationTimestamp = metav1.NewTime(in.StageTimestamp.Time)
 	out.Timestamp = metav1.NewTime(in.RequestReceivedTimestamp.Time)
 	return nil
-
 }

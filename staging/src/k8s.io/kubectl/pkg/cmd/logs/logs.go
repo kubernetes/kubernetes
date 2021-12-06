@@ -359,7 +359,6 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 
 				fmt.Fprintf(writer, "error: %v\n", err)
 			}
-
 		}(objRef, request)
 	}
 

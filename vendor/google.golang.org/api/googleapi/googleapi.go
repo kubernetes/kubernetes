@@ -327,7 +327,6 @@ func CloseBody(res *http.Response) {
 		}
 	}
 	res.Body.Close()
-
 }
 
 // VariantType returns the type name of the given variant.

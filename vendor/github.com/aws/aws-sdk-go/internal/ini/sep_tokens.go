@@ -4,9 +4,7 @@ import (
 	"fmt"
 )
 
-var (
-	emptyRunes = []rune{}
-)
+var emptyRunes = []rune{}
 
 func isSep(b []rune) bool {
 	if len(b) == 0 {

@@ -30,38 +30,36 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 )
 
-var (
-	kubeconfigFilePhaseProperties = map[string]struct {
-		name  string
-		short string
-		long  string
-	}{
-		kubeadmconstants.AdminKubeConfigFileName: {
-			name:  "admin",
-			short: "Generate a kubeconfig file for the admin to use and for kubeadm itself",
-			long:  "Generate the kubeconfig file for the admin and for kubeadm itself, and save it to %s file.",
-		},
-		kubeadmconstants.KubeletKubeConfigFileName: {
-			name:  "kubelet",
-			short: "Generate a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
-			long: cmdutil.LongDesc(`
+var kubeconfigFilePhaseProperties = map[string]struct {
+	name  string
+	short string
+	long  string
+}{
+	kubeadmconstants.AdminKubeConfigFileName: {
+		name:  "admin",
+		short: "Generate a kubeconfig file for the admin to use and for kubeadm itself",
+		long:  "Generate the kubeconfig file for the admin and for kubeadm itself, and save it to %s file.",
+	},
+	kubeadmconstants.KubeletKubeConfigFileName: {
+		name:  "kubelet",
+		short: "Generate a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
+		long: cmdutil.LongDesc(`
 					Generate the kubeconfig file for the kubelet to use and save it to %s file.
 
 					Please note that this should *only* be used for cluster bootstrapping purposes. After your control plane is up,
 					you should request all kubelet credentials from the CSR API.`),
-		},
-		kubeadmconstants.ControllerManagerKubeConfigFileName: {
-			name:  "controller-manager",
-			short: "Generate a kubeconfig file for the controller manager to use",
-			long:  "Generate the kubeconfig file for the controller manager to use and save it to %s file",
-		},
-		kubeadmconstants.SchedulerKubeConfigFileName: {
-			name:  "scheduler",
-			short: "Generate a kubeconfig file for the scheduler to use",
-			long:  "Generate the kubeconfig file for the scheduler to use and save it to %s file.",
-		},
-	}
-)
+	},
+	kubeadmconstants.ControllerManagerKubeConfigFileName: {
+		name:  "controller-manager",
+		short: "Generate a kubeconfig file for the controller manager to use",
+		long:  "Generate the kubeconfig file for the controller manager to use and save it to %s file",
+	},
+	kubeadmconstants.SchedulerKubeConfigFileName: {
+		name:  "scheduler",
+		short: "Generate a kubeconfig file for the scheduler to use",
+		long:  "Generate the kubeconfig file for the scheduler to use and save it to %s file.",
+	},
+}
 
 // NewKubeConfigPhase creates a kubeadm workflow phase that creates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.
 func NewKubeConfigPhase() workflow.Phase {

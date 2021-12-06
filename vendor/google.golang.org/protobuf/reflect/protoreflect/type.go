@@ -107,7 +107,6 @@ type Descriptor interface {
 	// This method returns a typed nil-pointer if no options are present.
 	// The caller must import the descriptorpb package to use this.
 	Options() ProtoMessage
-
 	doNotImplement
 }
 
@@ -138,7 +137,6 @@ type FileDescriptor interface {
 
 	// SourceLocations is a list of source locations.
 	SourceLocations() SourceLocations
-
 	isFileDescriptor
 }
 type isFileDescriptor interface{ ProtoType(FileDescriptor) }
@@ -149,7 +147,6 @@ type FileImports interface {
 	Len() int
 	// Get returns the ith FileImport. It panics if out of bounds.
 	Get(i int) FileImport
-
 	doNotImplement
 }
 
@@ -226,7 +223,6 @@ type MessageDescriptor interface {
 	Messages() MessageDescriptors
 	// Extensions is a list of nested extension declarations.
 	Extensions() ExtensionDescriptors
-
 	isMessageDescriptor
 }
 type isMessageDescriptor interface{ ProtoType(MessageDescriptor) }
@@ -278,7 +274,6 @@ type MessageDescriptors interface {
 	// ByName returns the MessageDescriptor for a message named s.
 	// It returns nil if not found.
 	ByName(s Name) MessageDescriptor
-
 	doNotImplement
 }
 
@@ -385,7 +380,6 @@ type FieldDescriptor interface {
 	// Message is the message descriptor if Kind is
 	// MessageKind or GroupKind. It returns nil for any other Kind.
 	Message() MessageDescriptor
-
 	isFieldDescriptor
 }
 type isFieldDescriptor interface{ ProtoType(FieldDescriptor) }
@@ -408,7 +402,6 @@ type FieldDescriptors interface {
 	// ByNumber returns the FieldDescriptor for a field numbered n.
 	// It returns nil if not found.
 	ByNumber(n FieldNumber) FieldDescriptor
-
 	doNotImplement
 }
 
@@ -424,7 +417,6 @@ type OneofDescriptor interface {
 
 	// Fields is a list of fields belonging to this oneof.
 	Fields() FieldDescriptors
-
 	isOneofDescriptor
 }
 type isOneofDescriptor interface{ ProtoType(OneofDescriptor) }
@@ -438,7 +430,6 @@ type OneofDescriptors interface {
 	// ByName returns the OneofDescriptor for a oneof named s.
 	// It returns nil if not found.
 	ByName(s Name) OneofDescriptor
-
 	doNotImplement
 }
 
@@ -466,7 +457,6 @@ type ExtensionDescriptors interface {
 	// ByName returns the ExtensionDescriptor for a field named s.
 	// It returns nil if not found.
 	ByName(s Name) ExtensionDescriptor
-
 	doNotImplement
 }
 
@@ -542,7 +532,6 @@ type EnumDescriptor interface {
 	ReservedNames() Names
 	// ReservedRanges is a list of reserved ranges of enum numbers.
 	ReservedRanges() EnumRanges
-
 	isEnumDescriptor
 }
 type isEnumDescriptor interface{ ProtoType(EnumDescriptor) }
@@ -567,7 +556,6 @@ type EnumDescriptors interface {
 	// ByName returns the EnumDescriptor for an enum named s.
 	// It returns nil if not found.
 	ByName(s Name) EnumDescriptor
-
 	doNotImplement
 }
 
@@ -584,7 +572,6 @@ type EnumValueDescriptor interface {
 
 	// Number returns the enum value as an integer.
 	Number() EnumNumber
-
 	isEnumValueDescriptor
 }
 type isEnumValueDescriptor interface{ ProtoType(EnumValueDescriptor) }
@@ -602,7 +589,6 @@ type EnumValueDescriptors interface {
 	// If multiple have the same number, the first one defined is returned
 	// It returns nil if not found.
 	ByNumber(n EnumNumber) EnumValueDescriptor
-
 	doNotImplement
 }
 
@@ -615,7 +601,6 @@ type ServiceDescriptor interface {
 
 	// Methods is a list of nested message declarations.
 	Methods() MethodDescriptors
-
 	isServiceDescriptor
 }
 type isServiceDescriptor interface{ ProtoType(ServiceDescriptor) }
@@ -629,7 +614,6 @@ type ServiceDescriptors interface {
 	// ByName returns the ServiceDescriptor for a service named s.
 	// It returns nil if not found.
 	ByName(s Name) ServiceDescriptor
-
 	doNotImplement
 }
 
@@ -646,7 +630,6 @@ type MethodDescriptor interface {
 	IsStreamingClient() bool
 	// IsStreamingServer reports whether the server streams multiple messages.
 	IsStreamingServer() bool
-
 	isMethodDescriptor
 }
 type isMethodDescriptor interface{ ProtoType(MethodDescriptor) }
@@ -660,6 +643,5 @@ type MethodDescriptors interface {
 	// ByName returns the MethodDescriptor for a service method named s.
 	// It returns nil if not found.
 	ByName(s Name) MethodDescriptor
-
 	doNotImplement
 }

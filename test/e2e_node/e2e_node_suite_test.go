@@ -28,7 +28,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-
 	"math/rand"
 	"os"
 	"os/exec"
@@ -128,7 +127,6 @@ func TestMain(m *testing.M) {
 const rootfs = "/rootfs"
 
 func TestE2eNode(t *testing.T) {
-
 	// Make sure we are not limited by sshd when it comes to open files
 	if err := rlimit.SetNumFiles(1000000); err != nil {
 		klog.Infof("failed to set rlimit on max file handles: %v", err)
@@ -175,7 +173,7 @@ func TestE2eNode(t *testing.T) {
 	reportDir := framework.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exist
-		if err := os.MkdirAll(reportDir, 0755); err != nil {
+		if err := os.MkdirAll(reportDir, 0o755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory

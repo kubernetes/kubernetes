@@ -1,5 +1,5 @@
-// +build windows
-// +build !go1.4
+//go:build windows && !go1.4
+// +build windows,!go1.4
 
 package mousetrap
 

@@ -26,9 +26,7 @@ type Tracer interface {
 	EndSpan(ctx context.Context, httpStatusCode int, err error)
 }
 
-var (
-	tracer Tracer
-)
+var tracer Tracer
 
 // Register will register the provided Tracer.  Pass nil to unregister a Tracer.
 func Register(t Tracer) {

@@ -40,13 +40,11 @@ type Db struct {
 	files []*FileDescription
 }
 
-var (
-	// DefaultDb used at evaluation time or unless overridden at check time.
-	DefaultDb = &Db{
-		revFileDescriptorMap: make(map[string]*FileDescription),
-		files:                []*FileDescription{},
-	}
-)
+// DefaultDb used at evaluation time or unless overridden at check time.
+var DefaultDb = &Db{
+	revFileDescriptorMap: make(map[string]*FileDescription),
+	files:                []*FileDescription{},
+}
 
 // NewDb creates a new `pb.Db` with an empty type name to file description map.
 func NewDb() *Db {

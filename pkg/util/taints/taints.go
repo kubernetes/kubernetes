@@ -179,7 +179,7 @@ func addTaints(oldTaints []v1.Taint, newTaints *[]v1.Taint) bool {
 
 // CheckIfTaintsAlreadyExists checks if the node already has taints that we want to add and returns a string with taint keys.
 func CheckIfTaintsAlreadyExists(oldTaints []v1.Taint, taints []v1.Taint) string {
-	var existingTaintList = make([]string, 0)
+	existingTaintList := make([]string, 0)
 	for _, taint := range taints {
 		for _, oldTaint := range oldTaints {
 			if taint.Key == oldTaint.Key && taint.Effect == oldTaint.Effect {

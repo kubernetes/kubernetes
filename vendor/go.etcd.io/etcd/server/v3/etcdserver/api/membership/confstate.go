@@ -24,9 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	confStateKey = []byte("confState")
-)
+var confStateKey = []byte("confState")
 
 // MustUnsafeSaveConfStateToBackend persists confState using given transaction (tx).
 // confState in backend is persisted since etcd v3.5.

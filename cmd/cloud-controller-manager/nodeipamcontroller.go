@@ -160,7 +160,6 @@ func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
 // for --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 respectively. If value not provided,
 // then it will return default IPv4 and IPv6 cidr mask sizes.
 func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, clusterCIDRs []*net.IPNet) ([]int, error) {
-
 	sortedSizes := func(maskSizeIPv4, maskSizeIPv6 int) []int {
 		nodeMaskCIDRs := make([]int, len(clusterCIDRs))
 

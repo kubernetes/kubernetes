@@ -188,5 +188,4 @@ func TestValidateKubeletFlags(t *testing.T) {
 			}
 		})
 	}
-
 }

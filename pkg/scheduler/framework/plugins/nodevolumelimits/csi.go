@@ -58,8 +58,10 @@ type CSILimits struct {
 	translator InTreeToCSITranslator
 }
 
-var _ framework.FilterPlugin = &CSILimits{}
-var _ framework.EnqueueExtensions = &CSILimits{}
+var (
+	_ framework.FilterPlugin      = &CSILimits{}
+	_ framework.EnqueueExtensions = &CSILimits{}
+)
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
 const CSIName = names.NodeVolumeLimits
@@ -170,7 +172,6 @@ func (pl *CSILimits) filterAttachableVolumes(
 		}
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-
 		if err != nil {
 			if newPod {
 				// The PVC is required to proceed with

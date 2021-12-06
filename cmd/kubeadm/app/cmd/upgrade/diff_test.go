@@ -180,5 +180,4 @@ func TestValidateManifests(t *testing.T) {
 			}
 		})
 	}
-
 }

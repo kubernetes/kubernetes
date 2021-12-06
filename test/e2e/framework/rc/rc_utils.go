@@ -35,7 +35,6 @@ import (
 // ByNameContainer returns a ReplicationController with specified name and container
 func ByNameContainer(name string, replicas int32, labels map[string]string, c v1.Container,
 	gracePeriod *int64) *v1.ReplicationController {
-
 	zeroGracePeriod := int64(0)
 
 	// Add "name": name to the labels, overwriting if it exists.

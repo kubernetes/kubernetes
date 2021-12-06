@@ -38,10 +38,8 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-var (
-	// routeUpdateInterval defines the route reconciling interval.
-	routeUpdateInterval = 30 * time.Second
-)
+// routeUpdateInterval defines the route reconciling interval.
+var routeUpdateInterval = 30 * time.Second
 
 // routeOperation defines the allowed operations for route updating.
 type routeOperation string
@@ -379,7 +377,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	}
 	if unmanaged {
 		if az.ipv6DualStackEnabled {
-			//TODO (khenidak) add support for unmanaged nodes when the feature reaches beta
+			// TODO (khenidak) add support for unmanaged nodes when the feature reaches beta
 			return fmt.Errorf("unmanaged nodes are not supported in dual stack mode")
 		}
 		klog.V(2).Infof("CreateRoute: omitting unmanaged node %q", kubeRoute.TargetNode)
@@ -512,7 +510,6 @@ func mapRouteNameToNodeName(ipv6DualStackEnabled bool, routeName string) types.N
 	parts := strings.Split(routeName, routeNameSeparator)
 	nodeName := parts[0]
 	return types.NodeName(nodeName)
-
 }
 
 // given a list of ips, return the first one
@@ -529,7 +526,7 @@ func findFirstIPByFamily(ips []string, v6 bool) (string, error) {
 	return "", fmt.Errorf("no match found matching the ipfamily requested")
 }
 
-//strips : . /
+// strips : . /
 func cidrtoRfc1035(cidr string) string {
 	cidr = strings.ReplaceAll(cidr, ":", "")
 	cidr = strings.ReplaceAll(cidr, ".", "")

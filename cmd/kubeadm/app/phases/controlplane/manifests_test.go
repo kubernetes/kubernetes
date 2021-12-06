@@ -45,7 +45,6 @@ const (
 var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta.2").String()
 
 func TestGetStaticPodSpecs(t *testing.T) {
-
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.9.0",
@@ -54,7 +53,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	// Executes GetStaticPodSpecs
 	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{})
 
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		staticPodName string
 	}{
@@ -76,12 +75,10 @@ func TestGetStaticPodSpecs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// assert the spec for the staticPodName exists
 			if spec, ok := specs[tc.staticPodName]; ok {
-
 				// Assert each specs refers to the right pod
 				if spec.Spec.Containers[0].Name != tc.staticPodName {
 					t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", tc.staticPodName, spec.Spec.Containers[0].Name, tc.staticPodName)
 				}
-
 			} else {
 				t.Errorf("getStaticPodSpecs didn't create spec for %s ", tc.staticPodName)
 			}
@@ -90,8 +87,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 }
 
 func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		name       string
 		components []string
 	}{
@@ -153,7 +149,7 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 	}
 
 	patchesPath := filepath.Join(tmpdir, "patch-files")
-	err := os.MkdirAll(patchesPath, 0777)
+	err := os.MkdirAll(patchesPath, 0o777)
 	if err != nil {
 		t.Fatalf("Couldn't create %s", patchesPath)
 	}
@@ -164,7 +160,7 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 	    patched: "true"
 	`)
 
-	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.KubeAPIServer+".yaml"), []byte(patchString), 0644)
+	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.KubeAPIServer+".yaml"), []byte(patchString), 0o644)
 	if err != nil {
 		t.Fatalf("WriteFile returned unexpected error: %v", err)
 	}
@@ -189,7 +185,7 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 }
 
 func TestGetAPIServerCommand(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		cfg      *kubeadmapi.ClusterConfiguration
 		endpoint *kubeadmapi.APIEndpoint
@@ -534,7 +530,7 @@ func removeCommon(left, right []string) []string {
 }
 
 func TestGetControllerManagerCommand(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		cfg      *kubeadmapi.ClusterConfiguration
 		expected []string
@@ -921,7 +917,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 }
 
 func TestGetSchedulerCommand(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		cfg      *kubeadmapi.ClusterConfiguration
 		expected []string
@@ -953,7 +949,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 }
 
 func TestGetAuthzModes(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		authMode []string
 		expected string
@@ -1001,7 +997,7 @@ func TestGetAuthzModes(t *testing.T) {
 }
 
 func TestIsValidAuthzMode(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		mode  string
 		valid bool
 	}{
@@ -1046,7 +1042,7 @@ func TestIsValidAuthzMode(t *testing.T) {
 }
 
 func TestCompareAuthzModes(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name   string
 		modesA []string
 		modesB []string

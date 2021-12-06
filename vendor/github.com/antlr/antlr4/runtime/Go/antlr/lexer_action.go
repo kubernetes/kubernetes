@@ -7,14 +7,14 @@ package antlr
 import "strconv"
 
 const (
-	LexerActionTypeChannel  = 0 //The type of a {@link LexerChannelAction} action.
-	LexerActionTypeCustom   = 1 //The type of a {@link LexerCustomAction} action.
-	LexerActionTypeMode     = 2 //The type of a {@link LexerModeAction} action.
-	LexerActionTypeMore     = 3 //The type of a {@link LexerMoreAction} action.
-	LexerActionTypePopMode  = 4 //The type of a {@link LexerPopModeAction} action.
-	LexerActionTypePushMode = 5 //The type of a {@link LexerPushModeAction} action.
-	LexerActionTypeSkip     = 6 //The type of a {@link LexerSkipAction} action.
-	LexerActionTypeType     = 7 //The type of a {@link LexerTypeAction} action.
+	LexerActionTypeChannel  = 0 // The type of a {@link LexerChannelAction} action.
+	LexerActionTypeCustom   = 1 // The type of a {@link LexerCustomAction} action.
+	LexerActionTypeMode     = 2 // The type of a {@link LexerModeAction} action.
+	LexerActionTypeMore     = 3 // The type of a {@link LexerMoreAction} action.
+	LexerActionTypePopMode  = 4 // The type of a {@link LexerPopModeAction} action.
+	LexerActionTypePushMode = 5 // The type of a {@link LexerPushModeAction} action.
+	LexerActionTypeSkip     = 6 // The type of a {@link LexerSkipAction} action.
+	LexerActionTypeType     = 7 // The type of a {@link LexerTypeAction} action.
 )
 
 type LexerAction interface {
@@ -134,7 +134,6 @@ type LexerPushModeAction struct {
 }
 
 func NewLexerPushModeAction(mode int) *LexerPushModeAction {
-
 	l := new(LexerPushModeAction)
 	l.BaseLexerAction = NewBaseLexerAction(LexerActionTypePushMode)
 
@@ -178,7 +177,6 @@ type LexerPopModeAction struct {
 }
 
 func NewLexerPopModeAction() *LexerPopModeAction {
-
 	l := new(LexerPopModeAction)
 
 	l.BaseLexerAction = NewBaseLexerAction(LexerActionTypePopMode)
@@ -394,7 +392,6 @@ type LexerIndexedCustomAction struct {
 }
 
 func NewLexerIndexedCustomAction(offset int, lexerAction LexerAction) *LexerIndexedCustomAction {
-
 	l := new(LexerIndexedCustomAction)
 	l.BaseLexerAction = NewBaseLexerAction(lexerAction.getActionType())
 

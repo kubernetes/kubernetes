@@ -50,12 +50,15 @@ const (
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
 }
+
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)
 }
+
 func (handler *osIOHandler) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
+
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return ioutil.WriteFile(filename, data, perm)
 }
@@ -127,7 +130,7 @@ func removeFromScsiSubsystem(deviceName string, io ioHandler) {
 	fileName := "/sys/block/" + deviceName + "/device/delete"
 	klog.V(4).Infof("fc: remove device from scsi-subsystem: path: %s", fileName)
 	data := []byte("1")
-	io.WriteFile(fileName, data, 0666)
+	io.WriteFile(fileName, data, 0o666)
 }
 
 // rescan scsi bus
@@ -137,7 +140,7 @@ func scsiHostRescan(io ioHandler) {
 		for _, f := range dirs {
 			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
-			io.WriteFile(name, data, 0666)
+			io.WriteFile(name, data, 0o666)
 		}
 	}
 }

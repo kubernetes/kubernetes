@@ -8,11 +8,12 @@ package storage
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // FileSharesClient is the the Azure Storage Management API.
@@ -54,25 +55,48 @@ func (client FileSharesClient) Create(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: shareName,
-			Constraints: []validation.Constraint{{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
-				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: fileShare,
-			Constraints: []validation.Constraint{{Target: "fileShare.FileShareProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "fileShare.FileShareProperties.ShareQuota", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "fileShare.FileShareProperties.ShareQuota", Name: validation.InclusiveMaximum, Rule: int64(102400), Chain: nil},
-						{Target: "fileShare.FileShareProperties.ShareQuota", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-					}},
-				}}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: shareName,
+			Constraints: []validation.Constraint{
+				{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: fileShare,
+			Constraints: []validation.Constraint{{
+				Target: "fileShare.FileShareProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "fileShare.FileShareProperties.ShareQuota", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "fileShare.FileShareProperties.ShareQuota", Name: validation.InclusiveMaximum, Rule: int64(102400), Chain: nil},
+							{Target: "fileShare.FileShareProperties.ShareQuota", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+						},
+					},
+				},
+			}},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.FileSharesClient", "Create", err.Error())
 	}
 
@@ -161,18 +185,33 @@ func (client FileSharesClient) Delete(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: shareName,
-			Constraints: []validation.Constraint{{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
-				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: shareName,
+			Constraints: []validation.Constraint{
+				{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.FileSharesClient", "Delete", err.Error())
 	}
 
@@ -259,18 +298,33 @@ func (client FileSharesClient) Get(ctx context.Context, resourceGroupName string
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: shareName,
-			Constraints: []validation.Constraint{{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
-				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: shareName,
+			Constraints: []validation.Constraint{
+				{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.FileSharesClient", "Get", err.Error())
 	}
 
@@ -360,15 +414,26 @@ func (client FileSharesClient) List(ctx context.Context, resourceGroupName strin
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.FileSharesClient", "List", err.Error())
 	}
 
@@ -505,21 +570,40 @@ func (client FileSharesClient) Restore(ctx context.Context, resourceGroupName st
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: shareName,
-			Constraints: []validation.Constraint{{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
-				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: deletedShare,
-			Constraints: []validation.Constraint{{Target: "deletedShare.DeletedShareName", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "deletedShare.DeletedShareVersion", Name: validation.Null, Rule: true, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: shareName,
+			Constraints: []validation.Constraint{
+				{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: deletedShare,
+			Constraints: []validation.Constraint{
+				{Target: "deletedShare.DeletedShareName", Name: validation.Null, Rule: true, Chain: nil},
+				{Target: "deletedShare.DeletedShareVersion", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.FileSharesClient", "Restore", err.Error())
 	}
 
@@ -609,18 +693,33 @@ func (client FileSharesClient) Update(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: shareName,
-			Constraints: []validation.Constraint{{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
-				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: shareName,
+			Constraints: []validation.Constraint{
+				{Target: "shareName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "shareName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.FileSharesClient", "Update", err.Error())
 	}
 

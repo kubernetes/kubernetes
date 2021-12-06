@@ -121,7 +121,6 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		}
 		wg.Wait()
 	})
-
 })
 
 // PerformVolumeLifeCycleInParallel performs volume lifecycle operations

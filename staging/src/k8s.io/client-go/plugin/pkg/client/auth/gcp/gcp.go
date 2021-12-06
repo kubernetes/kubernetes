@@ -52,7 +52,8 @@ var (
 	//   email instead of numeric uniqueID.
 	defaultScopes = []string{
 		"https://www.googleapis.com/auth/cloud-platform",
-		"https://www.googleapis.com/auth/userinfo.email"}
+		"https://www.googleapis.com/auth/userinfo.email",
+	}
 )
 
 // gcpAuthProvider is an auth provider plugin that uses GCP credentials to provide
@@ -376,7 +377,6 @@ func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 
 	res, err := t.oauthTransport.RoundTrip(req)
-
 	if err != nil {
 		return nil, err
 	}

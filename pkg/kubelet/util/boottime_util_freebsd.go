@@ -22,9 +22,9 @@ package util
 import (
 	"fmt"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
-	"unsafe"
 )
 
 // GetBootTime returns the time at which the machine was started, truncated to the nearest second

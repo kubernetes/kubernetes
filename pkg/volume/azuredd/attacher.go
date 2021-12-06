@@ -51,11 +51,15 @@ type azureDiskAttacher struct {
 	cloud  *azure.Cloud
 }
 
-var _ volume.Attacher = &azureDiskAttacher{}
-var _ volume.Detacher = &azureDiskDetacher{}
+var (
+	_ volume.Attacher = &azureDiskAttacher{}
+	_ volume.Detacher = &azureDiskDetacher{}
+)
 
-var _ volume.DeviceMounter = &azureDiskAttacher{}
-var _ volume.DeviceUnmounter = &azureDiskDetacher{}
+var (
+	_ volume.DeviceMounter   = &azureDiskAttacher{}
+	_ volume.DeviceUnmounter = &azureDiskDetacher{}
+)
 
 // Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
 func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
@@ -206,7 +210,6 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 func (a *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	mounter := a.plugin.host.GetMounter(azureDataDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
-
 	if err != nil {
 		if os.IsNotExist(err) {
 			dir := deviceMountPath
@@ -214,7 +217,7 @@ func (a *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 				// in windows, as we use mklink, only need to MkdirAll for parent directory
 				dir = filepath.Dir(deviceMountPath)
 			}
-			if err := os.MkdirAll(dir, 0750); err != nil {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return fmt.Errorf("azureDisk - mountDevice:CreateDirectory failed with %s", err)
 			}
 			notMnt = true

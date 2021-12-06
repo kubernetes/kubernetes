@@ -529,7 +529,7 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 }
 
 func (o *AuditLogOptions) ensureLogFile() error {
-	mode := os.FileMode(0600)
+	mode := os.FileMode(0o600)
 	f, err := os.OpenFile(o.Path, os.O_CREATE|os.O_APPEND|os.O_RDWR, mode)
 	if err != nil {
 		return err

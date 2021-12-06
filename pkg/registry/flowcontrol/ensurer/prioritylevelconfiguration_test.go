@@ -101,7 +101,6 @@ func TestEnsurePriorityLevel(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			client := fake.NewSimpleClientset().FlowcontrolV1beta2().PriorityLevelConfigurations()
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})

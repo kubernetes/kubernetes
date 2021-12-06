@@ -6,11 +6,9 @@ import (
 	"github.com/storageos/go-api/types"
 )
 
-var (
-	// ClusterMaintenanceAPIPrefix is a path to the HTTP endpoint for managing
-	// the cluster maintenance mode.
-	ClusterMaintenanceAPIPrefix = "cluster/maintenance"
-)
+// ClusterMaintenanceAPIPrefix is a path to the HTTP endpoint for managing
+// the cluster maintenance mode.
+var ClusterMaintenanceAPIPrefix = "cluster/maintenance"
 
 // Maintenance returns the maintenance status of the cluster
 func (c *Client) Maintenance() (*types.Maintenance, error) {

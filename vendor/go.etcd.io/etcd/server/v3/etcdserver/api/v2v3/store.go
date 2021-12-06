@@ -371,7 +371,6 @@ func (s *v2v3Store) CompareAndSwap(
 		clientv3.OpGet(key),
 		clientv3.OpGet(key+"/"),
 	).Commit()
-
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +499,6 @@ func (s *v2v3Store) CompareAndDelete(nodePath, prevValue string, prevIndex uint6
 		clientv3.OpGet(key),
 		clientv3.OpGet(key+"/"),
 	).Commit()
-
 	if err != nil {
 		return nil, err
 	}

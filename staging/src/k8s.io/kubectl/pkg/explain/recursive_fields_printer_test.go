@@ -62,7 +62,7 @@ field2	<[]map[string]string>
 }
 
 func TestRecursiveFieldsWithSelfReferenceObjects(t *testing.T) {
-	var resources = tst.NewFakeResources("test-recursive-swagger.json")
+	resources := tst.NewFakeResources("test-recursive-swagger.json")
 	schema := resources.LookupResource(schema.GroupVersionKind{
 		Group:   "",
 		Version: "v2",

@@ -172,7 +172,6 @@ func TestDynamicClientWatch(t *testing.T) {
 		Watch:           true,
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", "event-9").String(),
 	})
-
 	if err != nil {
 		t.Fatalf("Failed watch: %v", err)
 	}
@@ -273,7 +272,6 @@ func TestUnstructuredExtract(t *testing.T) {
 	if !reflect.DeepEqual(pod, extracted) {
 		t.Fatalf("extracted pod doesn't equal applied pod. wanted:\n %v\n, got:\n %v\n", pod, extracted)
 	}
-
 }
 
 func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {

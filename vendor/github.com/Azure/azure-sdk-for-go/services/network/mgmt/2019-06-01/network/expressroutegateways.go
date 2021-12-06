@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ExpressRouteGatewaysClient is the network Client
@@ -49,9 +50,14 @@ func (client ExpressRouteGatewaysClient) CreateOrUpdate(ctx context.Context, res
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: putExpressRouteGatewayParameters,
-			Constraints: []validation.Constraint{{Target: "putExpressRouteGatewayParameters.ExpressRouteGatewayProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "putExpressRouteGatewayParameters.ExpressRouteGatewayProperties.VirtualHub", Name: validation.Null, Rule: true, Chain: nil}}}}}}); err != nil {
+		{
+			TargetValue: putExpressRouteGatewayParameters,
+			Constraints: []validation.Constraint{{
+				Target: "putExpressRouteGatewayParameters.ExpressRouteGatewayProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{{Target: "putExpressRouteGatewayParameters.ExpressRouteGatewayProperties.VirtualHub", Name: validation.Null, Rule: true, Chain: nil}},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.ExpressRouteGatewaysClient", "CreateOrUpdate", err.Error())
 	}
 

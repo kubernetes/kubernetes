@@ -5,9 +5,7 @@ import (
 	"sync"
 )
 
-var (
-	bufferPool BufferPool
-)
+var bufferPool BufferPool
 
 type BufferPool interface {
 	Put(*bytes.Buffer)

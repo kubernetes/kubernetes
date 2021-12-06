@@ -9,11 +9,12 @@ package containerservice
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // The package's fully qualified name.
@@ -2556,6 +2557,7 @@ func unmarshalBasicOpenShiftManagedClusterBaseIdentityProvider(body []byte) (Bas
 		return osmcbip, err
 	}
 }
+
 func unmarshalBasicOpenShiftManagedClusterBaseIdentityProviderArray(body []byte) ([]BasicOpenShiftManagedClusterBaseIdentityProvider, error) {
 	var rawMessages []*json.RawMessage
 	err := json.Unmarshal(body, &rawMessages)

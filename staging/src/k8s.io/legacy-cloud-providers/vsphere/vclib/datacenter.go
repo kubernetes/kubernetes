@@ -140,9 +140,12 @@ func (dc *Datacenter) GetAllDatastores(ctx context.Context) (map[string]*Datasto
 	dsURLInfoMap := make(map[string]*DatastoreInfo)
 	for _, dsMo := range dsMoList {
 		dsURLInfoMap[dsMo.Info.GetDatastoreInfo().Url] = &DatastoreInfo{
-			&Datastore{object.NewDatastore(dc.Client(), dsMo.Reference()),
-				dc},
-			dsMo.Info.GetDatastoreInfo()}
+			&Datastore{
+				object.NewDatastore(dc.Client(), dsMo.Reference()),
+				dc,
+			},
+			dsMo.Info.GetDatastoreInfo(),
+		}
 	}
 	klog.V(9).Infof("dsURLInfoMap : %+v", dsURLInfoMap)
 	return dsURLInfoMap, nil
@@ -264,7 +267,6 @@ func (dc *Datacenter) GetVirtualDiskPage83Data(ctx context.Context, diskPath str
 	vdm := object.NewVirtualDiskManager(dc.Client())
 	// Returns uuid of vmdk virtual disk
 	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc.Datacenter)
-
 	if err != nil {
 		klog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
 		return "", err

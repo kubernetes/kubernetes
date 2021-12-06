@@ -336,7 +336,6 @@ func WaitForResizingCondition(pvc *v1.PersistentVolumeClaim, c clientset.Interfa
 	waitErr := wait.PollImmediate(resizePollInterval, duration, func() (bool, error) {
 		var err error
 		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
-
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %v", pvc.Name, err)
 		}
@@ -422,7 +421,7 @@ func WaitForFSResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.
 		pvcSize := updatedPVC.Spec.Resources.Requests[v1.ResourceStorage]
 		pvcStatusSize := updatedPVC.Status.Capacity[v1.ResourceStorage]
 
-		//If pvc's status field size is greater than or equal to pvc's size then done
+		// If pvc's status field size is greater than or equal to pvc's size then done
 		if pvcStatusSize.Cmp(pvcSize) >= 0 {
 			return true, nil
 		}

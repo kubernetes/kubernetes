@@ -4,8 +4,7 @@ package matchers
 
 import "github.com/onsi/gomega/format"
 
-type BeNilMatcher struct {
-}
+type BeNilMatcher struct{}
 
 func (matcher *BeNilMatcher) Match(actual interface{}) (success bool, err error) {
 	return isNil(actual), nil

@@ -27,9 +27,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var (
-	kubemarkExternalKubeConfig = flag.String(fmt.Sprintf("%s-%s", "kubemark-external", clientcmd.RecommendedConfigPathFlag), "", "Path to kubeconfig containing embedded authinfo for external cluster.")
-)
+var kubemarkExternalKubeConfig = flag.String(fmt.Sprintf("%s-%s", "kubemark-external", clientcmd.RecommendedConfigPathFlag), "", "Path to kubeconfig containing embedded authinfo for external cluster.")
 
 func init() {
 	framework.RegisterProvider("kubemark", newProvider)

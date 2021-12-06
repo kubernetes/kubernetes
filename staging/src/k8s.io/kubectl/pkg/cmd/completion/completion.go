@@ -111,14 +111,12 @@ var (
 		    kubectl completion powershell >> $PROFILE`))
 )
 
-var (
-	completionShells = map[string]func(out io.Writer, boilerPlate string, cmd *cobra.Command) error{
-		"bash":       runCompletionBash,
-		"zsh":        runCompletionZsh,
-		"fish":       runCompletionFish,
-		"powershell": runCompletionPwsh,
-	}
-)
+var completionShells = map[string]func(out io.Writer, boilerPlate string, cmd *cobra.Command) error{
+	"bash":       runCompletionBash,
+	"zsh":        runCompletionZsh,
+	"fish":       runCompletionFish,
+	"powershell": runCompletionPwsh,
+}
 
 // NewCmdCompletion creates the `completion` command
 func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {

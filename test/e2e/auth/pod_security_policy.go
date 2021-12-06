@@ -353,7 +353,8 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 			RunAsGroup: &policyv1beta1.RunAsGroupStrategyOptions{
 				Rule: policyv1beta1.RunAsGroupStrategyMustRunAs,
 				Ranges: []policyv1beta1.IDRange{
-					{Min: nobodyUser, Max: nobodyUser}},
+					{Min: nobodyUser, Max: nobodyUser},
+				},
 			},
 			SELinux: policyv1beta1.SELinuxStrategyOptions{
 				Rule: policyv1beta1.SELinuxStrategyRunAsAny,

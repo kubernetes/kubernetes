@@ -55,12 +55,12 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
-	//deferred clean up
+	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
-	//Bad Path
+	// Bad Path
 	badspec, err := getVolumeSpecFromGlobalMapPath("", testVolName)
 	if badspec != nil || err == nil {
 		t.Fatalf("Expected not to get spec from GlobalMapPath but did")
@@ -574,7 +574,7 @@ func TestGetDeviceMountPath(t *testing.T) {
 		if c.deprecated {
 			// This is a deprecated device mount path, we create it,
 			// and hope attacher.GetDeviceMountPath return c.targetPath.
-			if err := os.MkdirAll(c.targetPath, 0700); err != nil {
+			if err := os.MkdirAll(c.targetPath, 0o700); err != nil {
 				t.Fatalf("Create deprecated mount path failed: %v", err)
 			}
 		}
@@ -622,7 +622,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 		{"vol", canonicalDir},
 		{"vol", deprecatedDir},
 	} {
-		if err := os.MkdirAll(c.targetPath, 0700); err != nil {
+		if err := os.MkdirAll(c.targetPath, 0o700); err != nil {
 			t.Fatalf("Create mount path %s failed: %v", c.targetPath, err)
 		}
 		if err = fakeMounter.Mount("/dev/rbd0", c.targetPath, "fake", nil); err != nil {

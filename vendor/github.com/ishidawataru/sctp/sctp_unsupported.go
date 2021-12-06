@@ -1,3 +1,4 @@
+//go:build !linux || (linux && 386)
 // +build !linux linux,386
 
 package sctp

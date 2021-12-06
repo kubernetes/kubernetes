@@ -529,7 +529,7 @@ func JSONPatch(codec runtime.Codec, dst runtime.Object, fragment string) (runtim
 // DumpReaderToFile writes all data from the given io.Reader to the specified file
 // (usually for temporary use).
 func DumpReaderToFile(reader io.Reader, filename string) error {
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -588,7 +588,7 @@ const (
 )
 
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
-	var dryRunFlag = GetFlagString(cmd, "dry-run")
+	dryRunFlag := GetFlagString(cmd, "dry-run")
 	switch dryRunFlag {
 	case cmd.Flag("dry-run").NoOptDefVal:
 		return DryRunNone, errors.New(`--dry-run flag without a value was specified. A value must be set: "none", "server", or "client".`)

@@ -67,11 +67,15 @@ type LimitRanger struct {
 	liveTTL         time.Duration
 }
 
-var _ admission.MutationInterface = &LimitRanger{}
-var _ admission.ValidationInterface = &LimitRanger{}
+var (
+	_ admission.MutationInterface   = &LimitRanger{}
+	_ admission.ValidationInterface = &LimitRanger{}
+)
 
-var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &LimitRanger{}
-var _ genericadmissioninitailizer.WantsExternalKubeClientSet = &LimitRanger{}
+var (
+	_ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &LimitRanger{}
+	_ genericadmissioninitailizer.WantsExternalKubeClientSet       = &LimitRanger{}
+)
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -411,7 +415,6 @@ func sum(inputs []api.ResourceList) api.ResourceList {
 			} else {
 				result[key] = *(resource.NewQuantity(total, resource.DecimalSI))
 			}
-
 		}
 	}
 	return result

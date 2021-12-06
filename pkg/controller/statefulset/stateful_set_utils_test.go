@@ -44,6 +44,7 @@ type noopRecorder struct{}
 func (r *noopRecorder) Event(object runtime.Object, eventtype, reason, message string) {}
 func (r *noopRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 }
+
 func (r *noopRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
 }
 
@@ -457,7 +458,8 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 func TestHasOwnerRef(t *testing.T) {
 	target := v1.Pod{}
 	target.SetOwnerReferences([]metav1.OwnerReference{
-		{UID: "123"}, {UID: "456"}})
+		{UID: "123"}, {UID: "456"},
+	})
 	ownerA := v1.Pod{}
 	ownerA.GetObjectMeta().SetUID("123")
 	ownerB := v1.Pod{}
@@ -473,7 +475,8 @@ func TestHasOwnerRef(t *testing.T) {
 func TestHasStaleOwnerRef(t *testing.T) {
 	target := v1.Pod{}
 	target.SetOwnerReferences([]metav1.OwnerReference{
-		{Name: "bob", UID: "123"}, {Name: "shirley", UID: "456"}})
+		{Name: "bob", UID: "123"}, {Name: "shirley", UID: "456"},
+	})
 	ownerA := v1.Pod{}
 	ownerA.SetUID("123")
 	ownerA.Name = "bob"
@@ -713,7 +716,6 @@ func TestRollingUpdateApplyRevision(t *testing.T) {
 }
 
 func TestGetPersistentVolumeClaims(t *testing.T) {
-
 	// nil inherits statefulset labels
 	pod := newPod()
 	statefulSet := newStatefulSet(1)
@@ -919,7 +921,8 @@ func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels m
 							HostPath: &v1.HostPathVolumeSource{
 								Path: fmt.Sprintf("/tmp/%v", "home"),
 							},
-						}}},
+						},
+					}},
 				},
 			},
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{

@@ -222,7 +222,7 @@ func TestDefaultOnReadPvc(t *testing.T) {
 		Name: "my-pvc",
 	}
 
-	var tests = map[string]struct {
+	tests := map[string]struct {
 		anyEnabled    bool
 		dataSource    bool
 		dataSourceRef bool

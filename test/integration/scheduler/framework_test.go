@@ -145,18 +145,20 @@ const (
 	permitPluginName             = "permit-plugin"
 )
 
-var _ framework.PreFilterPlugin = &PreFilterPlugin{}
-var _ framework.PostFilterPlugin = &PostFilterPlugin{}
-var _ framework.ScorePlugin = &ScorePlugin{}
-var _ framework.FilterPlugin = &FilterPlugin{}
-var _ framework.ScorePlugin = &ScorePlugin{}
-var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
-var _ framework.ReservePlugin = &ReservePlugin{}
-var _ framework.PreScorePlugin = &PreScorePlugin{}
-var _ framework.PreBindPlugin = &PreBindPlugin{}
-var _ framework.BindPlugin = &BindPlugin{}
-var _ framework.PostBindPlugin = &PostBindPlugin{}
-var _ framework.PermitPlugin = &PermitPlugin{}
+var (
+	_ framework.PreFilterPlugin  = &PreFilterPlugin{}
+	_ framework.PostFilterPlugin = &PostFilterPlugin{}
+	_ framework.ScorePlugin      = &ScorePlugin{}
+	_ framework.FilterPlugin     = &FilterPlugin{}
+	_ framework.ScorePlugin      = &ScorePlugin{}
+	_ framework.ScorePlugin      = &ScoreWithNormalizePlugin{}
+	_ framework.ReservePlugin    = &ReservePlugin{}
+	_ framework.PreScorePlugin   = &PreScorePlugin{}
+	_ framework.PreBindPlugin    = &PreBindPlugin{}
+	_ framework.BindPlugin       = &BindPlugin{}
+	_ framework.PostBindPlugin   = &PostBindPlugin{}
+	_ framework.PermitPlugin     = &PermitPlugin{}
+)
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
@@ -715,7 +717,8 @@ func TestPostFilterPlugin(t *testing.T) {
 							},
 						},
 					},
-				}}})
+				}},
+			})
 
 			// Create the API server and the scheduler with the test plugin set.
 			testCtx := initTestSchedulerForFrameworkTest(
@@ -2134,8 +2137,10 @@ const (
 	jobPluginName = "job plugin"
 )
 
-var _ framework.PreFilterPlugin = &JobPlugin{}
-var _ framework.PostBindPlugin = &PostBindPlugin{}
+var (
+	_ framework.PreFilterPlugin = &JobPlugin{}
+	_ framework.PostBindPlugin  = &PostBindPlugin{}
+)
 
 type JobPlugin struct {
 	podLister     listersv1.PodLister

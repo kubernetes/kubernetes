@@ -218,7 +218,6 @@ func TestIsStatusConditionPresentAndEqual(t *testing.T) {
 			if actual != test.expected {
 				t.Error(actual)
 			}
-
 		})
 	}
 }

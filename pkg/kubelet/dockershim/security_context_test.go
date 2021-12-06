@@ -32,7 +32,7 @@ import (
 
 func TestModifyContainerConfig(t *testing.T) {
 	var uid int64 = 123
-	var username = "testuser"
+	username := "testuser"
 	var gid int64 = 423
 
 	cases := []struct {

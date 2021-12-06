@@ -76,7 +76,8 @@ func TestCheckReadyForTests(t *testing.T) {
 			nodes: []v1.Node{
 				fromVanillaNode(func(n *v1.Node) {
 					n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoExecute}}
-				})},
+				}),
+			},
 			expected: false,
 		}, {
 			desc:                 "Tainted node can be allowed via allowedNotReadyNodes",
@@ -85,7 +86,8 @@ func TestCheckReadyForTests(t *testing.T) {
 			nodes: []v1.Node{
 				fromVanillaNode(func(n *v1.Node) {
 					n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoExecute}}
-				})},
+				}),
+			},
 			expected: true,
 		}, {
 			desc: "Multi-node, all OK",

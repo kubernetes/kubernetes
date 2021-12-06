@@ -69,7 +69,7 @@ func TestLoadSeccompLocalhostProfiles(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpdir)
 	testProfile := `{"foo": "bar"}`
-	err = ioutil.WriteFile(filepath.Join(tmpdir, "test"), []byte(testProfile), 0644)
+	err = ioutil.WriteFile(filepath.Join(tmpdir, "test"), []byte(testProfile), 0o644)
 	require.NoError(t, err)
 
 	tests := []struct {

@@ -174,8 +174,10 @@ type AuthProviderConfig struct {
 	Config map[string]string `json:"config,omitempty"`
 }
 
-var _ fmt.Stringer = new(AuthProviderConfig)
-var _ fmt.GoStringer = new(AuthProviderConfig)
+var (
+	_ fmt.Stringer   = new(AuthProviderConfig)
+	_ fmt.GoStringer = new(AuthProviderConfig)
+)
 
 // GoString implements fmt.GoStringer and sanitizes sensitive fields of
 // AuthProviderConfig to prevent accidental leaking via logs.
@@ -277,8 +279,10 @@ type ExecConfig struct {
 	StdinUnavailableMessage string
 }
 
-var _ fmt.Stringer = new(ExecConfig)
-var _ fmt.GoStringer = new(ExecConfig)
+var (
+	_ fmt.Stringer   = new(ExecConfig)
+	_ fmt.GoStringer = new(ExecConfig)
+)
 
 // GoString implements fmt.GoStringer and sanitizes sensitive fields of
 // ExecConfig to prevent accidental leaking via logs.

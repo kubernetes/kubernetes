@@ -78,7 +78,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 		return nil
 	}
 
-	if err := os.MkdirAll(volPath, 0750); err != nil {
+	if err := os.MkdirAll(volPath, 0o750); err != nil {
 		klog.Errorf("failed to mkdir:%s", volPath)
 		return err
 	}

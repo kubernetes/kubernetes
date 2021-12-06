@@ -34,7 +34,6 @@ type DiagnosticErrorListener struct {
 }
 
 func NewDiagnosticErrorListener(exactOnly bool) *DiagnosticErrorListener {
-
 	n := new(DiagnosticErrorListener)
 
 	// whether all ambiguities or only exact ambiguities are Reported.
@@ -56,7 +55,6 @@ func (d *DiagnosticErrorListener) ReportAmbiguity(recognizer Parser, dfa *DFA, s
 }
 
 func (d *DiagnosticErrorListener) ReportAttemptingFullContext(recognizer Parser, dfa *DFA, startIndex, stopIndex int, conflictingAlts *BitSet, configs ATNConfigSet) {
-
 	msg := "reportAttemptingFullContext d=" +
 		d.getDecisionDescription(recognizer, dfa) +
 		", input='" +

@@ -16,8 +16,10 @@ import (
 	"github.com/aws/aws-sdk-go/private/protocol"
 )
 
-var timeType = reflect.ValueOf(time.Time{}).Type()
-var byteSliceType = reflect.ValueOf([]byte{}).Type()
+var (
+	timeType      = reflect.ValueOf(time.Time{}).Type()
+	byteSliceType = reflect.ValueOf([]byte{}).Type()
+)
 
 // BuildJSON builds a JSON string for a given object v.
 func BuildJSON(v interface{}) ([]byte, error) {

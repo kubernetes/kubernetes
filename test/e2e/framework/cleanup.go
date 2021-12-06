@@ -24,13 +24,16 @@ import (
 
 // CleanupActionHandle is an integer pointer type for handling cleanup action
 type CleanupActionHandle *int
+
 type cleanupFuncHandle struct {
 	actionHandle CleanupActionHandle
 	actionHook   func()
 }
 
-var cleanupActionsLock sync.Mutex
-var cleanupHookList = []cleanupFuncHandle{}
+var (
+	cleanupActionsLock sync.Mutex
+	cleanupHookList    = []cleanupFuncHandle{}
+)
 
 // AddCleanupAction installs a function that will be called in the event of the
 // whole test being terminated.  This allows arbitrary pieces of the overall

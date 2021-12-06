@@ -245,7 +245,6 @@ func (na nodeAffinity) mutatePodTemplate(pod *v1.Pod) {
 func (inputConfig *schedulerPerfConfig) generateNodes(config *testConfig) {
 	for i := 0; i < inputConfig.NodeCount; i++ {
 		config.clientset.CoreV1().Nodes().Create(context.TODO(), config.mutatedNodeTemplate, metav1.CreateOptions{})
-
 	}
 	for i := 0; i < config.numNodes-inputConfig.NodeCount; i++ {
 		config.clientset.CoreV1().Nodes().Create(context.TODO(), baseNodeTemplate, metav1.CreateOptions{})
@@ -281,7 +280,7 @@ func (inputConfig *schedulerPerfConfig) generatePodAndNodeTopology(config *testC
 }
 
 // writePodAndNodeTopologyToConfig reads a configuration and then applies it to a test configuration.
-//TODO: As of now, this function is not doing anything except for reading input values to priority structs.
+// TODO: As of now, this function is not doing anything except for reading input values to priority structs.
 func writePodAndNodeTopologyToConfig(config *testConfig) error {
 	// High Level structure that should be filled for every predicate or priority.
 	inputConfig := &schedulerPerfConfig{

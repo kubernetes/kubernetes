@@ -497,6 +497,7 @@ const logSignInfoMsg = `DEBUG: Request Signature:
 ---[ STRING TO SIGN ]--------------------------------
 %s%s
 -----------------------------------------------------`
+
 const logSignedURLMsg = `
 ---[ SIGNED URL ]------------------------------------
 %s`
@@ -552,7 +553,6 @@ func (ctx *signingCtx) build(disableHeaderHoisting bool) error {
 // Returning an error if the request is unsigned, or unable to extract the
 // signature.
 func GetSignedRequestSignature(r *http.Request) ([]byte, error) {
-
 	if auth := r.Header.Get(authorizationHeader); len(auth) != 0 {
 		ps := strings.Split(auth, ", ")
 		for _, p := range ps {
@@ -604,6 +604,7 @@ func buildQuery(r rule, header http.Header) (url.Values, http.Header) {
 
 	return query, unsignedHeaders
 }
+
 func (ctx *signingCtx) buildCanonicalHeaders(r rule, header http.Header) {
 	var headers []string
 	headers = append(headers, "host")

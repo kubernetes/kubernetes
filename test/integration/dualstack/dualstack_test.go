@@ -70,7 +70,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 		t.Fatalf("creating kubernetes service timed out")
 	}
 
-	var testcases = []struct {
+	testcases := []struct {
 		name               string
 		serviceType        v1.ServiceType
 		clusterIPs         []string
@@ -219,7 +219,6 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 	for i, tc := range testcases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
@@ -286,7 +285,7 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 		t.Fatalf("creating kubernetes service timed out")
 	}
 
-	var testcases = []struct {
+	testcases := []struct {
 		name               string
 		serviceType        v1.ServiceType
 		clusterIPs         []string
@@ -435,7 +434,6 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 	for i, tc := range testcases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
@@ -512,7 +510,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 		t.Fatalf("creating kubernetes service timed out")
 	}
 
-	var testcases = []struct {
+	testcases := []struct {
 		name               string
 		serviceType        v1.ServiceType
 		clusterIPs         []string
@@ -662,7 +660,6 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 	for i, tc := range testcases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
@@ -750,7 +747,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 		t.Errorf("server without enabled endpoints failed to register: %v", err)
 	}
 
-	var testcases = []struct {
+	testcases := []struct {
 		name               string
 		serviceType        v1.ServiceType
 		clusterIPs         []string
@@ -891,7 +888,6 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	for i, tc := range testcases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
@@ -1338,7 +1334,6 @@ func TestServiceUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
 	}
-
 }
 
 // validateServiceAndClusterIPFamily checks that the service has the expected IPFamilies
@@ -1577,6 +1572,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 type serviceMergePatch struct {
 	Spec specMergePatch `json:"spec,omitempty"`
 }
+
 type specMergePatch struct {
 	Type         v1.ServiceType `json:"type,omitempty"`
 	ExternalName string         `json:"externalName,omitempty"`

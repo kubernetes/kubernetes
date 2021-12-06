@@ -41,7 +41,6 @@ type DecodeAction func(d *Decoder) error
 
 // Add specifies an action to call on the Decoder when the specified path is encountered.
 func (je *PathActions) Add(action DecodeAction, path ...interface{}) {
-
 	var node *pathNode = &je.node
 	for _, ps := range path {
 		found := false

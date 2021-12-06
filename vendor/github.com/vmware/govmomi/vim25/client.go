@@ -32,12 +32,10 @@ const (
 	Path      = "/sdk"
 )
 
-var (
-	ServiceInstance = types.ManagedObjectReference{
-		Type:  "ServiceInstance",
-		Value: "ServiceInstance",
-	}
-)
+var ServiceInstance = types.ManagedObjectReference{
+	Type:  "ServiceInstance",
+	Value: "ServiceInstance",
+}
 
 // Client is a tiny wrapper around the vim25/soap Client that stores session
 // specific state (i.e. state that only needs to be retrieved once after the

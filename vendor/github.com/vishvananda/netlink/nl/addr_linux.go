@@ -54,8 +54,10 @@ func (msg *IfAddrmsg) Len() int {
 // 	__u32	tstamp; /* updated timestamp, hundredths of seconds */
 // };
 
-const IFA_CACHEINFO = 6
-const SizeofIfaCacheInfo = 0x10
+const (
+	IFA_CACHEINFO      = 6
+	SizeofIfaCacheInfo = 0x10
+)
 
 type IfaCacheInfo struct {
 	IfaPrefered uint32

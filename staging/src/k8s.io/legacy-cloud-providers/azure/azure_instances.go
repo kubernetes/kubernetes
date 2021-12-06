@@ -46,9 +46,7 @@ const (
 	nodeNameEnvironmentName = "NODE_NAME"
 )
 
-var (
-	errNodeNotInitialized = fmt.Errorf("providerID is empty, the node is not initialized yet")
-)
+var errNodeNotInitialized = fmt.Errorf("providerID is empty, the node is not initialized yet")
 
 func (az *Cloud) addressGetter(nodeName types.NodeName) ([]v1.NodeAddress, error) {
 	ip, publicIP, err := az.getIPForMachine(nodeName)

@@ -34,9 +34,7 @@ var CmdTestWebserver = &cobra.Command{
 	Run:   main,
 }
 
-var (
-	port int
-)
+var port int
 
 func init() {
 	CmdTestWebserver.Flags().IntVar(&port, "port", 80, "Port number.")

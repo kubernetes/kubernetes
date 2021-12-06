@@ -8,10 +8,11 @@ package resources
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ProvidersClient is the provides operations for working with resources and resource groups.

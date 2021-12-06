@@ -29,7 +29,6 @@ type Backend interface {
 
 // ConsistentIndexer is an interface that wraps the Get/Set/Save method for consistentIndex.
 type ConsistentIndexer interface {
-
 	// ConsistentIndex returns the consistent index of current executing entry.
 	ConsistentIndex() uint64
 

@@ -114,6 +114,7 @@ func (m mapUnstructuredString) Set(key string, val Value) {
 func (m mapUnstructuredString) Get(key string) (Value, bool) {
 	return m.GetUsing(HeapAllocator, key)
 }
+
 func (m mapUnstructuredString) GetUsing(a Allocator, key string) (Value, bool) {
 	if v, ok := m[key]; !ok {
 		return nil, false

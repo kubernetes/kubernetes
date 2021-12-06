@@ -32,12 +32,10 @@ const (
 	Path      = "/pbm"
 )
 
-var (
-	ServiceInstance = vim.ManagedObjectReference{
-		Type:  "PbmServiceInstance",
-		Value: "ServiceInstance",
-	}
-)
+var ServiceInstance = vim.ManagedObjectReference{
+	Type:  "PbmServiceInstance",
+	Value: "ServiceInstance",
+}
 
 type Client struct {
 	*soap.Client

@@ -65,27 +65,35 @@ type AttributesRecord struct {
 func (a *AttributesRecord) GetName() string {
 	return a.Name
 }
+
 func (a *AttributesRecord) GetNamespace() string {
 	return a.Namespace
 }
+
 func (a *AttributesRecord) GetKind() schema.GroupVersionKind {
 	return a.Kind
 }
+
 func (a *AttributesRecord) GetResource() schema.GroupVersionResource {
 	return a.Resource
 }
+
 func (a *AttributesRecord) GetSubresource() string {
 	return a.Subresource
 }
+
 func (a *AttributesRecord) GetOperation() admissionv1.Operation {
 	return a.Operation
 }
+
 func (a *AttributesRecord) GetUserName() string {
 	return a.Username
 }
+
 func (a *AttributesRecord) GetObject() (runtime.Object, error) {
 	return a.Object, nil
 }
+
 func (a *AttributesRecord) GetOldObject() (runtime.Object, error) {
 	return a.OldObject, nil
 }
@@ -110,30 +118,39 @@ type attributes struct {
 func (a *attributes) GetName() string {
 	return a.r.Name
 }
+
 func (a *attributes) GetNamespace() string {
 	return a.r.Namespace
 }
+
 func (a *attributes) GetKind() schema.GroupVersionKind {
 	return schema.GroupVersionKind(a.r.Kind)
 }
+
 func (a *attributes) GetResource() schema.GroupVersionResource {
 	return schema.GroupVersionResource(a.r.Resource)
 }
+
 func (a *attributes) GetSubresource() string {
 	return a.r.RequestSubResource
 }
+
 func (a *attributes) GetOperation() admissionv1.Operation {
 	return a.r.Operation
 }
+
 func (a *attributes) GetUserName() string {
 	return a.r.UserInfo.Username
 }
+
 func (a *attributes) GetObject() (runtime.Object, error) {
 	return a.decode(a.r.Object)
 }
+
 func (a *attributes) GetOldObject() (runtime.Object, error) {
 	return a.decode(a.r.OldObject)
 }
+
 func (a *attributes) decode(in runtime.RawExtension) (runtime.Object, error) {
 	if in.Raw == nil {
 		return nil, nil

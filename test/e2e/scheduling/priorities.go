@@ -120,7 +120,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	})
 
 	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
-
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 
 		ginkgo.By("Trying to launch a pod with a label to get a node which can launch it.")
@@ -180,7 +179,8 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 											Key:      "security",
 											Operator: metav1.LabelSelectorOpNotIn,
 											Values:   []string{"S2"},
-										}, {
+										},
+										{
 											Key:      "security",
 											Operator: metav1.LabelSelectorOpExists,
 										},
@@ -388,8 +388,8 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 
 	// find the max, if the node has the max,use the one, if not,use the ratio parameter
 	var maxCPUFraction, maxMemFraction float64 = ratio, ratio
-	var cpuFractionMap = make(map[string]float64)
-	var memFractionMap = make(map[string]float64)
+	cpuFractionMap := make(map[string]float64)
+	memFractionMap := make(map[string]float64)
 
 	// For each node, stores its pods info
 	nodeNameToPodList := podListForEachNode(cs)

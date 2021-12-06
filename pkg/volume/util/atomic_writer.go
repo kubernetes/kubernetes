@@ -364,7 +364,7 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 	// 0755 permissions are needed to allow 'group' and 'other' to recurse the
 	// directory tree.  do a chmod here to ensure that permissions are set correctly
 	// regardless of the process' umask.
-	err = os.Chmod(tsDir, 0755)
+	err = os.Chmod(tsDir, 0o755)
 	if err != nil {
 		klog.Errorf("%s: unable to set mode on new temp directory: %v", w.logContext, err)
 		return "", err

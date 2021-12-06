@@ -110,12 +110,12 @@ func (r removedInStorage) New() runtime.Object {
 	return removedInObj{major: r.major, minor: r.minor}
 }
 
-type neverRemovedObj struct {
-}
+type neverRemovedObj struct{}
 
 func (r neverRemovedObj) GetObjectKind() schema.ObjectKind {
 	panic("don't do this")
 }
+
 func (r neverRemovedObj) DeepCopyObject() runtime.Object {
 	panic("don't do this either")
 }
@@ -127,9 +127,11 @@ type removedInObj struct {
 func (r removedInObj) GetObjectKind() schema.ObjectKind {
 	panic("don't do this")
 }
+
 func (r removedInObj) DeepCopyObject() runtime.Object {
 	panic("don't do this either")
 }
+
 func (r removedInObj) APILifecycleRemoved() (major, minor int) {
 	return r.major, r.minor
 }

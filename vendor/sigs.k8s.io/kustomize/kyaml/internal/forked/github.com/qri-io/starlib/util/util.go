@@ -212,7 +212,7 @@ func Marshal(data interface{}) (v starlark.Value, err error) {
 	// case time.Time:
 	// 	v = starlibtime.Time(x)
 	case []interface{}:
-		var elems = make([]starlark.Value, len(x))
+		elems := make([]starlark.Value, len(x))
 		for i, val := range x {
 			elems[i], err = Marshal(val)
 			if err != nil {

@@ -91,36 +91,43 @@ func (f *fakePodWorkers) IsPodKnownTerminated(uid types.UID) bool {
 	defer f.statusLock.Unlock()
 	return f.terminated[uid]
 }
+
 func (f *fakePodWorkers) CouldHaveRunningContainers(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.running[uid]
 }
+
 func (f *fakePodWorkers) IsPodTerminationRequested(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.terminationRequested[uid]
 }
+
 func (f *fakePodWorkers) ShouldPodContainersBeTerminating(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.terminating[uid]
 }
+
 func (f *fakePodWorkers) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.removeRuntime[uid]
 }
+
 func (f *fakePodWorkers) setPodRuntimeBeRemoved(uid types.UID) {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	f.removeRuntime = map[types.UID]bool{uid: true}
 }
+
 func (f *fakePodWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.removeContent[uid]
 }
+
 func (f *fakePodWorkers) IsPodForMirrorPodTerminatingByFullName(podFullname string) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
@@ -289,7 +296,6 @@ func TestUpdatePod(t *testing.T) {
 		last := len(processed[uid]) - 1
 		if processed[uid][first].name != "0" {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, first, processed[uid][first])
-
 		}
 		if processed[uid][last].name != strconv.Itoa(i) {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, last, processed[uid][last])

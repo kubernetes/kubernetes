@@ -3,11 +3,12 @@ package jsoniter
 import (
 	"errors"
 	"fmt"
-	"github.com/modern-go/reflect2"
 	"io"
 	"reflect"
 	"strconv"
 	"unsafe"
+
+	"github.com/modern-go/reflect2"
 )
 
 // Any generic object representation.
@@ -303,8 +304,7 @@ func (codec *anyCodec) IsEmpty(ptr unsafe.Pointer) bool {
 	return any.Size() == 0
 }
 
-type directAnyCodec struct {
-}
+type directAnyCodec struct{}
 
 func (codec *directAnyCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	*(*Any)(ptr) = iter.readAny()

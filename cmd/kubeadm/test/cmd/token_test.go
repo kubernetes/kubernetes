@@ -57,8 +57,9 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 		t.Error("'kubeadm token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
 	}
 }
+
 func TestCmdTokenDelete(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		args     string
 		expected bool

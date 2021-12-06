@@ -1,3 +1,4 @@
+//go:build go1.8
 // +build go1.8
 
 package gziphandler
@@ -17,7 +18,6 @@ func (w *GzipResponseWriter) Push(target string, opts *http.PushOptions) error {
 
 // setAcceptEncodingForPushOptions sets "Accept-Encoding" : "gzip" for PushOptions without overriding existing headers.
 func setAcceptEncodingForPushOptions(opts *http.PushOptions) *http.PushOptions {
-
 	if opts == nil {
 		opts = &http.PushOptions{
 			Header: http.Header{

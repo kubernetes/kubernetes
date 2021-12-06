@@ -134,7 +134,6 @@ func (c *Manager) GetTag(ctx context.Context, id string) (*Tag, error) {
 	url := internal.URL(c, internal.TagPath).WithID(id)
 	var res Tag
 	return &res, c.Do(ctx, url.Request(http.MethodGet), &res)
-
 }
 
 // GetTagForCategory fetches the tag information for the given identifier in the given category.

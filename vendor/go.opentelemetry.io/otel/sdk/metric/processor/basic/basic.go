@@ -116,11 +116,13 @@ type (
 	}
 )
 
-var _ export.Processor = &Processor{}
-var _ export.Checkpointer = &Processor{}
-var _ export.CheckpointSet = &state{}
-var ErrInconsistentState = fmt.Errorf("inconsistent processor state")
-var ErrInvalidExportKind = fmt.Errorf("invalid export kind")
+var (
+	_                    export.Processor     = &Processor{}
+	_                    export.Checkpointer  = &Processor{}
+	_                    export.CheckpointSet = &state{}
+	ErrInconsistentState                      = fmt.Errorf("inconsistent processor state")
+	ErrInvalidExportKind                      = fmt.Errorf("invalid export kind")
+)
 
 // New returns a basic Processor that is also a Checkpointer using the provided
 // AggregatorSelector to select Aggregators.  The ExportKindSelector

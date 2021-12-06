@@ -31,7 +31,7 @@ import (
 
 func TestRecordOperation(t *testing.T) {
 	// Use local registry
-	var registry = compbasemetrics.NewKubeRegistry()
+	registry := compbasemetrics.NewKubeRegistry()
 	var gather compbasemetrics.Gatherer = registry
 
 	registry.MustRegister(metrics.RuntimeOperations)

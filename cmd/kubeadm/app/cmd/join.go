@@ -167,7 +167,6 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			c, err := joinRunner.InitData(args)
 			if err != nil {
 				return err
@@ -334,7 +333,6 @@ func newJoinOptions() *joinOptions {
 // This func takes care of validating joinOptions passed to the command, and then it converts
 // options into the internal JoinConfiguration type that is used as input all the phases in the kubeadm join workflow
 func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Writer, adminKubeConfigPath string) (*joinData, error) {
-
 	// Validate the mixed arguments with --config and return early on errors
 	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return nil, err
@@ -424,7 +422,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		}
 		klog.V(1).Infof("[preflight] found discovery flags missing for this command. using FileDiscovery: %s", adminKubeConfigPath)
 		opt.externalcfg.Discovery.File = &kubeadmapiv1.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
-		opt.externalcfg.Discovery.BootstrapToken = nil //NB. this could be removed when we get better control on args (e.g. phases without discovery should have NoArgs )
+		opt.externalcfg.Discovery.BootstrapToken = nil // NB. this could be removed when we get better control on args (e.g. phases without discovery should have NoArgs )
 	}
 
 	cfg, err := configutil.LoadOrDefaultJoinConfiguration(opt.cfgPath, opt.externalcfg)

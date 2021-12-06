@@ -313,7 +313,7 @@ func parseLoginDefs(file string) (*limits, error) {
 	if len(file) == 0 {
 		return &l, nil
 	}
-	var mapping = map[string]*int64{
+	mapping := map[string]*int64{
 		"SYS_UID_MIN": &l.minUID,
 		"SYS_UID_MAX": &l.maxUID,
 		"SYS_GID_MIN": &l.minGID,

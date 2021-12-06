@@ -346,7 +346,7 @@ func TestSync(t *testing.T) {
 
 		c.checkAPIService(test.apiServiceName)
 
-		//compare the expected results
+		// compare the expected results
 		err := test.expectedResults(test.apiServiceName, fakeClient)
 		if err != nil {
 			t.Errorf("%s %v", test.name, err)

@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VirtualNetworkGatewayConnectionsClient is the network Client
@@ -49,15 +50,27 @@ func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdate(ctx context.
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}}},
-					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}}},
-					{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2.LocalNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway1.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+					{
+						Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.VirtualNetworkGateway2.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+					{
+						Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayConnectionPropertiesFormat.LocalNetworkGateway2.LocalNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.VirtualNetworkGatewayConnectionsClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -493,11 +506,17 @@ func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKey(ctx context.
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.KeyLength", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.KeyLength", Name: validation.InclusiveMaximum, Rule: int64(128), Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.KeyLength", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{
+					{Target: "parameters.KeyLength", Name: validation.InclusiveMaximum, Rule: int64(128), Chain: nil},
 					{Target: "parameters.KeyLength", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-				}}}}}); err != nil {
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.VirtualNetworkGatewayConnectionsClient", "ResetSharedKey", err.Error())
 	}
 
@@ -586,8 +605,11 @@ func (client VirtualNetworkGatewayConnectionsClient) SetSharedKey(ctx context.Co
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.Value", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.Value", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.VirtualNetworkGatewayConnectionsClient", "SetSharedKey", err.Error())
 	}
 

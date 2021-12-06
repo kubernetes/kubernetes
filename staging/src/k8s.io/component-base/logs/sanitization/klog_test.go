@@ -31,7 +31,6 @@ import (
 )
 
 func TestKlogIntegration(t *testing.T) {
-
 	fs := flag.FlagSet{}
 	klog.InitFlags(&fs)
 	err := fs.Set("v", "1")
@@ -213,14 +212,11 @@ func TestKlogIntegration(t *testing.T) {
 			if !assert.Equal(t, expect, logString) {
 				t.Errorf("Info has wrong format \n expect:%s\n got:%s", expect, logString)
 			}
-
 		})
 	}
 }
 
-var (
-	re = regexp.MustCompile(`\s{2,}`)
-)
+var re = regexp.MustCompile(`\s{2,}`)
 
 // normalizeKlogLine removes duplicate whitespaces to make lines match no matter the environment.
 // Klog padds the log header to try to maintain same width. Depending on how high the process

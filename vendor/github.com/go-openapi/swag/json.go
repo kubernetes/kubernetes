@@ -245,8 +245,8 @@ func buildnameIndex(tpe reflect.Type, idx, reverseIdx map[string]string) {
 }
 
 func newNameIndex(tpe reflect.Type) nameIndex {
-	var idx = make(map[string]string, tpe.NumField())
-	var reverseIdx = make(map[string]string, tpe.NumField())
+	idx := make(map[string]string, tpe.NumField())
+	reverseIdx := make(map[string]string, tpe.NumField())
 
 	buildnameIndex(tpe, idx, reverseIdx)
 	return nameIndex{jsonNames: idx, goNames: reverseIdx}

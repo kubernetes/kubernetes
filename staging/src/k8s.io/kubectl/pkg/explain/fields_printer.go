@@ -27,8 +27,10 @@ type regularFieldsPrinter struct {
 	Error  error
 }
 
-var _ proto.SchemaVisitor = &regularFieldsPrinter{}
-var _ fieldsPrinter = &regularFieldsPrinter{}
+var (
+	_ proto.SchemaVisitor = &regularFieldsPrinter{}
+	_ fieldsPrinter       = &regularFieldsPrinter{}
+)
 
 // VisitArray prints a Array type. It is just a passthrough.
 func (f *regularFieldsPrinter) VisitArray(a *proto.Array) {

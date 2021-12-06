@@ -274,7 +274,7 @@ func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
 	}
 
 	// Determine the threshold before starting a new node.
-	var fillPercent = n.bucket.FillPercent
+	fillPercent := n.bucket.FillPercent
 	if fillPercent < minFillPercent {
 		fillPercent = minFillPercent
 	} else if fillPercent > maxFillPercent {
@@ -333,7 +333,7 @@ func (n *node) splitIndex(threshold int) (index, sz uintptr) {
 // spill writes the nodes to dirty pages and splits nodes as it goes.
 // Returns an error if dirty pages cannot be allocated.
 func (n *node) spill() error {
-	var tx = n.bucket.tx
+	tx := n.bucket.tx
 	if n.spilled {
 		return nil
 	}
@@ -352,7 +352,7 @@ func (n *node) spill() error {
 	n.children = nil
 
 	// Split nodes into appropriate sizes. The first node will always be n.
-	var nodes = n.split(uintptr(tx.db.pageSize))
+	nodes := n.split(uintptr(tx.db.pageSize))
 	for _, node := range nodes {
 		// Add node's page to the freelist if it's not new.
 		if node.pgid > 0 {
@@ -376,7 +376,7 @@ func (n *node) spill() error {
 
 		// Insert into parent inodes.
 		if node.parent != nil {
-			var key = node.key
+			key := node.key
 			if key == nil {
 				key = node.inodes[0].key
 			}
@@ -412,7 +412,7 @@ func (n *node) rebalance() {
 	n.bucket.tx.stats.Rebalance++
 
 	// Ignore if node is above threshold (25%) and has enough keys.
-	var threshold = n.bucket.tx.db.pageSize / 4
+	threshold := n.bucket.tx.db.pageSize / 4
 	if n.size() > threshold && len(n.inodes) > n.minKeys() {
 		return
 	}
@@ -457,7 +457,7 @@ func (n *node) rebalance() {
 
 	// Destination node is right sibling if idx == 0, otherwise left sibling.
 	var target *node
-	var useNextSibling = (n.parent.childIndex(n) == 0)
+	useNextSibling := (n.parent.childIndex(n) == 0)
 	if useNextSibling {
 		target = n.nextSibling()
 	} else {

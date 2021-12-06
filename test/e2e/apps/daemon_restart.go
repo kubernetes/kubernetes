@@ -108,7 +108,6 @@ func (r *RestartDaemonConfig) waitUp() {
 	} else {
 		healthzCheck = fmt.Sprintf(
 			"curl -s -o %v -I -w \"%%{http_code}\" http://localhost:%v/healthz", nullDev, r.healthzPort)
-
 	}
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
 		result, err := e2essh.NodeExec(r.nodeName, healthzCheck, framework.TestContext.Provider)
@@ -202,7 +201,6 @@ func getContainerRestarts(c clientset.Interface, ns string, labelSelector labels
 }
 
 var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
-
 	f := framework.NewDefaultFramework("daemonrestart")
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(uuid.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
@@ -268,7 +266,6 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	})
 
 	ginkgo.It("Controller Manager should not create/delete replicas across restart", func() {
-
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
@@ -299,7 +296,6 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	})
 
 	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func() {
-
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(

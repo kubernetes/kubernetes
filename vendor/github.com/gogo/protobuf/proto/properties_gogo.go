@@ -32,5 +32,7 @@ import (
 	"reflect"
 )
 
-var sizerType = reflect.TypeOf((*Sizer)(nil)).Elem()
-var protosizerType = reflect.TypeOf((*ProtoSizer)(nil)).Elem()
+var (
+	sizerType      = reflect.TypeOf((*Sizer)(nil)).Elem()
+	protosizerType = reflect.TypeOf((*ProtoSizer)(nil)).Elem()
+)

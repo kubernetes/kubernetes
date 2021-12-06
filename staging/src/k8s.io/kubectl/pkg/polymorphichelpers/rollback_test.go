@@ -54,7 +54,9 @@ func TestRollbackerFor(t *testing.T) {
 func TestGetDeploymentPatch(t *testing.T) {
 	patchType, patchBytes, err := getDeploymentPatch(&corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{Image: "foo"}}}}, map[string]string{"a": "true"})
+			Containers: []corev1.Container{{Image: "foo"}},
+		},
+	}, map[string]string{"a": "true"})
 	if err != nil {
 		t.Error(err)
 	}

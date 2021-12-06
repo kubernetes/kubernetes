@@ -25,11 +25,8 @@ import (
 
 type SnapshotCache interface {
 	Add(snapshot Snapshot)
-
 	Delete(i int)
-
 	List(ready bool) []csi.Snapshot
-
 	FindSnapshot(k, v string) (int, Snapshot)
 }
 

@@ -375,6 +375,7 @@ func (mt messageType) Enum(i int) pref.EnumType {
 	}
 	return nil
 }
+
 func (mt messageType) Message(i int) pref.MessageType {
 	if md := mt.desc.Fields().Get(i).Message(); md != nil {
 		return NewMessageType(md)
@@ -474,6 +475,7 @@ func (x *dynamicMap) NewValue() pref.Value {
 	}
 	return x.desc.MapValue().Default()
 }
+
 func (x *dynamicMap) IsValid() bool {
 	return x.mapv != nil
 }

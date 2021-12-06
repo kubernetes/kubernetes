@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VirtualMachineRunCommandsClient is the compute Client
@@ -48,8 +49,11 @@ func (client VirtualMachineRunCommandsClient) Get(ctx context.Context, location 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: location,
-			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachineRunCommandsClient", "Get", err.Error())
 	}
 
@@ -129,8 +133,11 @@ func (client VirtualMachineRunCommandsClient) List(ctx context.Context, location
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: location,
-			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachineRunCommandsClient", "List", err.Error())
 	}
 

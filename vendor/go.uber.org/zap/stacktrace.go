@@ -27,13 +27,11 @@ import (
 	"go.uber.org/zap/internal/bufferpool"
 )
 
-var (
-	_stacktracePool = sync.Pool{
-		New: func() interface{} {
-			return newProgramCounters(64)
-		},
-	}
-)
+var _stacktracePool = sync.Pool{
+	New: func() interface{} {
+		return newProgramCounters(64)
+	},
+}
 
 func takeStacktrace(skip int) string {
 	buffer := bufferpool.Get()

@@ -327,7 +327,6 @@ func TestAllPossibleAccessModes(t *testing.T) {
 	if !util.ContainsAccessMode(possibleModes[0], v1.ReadWriteMany) {
 		t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 	}
-
 }
 
 func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
@@ -1047,7 +1046,6 @@ func createTestVolOrderedIndex(pv *v1.PersistentVolume) persistentVolumeOrderedI
 }
 
 func TestVolumeModeCheck(t *testing.T) {
-
 	blockMode := v1.PersistentVolumeBlock
 	filesystemMode := v1.PersistentVolumeFilesystem
 

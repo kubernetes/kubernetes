@@ -20,7 +20,6 @@ type FileStream struct {
 }
 
 func NewFileStream(fileName string) (*FileStream, error) {
-
 	buf := bytes.NewBuffer(nil)
 
 	f, err := os.Open(fileName)
@@ -41,7 +40,6 @@ func NewFileStream(fileName string) (*FileStream, error) {
 	fs.InputStream = NewInputStream(s)
 
 	return fs, nil
-
 }
 
 func (f *FileStream) GetSourceName() string {

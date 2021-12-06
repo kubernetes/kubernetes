@@ -22,9 +22,7 @@ import (
 	"k8s.io/utils/clock"
 )
 
-var (
-	_ = clock.PassiveClock(&SimpleIntervalClock{})
-)
+var _ = clock.PassiveClock(&SimpleIntervalClock{})
 
 // SimpleIntervalClock implements clock.PassiveClock, but each invocation of Now steps the clock forward the specified duration
 type SimpleIntervalClock struct {

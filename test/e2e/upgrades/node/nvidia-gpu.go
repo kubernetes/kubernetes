@@ -31,8 +31,7 @@ const (
 
 // NvidiaGPUUpgradeTest tests that gpu resource is available before and after
 // a cluster upgrade.
-type NvidiaGPUUpgradeTest struct {
-}
+type NvidiaGPUUpgradeTest struct{}
 
 // Name returns the tracking name of the test.
 func (NvidiaGPUUpgradeTest) Name() string { return "nvidia-gpu-upgrade [sig-node] [sig-scheduling]" }

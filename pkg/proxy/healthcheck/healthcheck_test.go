@@ -58,15 +58,16 @@ type fakeNetListener struct {
 	addr   string
 }
 
-type fakeAddr struct {
-}
+type fakeAddr struct{}
 
 func (fa fakeAddr) Network() string {
 	return "tcp"
 }
+
 func (fa fakeAddr) String() string {
 	return "<test>"
 }
+
 func (fake *fakeNetListener) Accept() (net.Conn, error) {
 	// Not implemented
 	return nil, nil
@@ -278,7 +279,7 @@ func TestServer(t *testing.T) {
 
 	// sync new services
 	hcs.SyncServices(map[types.NamespacedName]uint16{
-		//nsn1: 9376, // remove it
+		// nsn1: 9376, // remove it
 		nsn2: 12909, // leave it
 		nsn3: 11114, // change it
 		nsn4: 11878, // add it

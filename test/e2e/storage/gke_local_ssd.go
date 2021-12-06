@@ -31,7 +31,6 @@ import (
 )
 
 var _ = utils.SIGDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
-
 	f := framework.NewDefaultFramework("localssd")
 
 	ginkgo.BeforeEach(func() {
@@ -59,9 +58,9 @@ func createNodePoolWithLocalSsds(nodePoolName string) {
 }
 
 func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
-	var pod = testPodWithSsd("echo 'hello world' > /mnt/disks/ssd0/data  && sleep 1 && cat /mnt/disks/ssd0/data")
+	pod := testPodWithSsd("echo 'hello world' > /mnt/disks/ssd0/data  && sleep 1 && cat /mnt/disks/ssd0/data")
 	var msg string
-	var out = []string{"hello world"}
+	out := []string{"hello world"}
 
 	f.TestContainerOutput(msg, pod, 0, out)
 }

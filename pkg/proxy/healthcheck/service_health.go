@@ -53,7 +53,6 @@ type ServiceHealthServer interface {
 }
 
 func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses []string) ServiceHealthServer {
-
 	nodeAddresses, err := utilproxy.GetNodeAddresses(nodePortAddresses, utilproxy.RealNetwork{})
 	if err != nil || nodeAddresses.Len() == 0 {
 		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
@@ -125,7 +124,6 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 
 		svc := &hcInstance{nsn: nsn, port: port}
 		err := svc.listenAndServeAll(hcs)
-
 		if err != nil {
 			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.hostname, nsn.String(), port, err)
 

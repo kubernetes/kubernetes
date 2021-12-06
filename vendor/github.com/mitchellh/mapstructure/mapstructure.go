@@ -1156,7 +1156,6 @@ func (d *Decoder) decodeArray(name string, data interface{}, val reflect.Value) 
 		if dataVal.Len() > arrayType.Len() {
 			return fmt.Errorf(
 				"'%s': expected source data to have length less or equal to %d, got %d", name, arrayType.Len(), dataVal.Len())
-
 		}
 
 		// Make a new array to hold our result, same size as the original data.

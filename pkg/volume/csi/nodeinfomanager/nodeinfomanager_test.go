@@ -58,9 +58,11 @@ type testcase struct {
 	hasModified      bool
 }
 
-type nodeIDMap map[string]string
-type topologyKeyMap map[string][]string
-type labelMap map[string]string
+type (
+	nodeIDMap      map[string]string
+	topologyKeyMap map[string][]string
+	labelMap       map[string]string
+)
 
 // TestInstallCSIDriver tests InstallCSIDriver with various existing Node and/or CSINode objects.
 // The node IDs in all test cases below are the same between the Node annotation and CSINode.

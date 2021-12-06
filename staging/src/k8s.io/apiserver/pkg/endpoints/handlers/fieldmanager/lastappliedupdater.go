@@ -71,11 +71,11 @@ func (f *lastAppliedUpdater) Apply(liveObj, newObj runtime.Object, managed Manag
 }
 
 func hasLastApplied(obj runtime.Object) bool {
-	var accessor, err = meta.Accessor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
-	var annotations = accessor.GetAnnotations()
+	annotations := accessor.GetAnnotations()
 	if annotations == nil {
 		return false
 	}
@@ -88,7 +88,7 @@ func setLastApplied(obj runtime.Object, value string) error {
 	if err != nil {
 		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
-	var annotations = accessor.GetAnnotations()
+	annotations := accessor.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
@@ -103,13 +103,13 @@ func setLastApplied(obj runtime.Object, value string) error {
 func buildLastApplied(obj runtime.Object) (string, error) {
 	obj = obj.DeepCopyObject()
 
-	var accessor, err = meta.Accessor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
 
 	// Remove the annotation from the object before encoding the object
-	var annotations = accessor.GetAnnotations()
+	annotations := accessor.GetAnnotations()
 	delete(annotations, corev1.LastAppliedConfigAnnotation)
 	accessor.SetAnnotations(annotations)
 

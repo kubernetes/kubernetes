@@ -502,7 +502,7 @@ func (p *plugin) hasLoop(pkg string, field *descriptor.FieldDescriptorProto, vis
 }
 
 func (p *plugin) loops(pkg string, field *descriptor.FieldDescriptorProto, message *generator.Descriptor) int {
-	//fmt.Fprintf(os.Stderr, "loops %v %v\n", field.GetTypeName(), generator.CamelCaseSlice(message.TypeName()))
+	// fmt.Fprintf(os.Stderr, "loops %v %v\n", field.GetTypeName(), generator.CamelCaseSlice(message.TypeName()))
 	excludes := []*generator.Descriptor{}
 	loops := 0
 	for {
@@ -511,7 +511,7 @@ func (p *plugin) loops(pkg string, field *descriptor.FieldDescriptorProto, messa
 		if loopTo == nil {
 			break
 		}
-		//fmt.Fprintf(os.Stderr, "loopTo %v\n", generator.CamelCaseSlice(loopTo.TypeName()))
+		// fmt.Fprintf(os.Stderr, "loopTo %v\n", generator.CamelCaseSlice(loopTo.TypeName()))
 		excludes = append(excludes, loopTo)
 		loops++
 	}
@@ -676,7 +676,7 @@ func (p *plugin) Generate(file *generator.FileDescriptor) {
 		p.P(`}`)
 		p.P(``)
 
-		//Generate NewPopulated functions for oneof fields
+		// Generate NewPopulated functions for oneof fields
 		m := proto.Clone(message.DescriptorProto).(*descriptor.DescriptorProto)
 		for _, f := range m.Field {
 			oneof := f.OneofIndex != nil
@@ -807,7 +807,6 @@ func (p *plugin) Generate(file *generator.FileDescriptor) {
 	p.P(`return dAtA`)
 	p.Out()
 	p.P(`}`)
-
 }
 
 func init() {

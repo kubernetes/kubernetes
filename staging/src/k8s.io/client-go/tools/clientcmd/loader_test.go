@@ -38,50 +38,64 @@ import (
 var (
 	testConfigAlfa = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"red-user": {Token: "red-token"}},
+			"red-user": {Token: "red-token"},
+		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"cow-cluster": {Server: "http://cow.org:8080"}},
+			"cow-cluster": {Server: "http://cow.org:8080"},
+		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster", Namespace: "hammer-ns"}},
+			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster", Namespace: "hammer-ns"},
+		},
 	}
 	testConfigBravo = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"black-user": {Token: "black-token"}},
+			"black-user": {Token: "black-token"},
+		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"pig-cluster": {Server: "http://pig.org:8080"}},
+			"pig-cluster": {Server: "http://pig.org:8080"},
+		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"queen-anne-context": {AuthInfo: "black-user", Cluster: "pig-cluster", Namespace: "saw-ns"}},
+			"queen-anne-context": {AuthInfo: "black-user", Cluster: "pig-cluster", Namespace: "saw-ns"},
+		},
 	}
 	testConfigCharlie = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"green-user": {Token: "green-token"}},
+			"green-user": {Token: "green-token"},
+		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"horse-cluster": {Server: "http://horse.org:8080"}},
+			"horse-cluster": {Server: "http://horse.org:8080"},
+		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"shaker-context": {AuthInfo: "green-user", Cluster: "horse-cluster", Namespace: "chisel-ns"}},
+			"shaker-context": {AuthInfo: "green-user", Cluster: "horse-cluster", Namespace: "chisel-ns"},
+		},
 	}
 	testConfigDelta = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"blue-user": {Token: "blue-token"}},
+			"blue-user": {Token: "blue-token"},
+		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"chicken-cluster": {Server: "http://chicken.org:8080"}},
+			"chicken-cluster": {Server: "http://chicken.org:8080"},
+		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"gothic-context": {AuthInfo: "blue-user", Cluster: "chicken-cluster", Namespace: "plane-ns"}},
+			"gothic-context": {AuthInfo: "blue-user", Cluster: "chicken-cluster", Namespace: "plane-ns"},
+		},
 	}
 
 	testConfigConflictAlfa = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"red-user":    {Token: "a-different-red-token"},
-			"yellow-user": {Token: "yellow-token"}},
+			"yellow-user": {Token: "yellow-token"},
+		},
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true},
-			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true}},
+			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true},
+		},
 		CurrentContext: "federal-context",
 	}
 )
 
 func TestNilOutMap(t *testing.T) {
-	var fakeKubeconfigData = `apiVersion: v1
+	fakeKubeconfigData := `apiVersion: v1
 kind: Config
 clusters:
 - cluster:
@@ -135,7 +149,7 @@ func TestErrorReadingFile(t *testing.T) {
 	commandLineFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(commandLineFile.Name())
 
-	if err := ioutil.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
+	if err := ioutil.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0o644); err != nil {
 		t.Fatalf("Error creating tempfile: %v", err)
 	}
 
@@ -308,8 +322,7 @@ users:
 - name: kubeconfig-user
   user:
     tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-`), os.FileMode(0755))
-
+`), os.FileMode(0o755))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -350,8 +363,7 @@ users:
 - name: kubeconfig-user
   user:
     tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-`), os.FileMode(0755))
-
+`), os.FileMode(0o755))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -390,8 +402,7 @@ users:
 - name: kubeconfig-user
   user:
     tokenFile: /var/run/secrets/test.example.com/serviceaccount/token
-`), os.FileMode(0755))
-
+`), os.FileMode(0o755))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -434,8 +445,7 @@ extensions:
 - extension:
     bytes: some-example
   name: test-extension
-`), os.FileMode(0755))
-
+`), os.FileMode(0o755))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -556,7 +566,6 @@ func TestResolveRelativePaths(t *testing.T) {
 	if foundAuthInfoCount != 7 {
 		t.Errorf("Expected 7 users, found %v: %v", foundAuthInfoCount, mergedConfig.AuthInfos)
 	}
-
 }
 
 func TestMigratingFile(t *testing.T) {

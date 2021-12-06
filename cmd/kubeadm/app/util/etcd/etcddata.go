@@ -24,7 +24,7 @@ import (
 
 // CreateDataDirectory creates the etcd data directory (commonly /var/lib/etcd) with the right permissions.
 func CreateDataDirectory(dir string) error {
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return errors.Wrapf(err, "failed to create the etcd data directory: %q", dir)
 	}
 	return nil

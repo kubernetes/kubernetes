@@ -100,7 +100,6 @@ var _ = SIGDescribe("Aggregator", func() {
 		// Testing a 1.17 version of the sample-apiserver
 		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
-
 })
 
 func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
@@ -147,7 +146,6 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 
 	// kubectl create -f clusterrole.yaml
 	_, err = client.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
-
 		ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver-reader"},
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
@@ -343,7 +341,6 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	)
 
 	err = pollTimed(100*time.Millisecond, 60*time.Second, func() (bool, error) {
-
 		currentAPIService, _ = aggrclient.ApiregistrationV1().APIServices().Get(context.TODO(), "v1alpha1.wardle.example.com", metav1.GetOptions{})
 		currentPods, _ = client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 

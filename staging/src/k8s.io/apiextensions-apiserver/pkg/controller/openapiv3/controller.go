@@ -228,7 +228,6 @@ func (c *Controller) updateCRDSpec(crd *apiextensionsv1.CustomResourceDefinition
 
 func (c *Controller) buildV3Spec(crd *apiextensionsv1.CustomResourceDefinition, name, versionName string) error {
 	v3, err := builder.BuildOpenAPIV3(crd, versionName, builder.Options{V2: false})
-
 	if err != nil {
 		return err
 	}

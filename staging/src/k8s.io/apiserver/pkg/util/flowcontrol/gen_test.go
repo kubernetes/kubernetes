@@ -47,14 +47,19 @@ func genPL(rng *rand.Rand, name string) *flowcontrol.PriorityLevelConfiguration 
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				AssuredConcurrencyShares: rng.Int31n(100) + 1,
 				LimitResponse: flowcontrol.LimitResponse{
-					Type: flowcontrol.LimitResponseTypeReject}}}}
+					Type: flowcontrol.LimitResponseTypeReject,
+				},
+			},
+		},
+	}
 	if rng.Float32() < 0.95 {
 		plc.Spec.Limited.LimitResponse.Type = flowcontrol.LimitResponseTypeQueue
 		hs := rng.Int31n(5) + 1
 		plc.Spec.Limited.LimitResponse.Queuing = &flowcontrol.QueuingConfiguration{
 			Queues:           hs + rng.Int31n(20),
 			HandSize:         hs,
-			QueueLengthLimit: 5}
+			QueueLengthLimit: 5,
+		}
 	}
 	labelVals := []string{"test"}
 	_, err := queueSetCompleterForPL(noRestraintQSF, nil, plc, time.Minute, metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, labelVals), metrics.PriorityLevelExecutionSeatsObserverGenerator.Generate(1, 1, labelVals))
@@ -99,7 +104,8 @@ var mandFTRExempt = &fsTestingRecord{
 				RequestInfo: &request.RequestInfo{
 					IsResourceRequest: false,
 					Path:              "/foo/bar",
-					Verb:              "frobulate"},
+					Verb:              "frobulate",
+				},
 				User: &user.DefaultInfo{
 					Name:   "nobody",
 					Groups: []string{user.AllAuthenticated, "nogroup"},
@@ -124,7 +130,8 @@ var mandFTRExempt = &fsTestingRecord{
 				RequestInfo: &request.RequestInfo{
 					IsResourceRequest: false,
 					Path:              "/foo/bar",
-					Verb:              "frobulate"},
+					Verb:              "frobulate",
+				},
 				User: &user.DefaultInfo{
 					Name:   "nobody",
 					Groups: []string{user.AllAuthenticated, user.SystemPrivilegedGroup},
@@ -157,7 +164,8 @@ var mandFTRCatchAll = &fsTestingRecord{
 				RequestInfo: &request.RequestInfo{
 					IsResourceRequest: false,
 					Path:              "/foo/bar",
-					Verb:              "frobulate"},
+					Verb:              "frobulate",
+				},
 				User: &user.DefaultInfo{
 					Name:   "nobody",
 					Groups: []string{user.AllAuthenticated, "nogroup"},
@@ -192,16 +200,19 @@ var mandFTRCatchAll = &fsTestingRecord{
 func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool, goodPLNames, badPLNames sets.String) *fsTestingRecord {
 	fs := &flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       flowcontrol.FlowSchemaSpec{}}
+		Spec:       flowcontrol.FlowSchemaSpec{},
+	}
 	// 5% chance of zero rules, otherwise draw from 1--6 biased low
 	nRules := (1 + rng.Intn(3)) * (1 + rng.Intn(2)) * ((19 + rng.Intn(20)) / 20)
-	ftr := &fsTestingRecord{fs: fs,
+	ftr := &fsTestingRecord{
+		fs:                            fs,
 		wellFormed:                    true,
 		matchesAllResourceRequests:    nRules > 0 && rng.Float32() < 0.1,
 		matchesAllNonResourceRequests: nRules > 0 && rng.Float32() < 0.1,
 		digests: map[bool]map[bool][]RequestDigest{
 			false: {false: {}, true: {}},
-			true:  {false: {}, true: {}}},
+			true:  {false: {}, true: {}},
+		},
 	}
 	dangleStatus := flowcontrol.ConditionFalse
 	if rng.Float32() < 0.9 && len(goodPLNames) > 0 {
@@ -213,7 +224,8 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 	}
 	fs.Status.Conditions = []flowcontrol.FlowSchemaCondition{{
 		Type:   flowcontrol.FlowSchemaConditionDangling,
-		Status: dangleStatus}}
+		Status: dangleStatus,
+	}}
 	fs.Spec.MatchingPrecedence = rng.Int31n(9997) + 2
 	if rng.Float32() < 0.8 {
 		fdmt := flowcontrol.FlowDistinguisherMethodType(pickSetString(rng, flowDistinguisherMethodTypes))
@@ -441,12 +453,14 @@ func genUser(rng *rand.Rand, pfx string) (*flowcontrol.UserSubject, []user.Info,
 		Name:   pfx + "-u",
 		UID:    "good-id",
 		Groups: []string{pfx + "-g1", mg(rng), pfx + "-g2"},
-		Extra:  noextra}
+		Extra:  noextra,
+	}
 	skips := []user.Info{&user.DefaultInfo{
 		Name:   mui.Name + "x",
 		UID:    mui.UID,
 		Groups: mui.Groups,
-		Extra:  mui.Extra}}
+		Extra:  mui.Extra,
+	}}
 	return &flowcontrol.UserSubject{mui.Name}, []user.Info{mui}, skips
 }
 
@@ -476,7 +490,8 @@ func genGroup(rng *rand.Rand, pfx string) (*flowcontrol.GroupSubject, []user.Inf
 		Name:   pfx + "-u",
 		UID:    "good-id",
 		Groups: []string{name},
-		Extra:  noextra}
+		Extra:  noextra,
+	}
 	if rng.Intn(2) == 0 {
 		ui.Groups = append([]string{mg(rng)}, ui.Groups...)
 	} else {
@@ -492,7 +507,8 @@ func genGroup(rng *rand.Rand, pfx string) (*flowcontrol.GroupSubject, []user.Inf
 		Name:   pfx + "-u",
 		UID:    "bad-id",
 		Groups: []string{pfx + "-j", mg(rng)},
-		Extra:  noextra}
+		Extra:  noextra,
+	}
 	if rng.Intn(2) == 0 {
 		skipper.Groups = append(skipper.Groups, pfx+"-k")
 	}
@@ -510,20 +526,23 @@ func genServiceAccount(rng *rand.Rand, pfx string) (*flowcontrol.ServiceAccountS
 		Name:   fmt.Sprintf("system:serviceaccount:%s:%s", ns, name),
 		UID:    "good-id",
 		Groups: []string{pfx + "-g1", mg(rng), pfx + "-g2"},
-		Extra:  noextra}
+		Extra:  noextra,
+	}
 	var skips []user.Info
 	if mname == "*" || rng.Intn(2) == 0 {
 		skips = []user.Info{&user.DefaultInfo{
 			Name:   fmt.Sprintf("system:serviceaccount:%sx:%s", ns, name),
 			UID:    "bad-id",
 			Groups: mui.Groups,
-			Extra:  mui.Extra}}
+			Extra:  mui.Extra,
+		}}
 	} else {
 		skips = []user.Info{&user.DefaultInfo{
 			Name:   fmt.Sprintf("system:serviceaccount:%s:%sx", ns, name),
 			UID:    "bad-id",
 			Groups: mui.Groups,
-			Extra:  mui.Extra}}
+			Extra:  mui.Extra,
+		}}
 	}
 	return &flowcontrol.ServiceAccountSubject{Namespace: ns, Name: mname}, []user.Info{mui}, skips
 }
@@ -542,7 +561,8 @@ func genResourceRule(rng *rand.Rand, pfx string, mayMatchClusterScope, matchAllR
 		APIGroups:    []string{pfx + ".g1", pfx + ".g2", pfx + ".g3"},
 		Resources:    []string{pfx + "-r1s", pfx + "-r2s", pfx + "-r3s"},
 		ClusterScope: namespaces[0] == "",
-		Namespaces:   rnamespaces}
+		Namespaces:   rnamespaces,
+	}
 	matchingRIs := genRRIs(rng, 3, rr.Verbs, rr.APIGroups, rr.Resources, namespaces)
 	var skippingRIs []*request.RequestInfo
 	if !someMatchesAllResources {
@@ -587,7 +607,8 @@ func genRRIs(rng *rand.Rand, m int, verbs, apiGroups, resources, namespaces []st
 			Verb:              verbs[coord%nv],
 			APIGroup:          apiGroups[coord/nv%ng],
 			Resource:          resources[coord/nv/ng%nr],
-			Namespace:         namespaces[coord/nv/ng/nr]})
+			Namespace:         namespaces[coord/nv/ng/nr],
+		})
 	}
 	return ans
 }
@@ -601,7 +622,8 @@ func genNRRIs(rng *rand.Rand, m int, verbs, urls []string) []*request.RequestInf
 		ri := &request.RequestInfo{
 			IsResourceRequest: false,
 			Verb:              verbs[coord%nv],
-			Path:              urls[coord/nv]}
+			Path:              urls[coord/nv],
+		}
 		if rng.Intn(2) == 1 {
 			ri.Path = ri.Path + "/more"
 		}

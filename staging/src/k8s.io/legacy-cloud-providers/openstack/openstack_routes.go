@@ -93,7 +93,7 @@ func (r *Routes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 		}
 		route := cloudprovider.Route{
 			Name:            item.DestinationCIDR,
-			TargetNode:      nodeName, //contains the nexthop address if node was not found
+			TargetNode:      nodeName, // contains the nexthop address if node was not found
 			Blackhole:       !foundNode,
 			DestinationCIDR: item.DestinationCIDR,
 		}
@@ -158,7 +158,6 @@ func (r *Routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	ip, _, _ := netutils.ParseCIDRSloppy(route.DestinationCIDR)
 	isCIDRv6 := ip.To4() == nil
 	addr, err := getAddressByName(r.compute, route.TargetNode, isCIDRv6)
-
 	if err != nil {
 		return err
 	}

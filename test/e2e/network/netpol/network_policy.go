@@ -119,7 +119,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 	var model *Model
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
-
 		ginkgo.AfterEach(func() {
 			if !useFixedNamespaces {
 				k8s := newKubeManager(f)
@@ -1261,7 +1260,6 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client using UDP", func() {
-
 		ginkgo.AfterEach(func() {
 			if !useFixedNamespaces {
 				k8s := newKubeManager(f)
@@ -1346,7 +1344,6 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disrupt
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client using SCTP", func() {
-
 		ginkgo.AfterEach(func() {
 			if !useFixedNamespaces {
 				k8s := newKubeManager(f)

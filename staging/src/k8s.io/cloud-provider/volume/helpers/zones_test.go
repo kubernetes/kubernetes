@@ -415,7 +415,6 @@ func TestChooseZonesForVolume(t *testing.T) {
 }
 
 func TestSelectZoneForVolume(t *testing.T) {
-
 	nodeWithGATopologyLabels := &v1.Node{}
 	nodeWithGATopologyLabels.Labels = map[string]string{v1.LabelTopologyZone: "zoneX"}
 
@@ -441,7 +440,6 @@ func TestSelectZoneForVolume(t *testing.T) {
 		ExpectedZones      string // set of zones one of whose members should match returned zone (requires ExpectSpecificZone to be false)
 	}{
 		// NEGATIVE TESTS
-
 		// Zone and Zones are both specified [Fail]
 		// [1] Node irrelevant
 		// [2] Zone and Zones parameters presents
@@ -805,7 +803,6 @@ func TestSelectZoneForVolume(t *testing.T) {
 }
 
 func TestSelectZonesForVolume(t *testing.T) {
-
 	nodeWithZoneLabels := &v1.Node{}
 	nodeWithZoneLabels.Labels = map[string]string{v1.LabelTopologyZone: "zoneX"}
 
@@ -830,7 +827,6 @@ func TestSelectZonesForVolume(t *testing.T) {
 		ExpectedZone        string // zone that should be a member of returned zones
 	}{
 		// NEGATIVE TESTS
-
 		// Zone and Zones are both specified [Fail]
 		// [1] Node irrelevant
 		// [2] Zone and Zones parameters presents
@@ -1493,7 +1489,6 @@ func TestChooseZonesForVolumeIncludingZone(t *testing.T) {
 		ExpectedZone        string // zone that should be a member of returned zones
 	}{
 		// NEGATIVE TESTS
-
 		// Not enough zones specified to fit ReplicaCount [Fail]
 		{
 			Name:         "Too_Few_Zones",

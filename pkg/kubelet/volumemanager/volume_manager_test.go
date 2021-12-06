@@ -188,7 +188,6 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected a volume to be mounted, got: %s", err)
 	}
-
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
@@ -330,7 +329,8 @@ func createObjects(pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, 
 					Name:       "fake/fake-device",
 					DevicePath: "fake/path",
 				},
-			}},
+			},
+		},
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -429,8 +429,7 @@ func delayClaimBecomesBound(
 	namespace, claimName string,
 ) {
 	time.Sleep(500 * time.Millisecond)
-	volumeClaim, _ :=
-		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+	volumeClaim, _ := kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
 	volumeClaim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimBound,
 	}
@@ -439,8 +438,8 @@ func delayClaimBecomesBound(
 
 func runVolumeManager(manager VolumeManager) chan struct{} {
 	stopCh := make(chan struct{})
-	//readyCh := make(chan bool, 1)
-	//readyCh <- true
+	// readyCh := make(chan bool, 1)
+	// readyCh <- true
 	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
 	go manager.Run(sourcesReady, stopCh)
 	return stopCh

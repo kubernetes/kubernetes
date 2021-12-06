@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // FirewallPolicyRuleGroupsClient is the network Client
@@ -50,13 +51,22 @@ func (client FirewallPolicyRuleGroupsClient) CreateOrUpdate(ctx context.Context,
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.FirewallPolicyRuleGroupProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.FirewallPolicyRuleGroupProperties.Priority", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.FirewallPolicyRuleGroupProperties.Priority", Name: validation.InclusiveMaximum, Rule: int64(65000), Chain: nil},
-						{Target: "parameters.FirewallPolicyRuleGroupProperties.Priority", Name: validation.InclusiveMinimum, Rule: int64(100), Chain: nil},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.FirewallPolicyRuleGroupProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.FirewallPolicyRuleGroupProperties.Priority", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "parameters.FirewallPolicyRuleGroupProperties.Priority", Name: validation.InclusiveMaximum, Rule: int64(65000), Chain: nil},
+							{Target: "parameters.FirewallPolicyRuleGroupProperties.Priority", Name: validation.InclusiveMinimum, Rule: int64(100), Chain: nil},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.FirewallPolicyRuleGroupsClient", "CreateOrUpdate", err.Error())
 	}
 

@@ -85,11 +85,13 @@ type nfsVolume struct {
 	f          *framework.Framework
 }
 
-var _ storageframework.TestDriver = &nfsDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &nfsDriver{}
-var _ storageframework.InlineVolumeTestDriver = &nfsDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &nfsDriver{}
-var _ storageframework.DynamicPVTestDriver = &nfsDriver{}
+var (
+	_ storageframework.TestDriver                     = &nfsDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &nfsDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &nfsDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &nfsDriver{}
+	_ storageframework.DynamicPVTestDriver            = &nfsDriver{}
+)
 
 // InitNFSDriver returns nfsDriver that implements TestDriver interface
 func InitNFSDriver() storageframework.TestDriver {
@@ -227,10 +229,12 @@ type glusterVolume struct {
 	f         *framework.Framework
 }
 
-var _ storageframework.TestDriver = &glusterFSDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &glusterFSDriver{}
-var _ storageframework.InlineVolumeTestDriver = &glusterFSDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &glusterFSDriver{}
+var (
+	_ storageframework.TestDriver                     = &glusterFSDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &glusterFSDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &glusterFSDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &glusterFSDriver{}
+)
 
 // InitGlusterFSDriver returns glusterFSDriver that implements TestDriver interface
 func InitGlusterFSDriver() storageframework.TestDriver {
@@ -354,6 +358,7 @@ func (v *glusterVolume) DeleteVolume() {
 type iSCSIDriver struct {
 	driverInfo storageframework.DriverInfo
 }
+
 type iSCSIVolume struct {
 	serverPod *v1.Pod
 	serverIP  string
@@ -361,10 +366,12 @@ type iSCSIVolume struct {
 	iqn       string
 }
 
-var _ storageframework.TestDriver = &iSCSIDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &iSCSIDriver{}
-var _ storageframework.InlineVolumeTestDriver = &iSCSIDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &iSCSIDriver{}
+var (
+	_ storageframework.TestDriver                     = &iSCSIDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &iSCSIDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &iSCSIDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &iSCSIDriver{}
+)
 
 // InitISCSIDriver returns iSCSIDriver that implements TestDriver interface
 func InitISCSIDriver() storageframework.TestDriver {
@@ -537,10 +544,12 @@ type rbdVolume struct {
 	f         *framework.Framework
 }
 
-var _ storageframework.TestDriver = &rbdDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &rbdDriver{}
-var _ storageframework.InlineVolumeTestDriver = &rbdDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &rbdDriver{}
+var (
+	_ storageframework.TestDriver                     = &rbdDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &rbdDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &rbdDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &rbdDriver{}
+)
 
 // InitRbdDriver returns rbdDriver that implements TestDriver interface
 func InitRbdDriver() storageframework.TestDriver {
@@ -662,10 +671,12 @@ type cephVolume struct {
 	f         *framework.Framework
 }
 
-var _ storageframework.TestDriver = &cephFSDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &cephFSDriver{}
-var _ storageframework.InlineVolumeTestDriver = &cephFSDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &cephFSDriver{}
+var (
+	_ storageframework.TestDriver                     = &cephFSDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &cephFSDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &cephFSDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &cephFSDriver{}
+)
 
 // InitCephFSDriver returns cephFSDriver that implements TestDriver interface
 func InitCephFSDriver() storageframework.TestDriver {
@@ -765,9 +776,11 @@ type hostPathDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-var _ storageframework.TestDriver = &hostPathDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &hostPathDriver{}
-var _ storageframework.InlineVolumeTestDriver = &hostPathDriver{}
+var (
+	_ storageframework.TestDriver                     = &hostPathDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &hostPathDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &hostPathDriver{}
+)
 
 // InitHostPathDriver returns hostPathDriver that implements TestDriver interface
 func InitHostPathDriver() storageframework.TestDriver {
@@ -840,9 +853,11 @@ type hostPathSymlinkVolume struct {
 	f          *framework.Framework
 }
 
-var _ storageframework.TestDriver = &hostPathSymlinkDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &hostPathSymlinkDriver{}
-var _ storageframework.InlineVolumeTestDriver = &hostPathSymlinkDriver{}
+var (
+	_ storageframework.TestDriver                     = &hostPathSymlinkDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &hostPathSymlinkDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &hostPathSymlinkDriver{}
+)
 
 // InitHostPathSymlinkDriver returns hostPathSymlinkDriver that implements TestDriver interface
 func InitHostPathSymlinkDriver() storageframework.TestDriver {
@@ -985,9 +1000,11 @@ type emptydirDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-var _ storageframework.TestDriver = &emptydirDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &emptydirDriver{}
-var _ storageframework.InlineVolumeTestDriver = &emptydirDriver{}
+var (
+	_ storageframework.TestDriver                     = &emptydirDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &emptydirDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &emptydirDriver{}
+)
 
 // InitEmptydirDriver returns emptydirDriver that implements TestDriver interface
 func InitEmptydirDriver() storageframework.TestDriver {
@@ -1050,11 +1067,13 @@ type cinderVolume struct {
 	volumeID   string
 }
 
-var _ storageframework.TestDriver = &cinderDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &cinderDriver{}
-var _ storageframework.InlineVolumeTestDriver = &cinderDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &cinderDriver{}
-var _ storageframework.DynamicPVTestDriver = &cinderDriver{}
+var (
+	_ storageframework.TestDriver                     = &cinderDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &cinderDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &cinderDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &cinderDriver{}
+	_ storageframework.DynamicPVTestDriver            = &cinderDriver{}
+)
 
 // InitCinderDriver returns cinderDriver that implements TestDriver interface
 func InitCinderDriver() storageframework.TestDriver {
@@ -1218,11 +1237,13 @@ type gcePdVolume struct {
 	volumeName string
 }
 
-var _ storageframework.TestDriver = &gcePdDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &gcePdDriver{}
-var _ storageframework.InlineVolumeTestDriver = &gcePdDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &gcePdDriver{}
-var _ storageframework.DynamicPVTestDriver = &gcePdDriver{}
+var (
+	_ storageframework.TestDriver                     = &gcePdDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &gcePdDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &gcePdDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &gcePdDriver{}
+	_ storageframework.DynamicPVTestDriver            = &gcePdDriver{}
+)
 
 // InitGcePdDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver() storageframework.TestDriver {
@@ -1362,7 +1383,6 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 		}
 	}
 	return config, func() {}
-
 }
 
 func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -1398,11 +1418,13 @@ type vSphereVolume struct {
 	nodeInfo   *vspheretest.NodeInfo
 }
 
-var _ storageframework.TestDriver = &vSphereDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &vSphereDriver{}
-var _ storageframework.InlineVolumeTestDriver = &vSphereDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &vSphereDriver{}
-var _ storageframework.DynamicPVTestDriver = &vSphereDriver{}
+var (
+	_ storageframework.TestDriver                     = &vSphereDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &vSphereDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &vSphereDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &vSphereDriver{}
+	_ storageframework.DynamicPVTestDriver            = &vSphereDriver{}
+)
 
 // InitVSphereDriver returns vSphereDriver that implements TestDriver interface
 func InitVSphereDriver() storageframework.TestDriver {
@@ -1430,6 +1452,7 @@ func InitVSphereDriver() storageframework.TestDriver {
 		},
 	}
 }
+
 func (v *vSphereDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &v.driverInfo
 }
@@ -1522,11 +1545,13 @@ type azureDiskVolume struct {
 	volumeName string
 }
 
-var _ storageframework.TestDriver = &azureDiskDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &azureDiskDriver{}
-var _ storageframework.InlineVolumeTestDriver = &azureDiskDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &azureDiskDriver{}
-var _ storageframework.DynamicPVTestDriver = &azureDiskDriver{}
+var (
+	_ storageframework.TestDriver                     = &azureDiskDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &azureDiskDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &azureDiskDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &azureDiskDriver{}
+	_ storageframework.DynamicPVTestDriver            = &azureDiskDriver{}
+)
 
 // InitAzureDiskDriver returns azureDiskDriver that implements TestDriver interface
 func InitAzureDiskDriver() storageframework.TestDriver {
@@ -1662,10 +1687,12 @@ type awsVolume struct {
 
 var _ storageframework.TestDriver = &awsDriver{}
 
-var _ storageframework.PreprovisionedVolumeTestDriver = &awsDriver{}
-var _ storageframework.InlineVolumeTestDriver = &awsDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &awsDriver{}
-var _ storageframework.DynamicPVTestDriver = &awsDriver{}
+var (
+	_ storageframework.PreprovisionedVolumeTestDriver = &awsDriver{}
+	_ storageframework.InlineVolumeTestDriver         = &awsDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &awsDriver{}
+	_ storageframework.DynamicPVTestDriver            = &awsDriver{}
+)
 
 // InitAwsDriver returns awsDriver that implements TestDriver interface
 func InitAwsDriver() storageframework.TestDriver {
@@ -1843,9 +1870,11 @@ var (
 	localVolumeMaxFileSizes       = map[utils.LocalVolumeType]int64{}
 )
 
-var _ storageframework.TestDriver = &localDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &localDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &localDriver{}
+var (
+	_ storageframework.TestDriver                     = &localDriver{}
+	_ storageframework.PreprovisionedVolumeTestDriver = &localDriver{}
+	_ storageframework.PreprovisionedPVTestDriver     = &localDriver{}
+)
 
 // InitLocalDriverWithVolumeType initializes the local driver based on the volume type.
 func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() storageframework.TestDriver {

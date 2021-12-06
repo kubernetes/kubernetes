@@ -399,14 +399,14 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 		return err
 	}
 
-	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0755))
-	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0755))
+	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0o755))
+	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0o755))
 	if err != nil {
 		return err
 	}
 
-	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0755))
-	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0755))
+	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0o755))
+	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0o755))
 	if err != nil {
 		return err
 	}
@@ -428,7 +428,6 @@ func caCertFromBundle(bundlePath string) (*x509.Certificate, error) {
 		if nextBlock == nil {
 			if block == nil {
 				return nil, fmt.Errorf("no certificate found in %q", bundlePath)
-
 			}
 			return x509.ParseCertificate(block.Bytes)
 		}

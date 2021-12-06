@@ -53,9 +53,7 @@ type tracesDriver struct {
 	tracesClient coltracepb.TraceServiceClient
 }
 
-var (
-	errNoClient = errors.New("no client")
-)
+var errNoClient = errors.New("no client")
 
 // NewDriver creates a new gRPC protocol driver.
 func NewDriver(opts ...Option) otlp.ProtocolDriver {

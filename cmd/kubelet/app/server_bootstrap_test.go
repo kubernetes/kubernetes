@@ -189,7 +189,6 @@ func Test_buildClientCertificateManager_populateCertDir(t *testing.T) {
 	if len(fi) != 2 {
 		t.Fatalf("Unexpected directory contents: %#v", fi)
 	}
-
 }
 
 func getFileInfo(dir string) map[string]os.FileInfo {
@@ -253,6 +252,7 @@ func (s *csrSimulator) SetExpectUserAgent(a string) {
 	defer s.userAgentLock.Unlock()
 	s.expectUserAgent = a
 }
+
 func (s *csrSimulator) ExpectUserAgent() string {
 	s.userAgentLock.Lock()
 	defer s.userAgentLock.Unlock()

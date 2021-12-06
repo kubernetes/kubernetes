@@ -119,7 +119,9 @@ func (e *Env) LookupIdent(name string) *exprpb.Decl {
 				decls.Int,
 				&exprpb.Constant{
 					ConstantKind: &exprpb.Constant_Int64Value{
-						Int64Value: int64(enumValue.(types.Int))}})
+						Int64Value: int64(enumValue.(types.Int)),
+					},
+				})
 			e.declarations.AddIdent(decl)
 			return decl
 		}
@@ -182,7 +184,7 @@ func (e *Env) addOverload(f *exprpb.Decl, overload *exprpb.Decl_FunctionDecl_Ove
 func (e *Env) addFunction(decl *exprpb.Decl) []errorMsg {
 	current := e.declarations.FindFunction(decl.Name)
 	if current == nil {
-		//Add the function declaration without overloads and check the overloads below.
+		// Add the function declaration without overloads and check the overloads below.
 		current = decls.NewFunction(decl.Name)
 		e.declarations.AddFunction(current)
 	}
@@ -246,11 +248,9 @@ func sanitizeFunction(decl *exprpb.Decl) *exprpb.Decl {
 		}
 		// If sanitized, replace the overload definition.
 		if o.IsInstanceFunction {
-			overloads[i] =
-				decls.NewInstanceOverload(o.GetOverloadId(), params, rt)
+			overloads[i] = decls.NewInstanceOverload(o.GetOverloadId(), params, rt)
 		} else {
-			overloads[i] =
-				decls.NewOverload(o.GetOverloadId(), params, rt)
+			overloads[i] = decls.NewOverload(o.GetOverloadId(), params, rt)
 		}
 	}
 	return decls.NewFunction(decl.GetName(), overloads...)

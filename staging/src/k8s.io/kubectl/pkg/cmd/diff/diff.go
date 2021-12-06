@@ -240,7 +240,6 @@ func (p *Printer) Print(obj runtime.Object, w io.Writer) error {
 	}
 	_, err = w.Write(data)
 	return err
-
 }
 
 // DiffVersion gets the proper version of objects, and aggregate them into a directory.
@@ -301,7 +300,7 @@ func CreateDirectory(prefix string) (*Directory, error) {
 
 // NewFile creates a new file in the directory.
 func (d *Directory) NewFile(name string) (*os.File, error) {
-	return os.OpenFile(filepath.Join(d.Name, name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	return os.OpenFile(filepath.Join(d.Name, name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o700)
 }
 
 // Delete removes the directory recursively.
@@ -314,7 +313,6 @@ func (d *Directory) Delete() error {
 type Object interface {
 	Live() runtime.Object
 	Merged() (runtime.Object, error)
-
 	Name() string
 }
 

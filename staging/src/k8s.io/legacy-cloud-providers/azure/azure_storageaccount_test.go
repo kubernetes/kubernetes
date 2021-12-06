@@ -104,7 +104,8 @@ func TestGetStorageAccount(t *testing.T) {
 					State:                    "state",
 				},
 			},
-		}}
+		},
+	}
 
 	account := storage.Account{
 		Sku: &storage.Sku{
@@ -186,7 +187,8 @@ func TestGetStorageAccountEdgeCases(t *testing.T) {
 	accountPropertiesWithoutVirtualNetworkRules := storage.AccountProperties{
 		NetworkRuleSet: &storage.NetworkRuleSet{
 			VirtualNetworkRules: nil,
-		}}
+		},
+	}
 
 	tests := []struct {
 		testCase           string

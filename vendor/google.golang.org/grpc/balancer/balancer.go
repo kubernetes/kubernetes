@@ -35,10 +35,8 @@ import (
 	"google.golang.org/grpc/serviceconfig"
 )
 
-var (
-	// m is a map from name to balancer builder.
-	m = make(map[string]Builder)
-)
+// m is a map from name to balancer builder.
+var m = make(map[string]Builder)
 
 // Register registers the balancer builder to the balancer map. b.Name
 // (lowercased) will be used as the name registered with this builder.  If the

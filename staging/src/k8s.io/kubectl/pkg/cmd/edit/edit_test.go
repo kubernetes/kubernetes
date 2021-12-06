@@ -122,7 +122,7 @@ func TestEdit(t *testing.T) {
 			if !bytes.Equal(body, expectedInput) {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
-					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
+					ioutil.WriteFile(inputFile, body, os.FileMode(0o644))
 				} else {
 					t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
 					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
@@ -145,14 +145,13 @@ func TestEdit(t *testing.T) {
 		if !bytes.Equal(body, expectedInput) {
 			if updateInputFixtures {
 				// Convenience to allow recapturing the input and persisting it here
-				ioutil.WriteFile(inputFile, body, os.FileMode(0644))
+				ioutil.WriteFile(inputFile, body, os.FileMode(0o644))
 			} else {
 				t.Errorf("%s, step %d: diff in edit content:\n%s", name, i, diff.StringDiff(string(body), string(expectedInput)))
 				t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 			}
 		}
 		return &http.Response{StatusCode: step.ResponseStatusCode, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
-
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

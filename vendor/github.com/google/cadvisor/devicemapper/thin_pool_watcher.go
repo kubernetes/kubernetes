@@ -43,7 +43,8 @@ func NewThinPoolWatcher(poolName, metadataDevice string) (*ThinPoolWatcher, erro
 		return nil, fmt.Errorf("encountered error creating thin_ls client: %v", err)
 	}
 
-	return &ThinPoolWatcher{poolName: poolName,
+	return &ThinPoolWatcher{
+		poolName:       poolName,
 		metadataDevice: metadataDevice,
 		lock:           &sync.RWMutex{},
 		cache:          make(map[string]uint64),

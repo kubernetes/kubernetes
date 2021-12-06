@@ -1,3 +1,4 @@
+//go:build !appengine
 // +build !appengine
 
 // This file encapsulates usage of unsafe.

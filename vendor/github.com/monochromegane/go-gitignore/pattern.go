@@ -47,7 +47,6 @@ func newPatternForEqualizedPath(path string) pattern {
 }
 
 func (p pattern) match(path string, isDir bool) bool {
-
 	if p.hasDirSuffix && !isDir {
 		return false
 	}

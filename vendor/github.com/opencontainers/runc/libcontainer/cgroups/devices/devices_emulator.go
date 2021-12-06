@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 // SPDX-License-Identifier: Apache-2.0

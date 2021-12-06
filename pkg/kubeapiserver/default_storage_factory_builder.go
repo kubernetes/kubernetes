@@ -59,7 +59,6 @@ func DefaultWatchCacheSizes() map[schema.GroupResource]int {
 
 // NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
-
 	resources := []schema.GroupVersionResource{
 		apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
 	}

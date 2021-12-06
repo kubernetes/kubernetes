@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package netns
@@ -6,9 +7,7 @@ import (
 	"errors"
 )
 
-var (
-	ErrNotImplemented = errors.New("not implemented")
-)
+var ErrNotImplemented = errors.New("not implemented")
 
 func Set(ns NsHandle) (err error) {
 	return ErrNotImplemented

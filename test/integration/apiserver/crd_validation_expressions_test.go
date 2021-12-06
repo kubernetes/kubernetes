@@ -273,7 +273,7 @@ func TestCustomResourceValidators(t *testing.T) {
 			t.Fatal("Expected CRD to be non-structural")
 		}
 
-		//Try to change it
+		// Try to change it
 		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.XValidations = apiextensionsv1.ValidationRules{
 			{
 				Rule: "has(self.foo)",

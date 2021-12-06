@@ -192,7 +192,6 @@ func (j *JSONPath) PrintResults(wr io.Writer, results []reflect.Value) error {
 	}
 
 	return nil
-
 }
 
 // walk visits tree rooted at the given node in DFS order
@@ -506,7 +505,7 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 			temp := []reflect.Value{value.Index(i)}
 			lefts, err := j.evalList(temp, node.Left)
 
-			//case exists
+			// case exists
 			if node.Operator == "exists" {
 				if len(lefts) > 0 {
 					results = append(results, value.Index(i))

@@ -247,7 +247,7 @@ func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 
 		const updateEnvVar = "UPDATE_BOOTSTRAP_POLICY_FIXTURE_DATA"
 		if os.Getenv(updateEnvVar) == "true" {
-			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
+			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0o755)); err == nil {
 				t.Logf("Updated data in %s", filename)
 				t.Logf("Verify the diff, commit changes, and rerun the tests")
 			} else {

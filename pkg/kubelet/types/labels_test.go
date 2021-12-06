@@ -23,7 +23,7 @@ import (
 )
 
 func TestGetContainerName(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		labels        map[string]string
 		containerName string
 	}{
@@ -47,7 +47,7 @@ func TestGetContainerName(t *testing.T) {
 }
 
 func TestGetPodName(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		labels  map[string]string
 		podName string
 	}{
@@ -71,7 +71,7 @@ func TestGetPodName(t *testing.T) {
 }
 
 func TestGetPodUID(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		labels map[string]string
 		podUID string
 	}{
@@ -95,7 +95,7 @@ func TestGetPodUID(t *testing.T) {
 }
 
 func TestGetPodNamespace(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		labels       map[string]string
 		podNamespace string
 	}{

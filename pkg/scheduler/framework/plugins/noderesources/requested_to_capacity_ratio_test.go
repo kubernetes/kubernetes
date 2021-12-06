@@ -408,7 +408,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 		name           string
 	}{
 		{
-
 			// resources["intel.com/foo"] = 3
 			// resources["intel.com/bar"] = 5
 			// Node1 scores (used resources) on 0-10 scale
@@ -422,7 +421,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// resourceScoringFunction((0+0),4)
 			//  = 0/4 * 100 = 0 = rawScoringFunction(0)
 			// Node1 Score: (0 * 3) + (0 * 5) / 8 = 0
-
 			// Node2 scores (used resources) on 0-10 scale
 			// rawScoringFunction(used + requested / available)
 			// intel.com/foo:
@@ -434,7 +432,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// resourceScoringFunction((0+0),8)
 			//  = 0/8 * 100 = 0 = rawScoringFunction(0)
 			// Node2 Score: (0 * 3) + (0 * 5) / 8 = 0
-
 			pod:            st.MakePod().Obj(),
 			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
@@ -442,7 +439,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 		},
 
 		{
-
 			// resources["intel.com/foo"] = 3
 			// resources["intel.com/bar"] = 5
 			// Node1 scores (used resources) on 0-10 scale
@@ -456,7 +452,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// resourceScoringFunction((0+2),4)
 			//  = 2/4 * 100 = 50 = rawScoringFunction(50)
 			// Node1 Score: (2 * 3) + (5 * 5) / 8 = 4
-
 			// Node2 scores (used resources) on 0-10 scale
 			// rawScoringFunction(used + requested / available)
 			// intel.com/foo:
@@ -468,7 +463,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// resourceScoringFunction((0+2),8)
 			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// Node2 Score: (5 * 3) + (2 * 5) / 8 = 3
-
 			pod:            &v1.Pod{Spec: extnededResourcePod1},
 			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 3}},
@@ -479,7 +473,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 		},
 
 		{
-
 			// resources["intel.com/foo"] = 3
 			// resources["intel.com/bar"] = 5
 			// Node1 scores (used resources) on 0-10 scale
@@ -504,7 +497,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// resourceScoringFunction((2+2),8)
 			//  = 4/8 *100 = 50 = rawScoringFunction(50)
 			// Node2 Score: (10 * 3) + (5 * 5) / 8 = 7
-
 			pod:            &v1.Pod{Spec: extnededResourcePod1},
 			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 7}},
@@ -515,7 +507,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 		},
 
 		{
-
 			// resources["intel.com/foo"] = 3
 			// resources["intel.com/bar"] = 5
 			// Node1 scores (used resources) on 0-10 scale
@@ -530,7 +521,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// intel.com/foo Score: { (0 + 4) / 4 } * 10 = 0
 			// intel.com/bar Score: { (0 + 2) / 8 } * 10 = 0
 			// Node2 Score: (1 * 3) + (0.25 * 5) / 8 = 5
-
 			// resources["intel.com/foo"] = 3
 			// resources["intel.com/bar"] = 5
 			// Node1 scores (used resources) on 0-10 scale
@@ -555,7 +545,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			// resourceScoringFunction((0+2),8)
 			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// Node2 Score: (10 * 3) + (2 * 5) / 8 = 5
-
 			pod:            &v1.Pod{Spec: extnededResourcePod2},
 			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
 			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 5}},

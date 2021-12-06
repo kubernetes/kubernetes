@@ -232,6 +232,4 @@ func unhex(b byte) (rune, bool) {
 	return 0, false
 }
 
-var (
-	newlineNormalizer = strings.NewReplacer("\r\n", "\n", "\r", "\n")
-)
+var newlineNormalizer = strings.NewReplacer("\r\n", "\n", "\r", "\n")

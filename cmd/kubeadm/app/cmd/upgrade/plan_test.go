@@ -25,7 +25,7 @@ import (
 )
 
 func TestSortedSliceFromStringIntMap(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		strMap        map[string]uint16
 		expectedSlice []string
@@ -67,7 +67,7 @@ func TestSortedSliceFromStringIntMap(t *testing.T) {
 
 // TODO Think about modifying this test to be less verbose checking b/c it can be brittle.
 func TestPrintAvailableUpgrades(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		upgrades      []upgrade.Upgrade
 		buf           *bytes.Buffer

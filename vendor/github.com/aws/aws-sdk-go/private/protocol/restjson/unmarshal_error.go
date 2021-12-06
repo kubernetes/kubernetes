@@ -40,7 +40,6 @@ func (u *UnmarshalTypedError) UnmarshalError(
 	resp *http.Response,
 	respMeta protocol.ResponseMetadata,
 ) (error, error) {
-
 	code := resp.Header.Get(errorTypeHeader)
 	msg := resp.Header.Get(errorMessageHeader)
 

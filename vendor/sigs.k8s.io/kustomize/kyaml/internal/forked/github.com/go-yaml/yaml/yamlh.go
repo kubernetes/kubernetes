@@ -639,7 +639,6 @@ type yaml_parser_t struct {
 }
 
 type yaml_comment_t struct {
-
 	scan_mark  yaml_mark_t // Position where scanning for comments started
 	token_mark yaml_mark_t // Position after which tokens will be associated with this comment
 	start_mark yaml_mark_t // Position of '#' comment mark

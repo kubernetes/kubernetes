@@ -8,7 +8,6 @@ import (
 
 type WriterInterface interface {
 	io.Writer
-
 	Truncate()
 	DumpOut()
 	DumpOutWithHeader(header string)

@@ -29,9 +29,7 @@ import (
 )
 
 var _ = utils.SIGDescribe("Volume limits", func() {
-	var (
-		c clientset.Interface
-	)
+	var c clientset.Interface
 	f := framework.NewDefaultFramework("volume-limits-on-node")
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")

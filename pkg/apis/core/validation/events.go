@@ -138,7 +138,6 @@ func legacyValidateEvent(event *core.Event) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))
 			}
 		}
-
 	} else {
 		if len(event.InvolvedObject.Namespace) == 0 && event.Namespace != metav1.NamespaceDefault && event.Namespace != metav1.NamespaceSystem {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))

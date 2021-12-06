@@ -1287,9 +1287,11 @@ type IpAddrString struct {
 	Context   uint32
 }
 
-const MAX_ADAPTER_NAME_LENGTH = 256
-const MAX_ADAPTER_DESCRIPTION_LENGTH = 128
-const MAX_ADAPTER_ADDRESS_LENGTH = 8
+const (
+	MAX_ADAPTER_NAME_LENGTH        = 256
+	MAX_ADAPTER_DESCRIPTION_LENGTH = 128
+	MAX_ADAPTER_ADDRESS_LENGTH     = 8
+)
 
 type IpAdapterInfo struct {
 	Next                *IpAdapterInfo
@@ -1312,9 +1314,11 @@ type IpAdapterInfo struct {
 	LeaseExpires        int64
 }
 
-const MAXLEN_PHYSADDR = 8
-const MAX_INTERFACE_NAME_LEN = 256
-const MAXLEN_IFDESCR = 256
+const (
+	MAXLEN_PHYSADDR        = 8
+	MAX_INTERFACE_NAME_LEN = 256
+	MAXLEN_IFDESCR         = 256
+)
 
 type MibIfRow struct {
 	Name            [MAX_INTERFACE_NAME_LEN]uint16
@@ -1378,18 +1382,21 @@ type DataBlob struct {
 	Size uint32
 	Data *byte
 }
-type CryptIntegerBlob DataBlob
-type CryptUintBlob DataBlob
-type CryptObjidBlob DataBlob
-type CertNameBlob DataBlob
-type CertRdnValueBlob DataBlob
-type CertBlob DataBlob
-type CrlBlob DataBlob
-type CryptDataBlob DataBlob
-type CryptHashBlob DataBlob
-type CryptDigestBlob DataBlob
-type CryptDerBlob DataBlob
-type CryptAttrBlob DataBlob
+
+type (
+	CryptIntegerBlob DataBlob
+	CryptUintBlob    DataBlob
+	CryptObjidBlob   DataBlob
+	CertNameBlob     DataBlob
+	CertRdnValueBlob DataBlob
+	CertBlob         DataBlob
+	CrlBlob          DataBlob
+	CryptDataBlob    DataBlob
+	CryptHashBlob    DataBlob
+	CryptDigestBlob  DataBlob
+	CryptDerBlob     DataBlob
+	CryptAttrBlob    DataBlob
+)
 
 type CryptBitBlob struct {
 	Size       uint32

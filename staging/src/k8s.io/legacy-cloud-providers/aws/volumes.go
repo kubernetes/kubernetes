@@ -76,7 +76,6 @@ func GetAWSVolumeID(kubeVolumeID string) (string, error) {
 
 func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName types.NodeName) (*diskInfo, bool, error) {
 	disk, err := newAWSDisk(c, diskName)
-
 	if err != nil {
 		return nil, true, err
 	}
@@ -86,7 +85,6 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 	}
 
 	info, err := disk.describeVolume()
-
 	if err != nil {
 		klog.Warningf("Error describing volume %s with %v", diskName, err)
 		awsDiskInfo.volumeState = "unknown"
@@ -100,7 +98,6 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 		awsDiskInfo.attachmentState = aws.StringValue(attachment.State)
 		instanceID := aws.StringValue(attachment.InstanceId)
 		instanceInfo, err := c.getInstanceByID(instanceID)
-
 		// This should never happen but if it does it could mean there was a race and instance
 		// has been deleted
 		if err != nil {

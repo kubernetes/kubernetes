@@ -670,6 +670,7 @@ func (a *Admission) exemptNamespace(namespace string) bool {
 	// TODO: consider optimizing to O(1) lookup
 	return containsString(namespace, a.Configuration.Exemptions.Namespaces)
 }
+
 func (a *Admission) exemptUser(username string) bool {
 	if len(username) == 0 {
 		return false
@@ -677,6 +678,7 @@ func (a *Admission) exemptUser(username string) bool {
 	// TODO: consider optimizing to O(1) lookup
 	return containsString(username, a.Configuration.Exemptions.Usernames)
 }
+
 func (a *Admission) exemptRuntimeClass(runtimeClass *string) bool {
 	if runtimeClass == nil || len(*runtimeClass) == 0 {
 		return false

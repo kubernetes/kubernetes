@@ -221,7 +221,6 @@ func (h *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 
 	if h.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats(&fsNamer{fs: filesystems, factory: h.machineInfoFactory}, &stats.DiskIo)
-
 	}
 	return nil
 }

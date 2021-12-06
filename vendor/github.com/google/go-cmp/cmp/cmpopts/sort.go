@@ -53,6 +53,7 @@ func (ss sliceSorter) filter(x, y interface{}) bool {
 	ok2 := sort.SliceIsSorted(y, func(i, j int) bool { return ss.less(vy, i, j) })
 	return !ok1 || !ok2
 }
+
 func (ss sliceSorter) sort(x interface{}) interface{} {
 	src := reflect.ValueOf(x)
 	dst := reflect.MakeSlice(src.Type(), src.Len(), src.Len())
@@ -63,6 +64,7 @@ func (ss sliceSorter) sort(x interface{}) interface{} {
 	ss.checkSort(dst)
 	return dst.Interface()
 }
+
 func (ss sliceSorter) checkSort(v reflect.Value) {
 	start := -1 // Start of a sequence of equal elements.
 	for i := 1; i < v.Len(); i++ {
@@ -77,6 +79,7 @@ func (ss sliceSorter) checkSort(v reflect.Value) {
 		}
 	}
 }
+
 func (ss sliceSorter) less(v reflect.Value, i, j int) bool {
 	vx, vy := v.Index(i), v.Index(j)
 	return ss.fnc.Call([]reflect.Value{vx, vy})[0].Bool()
@@ -117,6 +120,7 @@ func (ms mapSorter) filter(x, y interface{}) bool {
 		(vx.Kind() == reflect.Map && vx.Type().Key().AssignableTo(ms.in)) &&
 		(vx.Len() != 0 || vy.Len() != 0)
 }
+
 func (ms mapSorter) sort(x interface{}) interface{} {
 	src := reflect.ValueOf(x)
 	outType := reflect.StructOf([]reflect.StructField{
@@ -134,6 +138,7 @@ func (ms mapSorter) sort(x interface{}) interface{} {
 	ms.checkSort(dst)
 	return dst.Interface()
 }
+
 func (ms mapSorter) checkSort(v reflect.Value) {
 	for i := 1; i < v.Len(); i++ {
 		if !ms.less(v, i-1, i) {
@@ -141,6 +146,7 @@ func (ms mapSorter) checkSort(v reflect.Value) {
 		}
 	}
 }
+
 func (ms mapSorter) less(v reflect.Value, i, j int) bool {
 	vx, vy := v.Index(i).Field(0), v.Index(j).Field(0)
 	return ms.fnc.Call([]reflect.Value{vx, vy})[0].Bool()

@@ -111,7 +111,6 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 			matched, succeededOnce, _ := o.validatePatternProperty(key, value, res)
 
 			if !(regularProperty || matched || succeededOnce) {
-
 				// Cases: properties which are not regular properties and have not been matched by the PatternProperties validator
 				if o.AdditionalProperties != nil && o.AdditionalProperties.Schema != nil {
 					// AdditionalProperties as Schema

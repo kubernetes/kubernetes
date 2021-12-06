@@ -101,7 +101,6 @@ func TestConvertFieldLabel(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			crd := apiextensionsv1.CustomResourceDefinition{
 				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 					Conversion: &apiextensionsv1.CustomResourceConversion{

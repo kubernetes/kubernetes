@@ -21,9 +21,9 @@ package oom
 
 import (
 	"os"
+	"testing"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )

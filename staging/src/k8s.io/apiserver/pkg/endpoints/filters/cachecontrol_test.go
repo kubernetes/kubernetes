@@ -51,7 +51,7 @@ func TestCacheControl(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-				//do nothing
+				// do nothing
 			})
 			wrapped := WithCacheControl(handler)
 
@@ -72,5 +72,4 @@ func TestCacheControl(t *testing.T) {
 			}
 		})
 	}
-
 }

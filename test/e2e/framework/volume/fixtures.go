@@ -652,7 +652,6 @@ func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
 	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
-
 		if exiterr, ok := err.(uexec.CodeExitError); ok {
 			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,

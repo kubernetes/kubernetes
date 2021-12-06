@@ -31,9 +31,11 @@ type Aggregator struct {
 	value number.Number
 }
 
-var _ export.Aggregator = &Aggregator{}
-var _ export.Subtractor = &Aggregator{}
-var _ aggregation.Sum = &Aggregator{}
+var (
+	_ export.Aggregator = &Aggregator{}
+	_ export.Subtractor = &Aggregator{}
+	_ aggregation.Sum   = &Aggregator{}
+)
 
 // New returns a new counter aggregator implemented by atomic
 // operations.  This aggregator implements the aggregation.Sum

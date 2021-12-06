@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // LogAnalyticsClient is the compute Client
@@ -48,8 +49,11 @@ func (client LogAnalyticsClient) ExportRequestRateByInterval(ctx context.Context
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: location,
-			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.LogAnalyticsClient", "ExportRequestRateByInterval", err.Error())
 	}
 
@@ -134,8 +138,11 @@ func (client LogAnalyticsClient) ExportThrottledRequests(ctx context.Context, pa
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: location,
-			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.LogAnalyticsClient", "ExportThrottledRequests", err.Error())
 	}
 

@@ -79,7 +79,7 @@ func (p *perfCounter) getData() (uint64, error) {
 	}
 
 	var bufSize, bufCount uint32
-	var size = uint32(unsafe.Sizeof(win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
+	size := uint32(unsafe.Sizeof(win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
 	var emptyBuf [1]win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE // need at least 1 addressable null ptr.
 	var data uint64
 
@@ -110,7 +110,7 @@ func (p *perfCounter) getDataList() (map[string]uint64, error) {
 	}
 
 	var bufSize, bufCount uint32
-	var size = uint32(unsafe.Sizeof(win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
+	size := uint32(unsafe.Sizeof(win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
 	var emptyBuf [1]win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE // need at least 1 addressable null ptr.
 	data := map[string]uint64{}
 

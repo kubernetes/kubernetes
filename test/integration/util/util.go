@@ -78,7 +78,8 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: clientSet.EventsV1()})
+		Interface: clientSet.EventsV1(),
+	})
 
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 

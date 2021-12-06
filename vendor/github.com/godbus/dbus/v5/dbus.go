@@ -85,7 +85,7 @@ func storeBase(dest, src reflect.Value) error {
 
 func setDest(dest, src reflect.Value) error {
 	if !isVariant(src.Type()) && isVariant(dest.Type()) {
-		//special conversion for dbus.Variant
+		// special conversion for dbus.Variant
 		dest.Set(reflect.ValueOf(MakeVariant(src.Interface())))
 		return nil
 	}
@@ -163,8 +163,8 @@ func storeMapIntoVariant(dest, src reflect.Value) error {
 func storeMapIntoInterface(dest, src reflect.Value) error {
 	var dv reflect.Value
 	if isVariant(src.Type().Elem()) {
-		//Convert variants to interface{} recursively when converting
-		//to interface{}
+		// Convert variants to interface{} recursively when converting
+		// to interface{}
 		dv = reflect.MakeMap(
 			reflect.MapOf(src.Type().Key(), interfaceType))
 	} else {
@@ -197,7 +197,7 @@ func storeMapIntoMap(dest, src reflect.Value) error {
 func storeSlice(dest, src reflect.Value) error {
 	switch {
 	case src.Type() == interfacesType && dest.Kind() == reflect.Struct:
-		//The decoder always decodes structs as slices of interface{}
+		// The decoder always decodes structs as slices of interface{}
 		return storeStruct(dest, src)
 	case !kindsAreCompatible(dest.Type(), src.Type()):
 		return fmt.Errorf(
@@ -257,8 +257,8 @@ func storeSliceIntoVariant(dest, src reflect.Value) error {
 func storeSliceIntoInterface(dest, src reflect.Value) error {
 	var dv reflect.Value
 	if isVariant(src.Type().Elem()) {
-		//Convert variants to interface{} recursively when converting
-		//to interface{}
+		// Convert variants to interface{} recursively when converting
+		// to interface{}
 		dv = reflect.MakeSlice(reflect.SliceOf(interfaceType),
 			src.Len(), src.Cap())
 	} else {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/nxadm/tail/util"
 
-    "github.com/fsnotify/fsnotify"
+	"github.com/fsnotify/fsnotify"
 	"gopkg.in/tomb.v1"
 )
 
@@ -75,7 +75,6 @@ func (fw *InotifyFileWatcher) ChangeEvents(t *tomb.Tomb, pos int64) (*FileChange
 	fw.Size = pos
 
 	go func() {
-
 		events := Events(fw.Filename)
 
 		for {
@@ -104,7 +103,7 @@ func (fw *InotifyFileWatcher) ChangeEvents(t *tomb.Tomb, pos int64) (*FileChange
 				changes.NotifyDeleted()
 				return
 
-			//With an open fd, unlink(fd) - inotify returns IN_ATTRIB (==fsnotify.Chmod)
+			// With an open fd, unlink(fd) - inotify returns IN_ATTRIB (==fsnotify.Chmod)
 			case evt.Op&fsnotify.Chmod == fsnotify.Chmod:
 				fallthrough
 

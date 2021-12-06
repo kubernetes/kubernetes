@@ -153,66 +153,80 @@ func TestWarnings(t *testing.T) {
 		},
 		{
 			name: "photon",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "p", VolumeSource: api.VolumeSource{PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{}}},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{Name: "p", VolumeSource: api.VolumeSource{PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{}}},
+					},
+				},
 			},
 			expected: []string{`spec.volumes[0].photonPersistentDisk: deprecated in v1.11, non-functional in v1.16+`},
 		},
 		{
 			name: "gitRepo",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "s", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{Name: "s", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
+					},
+				},
 			},
 			expected: []string{`spec.volumes[0].gitRepo: deprecated in v1.11`},
 		},
 		{
 			name: "scaleIO",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "s", VolumeSource: api.VolumeSource{ScaleIO: &api.ScaleIOVolumeSource{}}},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{Name: "s", VolumeSource: api.VolumeSource{ScaleIO: &api.ScaleIOVolumeSource{}}},
+					},
+				},
 			},
 			expected: []string{`spec.volumes[0].scaleIO: deprecated in v1.16, non-functional in v1.22+`},
 		},
 		{
 			name: "flocker",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "s", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{}}},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{Name: "s", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{}}},
+					},
+				},
 			},
 			expected: []string{`spec.volumes[0].flocker: deprecated in v1.22, support removal is planned in v1.26`},
 		},
 		{
 			name: "storageOS",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "s", VolumeSource: api.VolumeSource{StorageOS: &api.StorageOSVolumeSource{}}},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{Name: "s", VolumeSource: api.VolumeSource{StorageOS: &api.StorageOSVolumeSource{}}},
+					},
+				},
 			},
 			expected: []string{`spec.volumes[0].storageOS: deprecated in v1.22, support removal is planned in v1.26`},
 		},
 		{
 			name: "quobyte",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "s", VolumeSource: api.VolumeSource{Quobyte: &api.QuobyteVolumeSource{}}},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{Name: "s", VolumeSource: api.VolumeSource{Quobyte: &api.QuobyteVolumeSource{}}},
+					},
+				},
 			},
 			expected: []string{`spec.volumes[0].quobyte: deprecated in v1.22, support removal is planned in v1.26`},
 		},
 		{
 			name: "duplicate hostAlias",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				HostAliases: []api.HostAlias{
-					{IP: "1.1.1.1"},
-					{IP: "1.1.1.1"},
-					{IP: "1.1.1.1"},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					HostAliases: []api.HostAlias{
+						{IP: "1.1.1.1"},
+						{IP: "1.1.1.1"},
+						{IP: "1.1.1.1"},
+					},
+				},
 			},
 			expected: []string{
 				`spec.hostAliases[1].ip: duplicate ip "1.1.1.1"`,
@@ -221,12 +235,14 @@ func TestWarnings(t *testing.T) {
 		},
 		{
 			name: "duplicate imagePullSecret",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				ImagePullSecrets: []api.LocalObjectReference{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					ImagePullSecrets: []api.LocalObjectReference{
+						{Name: "a"},
+						{Name: "a"},
+						{Name: "a"},
+					},
+				},
 			},
 			expected: []string{
 				`spec.imagePullSecrets[1].name: duplicate name "a"`,
@@ -235,10 +251,12 @@ func TestWarnings(t *testing.T) {
 		},
 		{
 			name: "empty imagePullSecret",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				ImagePullSecrets: []api.LocalObjectReference{
-					{Name: ""},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					ImagePullSecrets: []api.LocalObjectReference{
+						{Name: ""},
+					},
+				},
 			},
 			expected: []string{
 				`spec.imagePullSecrets[0].name: invalid empty name ""`,
@@ -246,12 +264,14 @@ func TestWarnings(t *testing.T) {
 		},
 		{
 			name: "duplicate volume",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
-				}},
+			template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{Name: "a"},
+						{Name: "a"},
+						{Name: "a"},
+					},
+				},
 			},
 			expected: []string{
 				`spec.volumes[1].name: duplicate name "a"`,

@@ -50,9 +50,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 )
 
-var (
-	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
-)
+var keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
 // allows test cases to have fine-grained control over mock behaviors. We also need

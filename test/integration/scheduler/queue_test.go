@@ -137,8 +137,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	}
 }
 
-var _ framework.FilterPlugin = &fakeCRPlugin{}
-var _ framework.EnqueueExtensions = &fakeCRPlugin{}
+var (
+	_ framework.FilterPlugin      = &fakeCRPlugin{}
+	_ framework.EnqueueExtensions = &fakeCRPlugin{}
+)
 
 type fakeCRPlugin struct{}
 
@@ -224,12 +226,14 @@ func TestCustomResourceEnqueue(t *testing.T) {
 					},
 				},
 			},
-		}}})
+		}},
+	})
 
 	testCtx.KubeConfig = server.ClientConfig
 	testCtx.ClientSet = kubernetes.NewForConfigOrDie(server.ClientConfig)
 	testCtx.NS, err = testCtx.ClientSet.CoreV1().Namespaces().Create(testCtx.Ctx, &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cr-enqueue-%v", string(uuid.NewUUID()))}}, metav1.CreateOptions{})
+		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cr-enqueue-%v", string(uuid.NewUUID()))},
+	}, metav1.CreateOptions{})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		t.Fatalf("Failed to integration test ns: %v", err)
 	}

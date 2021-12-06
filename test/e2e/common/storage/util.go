@@ -49,8 +49,8 @@ func getFileModeRegex(filePath string, mask *int32) string {
 		windowsMask int32
 	)
 	if mask == nil {
-		linuxMask = int32(0644)
-		windowsMask = int32(0775)
+		linuxMask = int32(0o644)
+		windowsMask = int32(0o775)
 	} else {
 		linuxMask = *mask
 		windowsMask = *mask

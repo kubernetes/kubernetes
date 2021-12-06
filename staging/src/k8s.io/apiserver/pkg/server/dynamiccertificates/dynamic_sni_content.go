@@ -22,8 +22,10 @@ type DynamicFileSNIContent struct {
 	sniNames []string
 }
 
-var _ SNICertKeyContentProvider = &DynamicFileSNIContent{}
-var _ ControllerRunner = &DynamicFileSNIContent{}
+var (
+	_ SNICertKeyContentProvider = &DynamicFileSNIContent{}
+	_ ControllerRunner          = &DynamicFileSNIContent{}
+)
 
 // NewDynamicSNIContentFromFiles returns a dynamic SNICertKeyContentProvider based on a cert and key filename and explicit names
 func NewDynamicSNIContentFromFiles(purpose, certFile, keyFile string, sniNames ...string) (*DynamicFileSNIContent, error) {

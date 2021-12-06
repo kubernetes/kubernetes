@@ -169,7 +169,7 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	destFile := fmt.Sprintf("%v_%v.json", namePrefix, time.Now().Format(dateFormat))
 	if *dataItemsDir != "" {
 		// Ensure the "dataItemsDir" path to be valid.
-		if err := os.MkdirAll(*dataItemsDir, 0750); err != nil {
+		if err := os.MkdirAll(*dataItemsDir, 0o750); err != nil {
 			return fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %v", *dataItemsDir, err)
 		}
 		destFile = path.Join(*dataItemsDir, destFile)
@@ -178,7 +178,7 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	if err := json.Indent(formatted, b, "", "  "); err != nil {
 		return fmt.Errorf("indenting error: %v", err)
 	}
-	return ioutil.WriteFile(destFile, formatted.Bytes(), 0644)
+	return ioutil.WriteFile(destFile, formatted.Bytes(), 0o644)
 }
 
 type labelValues struct {

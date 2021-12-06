@@ -58,6 +58,7 @@ func StdDoubleUnmarshal(v *float64, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdFloat(r randyWrappers, easy bool) *float32 {
 	v := NewPopulatedFloatValue(r, easy)
 	return &v.Value
@@ -88,6 +89,7 @@ func StdFloatUnmarshal(v *float32, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdInt64(r randyWrappers, easy bool) *int64 {
 	v := NewPopulatedInt64Value(r, easy)
 	return &v.Value
@@ -118,6 +120,7 @@ func StdInt64Unmarshal(v *int64, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdUInt64(r randyWrappers, easy bool) *uint64 {
 	v := NewPopulatedUInt64Value(r, easy)
 	return &v.Value
@@ -148,6 +151,7 @@ func StdUInt64Unmarshal(v *uint64, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdInt32(r randyWrappers, easy bool) *int32 {
 	v := NewPopulatedInt32Value(r, easy)
 	return &v.Value
@@ -178,6 +182,7 @@ func StdInt32Unmarshal(v *int32, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdUInt32(r randyWrappers, easy bool) *uint32 {
 	v := NewPopulatedUInt32Value(r, easy)
 	return &v.Value
@@ -208,6 +213,7 @@ func StdUInt32Unmarshal(v *uint32, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdBool(r randyWrappers, easy bool) *bool {
 	v := NewPopulatedBoolValue(r, easy)
 	return &v.Value
@@ -238,6 +244,7 @@ func StdBoolUnmarshal(v *bool, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdString(r randyWrappers, easy bool) *string {
 	v := NewPopulatedStringValue(r, easy)
 	return &v.Value
@@ -268,6 +275,7 @@ func StdStringUnmarshal(v *string, data []byte) error {
 	*v = pv.Value
 	return nil
 }
+
 func NewPopulatedStdBytes(r randyWrappers, easy bool) *[]byte {
 	v := NewPopulatedBytesValue(r, easy)
 	return &v.Value

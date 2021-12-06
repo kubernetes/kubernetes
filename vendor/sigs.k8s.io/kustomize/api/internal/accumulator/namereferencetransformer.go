@@ -109,8 +109,8 @@ func debug(fMap filterMap) {
 // obtain it's new name, and write that name into the HPA's
 // 'spec/scaleTargetRef/name' field. Return a filter that can do that.
 func (t *nameReferenceTransformer) determineFilters(
-	resources []*resource.Resource) (fMap filterMap) {
-
+	resources []*resource.Resource) (fMap filterMap,
+) {
 	// We cache the resource OrgId values because they don't change and otherwise are very visible in a memory pprof
 	resourceOrgIds := make([]resid.ResId, len(resources))
 	for i, resource := range resources {

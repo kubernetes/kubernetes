@@ -181,7 +181,6 @@ func buildHeaderMap(header *http.Header, v reflect.Value, tag reflect.StructTag)
 			continue
 		} else if err != nil {
 			return awserr.New(request.ErrCodeSerialization, "failed to encode REST request", err)
-
 		}
 		keyStr := strings.TrimSpace(key.String())
 		str = strings.TrimSpace(str)

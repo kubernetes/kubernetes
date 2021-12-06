@@ -562,7 +562,6 @@ func TestReconcileEndpoints(t *testing.T) {
 		}
 
 	}
-
 }
 
 func TestEmptySubsets(t *testing.T) {

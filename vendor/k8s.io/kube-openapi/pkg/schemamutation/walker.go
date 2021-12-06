@@ -35,12 +35,15 @@ type Walker struct {
 	RefCallback func(ref *spec.Ref) *spec.Ref
 }
 
-type SchemaCallbackFunc func(schema *spec.Schema) *spec.Schema
-type RefCallbackFunc func(ref *spec.Ref) *spec.Ref
+type (
+	SchemaCallbackFunc func(schema *spec.Schema) *spec.Schema
+	RefCallbackFunc    func(ref *spec.Ref) *spec.Ref
+)
 
 var SchemaCallBackNoop SchemaCallbackFunc = func(schema *spec.Schema) *spec.Schema {
 	return schema
 }
+
 var RefCallbackNoop RefCallbackFunc = func(ref *spec.Ref) *spec.Ref {
 	return ref
 }

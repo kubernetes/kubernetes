@@ -341,9 +341,9 @@ func (logger *Logger) Exit(code int) {
 	logger.ExitFunc(code)
 }
 
-//When file is opened with appending mode, it's safe to
-//write concurrently to a file (within 4k message on Linux).
-//In these cases user can choose to disable the lock.
+// When file is opened with appending mode, it's safe to
+// write concurrently to a file (within 4k message on Linux).
+// In these cases user can choose to disable the lock.
 func (logger *Logger) SetNoLock() {
 	logger.mu.Disable()
 }

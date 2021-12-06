@@ -72,7 +72,7 @@ func HandlerWithReset() http.Handler {
 func CustomRegister(c metrics.StableCollector) error {
 	err := defaultRegistry.CustomRegister(c)
 
-	//TODO(RainbowMango): Maybe we can wrap this error by error wrapping.(Golang 1.13)
+	// TODO(RainbowMango): Maybe we can wrap this error by error wrapping.(Golang 1.13)
 	_ = prometheus.Register(c)
 
 	return err

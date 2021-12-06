@@ -723,7 +723,6 @@ func TestCloud_chunkTargetDescriptions(t *testing.T) {
 					},
 				},
 				{
-
 					{
 						Id:   aws.String("i-abcdefg4"),
 						Port: aws.Int64(8080),

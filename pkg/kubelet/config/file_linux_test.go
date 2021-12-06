@@ -69,7 +69,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 
 func TestReadPodsFromFileExistAlready(t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
-	var testCases = getTestCases(hostname)
+	testCases := getTestCases(hostname)
 
 	for _, testCase := range testCases {
 		func() {
@@ -105,22 +105,20 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 	}
 }
 
-var (
-	testCases = []struct {
-		watchDir bool
-		symlink  bool
-		period   time.Duration
-	}{
-		// set the period to be long enough for the file to be changed
-		// and short enough to trigger the event
-		{true, true, 3 * time.Second},
+var testCases = []struct {
+	watchDir bool
+	symlink  bool
+	period   time.Duration
+}{
+	// set the period to be long enough for the file to be changed
+	// and short enough to trigger the event
+	{true, true, 3 * time.Second},
 
-		// set the period to avoid periodic PodUpdate event
-		{true, false, 60 * time.Second},
-		{false, true, 60 * time.Second},
-		{false, false, 60 * time.Second},
-	}
-)
+	// set the period to avoid periodic PodUpdate event
+	{true, false, 60 * time.Second},
+	{false, true, 60 * time.Second},
+	{false, false, 60 * time.Second},
+}
 
 func TestWatchFileAdded(t *testing.T) {
 	for _, testCase := range testCases {
@@ -230,7 +228,7 @@ func createSymbolicLink(link, target, name string, t *testing.T) string {
 
 func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
-	var testCases = getTestCases(hostname)
+	testCases := getTestCases(hostname)
 
 	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
@@ -283,7 +281,7 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 
 func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
-	var testCases = getTestCases(hostname)
+	testCases := getTestCases(hostname)
 
 	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
@@ -408,7 +406,7 @@ func expectEmptyUpdate(t *testing.T, ch chan interface{}) {
 }
 
 func writeFile(filename string, data []byte) error {
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0o666)
 	if err != nil {
 		return err
 	}

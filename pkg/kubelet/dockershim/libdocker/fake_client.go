@@ -491,7 +491,8 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 		{ID: id, Names: []string{name}, Image: c.Config.Image, Created: timestamp.Unix(), State: StatusCreatedPrefix, Labels: c.Config.Labels},
 	}, f.RunningContainerList...)
 	f.ContainerMap[id] = convertFakeContainer(&FakeContainer{
-		ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig, CreatedAt: timestamp})
+		ID: id, Name: name, Config: c.Config, HostConfig: c.HostConfig, CreatedAt: timestamp,
+	})
 
 	f.normalSleep(100, 25, 25)
 
@@ -591,7 +592,6 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 			f.appendContainerTrace("Removed", id)
 			return nil
 		}
-
 	}
 	for i := range f.RunningContainerList {
 		// allow removal of running containers which are not running

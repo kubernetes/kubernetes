@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package netns
@@ -50,7 +51,7 @@ func New() (ns NsHandle, err error) {
 // NewNamed creates a new named network namespace and returns a handle to it
 func NewNamed(name string) (NsHandle, error) {
 	if _, err := os.Stat(bindMountPath); os.IsNotExist(err) {
-		err = os.MkdirAll(bindMountPath, 0755)
+		err = os.MkdirAll(bindMountPath, 0o755)
 		if err != nil {
 			return None(), err
 		}
@@ -63,7 +64,7 @@ func NewNamed(name string) (NsHandle, error) {
 
 	namedPath := path.Join(bindMountPath, name)
 
-	f, err := os.OpenFile(namedPath, os.O_CREATE|os.O_EXCL, 0444)
+	f, err := os.OpenFile(namedPath, os.O_CREATE|os.O_EXCL, 0o444)
 	if err != nil {
 		return None(), err
 	}

@@ -30,11 +30,13 @@ func SetDefaults_ClusterRoleBinding(obj *rbacv1alpha1.ClusterRoleBinding) {
 		obj.RoleRef.APIGroup = GroupName
 	}
 }
+
 func SetDefaults_RoleBinding(obj *rbacv1alpha1.RoleBinding) {
 	if len(obj.RoleRef.APIGroup) == 0 {
 		obj.RoleRef.APIGroup = GroupName
 	}
 }
+
 func SetDefaults_Subject(obj *rbacv1alpha1.Subject) {
 	if len(obj.APIVersion) == 0 {
 		switch obj.Kind {

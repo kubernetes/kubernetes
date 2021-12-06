@@ -40,12 +40,14 @@ var ProberResults = metrics.NewCounterVec(
 		Help:           "Cumulative number of a liveness, readiness or startup probe for a container by result.",
 		StabilityLevel: metrics.ALPHA,
 	},
-	[]string{"probe_type",
+	[]string{
+		"probe_type",
 		"result",
 		"container",
 		"pod",
 		"namespace",
-		"pod_uid"},
+		"pod_uid",
+	},
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
@@ -103,7 +105,6 @@ func NewManager(
 	startupManager results.Manager,
 	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorder) Manager {
-
 	prober := newProber(runner, recorder)
 	return &manager{
 		statusManager:    statusManager,

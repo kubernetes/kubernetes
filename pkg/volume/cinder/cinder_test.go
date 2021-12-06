@@ -77,7 +77,7 @@ func getFakeDeviceName(host volume.VolumeHost, pdName string) string {
 func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
 	globalPath := makeGlobalPDName(b.plugin.host, b.pdName)
 	fakeDeviceName := getFakeDeviceName(b.plugin.host, b.pdName)
-	err := os.MkdirAll(fakeDeviceName, 0750)
+	err := os.MkdirAll(fakeDeviceName, 0o750)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath strin
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(globalPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(globalPath, 0750); err != nil {
+			if err := os.MkdirAll(globalPath, 0o750); err != nil {
 				return err
 			}
 			notmnt = true

@@ -261,7 +261,6 @@ func NewPodWithVolume(podName, volumeName, nodeName string) *v1.Pod {
 // Returns a volumeAttachment object
 func NewVolumeAttachment(vaName, pvName, nodeName string, status bool) *storagev1.VolumeAttachment {
 	return &storagev1.VolumeAttachment{
-
 		ObjectMeta: metav1.ObjectMeta{
 			UID:  types.UID(vaName),
 			Name: vaName,

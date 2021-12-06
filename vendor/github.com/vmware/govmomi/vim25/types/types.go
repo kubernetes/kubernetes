@@ -113,8 +113,7 @@ func init() {
 	t["AcknowledgeAlarmRequestType"] = reflect.TypeOf((*AcknowledgeAlarmRequestType)(nil)).Elem()
 }
 
-type AcknowledgeAlarmResponse struct {
-}
+type AcknowledgeAlarmResponse struct{}
 
 type AcquireCimServicesTicket AcquireCimServicesTicketRequestType
 
@@ -400,8 +399,7 @@ func init() {
 	t["AddFilterEntitiesRequestType"] = reflect.TypeOf((*AddFilterEntitiesRequestType)(nil)).Elem()
 }
 
-type AddFilterEntitiesResponse struct {
-}
+type AddFilterEntitiesResponse struct{}
 
 type AddFilterRequestType struct {
 	This       ManagedObjectReference `xml:"_this"`
@@ -438,8 +436,7 @@ func init() {
 	t["AddGuestAliasRequestType"] = reflect.TypeOf((*AddGuestAliasRequestType)(nil)).Elem()
 }
 
-type AddGuestAliasResponse struct {
-}
+type AddGuestAliasResponse struct{}
 
 type AddHostRequestType struct {
 	This         ManagedObjectReference  `xml:"_this"`
@@ -479,8 +476,7 @@ func init() {
 	t["AddInternetScsiSendTargetsRequestType"] = reflect.TypeOf((*AddInternetScsiSendTargetsRequestType)(nil)).Elem()
 }
 
-type AddInternetScsiSendTargetsResponse struct {
-}
+type AddInternetScsiSendTargetsResponse struct{}
 
 type AddInternetScsiStaticTargets AddInternetScsiStaticTargetsRequestType
 
@@ -498,8 +494,7 @@ func init() {
 	t["AddInternetScsiStaticTargetsRequestType"] = reflect.TypeOf((*AddInternetScsiStaticTargetsRequestType)(nil)).Elem()
 }
 
-type AddInternetScsiStaticTargetsResponse struct {
-}
+type AddInternetScsiStaticTargetsResponse struct{}
 
 type AddKey AddKeyRequestType
 
@@ -516,8 +511,7 @@ func init() {
 	t["AddKeyRequestType"] = reflect.TypeOf((*AddKeyRequestType)(nil)).Elem()
 }
 
-type AddKeyResponse struct {
-}
+type AddKeyResponse struct{}
 
 type AddKeys AddKeysRequestType
 
@@ -574,8 +568,7 @@ func init() {
 	t["AddMonitoredEntitiesRequestType"] = reflect.TypeOf((*AddMonitoredEntitiesRequestType)(nil)).Elem()
 }
 
-type AddMonitoredEntitiesResponse struct {
-}
+type AddMonitoredEntitiesResponse struct{}
 
 type AddNetworkResourcePool AddNetworkResourcePoolRequestType
 
@@ -592,8 +585,7 @@ func init() {
 	t["AddNetworkResourcePoolRequestType"] = reflect.TypeOf((*AddNetworkResourcePoolRequestType)(nil)).Elem()
 }
 
-type AddNetworkResourcePoolResponse struct {
-}
+type AddNetworkResourcePoolResponse struct{}
 
 type AddPortGroup AddPortGroupRequestType
 
@@ -610,8 +602,7 @@ func init() {
 	t["AddPortGroupRequestType"] = reflect.TypeOf((*AddPortGroupRequestType)(nil)).Elem()
 }
 
-type AddPortGroupResponse struct {
-}
+type AddPortGroupResponse struct{}
 
 type AddServiceConsoleVirtualNic AddServiceConsoleVirtualNicRequestType
 
@@ -691,8 +682,7 @@ func init() {
 	t["AddVirtualSwitchRequestType"] = reflect.TypeOf((*AddVirtualSwitchRequestType)(nil)).Elem()
 }
 
-type AddVirtualSwitchResponse struct {
-}
+type AddVirtualSwitchResponse struct{}
 
 type AdminDisabled struct {
 	HostConfigFault
@@ -1313,8 +1303,7 @@ func init() {
 	t["AnswerVMRequestType"] = reflect.TypeOf((*AnswerVMRequestType)(nil)).Elem()
 }
 
-type AnswerVMResponse struct {
-}
+type AnswerVMResponse struct{}
 
 type ApplicationQuiesceFault struct {
 	SnapshotFault
@@ -1454,8 +1443,7 @@ func init() {
 	t["ApplyRecommendationRequestType"] = reflect.TypeOf((*ApplyRecommendationRequestType)(nil)).Elem()
 }
 
-type ApplyRecommendationResponse struct {
-}
+type ApplyRecommendationResponse struct{}
 
 type ApplyStorageDrsRecommendationRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -5784,8 +5772,7 @@ func init() {
 	t["AssignUserToGroupRequestType"] = reflect.TypeOf((*AssignUserToGroupRequestType)(nil)).Elem()
 }
 
-type AssignUserToGroupResponse struct {
-}
+type AssignUserToGroupResponse struct{}
 
 type AssociateProfile AssociateProfileRequestType
 
@@ -5802,8 +5789,7 @@ func init() {
 	t["AssociateProfileRequestType"] = reflect.TypeOf((*AssociateProfileRequestType)(nil)).Elem()
 }
 
-type AssociateProfileResponse struct {
-}
+type AssociateProfileResponse struct{}
 
 type AttachDiskRequestType struct {
 	This          ManagedObjectReference `xml:"_this"`
@@ -5861,8 +5847,7 @@ func init() {
 	t["AttachScsiLunRequestType"] = reflect.TypeOf((*AttachScsiLunRequestType)(nil)).Elem()
 }
 
-type AttachScsiLunResponse struct {
-}
+type AttachScsiLunResponse struct{}
 
 type AttachTagToVStorageObject AttachTagToVStorageObjectRequestType
 
@@ -5881,8 +5866,7 @@ func init() {
 	t["AttachTagToVStorageObjectRequestType"] = reflect.TypeOf((*AttachTagToVStorageObjectRequestType)(nil)).Elem()
 }
 
-type AttachTagToVStorageObjectResponse struct {
-}
+type AttachTagToVStorageObjectResponse struct{}
 
 type AttachVmfsExtent AttachVmfsExtentRequestType
 
@@ -5900,8 +5884,7 @@ func init() {
 	t["AttachVmfsExtentRequestType"] = reflect.TypeOf((*AttachVmfsExtentRequestType)(nil)).Elem()
 }
 
-type AttachVmfsExtentResponse struct {
-}
+type AttachVmfsExtentResponse struct{}
 
 type AuthMinimumAdminPermission struct {
 	VimFault
@@ -6017,8 +6000,7 @@ func init() {
 	t["AutoStartPowerOffRequestType"] = reflect.TypeOf((*AutoStartPowerOffRequestType)(nil)).Elem()
 }
 
-type AutoStartPowerOffResponse struct {
-}
+type AutoStartPowerOffResponse struct{}
 
 type AutoStartPowerOn AutoStartPowerOnRequestType
 
@@ -6034,8 +6016,7 @@ func init() {
 	t["AutoStartPowerOnRequestType"] = reflect.TypeOf((*AutoStartPowerOnRequestType)(nil)).Elem()
 }
 
-type AutoStartPowerOnResponse struct {
-}
+type AutoStartPowerOnResponse struct{}
 
 type BackupBlobReadFailure struct {
 	DvsFault
@@ -6192,8 +6173,7 @@ func init() {
 	t["BindVnicRequestType"] = reflect.TypeOf((*BindVnicRequestType)(nil)).Elem()
 }
 
-type BindVnicResponse struct {
-}
+type BindVnicResponse struct{}
 
 type BlockedByFirewall struct {
 	HostConfigFault
@@ -6301,8 +6281,7 @@ func init() {
 	t["CancelRecommendationRequestType"] = reflect.TypeOf((*CancelRecommendationRequestType)(nil)).Elem()
 }
 
-type CancelRecommendationResponse struct {
-}
+type CancelRecommendationResponse struct{}
 
 type CancelRetrievePropertiesEx CancelRetrievePropertiesExRequestType
 
@@ -6319,8 +6298,7 @@ func init() {
 	t["CancelRetrievePropertiesExRequestType"] = reflect.TypeOf((*CancelRetrievePropertiesExRequestType)(nil)).Elem()
 }
 
-type CancelRetrievePropertiesExResponse struct {
-}
+type CancelRetrievePropertiesExResponse struct{}
 
 type CancelStorageDrsRecommendation CancelStorageDrsRecommendationRequestType
 
@@ -6337,8 +6315,7 @@ func init() {
 	t["CancelStorageDrsRecommendationRequestType"] = reflect.TypeOf((*CancelStorageDrsRecommendationRequestType)(nil)).Elem()
 }
 
-type CancelStorageDrsRecommendationResponse struct {
-}
+type CancelStorageDrsRecommendationResponse struct{}
 
 type CancelTask CancelTaskRequestType
 
@@ -6354,8 +6331,7 @@ func init() {
 	t["CancelTaskRequestType"] = reflect.TypeOf((*CancelTaskRequestType)(nil)).Elem()
 }
 
-type CancelTaskResponse struct {
-}
+type CancelTaskResponse struct{}
 
 type CancelWaitForUpdates CancelWaitForUpdatesRequestType
 
@@ -6371,8 +6347,7 @@ func init() {
 	t["CancelWaitForUpdatesRequestType"] = reflect.TypeOf((*CancelWaitForUpdatesRequestType)(nil)).Elem()
 }
 
-type CancelWaitForUpdatesResponse struct {
-}
+type CancelWaitForUpdatesResponse struct{}
 
 type CanceledHostOperationEvent struct {
 	HostEvent
@@ -6959,8 +6934,7 @@ func init() {
 	t["ChangeAccessModeRequestType"] = reflect.TypeOf((*ChangeAccessModeRequestType)(nil)).Elem()
 }
 
-type ChangeAccessModeResponse struct {
-}
+type ChangeAccessModeResponse struct{}
 
 type ChangeFileAttributesInGuest ChangeFileAttributesInGuestRequestType
 
@@ -6980,8 +6954,7 @@ func init() {
 	t["ChangeFileAttributesInGuestRequestType"] = reflect.TypeOf((*ChangeFileAttributesInGuestRequestType)(nil)).Elem()
 }
 
-type ChangeFileAttributesInGuestResponse struct {
-}
+type ChangeFileAttributesInGuestResponse struct{}
 
 type ChangeKeyRequestType struct {
 	This   ManagedObjectReference `xml:"_this"`
@@ -7017,8 +6990,7 @@ func init() {
 	t["ChangeLockdownModeRequestType"] = reflect.TypeOf((*ChangeLockdownModeRequestType)(nil)).Elem()
 }
 
-type ChangeLockdownModeResponse struct {
-}
+type ChangeLockdownModeResponse struct{}
 
 type ChangeNFSUserPassword ChangeNFSUserPasswordRequestType
 
@@ -7035,8 +7007,7 @@ func init() {
 	t["ChangeNFSUserPasswordRequestType"] = reflect.TypeOf((*ChangeNFSUserPasswordRequestType)(nil)).Elem()
 }
 
-type ChangeNFSUserPasswordResponse struct {
-}
+type ChangeNFSUserPasswordResponse struct{}
 
 type ChangeOwner ChangeOwnerRequestType
 
@@ -7055,8 +7026,7 @@ func init() {
 	t["ChangeOwnerRequestType"] = reflect.TypeOf((*ChangeOwnerRequestType)(nil)).Elem()
 }
 
-type ChangeOwnerResponse struct {
-}
+type ChangeOwnerResponse struct{}
 
 type ChangesInfoEventArgument struct {
 	DynamicData
@@ -7207,8 +7177,7 @@ func init() {
 	t["CheckCustomizationResourcesRequestType"] = reflect.TypeOf((*CheckCustomizationResourcesRequestType)(nil)).Elem()
 }
 
-type CheckCustomizationResourcesResponse struct {
-}
+type CheckCustomizationResourcesResponse struct{}
 
 type CheckCustomizationSpec CheckCustomizationSpecRequestType
 
@@ -7225,8 +7194,7 @@ func init() {
 	t["CheckCustomizationSpecRequestType"] = reflect.TypeOf((*CheckCustomizationSpecRequestType)(nil)).Elem()
 }
 
-type CheckCustomizationSpecResponse struct {
-}
+type CheckCustomizationSpecResponse struct{}
 
 type CheckForUpdates CheckForUpdatesRequestType
 
@@ -7457,8 +7425,7 @@ func init() {
 	t["ClearComplianceStatusRequestType"] = reflect.TypeOf((*ClearComplianceStatusRequestType)(nil)).Elem()
 }
 
-type ClearComplianceStatusResponse struct {
-}
+type ClearComplianceStatusResponse struct{}
 
 type ClearNFSUser ClearNFSUserRequestType
 
@@ -7474,8 +7441,7 @@ func init() {
 	t["ClearNFSUserRequestType"] = reflect.TypeOf((*ClearNFSUserRequestType)(nil)).Elem()
 }
 
-type ClearNFSUserResponse struct {
-}
+type ClearNFSUserResponse struct{}
 
 type ClearSystemEventLog ClearSystemEventLogRequestType
 
@@ -7491,8 +7457,7 @@ func init() {
 	t["ClearSystemEventLogRequestType"] = reflect.TypeOf((*ClearSystemEventLogRequestType)(nil)).Elem()
 }
 
-type ClearSystemEventLogResponse struct {
-}
+type ClearSystemEventLogResponse struct{}
 
 type ClearTriggeredAlarms ClearTriggeredAlarmsRequestType
 
@@ -7509,8 +7474,7 @@ func init() {
 	t["ClearTriggeredAlarmsRequestType"] = reflect.TypeOf((*ClearTriggeredAlarmsRequestType)(nil)).Elem()
 }
 
-type ClearTriggeredAlarmsResponse struct {
-}
+type ClearTriggeredAlarmsResponse struct{}
 
 type ClearVStorageObjectControlFlags ClearVStorageObjectControlFlagsRequestType
 
@@ -7529,8 +7493,7 @@ func init() {
 	t["ClearVStorageObjectControlFlagsRequestType"] = reflect.TypeOf((*ClearVStorageObjectControlFlagsRequestType)(nil)).Elem()
 }
 
-type ClearVStorageObjectControlFlagsResponse struct {
-}
+type ClearVStorageObjectControlFlagsResponse struct{}
 
 type ClockSkew struct {
 	HostConfigFault
@@ -9058,8 +9021,7 @@ func init() {
 	t["ConfigureCryptoKeyRequestType"] = reflect.TypeOf((*ConfigureCryptoKeyRequestType)(nil)).Elem()
 }
 
-type ConfigureCryptoKeyResponse struct {
-}
+type ConfigureCryptoKeyResponse struct{}
 
 type ConfigureDatastoreIORMRequestType struct {
 	This      ManagedObjectReference `xml:"_this"`
@@ -9097,8 +9059,7 @@ func init() {
 	t["ConfigureDatastorePrincipalRequestType"] = reflect.TypeOf((*ConfigureDatastorePrincipalRequestType)(nil)).Elem()
 }
 
-type ConfigureDatastorePrincipalResponse struct {
-}
+type ConfigureDatastorePrincipalResponse struct{}
 
 type ConfigureEvcModeRequestType struct {
 	This       ManagedObjectReference `xml:"_this"`
@@ -9154,8 +9115,7 @@ func init() {
 	t["ConfigureLicenseSourceRequestType"] = reflect.TypeOf((*ConfigureLicenseSourceRequestType)(nil)).Elem()
 }
 
-type ConfigureLicenseSourceResponse struct {
-}
+type ConfigureLicenseSourceResponse struct{}
 
 type ConfigurePowerPolicy ConfigurePowerPolicyRequestType
 
@@ -9172,8 +9132,7 @@ func init() {
 	t["ConfigurePowerPolicyRequestType"] = reflect.TypeOf((*ConfigurePowerPolicyRequestType)(nil)).Elem()
 }
 
-type ConfigurePowerPolicyResponse struct {
-}
+type ConfigurePowerPolicyResponse struct{}
 
 type ConfigureStorageDrsForPodRequestType struct {
 	This   ManagedObjectReference `xml:"_this"`
@@ -9626,8 +9585,7 @@ func init() {
 	t["CreateCustomizationSpecRequestType"] = reflect.TypeOf((*CreateCustomizationSpecRequestType)(nil)).Elem()
 }
 
-type CreateCustomizationSpecResponse struct {
-}
+type CreateCustomizationSpecResponse struct{}
 
 type CreateDVPortgroupRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -9742,8 +9700,7 @@ func init() {
 	t["CreateDiagnosticPartitionRequestType"] = reflect.TypeOf((*CreateDiagnosticPartitionRequestType)(nil)).Elem()
 }
 
-type CreateDiagnosticPartitionResponse struct {
-}
+type CreateDiagnosticPartitionResponse struct{}
 
 type CreateDirectory CreateDirectoryRequestType
 
@@ -9864,8 +9821,7 @@ func init() {
 	t["CreateGroupRequestType"] = reflect.TypeOf((*CreateGroupRequestType)(nil)).Elem()
 }
 
-type CreateGroupResponse struct {
-}
+type CreateGroupResponse struct{}
 
 type CreateImportSpec CreateImportSpecRequestType
 
@@ -10058,8 +10014,7 @@ func init() {
 	t["CreatePerfIntervalRequestType"] = reflect.TypeOf((*CreatePerfIntervalRequestType)(nil)).Elem()
 }
 
-type CreatePerfIntervalResponse struct {
-}
+type CreatePerfIntervalResponse struct{}
 
 type CreateProfile CreateProfileRequestType
 
@@ -10117,8 +10072,7 @@ func init() {
 	t["CreateRegistryKeyInGuestRequestType"] = reflect.TypeOf((*CreateRegistryKeyInGuestRequestType)(nil)).Elem()
 }
 
-type CreateRegistryKeyInGuestResponse struct {
-}
+type CreateRegistryKeyInGuestResponse struct{}
 
 type CreateResourcePool CreateResourcePoolRequestType
 
@@ -10376,8 +10330,7 @@ func init() {
 	t["CreateUserRequestType"] = reflect.TypeOf((*CreateUserRequestType)(nil)).Elem()
 }
 
-type CreateUserResponse struct {
-}
+type CreateUserResponse struct{}
 
 type CreateVApp CreateVAppRequestType
 
@@ -10531,8 +10484,7 @@ func init() {
 	t["CryptoManagerHostEnableRequestType"] = reflect.TypeOf((*CryptoManagerHostEnableRequestType)(nil)).Elem()
 }
 
-type CryptoManagerHostEnableResponse struct {
-}
+type CryptoManagerHostEnableResponse struct{}
 
 type CryptoManagerHostPrepare CryptoManagerHostPrepareRequestType
 
@@ -10548,8 +10500,7 @@ func init() {
 	t["CryptoManagerHostPrepareRequestType"] = reflect.TypeOf((*CryptoManagerHostPrepareRequestType)(nil)).Elem()
 }
 
-type CryptoManagerHostPrepareResponse struct {
-}
+type CryptoManagerHostPrepareResponse struct{}
 
 type CryptoManagerKmipCertificateInfo struct {
 	DynamicData
@@ -12616,8 +12567,7 @@ func init() {
 	t["DefragmentAllDisksRequestType"] = reflect.TypeOf((*DefragmentAllDisksRequestType)(nil)).Elem()
 }
 
-type DefragmentAllDisksResponse struct {
-}
+type DefragmentAllDisksResponse struct{}
 
 type DefragmentVirtualDiskRequestType struct {
 	This       ManagedObjectReference  `xml:"_this"`
@@ -12654,8 +12604,7 @@ func init() {
 	t["DeleteCustomizationSpecRequestType"] = reflect.TypeOf((*DeleteCustomizationSpecRequestType)(nil)).Elem()
 }
 
-type DeleteCustomizationSpecResponse struct {
-}
+type DeleteCustomizationSpecResponse struct{}
 
 type DeleteDatastoreFileRequestType struct {
 	This       ManagedObjectReference  `xml:"_this"`
@@ -12701,8 +12650,7 @@ func init() {
 	t["DeleteDirectoryInGuestRequestType"] = reflect.TypeOf((*DeleteDirectoryInGuestRequestType)(nil)).Elem()
 }
 
-type DeleteDirectoryInGuestResponse struct {
-}
+type DeleteDirectoryInGuestResponse struct{}
 
 type DeleteDirectoryRequestType struct {
 	This          ManagedObjectReference  `xml:"_this"`
@@ -12714,8 +12662,7 @@ func init() {
 	t["DeleteDirectoryRequestType"] = reflect.TypeOf((*DeleteDirectoryRequestType)(nil)).Elem()
 }
 
-type DeleteDirectoryResponse struct {
-}
+type DeleteDirectoryResponse struct{}
 
 type DeleteFile DeleteFileRequestType
 
@@ -12740,8 +12687,7 @@ func init() {
 	t["DeleteFileInGuestRequestType"] = reflect.TypeOf((*DeleteFileInGuestRequestType)(nil)).Elem()
 }
 
-type DeleteFileInGuestResponse struct {
-}
+type DeleteFileInGuestResponse struct{}
 
 type DeleteFileRequestType struct {
 	This          ManagedObjectReference `xml:"_this"`
@@ -12752,8 +12698,7 @@ func init() {
 	t["DeleteFileRequestType"] = reflect.TypeOf((*DeleteFileRequestType)(nil)).Elem()
 }
 
-type DeleteFileResponse struct {
-}
+type DeleteFileResponse struct{}
 
 type DeleteHostSpecification DeleteHostSpecificationRequestType
 
@@ -12770,8 +12715,7 @@ func init() {
 	t["DeleteHostSpecificationRequestType"] = reflect.TypeOf((*DeleteHostSpecificationRequestType)(nil)).Elem()
 }
 
-type DeleteHostSpecificationResponse struct {
-}
+type DeleteHostSpecificationResponse struct{}
 
 type DeleteHostSubSpecification DeleteHostSubSpecificationRequestType
 
@@ -12789,8 +12733,7 @@ func init() {
 	t["DeleteHostSubSpecificationRequestType"] = reflect.TypeOf((*DeleteHostSubSpecificationRequestType)(nil)).Elem()
 }
 
-type DeleteHostSubSpecificationResponse struct {
-}
+type DeleteHostSubSpecificationResponse struct{}
 
 type DeleteNvdimmBlockNamespacesRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -12847,8 +12790,7 @@ func init() {
 	t["DeleteRegistryKeyInGuestRequestType"] = reflect.TypeOf((*DeleteRegistryKeyInGuestRequestType)(nil)).Elem()
 }
 
-type DeleteRegistryKeyInGuestResponse struct {
-}
+type DeleteRegistryKeyInGuestResponse struct{}
 
 type DeleteRegistryValueInGuest DeleteRegistryValueInGuestRequestType
 
@@ -12867,8 +12809,7 @@ func init() {
 	t["DeleteRegistryValueInGuestRequestType"] = reflect.TypeOf((*DeleteRegistryValueInGuestRequestType)(nil)).Elem()
 }
 
-type DeleteRegistryValueInGuestResponse struct {
-}
+type DeleteRegistryValueInGuestResponse struct{}
 
 type DeleteScsiLunState DeleteScsiLunStateRequestType
 
@@ -12885,8 +12826,7 @@ func init() {
 	t["DeleteScsiLunStateRequestType"] = reflect.TypeOf((*DeleteScsiLunStateRequestType)(nil)).Elem()
 }
 
-type DeleteScsiLunStateResponse struct {
-}
+type DeleteScsiLunStateResponse struct{}
 
 type DeleteSnapshotRequestType struct {
 	This       ManagedObjectReference `xml:"_this"`
@@ -12944,8 +12884,7 @@ func init() {
 	t["DeleteVffsVolumeStateRequestType"] = reflect.TypeOf((*DeleteVffsVolumeStateRequestType)(nil)).Elem()
 }
 
-type DeleteVffsVolumeStateResponse struct {
-}
+type DeleteVffsVolumeStateResponse struct{}
 
 type DeleteVirtualDiskRequestType struct {
 	This       ManagedObjectReference  `xml:"_this"`
@@ -12982,8 +12921,7 @@ func init() {
 	t["DeleteVmfsVolumeStateRequestType"] = reflect.TypeOf((*DeleteVmfsVolumeStateRequestType)(nil)).Elem()
 }
 
-type DeleteVmfsVolumeStateResponse struct {
-}
+type DeleteVmfsVolumeStateResponse struct{}
 
 type DeleteVsanObjects DeleteVsanObjectsRequestType
 
@@ -13055,8 +12993,7 @@ func init() {
 	t["DeselectVnicForNicTypeRequestType"] = reflect.TypeOf((*DeselectVnicForNicTypeRequestType)(nil)).Elem()
 }
 
-type DeselectVnicForNicTypeResponse struct {
-}
+type DeselectVnicForNicTypeResponse struct{}
 
 type DeselectVnicRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -13066,8 +13003,7 @@ func init() {
 	t["DeselectVnicRequestType"] = reflect.TypeOf((*DeselectVnicRequestType)(nil)).Elem()
 }
 
-type DeselectVnicResponse struct {
-}
+type DeselectVnicResponse struct{}
 
 type DestinationSwitchFull struct {
 	CannotAccessNetwork
@@ -13113,8 +13049,7 @@ func init() {
 	t["DestroyChildrenRequestType"] = reflect.TypeOf((*DestroyChildrenRequestType)(nil)).Elem()
 }
 
-type DestroyChildrenResponse struct {
-}
+type DestroyChildrenResponse struct{}
 
 type DestroyCollector DestroyCollectorRequestType
 
@@ -13130,8 +13065,7 @@ func init() {
 	t["DestroyCollectorRequestType"] = reflect.TypeOf((*DestroyCollectorRequestType)(nil)).Elem()
 }
 
-type DestroyCollectorResponse struct {
-}
+type DestroyCollectorResponse struct{}
 
 type DestroyDatastore DestroyDatastoreRequestType
 
@@ -13147,8 +13081,7 @@ func init() {
 	t["DestroyDatastoreRequestType"] = reflect.TypeOf((*DestroyDatastoreRequestType)(nil)).Elem()
 }
 
-type DestroyDatastoreResponse struct {
-}
+type DestroyDatastoreResponse struct{}
 
 type DestroyIpPool DestroyIpPoolRequestType
 
@@ -13167,8 +13100,7 @@ func init() {
 	t["DestroyIpPoolRequestType"] = reflect.TypeOf((*DestroyIpPoolRequestType)(nil)).Elem()
 }
 
-type DestroyIpPoolResponse struct {
-}
+type DestroyIpPoolResponse struct{}
 
 type DestroyNetwork DestroyNetworkRequestType
 
@@ -13184,8 +13116,7 @@ func init() {
 	t["DestroyNetworkRequestType"] = reflect.TypeOf((*DestroyNetworkRequestType)(nil)).Elem()
 }
 
-type DestroyNetworkResponse struct {
-}
+type DestroyNetworkResponse struct{}
 
 type DestroyProfile DestroyProfileRequestType
 
@@ -13201,8 +13132,7 @@ func init() {
 	t["DestroyProfileRequestType"] = reflect.TypeOf((*DestroyProfileRequestType)(nil)).Elem()
 }
 
-type DestroyProfileResponse struct {
-}
+type DestroyProfileResponse struct{}
 
 type DestroyPropertyCollector DestroyPropertyCollectorRequestType
 
@@ -13218,8 +13148,7 @@ func init() {
 	t["DestroyPropertyCollectorRequestType"] = reflect.TypeOf((*DestroyPropertyCollectorRequestType)(nil)).Elem()
 }
 
-type DestroyPropertyCollectorResponse struct {
-}
+type DestroyPropertyCollectorResponse struct{}
 
 type DestroyPropertyFilter DestroyPropertyFilterRequestType
 
@@ -13235,8 +13164,7 @@ func init() {
 	t["DestroyPropertyFilterRequestType"] = reflect.TypeOf((*DestroyPropertyFilterRequestType)(nil)).Elem()
 }
 
-type DestroyPropertyFilterResponse struct {
-}
+type DestroyPropertyFilterResponse struct{}
 
 type DestroyRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -13261,8 +13189,7 @@ func init() {
 	t["DestroyVffsRequestType"] = reflect.TypeOf((*DestroyVffsRequestType)(nil)).Elem()
 }
 
-type DestroyVffsResponse struct {
-}
+type DestroyVffsResponse struct{}
 
 type DestroyView DestroyViewRequestType
 
@@ -13278,8 +13205,7 @@ func init() {
 	t["DestroyViewRequestType"] = reflect.TypeOf((*DestroyViewRequestType)(nil)).Elem()
 }
 
-type DestroyViewResponse struct {
-}
+type DestroyViewResponse struct{}
 
 type Destroy_Task DestroyRequestType
 
@@ -13344,8 +13270,7 @@ func init() {
 	t["DetachScsiLunRequestType"] = reflect.TypeOf((*DetachScsiLunRequestType)(nil)).Elem()
 }
 
-type DetachScsiLunResponse struct {
-}
+type DetachScsiLunResponse struct{}
 
 type DetachTagFromVStorageObject DetachTagFromVStorageObjectRequestType
 
@@ -13364,8 +13289,7 @@ func init() {
 	t["DetachTagFromVStorageObjectRequestType"] = reflect.TypeOf((*DetachTagFromVStorageObjectRequestType)(nil)).Elem()
 }
 
-type DetachTagFromVStorageObjectResponse struct {
-}
+type DetachTagFromVStorageObjectResponse struct{}
 
 type DeviceBackedVirtualDiskSpec struct {
 	VirtualDiskSpec
@@ -13627,8 +13551,7 @@ func init() {
 	t["DisableHyperThreadingRequestType"] = reflect.TypeOf((*DisableHyperThreadingRequestType)(nil)).Elem()
 }
 
-type DisableHyperThreadingResponse struct {
-}
+type DisableHyperThreadingResponse struct{}
 
 type DisableMultipathPath DisableMultipathPathRequestType
 
@@ -13645,8 +13568,7 @@ func init() {
 	t["DisableMultipathPathRequestType"] = reflect.TypeOf((*DisableMultipathPathRequestType)(nil)).Elem()
 }
 
-type DisableMultipathPathResponse struct {
-}
+type DisableMultipathPathResponse struct{}
 
 type DisableRuleset DisableRulesetRequestType
 
@@ -13663,8 +13585,7 @@ func init() {
 	t["DisableRulesetRequestType"] = reflect.TypeOf((*DisableRulesetRequestType)(nil)).Elem()
 }
 
-type DisableRulesetResponse struct {
-}
+type DisableRulesetResponse struct{}
 
 type DisableSecondaryVMRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -13699,8 +13620,7 @@ func init() {
 	t["DisableSmartCardAuthenticationRequestType"] = reflect.TypeOf((*DisableSmartCardAuthenticationRequestType)(nil)).Elem()
 }
 
-type DisableSmartCardAuthenticationResponse struct {
-}
+type DisableSmartCardAuthenticationResponse struct{}
 
 type DisallowedChangeByService struct {
 	RuntimeFault
@@ -13813,8 +13733,7 @@ func init() {
 	t["DiscoverFcoeHbasRequestType"] = reflect.TypeOf((*DiscoverFcoeHbasRequestType)(nil)).Elem()
 }
 
-type DiscoverFcoeHbasResponse struct {
-}
+type DiscoverFcoeHbasResponse struct{}
 
 type DiskChangeExtent struct {
 	DynamicData
@@ -13954,8 +13873,7 @@ func init() {
 	t["DissociateProfileRequestType"] = reflect.TypeOf((*DissociateProfileRequestType)(nil)).Elem()
 }
 
-type DissociateProfileResponse struct {
-}
+type DissociateProfileResponse struct{}
 
 type DistributedVirtualPort struct {
 	DynamicData
@@ -14497,8 +14415,7 @@ func init() {
 	t["DuplicateCustomizationSpecRequestType"] = reflect.TypeOf((*DuplicateCustomizationSpecRequestType)(nil)).Elem()
 }
 
-type DuplicateCustomizationSpecResponse struct {
-}
+type DuplicateCustomizationSpecResponse struct{}
 
 type DuplicateDisks struct {
 	VsanDiskFault
@@ -15464,8 +15381,7 @@ func init() {
 	t["DynamicArray"] = reflect.TypeOf((*DynamicArray)(nil)).Elem()
 }
 
-type DynamicData struct {
-}
+type DynamicData struct{}
 
 func init() {
 	t["DynamicData"] = reflect.TypeOf((*DynamicData)(nil)).Elem()
@@ -15790,8 +15706,7 @@ func init() {
 	t["EnableAlarmActionsRequestType"] = reflect.TypeOf((*EnableAlarmActionsRequestType)(nil)).Elem()
 }
 
-type EnableAlarmActionsResponse struct {
-}
+type EnableAlarmActionsResponse struct{}
 
 type EnableCrypto EnableCryptoRequestType
 
@@ -15808,8 +15723,7 @@ func init() {
 	t["EnableCryptoRequestType"] = reflect.TypeOf((*EnableCryptoRequestType)(nil)).Elem()
 }
 
-type EnableCryptoResponse struct {
-}
+type EnableCryptoResponse struct{}
 
 type EnableFeature EnableFeatureRequestType
 
@@ -15845,8 +15759,7 @@ func init() {
 	t["EnableHyperThreadingRequestType"] = reflect.TypeOf((*EnableHyperThreadingRequestType)(nil)).Elem()
 }
 
-type EnableHyperThreadingResponse struct {
-}
+type EnableHyperThreadingResponse struct{}
 
 type EnableMultipathPath EnableMultipathPathRequestType
 
@@ -15863,8 +15776,7 @@ func init() {
 	t["EnableMultipathPathRequestType"] = reflect.TypeOf((*EnableMultipathPathRequestType)(nil)).Elem()
 }
 
-type EnableMultipathPathResponse struct {
-}
+type EnableMultipathPathResponse struct{}
 
 type EnableNetworkResourceManagement EnableNetworkResourceManagementRequestType
 
@@ -15881,8 +15793,7 @@ func init() {
 	t["EnableNetworkResourceManagementRequestType"] = reflect.TypeOf((*EnableNetworkResourceManagementRequestType)(nil)).Elem()
 }
 
-type EnableNetworkResourceManagementResponse struct {
-}
+type EnableNetworkResourceManagementResponse struct{}
 
 type EnableRuleset EnableRulesetRequestType
 
@@ -15899,8 +15810,7 @@ func init() {
 	t["EnableRulesetRequestType"] = reflect.TypeOf((*EnableRulesetRequestType)(nil)).Elem()
 }
 
-type EnableRulesetResponse struct {
-}
+type EnableRulesetResponse struct{}
 
 type EnableSecondaryVMRequestType struct {
 	This ManagedObjectReference  `xml:"_this"`
@@ -15936,8 +15846,7 @@ func init() {
 	t["EnableSmartCardAuthenticationRequestType"] = reflect.TypeOf((*EnableSmartCardAuthenticationRequestType)(nil)).Elem()
 }
 
-type EnableSmartCardAuthenticationResponse struct {
-}
+type EnableSmartCardAuthenticationResponse struct{}
 
 type EncryptionKeyRequired struct {
 	InvalidState
@@ -15969,8 +15878,7 @@ func init() {
 	t["EnterLockdownModeRequestType"] = reflect.TypeOf((*EnterLockdownModeRequestType)(nil)).Elem()
 }
 
-type EnterLockdownModeResponse struct {
-}
+type EnterLockdownModeResponse struct{}
 
 type EnterMaintenanceModeRequestType struct {
 	This                  ManagedObjectReference `xml:"_this"`
@@ -16152,8 +16060,7 @@ func init() {
 	t["EsxAgentHostManagerUpdateConfigRequestType"] = reflect.TypeOf((*EsxAgentHostManagerUpdateConfigRequestType)(nil)).Elem()
 }
 
-type EsxAgentHostManagerUpdateConfigResponse struct {
-}
+type EsxAgentHostManagerUpdateConfigResponse struct{}
 
 type EvacuateVsanNodeRequestType struct {
 	This            ManagedObjectReference `xml:"_this"`
@@ -16425,8 +16332,7 @@ func init() {
 	t["ExitLockdownModeRequestType"] = reflect.TypeOf((*ExitLockdownModeRequestType)(nil)).Elem()
 }
 
-type ExitLockdownModeResponse struct {
-}
+type ExitLockdownModeResponse struct{}
 
 type ExitMaintenanceModeEvent struct {
 	HostEvent
@@ -16515,8 +16421,7 @@ func init() {
 	t["ExpandVmfsExtentRequestType"] = reflect.TypeOf((*ExpandVmfsExtentRequestType)(nil)).Elem()
 }
 
-type ExpandVmfsExtentResponse struct {
-}
+type ExpandVmfsExtentResponse struct{}
 
 type ExpiredAddonLicense struct {
 	ExpiredFeatureLicense
@@ -16741,8 +16646,7 @@ func init() {
 	t["ExtendVffsRequestType"] = reflect.TypeOf((*ExtendVffsRequestType)(nil)).Elem()
 }
 
-type ExtendVffsResponse struct {
-}
+type ExtendVffsResponse struct{}
 
 type ExtendVirtualDiskRequestType struct {
 	This          ManagedObjectReference  `xml:"_this"`
@@ -19962,8 +19866,7 @@ func init() {
 	t["HostClearVStorageObjectControlFlagsRequestType"] = reflect.TypeOf((*HostClearVStorageObjectControlFlagsRequestType)(nil)).Elem()
 }
 
-type HostClearVStorageObjectControlFlagsResponse struct {
-}
+type HostClearVStorageObjectControlFlagsResponse struct{}
 
 type HostCloneVStorageObjectRequestType struct {
 	This      ManagedObjectReference `xml:"_this"`
@@ -20340,8 +20243,7 @@ func init() {
 	t["HostConfigVFlashCacheRequestType"] = reflect.TypeOf((*HostConfigVFlashCacheRequestType)(nil)).Elem()
 }
 
-type HostConfigVFlashCacheResponse struct {
-}
+type HostConfigVFlashCacheResponse struct{}
 
 type HostConfigureVFlashResource HostConfigureVFlashResourceRequestType
 
@@ -20358,8 +20260,7 @@ func init() {
 	t["HostConfigureVFlashResourceRequestType"] = reflect.TypeOf((*HostConfigureVFlashResourceRequestType)(nil)).Elem()
 }
 
-type HostConfigureVFlashResourceResponse struct {
-}
+type HostConfigureVFlashResourceResponse struct{}
 
 type HostConnectFault struct {
 	VimFault
@@ -23676,8 +23577,7 @@ func init() {
 	t["HostProfileResetValidationStateRequestType"] = reflect.TypeOf((*HostProfileResetValidationStateRequestType)(nil)).Elem()
 }
 
-type HostProfileResetValidationStateResponse struct {
-}
+type HostProfileResetValidationStateResponse struct{}
 
 type HostProfileSerializedHostProfileSpec struct {
 	ProfileSerializedCreateSpec
@@ -23882,8 +23782,7 @@ func init() {
 	t["HostRemoveVFlashResourceRequestType"] = reflect.TypeOf((*HostRemoveVFlashResourceRequestType)(nil)).Elem()
 }
 
-type HostRemoveVFlashResourceResponse struct {
-}
+type HostRemoveVFlashResourceResponse struct{}
 
 type HostRemovedEvent struct {
 	HostEvent
@@ -23910,8 +23809,7 @@ func init() {
 	t["HostRenameVStorageObjectRequestType"] = reflect.TypeOf((*HostRenameVStorageObjectRequestType)(nil)).Elem()
 }
 
-type HostRenameVStorageObjectResponse struct {
-}
+type HostRenameVStorageObjectResponse struct{}
 
 type HostResignatureRescanResult struct {
 	DynamicData
@@ -24047,8 +23945,7 @@ func init() {
 	t["HostScheduleReconcileDatastoreInventoryRequestType"] = reflect.TypeOf((*HostScheduleReconcileDatastoreInventoryRequestType)(nil)).Elem()
 }
 
-type HostScheduleReconcileDatastoreInventoryResponse struct {
-}
+type HostScheduleReconcileDatastoreInventoryResponse struct{}
 
 type HostScsiDisk struct {
 	ScsiLun
@@ -24236,8 +24133,7 @@ func init() {
 	t["HostSetVStorageObjectControlFlagsRequestType"] = reflect.TypeOf((*HostSetVStorageObjectControlFlagsRequestType)(nil)).Elem()
 }
 
-type HostSetVStorageObjectControlFlagsResponse struct {
-}
+type HostSetVStorageObjectControlFlagsResponse struct{}
 
 type HostSharedGpuCapabilities struct {
 	DynamicData
@@ -25584,8 +25480,7 @@ func init() {
 	t["HttpNfcLeaseAbortRequestType"] = reflect.TypeOf((*HttpNfcLeaseAbortRequestType)(nil)).Elem()
 }
 
-type HttpNfcLeaseAbortResponse struct {
-}
+type HttpNfcLeaseAbortResponse struct{}
 
 type HttpNfcLeaseCapabilities struct {
 	DynamicData
@@ -25612,8 +25507,7 @@ func init() {
 	t["HttpNfcLeaseCompleteRequestType"] = reflect.TypeOf((*HttpNfcLeaseCompleteRequestType)(nil)).Elem()
 }
 
-type HttpNfcLeaseCompleteResponse struct {
-}
+type HttpNfcLeaseCompleteResponse struct{}
 
 type HttpNfcLeaseDatastoreLeaseInfo struct {
 	DynamicData
@@ -25719,8 +25613,7 @@ func init() {
 	t["HttpNfcLeaseProgressRequestType"] = reflect.TypeOf((*HttpNfcLeaseProgressRequestType)(nil)).Elem()
 }
 
-type HttpNfcLeaseProgressResponse struct {
-}
+type HttpNfcLeaseProgressResponse struct{}
 
 type HttpNfcLeasePullFromUrlsRequestType struct {
 	This  ManagedObjectReference   `xml:"_this"`
@@ -25756,8 +25649,7 @@ func init() {
 	t["HttpNfcLeaseSetManifestChecksumTypeRequestType"] = reflect.TypeOf((*HttpNfcLeaseSetManifestChecksumTypeRequestType)(nil)).Elem()
 }
 
-type HttpNfcLeaseSetManifestChecksumTypeResponse struct {
-}
+type HttpNfcLeaseSetManifestChecksumTypeResponse struct{}
 
 type HttpNfcLeaseSourceFile struct {
 	DynamicData
@@ -25937,8 +25829,7 @@ func init() {
 	t["ImportUnmanagedSnapshotRequestType"] = reflect.TypeOf((*ImportUnmanagedSnapshotRequestType)(nil)).Elem()
 }
 
-type ImportUnmanagedSnapshotResponse struct {
-}
+type ImportUnmanagedSnapshotResponse struct{}
 
 type ImportVApp ImportVAppRequestType
 
@@ -26338,8 +26229,7 @@ func init() {
 	t["InstallServerCertificateRequestType"] = reflect.TypeOf((*InstallServerCertificateRequestType)(nil)).Elem()
 }
 
-type InstallServerCertificateResponse struct {
-}
+type InstallServerCertificateResponse struct{}
 
 type InstallSmartCardTrustAnchor InstallSmartCardTrustAnchorRequestType
 
@@ -26356,8 +26246,7 @@ func init() {
 	t["InstallSmartCardTrustAnchorRequestType"] = reflect.TypeOf((*InstallSmartCardTrustAnchorRequestType)(nil)).Elem()
 }
 
-type InstallSmartCardTrustAnchorResponse struct {
-}
+type InstallSmartCardTrustAnchorResponse struct{}
 
 type InstantCloneRequestType struct {
 	This ManagedObjectReference         `xml:"_this"`
@@ -29026,8 +28915,7 @@ func init() {
 	t["LogUserEventRequestType"] = reflect.TypeOf((*LogUserEventRequestType)(nil)).Elem()
 }
 
-type LogUserEventResponse struct {
-}
+type LogUserEventResponse struct{}
 
 type Login LoginRequestType
 
@@ -29143,8 +29031,7 @@ func init() {
 	t["LogoutRequestType"] = reflect.TypeOf((*LogoutRequestType)(nil)).Elem()
 }
 
-type LogoutResponse struct {
-}
+type LogoutResponse struct{}
 
 type LongOption struct {
 	OptionType
@@ -29264,8 +29151,7 @@ func init() {
 	t["MakeDirectoryInGuestRequestType"] = reflect.TypeOf((*MakeDirectoryInGuestRequestType)(nil)).Elem()
 }
 
-type MakeDirectoryInGuestResponse struct {
-}
+type MakeDirectoryInGuestResponse struct{}
 
 type MakeDirectoryRequestType struct {
 	This                    ManagedObjectReference  `xml:"_this"`
@@ -29278,8 +29164,7 @@ func init() {
 	t["MakeDirectoryRequestType"] = reflect.TypeOf((*MakeDirectoryRequestType)(nil)).Elem()
 }
 
-type MakeDirectoryResponse struct {
-}
+type MakeDirectoryResponse struct{}
 
 type MakePrimaryVMRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -29436,8 +29321,7 @@ func init() {
 	t["MarkAsTemplateRequestType"] = reflect.TypeOf((*MarkAsTemplateRequestType)(nil)).Elem()
 }
 
-type MarkAsTemplateResponse struct {
-}
+type MarkAsTemplateResponse struct{}
 
 type MarkAsVirtualMachine MarkAsVirtualMachineRequestType
 
@@ -29455,8 +29339,7 @@ func init() {
 	t["MarkAsVirtualMachineRequestType"] = reflect.TypeOf((*MarkAsVirtualMachineRequestType)(nil)).Elem()
 }
 
-type MarkAsVirtualMachineResponse struct {
-}
+type MarkAsVirtualMachineResponse struct{}
 
 type MarkDefault MarkDefaultRequestType
 
@@ -29473,8 +29356,7 @@ func init() {
 	t["MarkDefaultRequestType"] = reflect.TypeOf((*MarkDefaultRequestType)(nil)).Elem()
 }
 
-type MarkDefaultResponse struct {
-}
+type MarkDefaultResponse struct{}
 
 type MarkForRemoval MarkForRemovalRequestType
 
@@ -29492,8 +29374,7 @@ func init() {
 	t["MarkForRemovalRequestType"] = reflect.TypeOf((*MarkForRemovalRequestType)(nil)).Elem()
 }
 
-type MarkForRemovalResponse struct {
-}
+type MarkForRemovalResponse struct{}
 
 type MemoryFileFormatNotSupportedByDatastore struct {
 	UnsupportedDatastore
@@ -29629,8 +29510,7 @@ func init() {
 	t["MergePermissionsRequestType"] = reflect.TypeOf((*MergePermissionsRequestType)(nil)).Elem()
 }
 
-type MergePermissionsResponse struct {
-}
+type MergePermissionsResponse struct{}
 
 type MethodAction struct {
 	Action
@@ -30194,8 +30074,7 @@ func init() {
 	t["MountToolsInstallerRequestType"] = reflect.TypeOf((*MountToolsInstallerRequestType)(nil)).Elem()
 }
 
-type MountToolsInstallerResponse struct {
-}
+type MountToolsInstallerResponse struct{}
 
 type MountVffsVolume MountVffsVolumeRequestType
 
@@ -30212,8 +30091,7 @@ func init() {
 	t["MountVffsVolumeRequestType"] = reflect.TypeOf((*MountVffsVolumeRequestType)(nil)).Elem()
 }
 
-type MountVffsVolumeResponse struct {
-}
+type MountVffsVolumeResponse struct{}
 
 type MountVmfsVolume MountVmfsVolumeRequestType
 
@@ -30249,8 +30127,7 @@ func init() {
 	t["MountVmfsVolumeRequestType"] = reflect.TypeOf((*MountVmfsVolumeRequestType)(nil)).Elem()
 }
 
-type MountVmfsVolumeResponse struct {
-}
+type MountVmfsVolumeResponse struct{}
 
 type MoveDVPortRequestType struct {
 	This                    ManagedObjectReference `xml:"_this"`
@@ -30313,8 +30190,7 @@ func init() {
 	t["MoveDirectoryInGuestRequestType"] = reflect.TypeOf((*MoveDirectoryInGuestRequestType)(nil)).Elem()
 }
 
-type MoveDirectoryInGuestResponse struct {
-}
+type MoveDirectoryInGuestResponse struct{}
 
 type MoveFileInGuest MoveFileInGuestRequestType
 
@@ -30335,8 +30211,7 @@ func init() {
 	t["MoveFileInGuestRequestType"] = reflect.TypeOf((*MoveFileInGuestRequestType)(nil)).Elem()
 }
 
-type MoveFileInGuestResponse struct {
-}
+type MoveFileInGuestResponse struct{}
 
 type MoveHostIntoRequestType struct {
 	This         ManagedObjectReference  `xml:"_this"`
@@ -30401,8 +30276,7 @@ func init() {
 	t["MoveIntoResourcePoolRequestType"] = reflect.TypeOf((*MoveIntoResourcePoolRequestType)(nil)).Elem()
 }
 
-type MoveIntoResourcePoolResponse struct {
-}
+type MoveIntoResourcePoolResponse struct{}
 
 type MoveInto_Task MoveIntoRequestType
 
@@ -32398,8 +32272,7 @@ func init() {
 	t["OverwriteCustomizationSpecRequestType"] = reflect.TypeOf((*OverwriteCustomizationSpecRequestType)(nil)).Elem()
 }
 
-type OverwriteCustomizationSpecResponse struct {
-}
+type OverwriteCustomizationSpecResponse struct{}
 
 type OvfAttribute struct {
 	OvfInvalidPackage
@@ -34839,8 +34712,7 @@ func init() {
 	t["PostEventRequestType"] = reflect.TypeOf((*PostEventRequestType)(nil)).Elem()
 }
 
-type PostEventResponse struct {
-}
+type PostEventResponse struct{}
 
 type PostHealthUpdates PostHealthUpdatesRequestType
 
@@ -34858,8 +34730,7 @@ func init() {
 	t["PostHealthUpdatesRequestType"] = reflect.TypeOf((*PostHealthUpdatesRequestType)(nil)).Elem()
 }
 
-type PostHealthUpdatesResponse struct {
-}
+type PostHealthUpdatesResponse struct{}
 
 type PowerDownHostToStandByRequestType struct {
 	This                  ManagedObjectReference `xml:"_this"`
@@ -35066,8 +34937,7 @@ func init() {
 	t["PrepareCryptoRequestType"] = reflect.TypeOf((*PrepareCryptoRequestType)(nil)).Elem()
 }
 
-type PrepareCryptoResponse struct {
-}
+type PrepareCryptoResponse struct{}
 
 type PrivilegeAvailability struct {
 	DynamicData
@@ -37977,8 +37847,7 @@ func init() {
 	t["RebootGuestRequestType"] = reflect.TypeOf((*RebootGuestRequestType)(nil)).Elem()
 }
 
-type RebootGuestResponse struct {
-}
+type RebootGuestResponse struct{}
 
 type RebootHostRequestType struct {
 	This  ManagedObjectReference `xml:"_this"`
@@ -38145,8 +38014,7 @@ func init() {
 	t["ReconfigureAlarmRequestType"] = reflect.TypeOf((*ReconfigureAlarmRequestType)(nil)).Elem()
 }
 
-type ReconfigureAlarmResponse struct {
-}
+type ReconfigureAlarmResponse struct{}
 
 type ReconfigureAutostart ReconfigureAutostartRequestType
 
@@ -38163,8 +38031,7 @@ func init() {
 	t["ReconfigureAutostartRequestType"] = reflect.TypeOf((*ReconfigureAutostartRequestType)(nil)).Elem()
 }
 
-type ReconfigureAutostartResponse struct {
-}
+type ReconfigureAutostartResponse struct{}
 
 type ReconfigureClusterRequestType struct {
 	This   ManagedObjectReference `xml:"_this"`
@@ -38280,8 +38147,7 @@ func init() {
 	t["ReconfigureDomObjectRequestType"] = reflect.TypeOf((*ReconfigureDomObjectRequestType)(nil)).Elem()
 }
 
-type ReconfigureDomObjectResponse struct {
-}
+type ReconfigureDomObjectResponse struct{}
 
 type ReconfigureDvsRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -38335,8 +38201,7 @@ func init() {
 	t["ReconfigureScheduledTaskRequestType"] = reflect.TypeOf((*ReconfigureScheduledTaskRequestType)(nil)).Elem()
 }
 
-type ReconfigureScheduledTaskResponse struct {
-}
+type ReconfigureScheduledTaskResponse struct{}
 
 type ReconfigureServiceConsoleReservation ReconfigureServiceConsoleReservationRequestType
 
@@ -38353,8 +38218,7 @@ func init() {
 	t["ReconfigureServiceConsoleReservationRequestType"] = reflect.TypeOf((*ReconfigureServiceConsoleReservationRequestType)(nil)).Elem()
 }
 
-type ReconfigureServiceConsoleReservationResponse struct {
-}
+type ReconfigureServiceConsoleReservationResponse struct{}
 
 type ReconfigureSnmpAgent ReconfigureSnmpAgentRequestType
 
@@ -38371,8 +38235,7 @@ func init() {
 	t["ReconfigureSnmpAgentRequestType"] = reflect.TypeOf((*ReconfigureSnmpAgentRequestType)(nil)).Elem()
 }
 
-type ReconfigureSnmpAgentResponse struct {
-}
+type ReconfigureSnmpAgentResponse struct{}
 
 type ReconfigureVirtualMachineReservation ReconfigureVirtualMachineReservationRequestType
 
@@ -38389,8 +38252,7 @@ func init() {
 	t["ReconfigureVirtualMachineReservationRequestType"] = reflect.TypeOf((*ReconfigureVirtualMachineReservationRequestType)(nil)).Elem()
 }
 
-type ReconfigureVirtualMachineReservationResponse struct {
-}
+type ReconfigureVirtualMachineReservationResponse struct{}
 
 type ReconnectHostRequestType struct {
 	This          ManagedObjectReference   `xml:"_this"`
@@ -38508,8 +38370,7 @@ func init() {
 	t["RefreshDVPortStateRequestType"] = reflect.TypeOf((*RefreshDVPortStateRequestType)(nil)).Elem()
 }
 
-type RefreshDVPortStateResponse struct {
-}
+type RefreshDVPortStateResponse struct{}
 
 type RefreshDatastore RefreshDatastoreRequestType
 
@@ -38525,8 +38386,7 @@ func init() {
 	t["RefreshDatastoreRequestType"] = reflect.TypeOf((*RefreshDatastoreRequestType)(nil)).Elem()
 }
 
-type RefreshDatastoreResponse struct {
-}
+type RefreshDatastoreResponse struct{}
 
 type RefreshDatastoreStorageInfo RefreshDatastoreStorageInfoRequestType
 
@@ -38542,8 +38402,7 @@ func init() {
 	t["RefreshDatastoreStorageInfoRequestType"] = reflect.TypeOf((*RefreshDatastoreStorageInfoRequestType)(nil)).Elem()
 }
 
-type RefreshDatastoreStorageInfoResponse struct {
-}
+type RefreshDatastoreStorageInfoResponse struct{}
 
 type RefreshDateTimeSystem RefreshDateTimeSystemRequestType
 
@@ -38559,8 +38418,7 @@ func init() {
 	t["RefreshDateTimeSystemRequestType"] = reflect.TypeOf((*RefreshDateTimeSystemRequestType)(nil)).Elem()
 }
 
-type RefreshDateTimeSystemResponse struct {
-}
+type RefreshDateTimeSystemResponse struct{}
 
 type RefreshFirewall RefreshFirewallRequestType
 
@@ -38576,8 +38434,7 @@ func init() {
 	t["RefreshFirewallRequestType"] = reflect.TypeOf((*RefreshFirewallRequestType)(nil)).Elem()
 }
 
-type RefreshFirewallResponse struct {
-}
+type RefreshFirewallResponse struct{}
 
 type RefreshGraphicsManager RefreshGraphicsManagerRequestType
 
@@ -38593,8 +38450,7 @@ func init() {
 	t["RefreshGraphicsManagerRequestType"] = reflect.TypeOf((*RefreshGraphicsManagerRequestType)(nil)).Elem()
 }
 
-type RefreshGraphicsManagerResponse struct {
-}
+type RefreshGraphicsManagerResponse struct{}
 
 type RefreshHealthStatusSystem RefreshHealthStatusSystemRequestType
 
@@ -38610,8 +38466,7 @@ func init() {
 	t["RefreshHealthStatusSystemRequestType"] = reflect.TypeOf((*RefreshHealthStatusSystemRequestType)(nil)).Elem()
 }
 
-type RefreshHealthStatusSystemResponse struct {
-}
+type RefreshHealthStatusSystemResponse struct{}
 
 type RefreshNetworkSystem RefreshNetworkSystemRequestType
 
@@ -38627,8 +38482,7 @@ func init() {
 	t["RefreshNetworkSystemRequestType"] = reflect.TypeOf((*RefreshNetworkSystemRequestType)(nil)).Elem()
 }
 
-type RefreshNetworkSystemResponse struct {
-}
+type RefreshNetworkSystemResponse struct{}
 
 type RefreshRecommendation RefreshRecommendationRequestType
 
@@ -38644,8 +38498,7 @@ func init() {
 	t["RefreshRecommendationRequestType"] = reflect.TypeOf((*RefreshRecommendationRequestType)(nil)).Elem()
 }
 
-type RefreshRecommendationResponse struct {
-}
+type RefreshRecommendationResponse struct{}
 
 type RefreshRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -38655,8 +38508,7 @@ func init() {
 	t["RefreshRequestType"] = reflect.TypeOf((*RefreshRequestType)(nil)).Elem()
 }
 
-type RefreshResponse struct {
-}
+type RefreshResponse struct{}
 
 type RefreshRuntime RefreshRuntimeRequestType
 
@@ -38672,8 +38524,7 @@ func init() {
 	t["RefreshRuntimeRequestType"] = reflect.TypeOf((*RefreshRuntimeRequestType)(nil)).Elem()
 }
 
-type RefreshRuntimeResponse struct {
-}
+type RefreshRuntimeResponse struct{}
 
 type RefreshServices RefreshServicesRequestType
 
@@ -38689,8 +38540,7 @@ func init() {
 	t["RefreshServicesRequestType"] = reflect.TypeOf((*RefreshServicesRequestType)(nil)).Elem()
 }
 
-type RefreshServicesResponse struct {
-}
+type RefreshServicesResponse struct{}
 
 type RefreshStorageDrsRecommendation RefreshStorageDrsRecommendationRequestType
 
@@ -38707,8 +38557,7 @@ func init() {
 	t["RefreshStorageDrsRecommendationRequestType"] = reflect.TypeOf((*RefreshStorageDrsRecommendationRequestType)(nil)).Elem()
 }
 
-type RefreshStorageDrsRecommendationResponse struct {
-}
+type RefreshStorageDrsRecommendationResponse struct{}
 
 type RefreshStorageDrsRecommendationsForPodRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -38743,8 +38592,7 @@ func init() {
 	t["RefreshStorageInfoRequestType"] = reflect.TypeOf((*RefreshStorageInfoRequestType)(nil)).Elem()
 }
 
-type RefreshStorageInfoResponse struct {
-}
+type RefreshStorageInfoResponse struct{}
 
 type RefreshStorageSystem RefreshStorageSystemRequestType
 
@@ -38760,8 +38608,7 @@ func init() {
 	t["RefreshStorageSystemRequestType"] = reflect.TypeOf((*RefreshStorageSystemRequestType)(nil)).Elem()
 }
 
-type RefreshStorageSystemResponse struct {
-}
+type RefreshStorageSystemResponse struct{}
 
 type RegisterChildVMRequestType struct {
 	This ManagedObjectReference  `xml:"_this"`
@@ -38819,8 +38666,7 @@ func init() {
 	t["RegisterExtensionRequestType"] = reflect.TypeOf((*RegisterExtensionRequestType)(nil)).Elem()
 }
 
-type RegisterExtensionResponse struct {
-}
+type RegisterExtensionResponse struct{}
 
 type RegisterHealthUpdateProvider RegisterHealthUpdateProviderRequestType
 
@@ -38857,8 +38703,7 @@ func init() {
 	t["RegisterKmipServerRequestType"] = reflect.TypeOf((*RegisterKmipServerRequestType)(nil)).Elem()
 }
 
-type RegisterKmipServerResponse struct {
-}
+type RegisterKmipServerResponse struct{}
 
 type RegisterVMRequestType struct {
 	This       ManagedObjectReference  `xml:"_this"`
@@ -38911,8 +38756,7 @@ func init() {
 	t["ReleaseCredentialsInGuestRequestType"] = reflect.TypeOf((*ReleaseCredentialsInGuestRequestType)(nil)).Elem()
 }
 
-type ReleaseCredentialsInGuestResponse struct {
-}
+type ReleaseCredentialsInGuestResponse struct{}
 
 type ReleaseIpAllocation ReleaseIpAllocationRequestType
 
@@ -38931,8 +38775,7 @@ func init() {
 	t["ReleaseIpAllocationRequestType"] = reflect.TypeOf((*ReleaseIpAllocationRequestType)(nil)).Elem()
 }
 
-type ReleaseIpAllocationResponse struct {
-}
+type ReleaseIpAllocationResponse struct{}
 
 type ReleaseManagedSnapshot ReleaseManagedSnapshotRequestType
 
@@ -38950,8 +38793,7 @@ func init() {
 	t["ReleaseManagedSnapshotRequestType"] = reflect.TypeOf((*ReleaseManagedSnapshotRequestType)(nil)).Elem()
 }
 
-type ReleaseManagedSnapshotResponse struct {
-}
+type ReleaseManagedSnapshotResponse struct{}
 
 type Reload ReloadRequestType
 
@@ -38967,8 +38809,7 @@ func init() {
 	t["ReloadRequestType"] = reflect.TypeOf((*ReloadRequestType)(nil)).Elem()
 }
 
-type ReloadResponse struct {
-}
+type ReloadResponse struct{}
 
 type RelocateVMRequestType struct {
 	This     ManagedObjectReference     `xml:"_this"`
@@ -39047,8 +38888,7 @@ func init() {
 	t["RemoveAlarmRequestType"] = reflect.TypeOf((*RemoveAlarmRequestType)(nil)).Elem()
 }
 
-type RemoveAlarmResponse struct {
-}
+type RemoveAlarmResponse struct{}
 
 type RemoveAllSnapshotsRequestType struct {
 	This        ManagedObjectReference `xml:"_this"`
@@ -39084,8 +38924,7 @@ func init() {
 	t["RemoveAssignedLicenseRequestType"] = reflect.TypeOf((*RemoveAssignedLicenseRequestType)(nil)).Elem()
 }
 
-type RemoveAssignedLicenseResponse struct {
-}
+type RemoveAssignedLicenseResponse struct{}
 
 type RemoveAuthorizationRole RemoveAuthorizationRoleRequestType
 
@@ -39103,8 +38942,7 @@ func init() {
 	t["RemoveAuthorizationRoleRequestType"] = reflect.TypeOf((*RemoveAuthorizationRoleRequestType)(nil)).Elem()
 }
 
-type RemoveAuthorizationRoleResponse struct {
-}
+type RemoveAuthorizationRoleResponse struct{}
 
 type RemoveCustomFieldDef RemoveCustomFieldDefRequestType
 
@@ -39121,8 +38959,7 @@ func init() {
 	t["RemoveCustomFieldDefRequestType"] = reflect.TypeOf((*RemoveCustomFieldDefRequestType)(nil)).Elem()
 }
 
-type RemoveCustomFieldDefResponse struct {
-}
+type RemoveCustomFieldDefResponse struct{}
 
 type RemoveDatastore RemoveDatastoreRequestType
 
@@ -39158,8 +38995,7 @@ func init() {
 	t["RemoveDatastoreRequestType"] = reflect.TypeOf((*RemoveDatastoreRequestType)(nil)).Elem()
 }
 
-type RemoveDatastoreResponse struct {
-}
+type RemoveDatastoreResponse struct{}
 
 type RemoveDiskMappingRequestType struct {
 	This            ManagedObjectReference `xml:"_this"`
@@ -39220,8 +39056,7 @@ func init() {
 	t["RemoveEntityPermissionRequestType"] = reflect.TypeOf((*RemoveEntityPermissionRequestType)(nil)).Elem()
 }
 
-type RemoveEntityPermissionResponse struct {
-}
+type RemoveEntityPermissionResponse struct{}
 
 type RemoveFailed struct {
 	VimFault
@@ -39259,8 +39094,7 @@ func init() {
 	t["RemoveFilterEntitiesRequestType"] = reflect.TypeOf((*RemoveFilterEntitiesRequestType)(nil)).Elem()
 }
 
-type RemoveFilterEntitiesResponse struct {
-}
+type RemoveFilterEntitiesResponse struct{}
 
 type RemoveFilterRequestType struct {
 	This     ManagedObjectReference `xml:"_this"`
@@ -39271,8 +39105,7 @@ func init() {
 	t["RemoveFilterRequestType"] = reflect.TypeOf((*RemoveFilterRequestType)(nil)).Elem()
 }
 
-type RemoveFilterResponse struct {
-}
+type RemoveFilterResponse struct{}
 
 type RemoveGroup RemoveGroupRequestType
 
@@ -39289,8 +39122,7 @@ func init() {
 	t["RemoveGroupRequestType"] = reflect.TypeOf((*RemoveGroupRequestType)(nil)).Elem()
 }
 
-type RemoveGroupResponse struct {
-}
+type RemoveGroupResponse struct{}
 
 type RemoveGuestAlias RemoveGuestAliasRequestType
 
@@ -39316,8 +39148,7 @@ func init() {
 	t["RemoveGuestAliasByCertRequestType"] = reflect.TypeOf((*RemoveGuestAliasByCertRequestType)(nil)).Elem()
 }
 
-type RemoveGuestAliasByCertResponse struct {
-}
+type RemoveGuestAliasByCertResponse struct{}
 
 type RemoveGuestAliasRequestType struct {
 	This       ManagedObjectReference  `xml:"_this"`
@@ -39332,8 +39163,7 @@ func init() {
 	t["RemoveGuestAliasRequestType"] = reflect.TypeOf((*RemoveGuestAliasRequestType)(nil)).Elem()
 }
 
-type RemoveGuestAliasResponse struct {
-}
+type RemoveGuestAliasResponse struct{}
 
 type RemoveInternetScsiSendTargets RemoveInternetScsiSendTargetsRequestType
 
@@ -39351,8 +39181,7 @@ func init() {
 	t["RemoveInternetScsiSendTargetsRequestType"] = reflect.TypeOf((*RemoveInternetScsiSendTargetsRequestType)(nil)).Elem()
 }
 
-type RemoveInternetScsiSendTargetsResponse struct {
-}
+type RemoveInternetScsiSendTargetsResponse struct{}
 
 type RemoveInternetScsiStaticTargets RemoveInternetScsiStaticTargetsRequestType
 
@@ -39370,8 +39199,7 @@ func init() {
 	t["RemoveInternetScsiStaticTargetsRequestType"] = reflect.TypeOf((*RemoveInternetScsiStaticTargetsRequestType)(nil)).Elem()
 }
 
-type RemoveInternetScsiStaticTargetsResponse struct {
-}
+type RemoveInternetScsiStaticTargetsResponse struct{}
 
 type RemoveKey RemoveKeyRequestType
 
@@ -39389,8 +39217,7 @@ func init() {
 	t["RemoveKeyRequestType"] = reflect.TypeOf((*RemoveKeyRequestType)(nil)).Elem()
 }
 
-type RemoveKeyResponse struct {
-}
+type RemoveKeyResponse struct{}
 
 type RemoveKeys RemoveKeysRequestType
 
@@ -39428,8 +39255,7 @@ func init() {
 	t["RemoveKmipServerRequestType"] = reflect.TypeOf((*RemoveKmipServerRequestType)(nil)).Elem()
 }
 
-type RemoveKmipServerResponse struct {
-}
+type RemoveKmipServerResponse struct{}
 
 type RemoveLicense RemoveLicenseRequestType
 
@@ -39453,8 +39279,7 @@ func init() {
 	t["RemoveLicenseLabelRequestType"] = reflect.TypeOf((*RemoveLicenseLabelRequestType)(nil)).Elem()
 }
 
-type RemoveLicenseLabelResponse struct {
-}
+type RemoveLicenseLabelResponse struct{}
 
 type RemoveLicenseRequestType struct {
 	This       ManagedObjectReference `xml:"_this"`
@@ -39465,8 +39290,7 @@ func init() {
 	t["RemoveLicenseRequestType"] = reflect.TypeOf((*RemoveLicenseRequestType)(nil)).Elem()
 }
 
-type RemoveLicenseResponse struct {
-}
+type RemoveLicenseResponse struct{}
 
 type RemoveMonitoredEntities RemoveMonitoredEntitiesRequestType
 
@@ -39484,8 +39308,7 @@ func init() {
 	t["RemoveMonitoredEntitiesRequestType"] = reflect.TypeOf((*RemoveMonitoredEntitiesRequestType)(nil)).Elem()
 }
 
-type RemoveMonitoredEntitiesResponse struct {
-}
+type RemoveMonitoredEntitiesResponse struct{}
 
 type RemoveNetworkResourcePool RemoveNetworkResourcePoolRequestType
 
@@ -39502,8 +39325,7 @@ func init() {
 	t["RemoveNetworkResourcePoolRequestType"] = reflect.TypeOf((*RemoveNetworkResourcePoolRequestType)(nil)).Elem()
 }
 
-type RemoveNetworkResourcePoolResponse struct {
-}
+type RemoveNetworkResourcePoolResponse struct{}
 
 type RemovePerfInterval RemovePerfIntervalRequestType
 
@@ -39520,8 +39342,7 @@ func init() {
 	t["RemovePerfIntervalRequestType"] = reflect.TypeOf((*RemovePerfIntervalRequestType)(nil)).Elem()
 }
 
-type RemovePerfIntervalResponse struct {
-}
+type RemovePerfIntervalResponse struct{}
 
 type RemovePortGroup RemovePortGroupRequestType
 
@@ -39538,8 +39359,7 @@ func init() {
 	t["RemovePortGroupRequestType"] = reflect.TypeOf((*RemovePortGroupRequestType)(nil)).Elem()
 }
 
-type RemovePortGroupResponse struct {
-}
+type RemovePortGroupResponse struct{}
 
 type RemoveScheduledTask RemoveScheduledTaskRequestType
 
@@ -39555,8 +39375,7 @@ func init() {
 	t["RemoveScheduledTaskRequestType"] = reflect.TypeOf((*RemoveScheduledTaskRequestType)(nil)).Elem()
 }
 
-type RemoveScheduledTaskResponse struct {
-}
+type RemoveScheduledTaskResponse struct{}
 
 type RemoveServiceConsoleVirtualNic RemoveServiceConsoleVirtualNicRequestType
 
@@ -39573,8 +39392,7 @@ func init() {
 	t["RemoveServiceConsoleVirtualNicRequestType"] = reflect.TypeOf((*RemoveServiceConsoleVirtualNicRequestType)(nil)).Elem()
 }
 
-type RemoveServiceConsoleVirtualNicResponse struct {
-}
+type RemoveServiceConsoleVirtualNicResponse struct{}
 
 type RemoveSmartCardTrustAnchor RemoveSmartCardTrustAnchorRequestType
 
@@ -39598,8 +39416,7 @@ func init() {
 	t["RemoveSmartCardTrustAnchorByFingerprintRequestType"] = reflect.TypeOf((*RemoveSmartCardTrustAnchorByFingerprintRequestType)(nil)).Elem()
 }
 
-type RemoveSmartCardTrustAnchorByFingerprintResponse struct {
-}
+type RemoveSmartCardTrustAnchorByFingerprintResponse struct{}
 
 type RemoveSmartCardTrustAnchorRequestType struct {
 	This   ManagedObjectReference `xml:"_this"`
@@ -39611,8 +39428,7 @@ func init() {
 	t["RemoveSmartCardTrustAnchorRequestType"] = reflect.TypeOf((*RemoveSmartCardTrustAnchorRequestType)(nil)).Elem()
 }
 
-type RemoveSmartCardTrustAnchorResponse struct {
-}
+type RemoveSmartCardTrustAnchorResponse struct{}
 
 type RemoveSnapshotRequestType struct {
 	This           ManagedObjectReference `xml:"_this"`
@@ -39649,8 +39465,7 @@ func init() {
 	t["RemoveUserRequestType"] = reflect.TypeOf((*RemoveUserRequestType)(nil)).Elem()
 }
 
-type RemoveUserResponse struct {
-}
+type RemoveUserResponse struct{}
 
 type RemoveVirtualNic RemoveVirtualNicRequestType
 
@@ -39667,8 +39482,7 @@ func init() {
 	t["RemoveVirtualNicRequestType"] = reflect.TypeOf((*RemoveVirtualNicRequestType)(nil)).Elem()
 }
 
-type RemoveVirtualNicResponse struct {
-}
+type RemoveVirtualNicResponse struct{}
 
 type RemoveVirtualSwitch RemoveVirtualSwitchRequestType
 
@@ -39685,8 +39499,7 @@ func init() {
 	t["RemoveVirtualSwitchRequestType"] = reflect.TypeOf((*RemoveVirtualSwitchRequestType)(nil)).Elem()
 }
 
-type RemoveVirtualSwitchResponse struct {
-}
+type RemoveVirtualSwitchResponse struct{}
 
 type RenameCustomFieldDef RenameCustomFieldDefRequestType
 
@@ -39704,8 +39517,7 @@ func init() {
 	t["RenameCustomFieldDefRequestType"] = reflect.TypeOf((*RenameCustomFieldDefRequestType)(nil)).Elem()
 }
 
-type RenameCustomFieldDefResponse struct {
-}
+type RenameCustomFieldDefResponse struct{}
 
 type RenameCustomizationSpec RenameCustomizationSpecRequestType
 
@@ -39723,8 +39535,7 @@ func init() {
 	t["RenameCustomizationSpecRequestType"] = reflect.TypeOf((*RenameCustomizationSpecRequestType)(nil)).Elem()
 }
 
-type RenameCustomizationSpecResponse struct {
-}
+type RenameCustomizationSpecResponse struct{}
 
 type RenameDatastore RenameDatastoreRequestType
 
@@ -39741,8 +39552,7 @@ func init() {
 	t["RenameDatastoreRequestType"] = reflect.TypeOf((*RenameDatastoreRequestType)(nil)).Elem()
 }
 
-type RenameDatastoreResponse struct {
-}
+type RenameDatastoreResponse struct{}
 
 type RenameRequestType struct {
 	This    ManagedObjectReference `xml:"_this"`
@@ -39769,8 +39579,7 @@ func init() {
 	t["RenameSnapshotRequestType"] = reflect.TypeOf((*RenameSnapshotRequestType)(nil)).Elem()
 }
 
-type RenameSnapshotResponse struct {
-}
+type RenameSnapshotResponse struct{}
 
 type RenameVStorageObject RenameVStorageObjectRequestType
 
@@ -39789,8 +39598,7 @@ func init() {
 	t["RenameVStorageObjectRequestType"] = reflect.TypeOf((*RenameVStorageObjectRequestType)(nil)).Elem()
 }
 
-type RenameVStorageObjectResponse struct {
-}
+type RenameVStorageObjectResponse struct{}
 
 type Rename_Task RenameRequestType
 
@@ -39818,8 +39626,7 @@ func init() {
 	t["ReplaceCACertificatesAndCRLsRequestType"] = reflect.TypeOf((*ReplaceCACertificatesAndCRLsRequestType)(nil)).Elem()
 }
 
-type ReplaceCACertificatesAndCRLsResponse struct {
-}
+type ReplaceCACertificatesAndCRLsResponse struct{}
 
 type ReplaceSmartCardTrustAnchors ReplaceSmartCardTrustAnchorsRequestType
 
@@ -39836,8 +39643,7 @@ func init() {
 	t["ReplaceSmartCardTrustAnchorsRequestType"] = reflect.TypeOf((*ReplaceSmartCardTrustAnchorsRequestType)(nil)).Elem()
 }
 
-type ReplaceSmartCardTrustAnchorsResponse struct {
-}
+type ReplaceSmartCardTrustAnchorsResponse struct{}
 
 type ReplicationConfigFault struct {
 	ReplicationFault
@@ -40080,8 +39886,7 @@ func init() {
 	t["RescanAllHbaRequestType"] = reflect.TypeOf((*RescanAllHbaRequestType)(nil)).Elem()
 }
 
-type RescanAllHbaResponse struct {
-}
+type RescanAllHbaResponse struct{}
 
 type RescanHba RescanHbaRequestType
 
@@ -40098,8 +39903,7 @@ func init() {
 	t["RescanHbaRequestType"] = reflect.TypeOf((*RescanHbaRequestType)(nil)).Elem()
 }
 
-type RescanHbaResponse struct {
-}
+type RescanHbaResponse struct{}
 
 type RescanVffs RescanVffsRequestType
 
@@ -40115,8 +39919,7 @@ func init() {
 	t["RescanVffsRequestType"] = reflect.TypeOf((*RescanVffsRequestType)(nil)).Elem()
 }
 
-type RescanVffsResponse struct {
-}
+type RescanVffsResponse struct{}
 
 type RescanVmfs RescanVmfsRequestType
 
@@ -40132,8 +39935,7 @@ func init() {
 	t["RescanVmfsRequestType"] = reflect.TypeOf((*RescanVmfsRequestType)(nil)).Elem()
 }
 
-type RescanVmfsResponse struct {
-}
+type RescanVmfsResponse struct{}
 
 type ResetCollector ResetCollectorRequestType
 
@@ -40149,8 +39951,7 @@ func init() {
 	t["ResetCollectorRequestType"] = reflect.TypeOf((*ResetCollectorRequestType)(nil)).Elem()
 }
 
-type ResetCollectorResponse struct {
-}
+type ResetCollectorResponse struct{}
 
 type ResetCounterLevelMapping ResetCounterLevelMappingRequestType
 
@@ -40167,8 +39968,7 @@ func init() {
 	t["ResetCounterLevelMappingRequestType"] = reflect.TypeOf((*ResetCounterLevelMappingRequestType)(nil)).Elem()
 }
 
-type ResetCounterLevelMappingResponse struct {
-}
+type ResetCounterLevelMappingResponse struct{}
 
 type ResetEntityPermissions ResetEntityPermissionsRequestType
 
@@ -40186,8 +39986,7 @@ func init() {
 	t["ResetEntityPermissionsRequestType"] = reflect.TypeOf((*ResetEntityPermissionsRequestType)(nil)).Elem()
 }
 
-type ResetEntityPermissionsResponse struct {
-}
+type ResetEntityPermissionsResponse struct{}
 
 type ResetFirmwareToFactoryDefaults ResetFirmwareToFactoryDefaultsRequestType
 
@@ -40203,8 +40002,7 @@ func init() {
 	t["ResetFirmwareToFactoryDefaultsRequestType"] = reflect.TypeOf((*ResetFirmwareToFactoryDefaultsRequestType)(nil)).Elem()
 }
 
-type ResetFirmwareToFactoryDefaultsResponse struct {
-}
+type ResetFirmwareToFactoryDefaultsResponse struct{}
 
 type ResetGuestInformation ResetGuestInformationRequestType
 
@@ -40220,8 +40018,7 @@ func init() {
 	t["ResetGuestInformationRequestType"] = reflect.TypeOf((*ResetGuestInformationRequestType)(nil)).Elem()
 }
 
-type ResetGuestInformationResponse struct {
-}
+type ResetGuestInformationResponse struct{}
 
 type ResetListView ResetListViewRequestType
 
@@ -40244,8 +40041,7 @@ func init() {
 	t["ResetListViewFromViewRequestType"] = reflect.TypeOf((*ResetListViewFromViewRequestType)(nil)).Elem()
 }
 
-type ResetListViewFromViewResponse struct {
-}
+type ResetListViewFromViewResponse struct{}
 
 type ResetListViewRequestType struct {
 	This ManagedObjectReference   `xml:"_this"`
@@ -40274,8 +40070,7 @@ func init() {
 	t["ResetSystemHealthInfoRequestType"] = reflect.TypeOf((*ResetSystemHealthInfoRequestType)(nil)).Elem()
 }
 
-type ResetSystemHealthInfoResponse struct {
-}
+type ResetSystemHealthInfoResponse struct{}
 
 type ResetVMRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -40629,8 +40424,7 @@ func init() {
 	t["RestartServiceConsoleVirtualNicRequestType"] = reflect.TypeOf((*RestartServiceConsoleVirtualNicRequestType)(nil)).Elem()
 }
 
-type RestartServiceConsoleVirtualNicResponse struct {
-}
+type RestartServiceConsoleVirtualNicResponse struct{}
 
 type RestartServiceRequestType struct {
 	This ManagedObjectReference `xml:"_this"`
@@ -40641,8 +40435,7 @@ func init() {
 	t["RestartServiceRequestType"] = reflect.TypeOf((*RestartServiceRequestType)(nil)).Elem()
 }
 
-type RestartServiceResponse struct {
-}
+type RestartServiceResponse struct{}
 
 type RestoreFirmwareConfiguration RestoreFirmwareConfigurationRequestType
 
@@ -40659,8 +40452,7 @@ func init() {
 	t["RestoreFirmwareConfigurationRequestType"] = reflect.TypeOf((*RestoreFirmwareConfigurationRequestType)(nil)).Elem()
 }
 
-type RestoreFirmwareConfigurationResponse struct {
-}
+type RestoreFirmwareConfigurationResponse struct{}
 
 type RestrictedByAdministrator struct {
 	RuntimeFault
@@ -41396,8 +41188,7 @@ func init() {
 	t["RewindCollectorRequestType"] = reflect.TypeOf((*RewindCollectorRequestType)(nil)).Elem()
 }
 
-type RewindCollectorResponse struct {
-}
+type RewindCollectorResponse struct{}
 
 type RoleAddedEvent struct {
 	RoleEvent
@@ -41510,8 +41301,7 @@ func init() {
 	t["RunScheduledTaskRequestType"] = reflect.TypeOf((*RunScheduledTaskRequestType)(nil)).Elem()
 }
 
-type RunScheduledTaskResponse struct {
-}
+type RunScheduledTaskResponse struct{}
 
 type RunScriptAction struct {
 	Action
@@ -41688,8 +41478,7 @@ func init() {
 	t["ScheduleReconcileDatastoreInventoryRequestType"] = reflect.TypeOf((*ScheduleReconcileDatastoreInventoryRequestType)(nil)).Elem()
 }
 
-type ScheduleReconcileDatastoreInventoryResponse struct {
-}
+type ScheduleReconcileDatastoreInventoryResponse struct{}
 
 type ScheduledHardwareUpgradeInfo struct {
 	DynamicData
@@ -42072,8 +41861,7 @@ func init() {
 	t["SelectActivePartitionRequestType"] = reflect.TypeOf((*SelectActivePartitionRequestType)(nil)).Elem()
 }
 
-type SelectActivePartitionResponse struct {
-}
+type SelectActivePartitionResponse struct{}
 
 type SelectVnic SelectVnicRequestType
 
@@ -42097,8 +41885,7 @@ func init() {
 	t["SelectVnicForNicTypeRequestType"] = reflect.TypeOf((*SelectVnicForNicTypeRequestType)(nil)).Elem()
 }
 
-type SelectVnicForNicTypeResponse struct {
-}
+type SelectVnicForNicTypeResponse struct{}
 
 type SelectVnicRequestType struct {
 	This   ManagedObjectReference `xml:"_this"`
@@ -42109,8 +41896,7 @@ func init() {
 	t["SelectVnicRequestType"] = reflect.TypeOf((*SelectVnicRequestType)(nil)).Elem()
 }
 
-type SelectVnicResponse struct {
-}
+type SelectVnicResponse struct{}
 
 type SelectionSet struct {
 	DynamicData
@@ -42157,8 +41943,7 @@ func init() {
 	t["SendNMIRequestType"] = reflect.TypeOf((*SendNMIRequestType)(nil)).Elem()
 }
 
-type SendNMIResponse struct {
-}
+type SendNMIResponse struct{}
 
 type SendSNMPAction struct {
 	Action
@@ -42182,8 +41967,7 @@ func init() {
 	t["SendTestNotificationRequestType"] = reflect.TypeOf((*SendTestNotificationRequestType)(nil)).Elem()
 }
 
-type SendTestNotificationResponse struct {
-}
+type SendTestNotificationResponse struct{}
 
 type ServerLicenseExpiredEvent struct {
 	LicenseEvent
@@ -42451,8 +42235,7 @@ func init() {
 	t["SetCollectorPageSizeRequestType"] = reflect.TypeOf((*SetCollectorPageSizeRequestType)(nil)).Elem()
 }
 
-type SetCollectorPageSizeResponse struct {
-}
+type SetCollectorPageSizeResponse struct{}
 
 type SetDisplayTopology SetDisplayTopologyRequestType
 
@@ -42469,8 +42252,7 @@ func init() {
 	t["SetDisplayTopologyRequestType"] = reflect.TypeOf((*SetDisplayTopologyRequestType)(nil)).Elem()
 }
 
-type SetDisplayTopologyResponse struct {
-}
+type SetDisplayTopologyResponse struct{}
 
 type SetEntityPermissions SetEntityPermissionsRequestType
 
@@ -42488,8 +42270,7 @@ func init() {
 	t["SetEntityPermissionsRequestType"] = reflect.TypeOf((*SetEntityPermissionsRequestType)(nil)).Elem()
 }
 
-type SetEntityPermissionsResponse struct {
-}
+type SetEntityPermissionsResponse struct{}
 
 type SetExtensionCertificate SetExtensionCertificateRequestType
 
@@ -42507,8 +42288,7 @@ func init() {
 	t["SetExtensionCertificateRequestType"] = reflect.TypeOf((*SetExtensionCertificateRequestType)(nil)).Elem()
 }
 
-type SetExtensionCertificateResponse struct {
-}
+type SetExtensionCertificateResponse struct{}
 
 type SetField SetFieldRequestType
 
@@ -42527,8 +42307,7 @@ func init() {
 	t["SetFieldRequestType"] = reflect.TypeOf((*SetFieldRequestType)(nil)).Elem()
 }
 
-type SetFieldResponse struct {
-}
+type SetFieldResponse struct{}
 
 type SetLicenseEdition SetLicenseEditionRequestType
 
@@ -42546,8 +42325,7 @@ func init() {
 	t["SetLicenseEditionRequestType"] = reflect.TypeOf((*SetLicenseEditionRequestType)(nil)).Elem()
 }
 
-type SetLicenseEditionResponse struct {
-}
+type SetLicenseEditionResponse struct{}
 
 type SetLocale SetLocaleRequestType
 
@@ -42564,8 +42342,7 @@ func init() {
 	t["SetLocaleRequestType"] = reflect.TypeOf((*SetLocaleRequestType)(nil)).Elem()
 }
 
-type SetLocaleResponse struct {
-}
+type SetLocaleResponse struct{}
 
 type SetMultipathLunPolicy SetMultipathLunPolicyRequestType
 
@@ -42583,8 +42360,7 @@ func init() {
 	t["SetMultipathLunPolicyRequestType"] = reflect.TypeOf((*SetMultipathLunPolicyRequestType)(nil)).Elem()
 }
 
-type SetMultipathLunPolicyResponse struct {
-}
+type SetMultipathLunPolicyResponse struct{}
 
 type SetNFSUser SetNFSUserRequestType
 
@@ -42602,8 +42378,7 @@ func init() {
 	t["SetNFSUserRequestType"] = reflect.TypeOf((*SetNFSUserRequestType)(nil)).Elem()
 }
 
-type SetNFSUserResponse struct {
-}
+type SetNFSUserResponse struct{}
 
 type SetPublicKey SetPublicKeyRequestType
 
@@ -42621,8 +42396,7 @@ func init() {
 	t["SetPublicKeyRequestType"] = reflect.TypeOf((*SetPublicKeyRequestType)(nil)).Elem()
 }
 
-type SetPublicKeyResponse struct {
-}
+type SetPublicKeyResponse struct{}
 
 type SetRegistryValueInGuest SetRegistryValueInGuestRequestType
 
@@ -42641,8 +42415,7 @@ func init() {
 	t["SetRegistryValueInGuestRequestType"] = reflect.TypeOf((*SetRegistryValueInGuestRequestType)(nil)).Elem()
 }
 
-type SetRegistryValueInGuestResponse struct {
-}
+type SetRegistryValueInGuestResponse struct{}
 
 type SetScreenResolution SetScreenResolutionRequestType
 
@@ -42660,8 +42433,7 @@ func init() {
 	t["SetScreenResolutionRequestType"] = reflect.TypeOf((*SetScreenResolutionRequestType)(nil)).Elem()
 }
 
-type SetScreenResolutionResponse struct {
-}
+type SetScreenResolutionResponse struct{}
 
 type SetTaskDescription SetTaskDescriptionRequestType
 
@@ -42678,8 +42450,7 @@ func init() {
 	t["SetTaskDescriptionRequestType"] = reflect.TypeOf((*SetTaskDescriptionRequestType)(nil)).Elem()
 }
 
-type SetTaskDescriptionResponse struct {
-}
+type SetTaskDescriptionResponse struct{}
 
 type SetTaskState SetTaskStateRequestType
 
@@ -42698,8 +42469,7 @@ func init() {
 	t["SetTaskStateRequestType"] = reflect.TypeOf((*SetTaskStateRequestType)(nil)).Elem()
 }
 
-type SetTaskStateResponse struct {
-}
+type SetTaskStateResponse struct{}
 
 type SetVStorageObjectControlFlags SetVStorageObjectControlFlagsRequestType
 
@@ -42718,8 +42488,7 @@ func init() {
 	t["SetVStorageObjectControlFlagsRequestType"] = reflect.TypeOf((*SetVStorageObjectControlFlagsRequestType)(nil)).Elem()
 }
 
-type SetVStorageObjectControlFlagsResponse struct {
-}
+type SetVStorageObjectControlFlagsResponse struct{}
 
 type SetVirtualDiskUuid SetVirtualDiskUuidRequestType
 
@@ -42738,8 +42507,7 @@ func init() {
 	t["SetVirtualDiskUuidRequestType"] = reflect.TypeOf((*SetVirtualDiskUuidRequestType)(nil)).Elem()
 }
 
-type SetVirtualDiskUuidResponse struct {
-}
+type SetVirtualDiskUuidResponse struct{}
 
 type SharedBusControllerNotSupported struct {
 	DeviceNotSupported
@@ -42828,8 +42596,7 @@ func init() {
 	t["ShutdownGuestRequestType"] = reflect.TypeOf((*ShutdownGuestRequestType)(nil)).Elem()
 }
 
-type ShutdownGuestResponse struct {
-}
+type ShutdownGuestResponse struct{}
 
 type ShutdownHostRequestType struct {
 	This  ManagedObjectReference `xml:"_this"`
@@ -43183,8 +42950,7 @@ func init() {
 	t["StandbyGuestRequestType"] = reflect.TypeOf((*StandbyGuestRequestType)(nil)).Elem()
 }
 
-type StandbyGuestResponse struct {
-}
+type StandbyGuestResponse struct{}
 
 type StartProgramInGuest StartProgramInGuestRequestType
 
@@ -43261,8 +43027,7 @@ func init() {
 	t["StartServiceRequestType"] = reflect.TypeOf((*StartServiceRequestType)(nil)).Elem()
 }
 
-type StartServiceResponse struct {
-}
+type StartServiceResponse struct{}
 
 type StateAlarmExpression struct {
 	AlarmExpression
@@ -43339,8 +43104,7 @@ func init() {
 	t["StopServiceRequestType"] = reflect.TypeOf((*StopServiceRequestType)(nil)).Elem()
 }
 
-type StopServiceResponse struct {
-}
+type StopServiceResponse struct{}
 
 type StorageDrsAutomationConfig struct {
 	DynamicData
@@ -44500,8 +44264,7 @@ func init() {
 	t["TerminateProcessInGuestRequestType"] = reflect.TypeOf((*TerminateProcessInGuestRequestType)(nil)).Elem()
 }
 
-type TerminateProcessInGuestResponse struct {
-}
+type TerminateProcessInGuestResponse struct{}
 
 type TerminateSession TerminateSessionRequestType
 
@@ -44518,8 +44281,7 @@ func init() {
 	t["TerminateSessionRequestType"] = reflect.TypeOf((*TerminateSessionRequestType)(nil)).Elem()
 }
 
-type TerminateSessionResponse struct {
-}
+type TerminateSessionResponse struct{}
 
 type TerminateVM TerminateVMRequestType
 
@@ -44535,8 +44297,7 @@ func init() {
 	t["TerminateVMRequestType"] = reflect.TypeOf((*TerminateVMRequestType)(nil)).Elem()
 }
 
-type TerminateVMResponse struct {
-}
+type TerminateVMResponse struct{}
 
 type ThirdPartyLicenseAssignmentFailed struct {
 	RuntimeFault
@@ -44973,8 +44734,7 @@ func init() {
 	t["UnassignUserFromGroupRequestType"] = reflect.TypeOf((*UnassignUserFromGroupRequestType)(nil)).Elem()
 }
 
-type UnassignUserFromGroupResponse struct {
-}
+type UnassignUserFromGroupResponse struct{}
 
 type UnbindVnic UnbindVnicRequestType
 
@@ -44993,8 +44753,7 @@ func init() {
 	t["UnbindVnicRequestType"] = reflect.TypeOf((*UnbindVnicRequestType)(nil)).Elem()
 }
 
-type UnbindVnicResponse struct {
-}
+type UnbindVnicResponse struct{}
 
 type UncommittedUndoableDisk struct {
 	MigrationFault
@@ -45126,8 +44885,7 @@ func init() {
 	t["UninstallServiceRequestType"] = reflect.TypeOf((*UninstallServiceRequestType)(nil)).Elem()
 }
 
-type UninstallServiceResponse struct {
-}
+type UninstallServiceResponse struct{}
 
 type UnlicensedVirtualMachinesEvent struct {
 	LicenseEvent
@@ -45203,8 +44961,7 @@ func init() {
 	t["UnmountForceMountedVmfsVolumeRequestType"] = reflect.TypeOf((*UnmountForceMountedVmfsVolumeRequestType)(nil)).Elem()
 }
 
-type UnmountForceMountedVmfsVolumeResponse struct {
-}
+type UnmountForceMountedVmfsVolumeResponse struct{}
 
 type UnmountToolsInstaller UnmountToolsInstallerRequestType
 
@@ -45220,8 +44977,7 @@ func init() {
 	t["UnmountToolsInstallerRequestType"] = reflect.TypeOf((*UnmountToolsInstallerRequestType)(nil)).Elem()
 }
 
-type UnmountToolsInstallerResponse struct {
-}
+type UnmountToolsInstallerResponse struct{}
 
 type UnmountVffsVolume UnmountVffsVolumeRequestType
 
@@ -45238,8 +44994,7 @@ func init() {
 	t["UnmountVffsVolumeRequestType"] = reflect.TypeOf((*UnmountVffsVolumeRequestType)(nil)).Elem()
 }
 
-type UnmountVffsVolumeResponse struct {
-}
+type UnmountVffsVolumeResponse struct{}
 
 type UnmountVmfsVolume UnmountVmfsVolumeRequestType
 
@@ -45275,8 +45030,7 @@ func init() {
 	t["UnmountVmfsVolumeRequestType"] = reflect.TypeOf((*UnmountVmfsVolumeRequestType)(nil)).Elem()
 }
 
-type UnmountVmfsVolumeResponse struct {
-}
+type UnmountVmfsVolumeResponse struct{}
 
 type UnrecognizedHost struct {
 	VimFault
@@ -45327,8 +45081,7 @@ func init() {
 	t["UnregisterExtensionRequestType"] = reflect.TypeOf((*UnregisterExtensionRequestType)(nil)).Elem()
 }
 
-type UnregisterExtensionResponse struct {
-}
+type UnregisterExtensionResponse struct{}
 
 type UnregisterHealthUpdateProvider UnregisterHealthUpdateProviderRequestType
 
@@ -45345,8 +45098,7 @@ func init() {
 	t["UnregisterHealthUpdateProviderRequestType"] = reflect.TypeOf((*UnregisterHealthUpdateProviderRequestType)(nil)).Elem()
 }
 
-type UnregisterHealthUpdateProviderResponse struct {
-}
+type UnregisterHealthUpdateProviderResponse struct{}
 
 type UnregisterVM UnregisterVMRequestType
 
@@ -45362,8 +45114,7 @@ func init() {
 	t["UnregisterVMRequestType"] = reflect.TypeOf((*UnregisterVMRequestType)(nil)).Elem()
 }
 
-type UnregisterVMResponse struct {
-}
+type UnregisterVMResponse struct{}
 
 type UnsharedSwapVMotionNotSupported struct {
 	MigrationFeatureNotSupported
@@ -45513,8 +45264,7 @@ func init() {
 	t["UpdateAuthorizationRoleRequestType"] = reflect.TypeOf((*UpdateAuthorizationRoleRequestType)(nil)).Elem()
 }
 
-type UpdateAuthorizationRoleResponse struct {
-}
+type UpdateAuthorizationRoleResponse struct{}
 
 type UpdateBootDevice UpdateBootDeviceRequestType
 
@@ -45531,8 +45281,7 @@ func init() {
 	t["UpdateBootDeviceRequestType"] = reflect.TypeOf((*UpdateBootDeviceRequestType)(nil)).Elem()
 }
 
-type UpdateBootDeviceResponse struct {
-}
+type UpdateBootDeviceResponse struct{}
 
 type UpdateChildResourceConfiguration UpdateChildResourceConfigurationRequestType
 
@@ -45549,8 +45298,7 @@ func init() {
 	t["UpdateChildResourceConfigurationRequestType"] = reflect.TypeOf((*UpdateChildResourceConfigurationRequestType)(nil)).Elem()
 }
 
-type UpdateChildResourceConfigurationResponse struct {
-}
+type UpdateChildResourceConfigurationResponse struct{}
 
 type UpdateClusterProfile UpdateClusterProfileRequestType
 
@@ -45567,8 +45315,7 @@ func init() {
 	t["UpdateClusterProfileRequestType"] = reflect.TypeOf((*UpdateClusterProfileRequestType)(nil)).Elem()
 }
 
-type UpdateClusterProfileResponse struct {
-}
+type UpdateClusterProfileResponse struct{}
 
 type UpdateConfig UpdateConfigRequestType
 
@@ -45586,8 +45333,7 @@ func init() {
 	t["UpdateConfigRequestType"] = reflect.TypeOf((*UpdateConfigRequestType)(nil)).Elem()
 }
 
-type UpdateConfigResponse struct {
-}
+type UpdateConfigResponse struct{}
 
 type UpdateConsoleIpRouteConfig UpdateConsoleIpRouteConfigRequestType
 
@@ -45604,8 +45350,7 @@ func init() {
 	t["UpdateConsoleIpRouteConfigRequestType"] = reflect.TypeOf((*UpdateConsoleIpRouteConfigRequestType)(nil)).Elem()
 }
 
-type UpdateConsoleIpRouteConfigResponse struct {
-}
+type UpdateConsoleIpRouteConfigResponse struct{}
 
 type UpdateCounterLevelMapping UpdateCounterLevelMappingRequestType
 
@@ -45622,8 +45367,7 @@ func init() {
 	t["UpdateCounterLevelMappingRequestType"] = reflect.TypeOf((*UpdateCounterLevelMappingRequestType)(nil)).Elem()
 }
 
-type UpdateCounterLevelMappingResponse struct {
-}
+type UpdateCounterLevelMappingResponse struct{}
 
 type UpdateDVSHealthCheckConfigRequestType struct {
 	This              ManagedObjectReference     `xml:"_this"`
@@ -45684,8 +45428,7 @@ func init() {
 	t["UpdateDateTimeConfigRequestType"] = reflect.TypeOf((*UpdateDateTimeConfigRequestType)(nil)).Elem()
 }
 
-type UpdateDateTimeConfigResponse struct {
-}
+type UpdateDateTimeConfigResponse struct{}
 
 type UpdateDateTimeRequestType struct {
 	This     ManagedObjectReference `xml:"_this"`
@@ -45696,8 +45439,7 @@ func init() {
 	t["UpdateDateTimeRequestType"] = reflect.TypeOf((*UpdateDateTimeRequestType)(nil)).Elem()
 }
 
-type UpdateDateTimeResponse struct {
-}
+type UpdateDateTimeResponse struct{}
 
 type UpdateDefaultPolicy UpdateDefaultPolicyRequestType
 
@@ -45714,8 +45456,7 @@ func init() {
 	t["UpdateDefaultPolicyRequestType"] = reflect.TypeOf((*UpdateDefaultPolicyRequestType)(nil)).Elem()
 }
 
-type UpdateDefaultPolicyResponse struct {
-}
+type UpdateDefaultPolicyResponse struct{}
 
 type UpdateDiskPartitions UpdateDiskPartitionsRequestType
 
@@ -45733,8 +45474,7 @@ func init() {
 	t["UpdateDiskPartitionsRequestType"] = reflect.TypeOf((*UpdateDiskPartitionsRequestType)(nil)).Elem()
 }
 
-type UpdateDiskPartitionsResponse struct {
-}
+type UpdateDiskPartitionsResponse struct{}
 
 type UpdateDnsConfig UpdateDnsConfigRequestType
 
@@ -45751,8 +45491,7 @@ func init() {
 	t["UpdateDnsConfigRequestType"] = reflect.TypeOf((*UpdateDnsConfigRequestType)(nil)).Elem()
 }
 
-type UpdateDnsConfigResponse struct {
-}
+type UpdateDnsConfigResponse struct{}
 
 type UpdateDvsCapability UpdateDvsCapabilityRequestType
 
@@ -45769,8 +45508,7 @@ func init() {
 	t["UpdateDvsCapabilityRequestType"] = reflect.TypeOf((*UpdateDvsCapabilityRequestType)(nil)).Elem()
 }
 
-type UpdateDvsCapabilityResponse struct {
-}
+type UpdateDvsCapabilityResponse struct{}
 
 type UpdateExtension UpdateExtensionRequestType
 
@@ -45787,8 +45525,7 @@ func init() {
 	t["UpdateExtensionRequestType"] = reflect.TypeOf((*UpdateExtensionRequestType)(nil)).Elem()
 }
 
-type UpdateExtensionResponse struct {
-}
+type UpdateExtensionResponse struct{}
 
 type UpdateFlags UpdateFlagsRequestType
 
@@ -45805,8 +45542,7 @@ func init() {
 	t["UpdateFlagsRequestType"] = reflect.TypeOf((*UpdateFlagsRequestType)(nil)).Elem()
 }
 
-type UpdateFlagsResponse struct {
-}
+type UpdateFlagsResponse struct{}
 
 type UpdateGraphicsConfig UpdateGraphicsConfigRequestType
 
@@ -45823,8 +45559,7 @@ func init() {
 	t["UpdateGraphicsConfigRequestType"] = reflect.TypeOf((*UpdateGraphicsConfigRequestType)(nil)).Elem()
 }
 
-type UpdateGraphicsConfigResponse struct {
-}
+type UpdateGraphicsConfigResponse struct{}
 
 type UpdateHostCustomizationsRequestType struct {
 	This                ManagedObjectReference                  `xml:"_this"`
@@ -45860,8 +45595,7 @@ func init() {
 	t["UpdateHostImageAcceptanceLevelRequestType"] = reflect.TypeOf((*UpdateHostImageAcceptanceLevelRequestType)(nil)).Elem()
 }
 
-type UpdateHostImageAcceptanceLevelResponse struct {
-}
+type UpdateHostImageAcceptanceLevelResponse struct{}
 
 type UpdateHostProfile UpdateHostProfileRequestType
 
@@ -45878,8 +45612,7 @@ func init() {
 	t["UpdateHostProfileRequestType"] = reflect.TypeOf((*UpdateHostProfileRequestType)(nil)).Elem()
 }
 
-type UpdateHostProfileResponse struct {
-}
+type UpdateHostProfileResponse struct{}
 
 type UpdateHostSpecification UpdateHostSpecificationRequestType
 
@@ -45897,8 +45630,7 @@ func init() {
 	t["UpdateHostSpecificationRequestType"] = reflect.TypeOf((*UpdateHostSpecificationRequestType)(nil)).Elem()
 }
 
-type UpdateHostSpecificationResponse struct {
-}
+type UpdateHostSpecificationResponse struct{}
 
 type UpdateHostSubSpecification UpdateHostSubSpecificationRequestType
 
@@ -45916,8 +45648,7 @@ func init() {
 	t["UpdateHostSubSpecificationRequestType"] = reflect.TypeOf((*UpdateHostSubSpecificationRequestType)(nil)).Elem()
 }
 
-type UpdateHostSubSpecificationResponse struct {
-}
+type UpdateHostSubSpecificationResponse struct{}
 
 type UpdateInternetScsiAdvancedOptions UpdateInternetScsiAdvancedOptionsRequestType
 
@@ -45936,8 +45667,7 @@ func init() {
 	t["UpdateInternetScsiAdvancedOptionsRequestType"] = reflect.TypeOf((*UpdateInternetScsiAdvancedOptionsRequestType)(nil)).Elem()
 }
 
-type UpdateInternetScsiAdvancedOptionsResponse struct {
-}
+type UpdateInternetScsiAdvancedOptionsResponse struct{}
 
 type UpdateInternetScsiAlias UpdateInternetScsiAliasRequestType
 
@@ -45955,8 +45685,7 @@ func init() {
 	t["UpdateInternetScsiAliasRequestType"] = reflect.TypeOf((*UpdateInternetScsiAliasRequestType)(nil)).Elem()
 }
 
-type UpdateInternetScsiAliasResponse struct {
-}
+type UpdateInternetScsiAliasResponse struct{}
 
 type UpdateInternetScsiAuthenticationProperties UpdateInternetScsiAuthenticationPropertiesRequestType
 
@@ -45975,8 +45704,7 @@ func init() {
 	t["UpdateInternetScsiAuthenticationPropertiesRequestType"] = reflect.TypeOf((*UpdateInternetScsiAuthenticationPropertiesRequestType)(nil)).Elem()
 }
 
-type UpdateInternetScsiAuthenticationPropertiesResponse struct {
-}
+type UpdateInternetScsiAuthenticationPropertiesResponse struct{}
 
 type UpdateInternetScsiDigestProperties UpdateInternetScsiDigestPropertiesRequestType
 
@@ -45995,8 +45723,7 @@ func init() {
 	t["UpdateInternetScsiDigestPropertiesRequestType"] = reflect.TypeOf((*UpdateInternetScsiDigestPropertiesRequestType)(nil)).Elem()
 }
 
-type UpdateInternetScsiDigestPropertiesResponse struct {
-}
+type UpdateInternetScsiDigestPropertiesResponse struct{}
 
 type UpdateInternetScsiDiscoveryProperties UpdateInternetScsiDiscoveryPropertiesRequestType
 
@@ -46014,8 +45741,7 @@ func init() {
 	t["UpdateInternetScsiDiscoveryPropertiesRequestType"] = reflect.TypeOf((*UpdateInternetScsiDiscoveryPropertiesRequestType)(nil)).Elem()
 }
 
-type UpdateInternetScsiDiscoveryPropertiesResponse struct {
-}
+type UpdateInternetScsiDiscoveryPropertiesResponse struct{}
 
 type UpdateInternetScsiIPProperties UpdateInternetScsiIPPropertiesRequestType
 
@@ -46033,8 +45759,7 @@ func init() {
 	t["UpdateInternetScsiIPPropertiesRequestType"] = reflect.TypeOf((*UpdateInternetScsiIPPropertiesRequestType)(nil)).Elem()
 }
 
-type UpdateInternetScsiIPPropertiesResponse struct {
-}
+type UpdateInternetScsiIPPropertiesResponse struct{}
 
 type UpdateInternetScsiName UpdateInternetScsiNameRequestType
 
@@ -46052,8 +45777,7 @@ func init() {
 	t["UpdateInternetScsiNameRequestType"] = reflect.TypeOf((*UpdateInternetScsiNameRequestType)(nil)).Elem()
 }
 
-type UpdateInternetScsiNameResponse struct {
-}
+type UpdateInternetScsiNameResponse struct{}
 
 type UpdateIpConfig UpdateIpConfigRequestType
 
@@ -46070,8 +45794,7 @@ func init() {
 	t["UpdateIpConfigRequestType"] = reflect.TypeOf((*UpdateIpConfigRequestType)(nil)).Elem()
 }
 
-type UpdateIpConfigResponse struct {
-}
+type UpdateIpConfigResponse struct{}
 
 type UpdateIpPool UpdateIpPoolRequestType
 
@@ -46089,8 +45812,7 @@ func init() {
 	t["UpdateIpPoolRequestType"] = reflect.TypeOf((*UpdateIpPoolRequestType)(nil)).Elem()
 }
 
-type UpdateIpPoolResponse struct {
-}
+type UpdateIpPoolResponse struct{}
 
 type UpdateIpRouteConfig UpdateIpRouteConfigRequestType
 
@@ -46107,8 +45829,7 @@ func init() {
 	t["UpdateIpRouteConfigRequestType"] = reflect.TypeOf((*UpdateIpRouteConfigRequestType)(nil)).Elem()
 }
 
-type UpdateIpRouteConfigResponse struct {
-}
+type UpdateIpRouteConfigResponse struct{}
 
 type UpdateIpRouteTableConfig UpdateIpRouteTableConfigRequestType
 
@@ -46125,8 +45846,7 @@ func init() {
 	t["UpdateIpRouteTableConfigRequestType"] = reflect.TypeOf((*UpdateIpRouteTableConfigRequestType)(nil)).Elem()
 }
 
-type UpdateIpRouteTableConfigResponse struct {
-}
+type UpdateIpRouteTableConfigResponse struct{}
 
 type UpdateIpmi UpdateIpmiRequestType
 
@@ -46143,8 +45863,7 @@ func init() {
 	t["UpdateIpmiRequestType"] = reflect.TypeOf((*UpdateIpmiRequestType)(nil)).Elem()
 }
 
-type UpdateIpmiResponse struct {
-}
+type UpdateIpmiResponse struct{}
 
 type UpdateKmipServer UpdateKmipServerRequestType
 
@@ -46161,8 +45880,7 @@ func init() {
 	t["UpdateKmipServerRequestType"] = reflect.TypeOf((*UpdateKmipServerRequestType)(nil)).Elem()
 }
 
-type UpdateKmipServerResponse struct {
-}
+type UpdateKmipServerResponse struct{}
 
 type UpdateKmsSignedCsrClientCert UpdateKmsSignedCsrClientCertRequestType
 
@@ -46180,8 +45898,7 @@ func init() {
 	t["UpdateKmsSignedCsrClientCertRequestType"] = reflect.TypeOf((*UpdateKmsSignedCsrClientCertRequestType)(nil)).Elem()
 }
 
-type UpdateKmsSignedCsrClientCertResponse struct {
-}
+type UpdateKmsSignedCsrClientCertResponse struct{}
 
 type UpdateLicense UpdateLicenseRequestType
 
@@ -46206,8 +45923,7 @@ func init() {
 	t["UpdateLicenseLabelRequestType"] = reflect.TypeOf((*UpdateLicenseLabelRequestType)(nil)).Elem()
 }
 
-type UpdateLicenseLabelResponse struct {
-}
+type UpdateLicenseLabelResponse struct{}
 
 type UpdateLicenseRequestType struct {
 	This       ManagedObjectReference `xml:"_this"`
@@ -46239,8 +45955,7 @@ func init() {
 	t["UpdateLinkedChildrenRequestType"] = reflect.TypeOf((*UpdateLinkedChildrenRequestType)(nil)).Elem()
 }
 
-type UpdateLinkedChildrenResponse struct {
-}
+type UpdateLinkedChildrenResponse struct{}
 
 type UpdateLocalSwapDatastore UpdateLocalSwapDatastoreRequestType
 
@@ -46257,8 +45972,7 @@ func init() {
 	t["UpdateLocalSwapDatastoreRequestType"] = reflect.TypeOf((*UpdateLocalSwapDatastoreRequestType)(nil)).Elem()
 }
 
-type UpdateLocalSwapDatastoreResponse struct {
-}
+type UpdateLocalSwapDatastoreResponse struct{}
 
 type UpdateLockdownExceptions UpdateLockdownExceptionsRequestType
 
@@ -46275,8 +45989,7 @@ func init() {
 	t["UpdateLockdownExceptionsRequestType"] = reflect.TypeOf((*UpdateLockdownExceptionsRequestType)(nil)).Elem()
 }
 
-type UpdateLockdownExceptionsResponse struct {
-}
+type UpdateLockdownExceptionsResponse struct{}
 
 type UpdateModuleOptionString UpdateModuleOptionStringRequestType
 
@@ -46294,8 +46007,7 @@ func init() {
 	t["UpdateModuleOptionStringRequestType"] = reflect.TypeOf((*UpdateModuleOptionStringRequestType)(nil)).Elem()
 }
 
-type UpdateModuleOptionStringResponse struct {
-}
+type UpdateModuleOptionStringResponse struct{}
 
 type UpdateNetworkConfig UpdateNetworkConfigRequestType
 
@@ -46332,8 +46044,7 @@ func init() {
 	t["UpdateNetworkResourcePoolRequestType"] = reflect.TypeOf((*UpdateNetworkResourcePoolRequestType)(nil)).Elem()
 }
 
-type UpdateNetworkResourcePoolResponse struct {
-}
+type UpdateNetworkResourcePoolResponse struct{}
 
 type UpdateOptions UpdateOptionsRequestType
 
@@ -46350,8 +46061,7 @@ func init() {
 	t["UpdateOptionsRequestType"] = reflect.TypeOf((*UpdateOptionsRequestType)(nil)).Elem()
 }
 
-type UpdateOptionsResponse struct {
-}
+type UpdateOptionsResponse struct{}
 
 type UpdatePassthruConfig UpdatePassthruConfigRequestType
 
@@ -46368,8 +46078,7 @@ func init() {
 	t["UpdatePassthruConfigRequestType"] = reflect.TypeOf((*UpdatePassthruConfigRequestType)(nil)).Elem()
 }
 
-type UpdatePassthruConfigResponse struct {
-}
+type UpdatePassthruConfigResponse struct{}
 
 type UpdatePerfInterval UpdatePerfIntervalRequestType
 
@@ -46386,8 +46095,7 @@ func init() {
 	t["UpdatePerfIntervalRequestType"] = reflect.TypeOf((*UpdatePerfIntervalRequestType)(nil)).Elem()
 }
 
-type UpdatePerfIntervalResponse struct {
-}
+type UpdatePerfIntervalResponse struct{}
 
 type UpdatePhysicalNicLinkSpeed UpdatePhysicalNicLinkSpeedRequestType
 
@@ -46405,8 +46113,7 @@ func init() {
 	t["UpdatePhysicalNicLinkSpeedRequestType"] = reflect.TypeOf((*UpdatePhysicalNicLinkSpeedRequestType)(nil)).Elem()
 }
 
-type UpdatePhysicalNicLinkSpeedResponse struct {
-}
+type UpdatePhysicalNicLinkSpeedResponse struct{}
 
 type UpdatePortGroup UpdatePortGroupRequestType
 
@@ -46424,8 +46131,7 @@ func init() {
 	t["UpdatePortGroupRequestType"] = reflect.TypeOf((*UpdatePortGroupRequestType)(nil)).Elem()
 }
 
-type UpdatePortGroupResponse struct {
-}
+type UpdatePortGroupResponse struct{}
 
 type UpdateProgress UpdateProgressRequestType
 
@@ -46442,8 +46148,7 @@ func init() {
 	t["UpdateProgressRequestType"] = reflect.TypeOf((*UpdateProgressRequestType)(nil)).Elem()
 }
 
-type UpdateProgressResponse struct {
-}
+type UpdateProgressResponse struct{}
 
 type UpdateReferenceHost UpdateReferenceHostRequestType
 
@@ -46460,8 +46165,7 @@ func init() {
 	t["UpdateReferenceHostRequestType"] = reflect.TypeOf((*UpdateReferenceHostRequestType)(nil)).Elem()
 }
 
-type UpdateReferenceHostResponse struct {
-}
+type UpdateReferenceHostResponse struct{}
 
 type UpdateRuleset UpdateRulesetRequestType
 
@@ -46479,8 +46183,7 @@ func init() {
 	t["UpdateRulesetRequestType"] = reflect.TypeOf((*UpdateRulesetRequestType)(nil)).Elem()
 }
 
-type UpdateRulesetResponse struct {
-}
+type UpdateRulesetResponse struct{}
 
 type UpdateScsiLunDisplayName UpdateScsiLunDisplayNameRequestType
 
@@ -46498,8 +46201,7 @@ func init() {
 	t["UpdateScsiLunDisplayNameRequestType"] = reflect.TypeOf((*UpdateScsiLunDisplayNameRequestType)(nil)).Elem()
 }
 
-type UpdateScsiLunDisplayNameResponse struct {
-}
+type UpdateScsiLunDisplayNameResponse struct{}
 
 type UpdateSelfSignedClientCert UpdateSelfSignedClientCertRequestType
 
@@ -46517,8 +46219,7 @@ func init() {
 	t["UpdateSelfSignedClientCertRequestType"] = reflect.TypeOf((*UpdateSelfSignedClientCertRequestType)(nil)).Elem()
 }
 
-type UpdateSelfSignedClientCertResponse struct {
-}
+type UpdateSelfSignedClientCertResponse struct{}
 
 type UpdateServiceConsoleVirtualNic UpdateServiceConsoleVirtualNicRequestType
 
@@ -46536,8 +46237,7 @@ func init() {
 	t["UpdateServiceConsoleVirtualNicRequestType"] = reflect.TypeOf((*UpdateServiceConsoleVirtualNicRequestType)(nil)).Elem()
 }
 
-type UpdateServiceConsoleVirtualNicResponse struct {
-}
+type UpdateServiceConsoleVirtualNicResponse struct{}
 
 type UpdateServiceMessage UpdateServiceMessageRequestType
 
@@ -46554,8 +46254,7 @@ func init() {
 	t["UpdateServiceMessageRequestType"] = reflect.TypeOf((*UpdateServiceMessageRequestType)(nil)).Elem()
 }
 
-type UpdateServiceMessageResponse struct {
-}
+type UpdateServiceMessageResponse struct{}
 
 type UpdateServicePolicy UpdateServicePolicyRequestType
 
@@ -46573,8 +46272,7 @@ func init() {
 	t["UpdateServicePolicyRequestType"] = reflect.TypeOf((*UpdateServicePolicyRequestType)(nil)).Elem()
 }
 
-type UpdateServicePolicyResponse struct {
-}
+type UpdateServicePolicyResponse struct{}
 
 type UpdateSet struct {
 	DynamicData
@@ -46603,8 +46301,7 @@ func init() {
 	t["UpdateSoftwareInternetScsiEnabledRequestType"] = reflect.TypeOf((*UpdateSoftwareInternetScsiEnabledRequestType)(nil)).Elem()
 }
 
-type UpdateSoftwareInternetScsiEnabledResponse struct {
-}
+type UpdateSoftwareInternetScsiEnabledResponse struct{}
 
 type UpdateSystemResources UpdateSystemResourcesRequestType
 
@@ -46621,8 +46318,7 @@ func init() {
 	t["UpdateSystemResourcesRequestType"] = reflect.TypeOf((*UpdateSystemResourcesRequestType)(nil)).Elem()
 }
 
-type UpdateSystemResourcesResponse struct {
-}
+type UpdateSystemResourcesResponse struct{}
 
 type UpdateSystemSwapConfiguration UpdateSystemSwapConfigurationRequestType
 
@@ -46639,8 +46335,7 @@ func init() {
 	t["UpdateSystemSwapConfigurationRequestType"] = reflect.TypeOf((*UpdateSystemSwapConfigurationRequestType)(nil)).Elem()
 }
 
-type UpdateSystemSwapConfigurationResponse struct {
-}
+type UpdateSystemSwapConfigurationResponse struct{}
 
 type UpdateSystemUsers UpdateSystemUsersRequestType
 
@@ -46657,8 +46352,7 @@ func init() {
 	t["UpdateSystemUsersRequestType"] = reflect.TypeOf((*UpdateSystemUsersRequestType)(nil)).Elem()
 }
 
-type UpdateSystemUsersResponse struct {
-}
+type UpdateSystemUsersResponse struct{}
 
 type UpdateUser UpdateUserRequestType
 
@@ -46675,8 +46369,7 @@ func init() {
 	t["UpdateUserRequestType"] = reflect.TypeOf((*UpdateUserRequestType)(nil)).Elem()
 }
 
-type UpdateUserResponse struct {
-}
+type UpdateUserResponse struct{}
 
 type UpdateVAppConfig UpdateVAppConfigRequestType
 
@@ -46693,8 +46386,7 @@ func init() {
 	t["UpdateVAppConfigRequestType"] = reflect.TypeOf((*UpdateVAppConfigRequestType)(nil)).Elem()
 }
 
-type UpdateVAppConfigResponse struct {
-}
+type UpdateVAppConfigResponse struct{}
 
 type UpdateVStorageInfrastructureObjectPolicyRequestType struct {
 	This ManagedObjectReference             `xml:"_this"`
@@ -46811,8 +46503,7 @@ func init() {
 	t["UpdateVirtualNicRequestType"] = reflect.TypeOf((*UpdateVirtualNicRequestType)(nil)).Elem()
 }
 
-type UpdateVirtualNicResponse struct {
-}
+type UpdateVirtualNicResponse struct{}
 
 type UpdateVirtualSwitch UpdateVirtualSwitchRequestType
 
@@ -46830,8 +46521,7 @@ func init() {
 	t["UpdateVirtualSwitchRequestType"] = reflect.TypeOf((*UpdateVirtualSwitchRequestType)(nil)).Elem()
 }
 
-type UpdateVirtualSwitchResponse struct {
-}
+type UpdateVirtualSwitchResponse struct{}
 
 type UpdateVmfsUnmapBandwidth UpdateVmfsUnmapBandwidthRequestType
 
@@ -46849,8 +46539,7 @@ func init() {
 	t["UpdateVmfsUnmapBandwidthRequestType"] = reflect.TypeOf((*UpdateVmfsUnmapBandwidthRequestType)(nil)).Elem()
 }
 
-type UpdateVmfsUnmapBandwidthResponse struct {
-}
+type UpdateVmfsUnmapBandwidthResponse struct{}
 
 type UpdateVmfsUnmapPriority UpdateVmfsUnmapPriorityRequestType
 
@@ -46868,8 +46557,7 @@ func init() {
 	t["UpdateVmfsUnmapPriorityRequestType"] = reflect.TypeOf((*UpdateVmfsUnmapPriorityRequestType)(nil)).Elem()
 }
 
-type UpdateVmfsUnmapPriorityResponse struct {
-}
+type UpdateVmfsUnmapPriorityResponse struct{}
 
 type UpdateVsanRequestType struct {
 	This   ManagedObjectReference `xml:"_this"`
@@ -46981,8 +46669,7 @@ func init() {
 	t["UpgradeVmLayoutRequestType"] = reflect.TypeOf((*UpgradeVmLayoutRequestType)(nil)).Elem()
 }
 
-type UpgradeVmLayoutResponse struct {
-}
+type UpgradeVmLayoutResponse struct{}
 
 type UpgradeVmfs UpgradeVmfsRequestType
 
@@ -46999,8 +46686,7 @@ func init() {
 	t["UpgradeVmfsRequestType"] = reflect.TypeOf((*UpgradeVmfsRequestType)(nil)).Elem()
 }
 
-type UpgradeVmfsResponse struct {
-}
+type UpgradeVmfsResponse struct{}
 
 type UpgradeVsanObjects UpgradeVsanObjectsRequestType
 
@@ -47071,8 +46757,7 @@ func init() {
 	t["UploadClientCertRequestType"] = reflect.TypeOf((*UploadClientCertRequestType)(nil)).Elem()
 }
 
-type UploadClientCertResponse struct {
-}
+type UploadClientCertResponse struct{}
 
 type UploadKmipServerCert UploadKmipServerCertRequestType
 
@@ -47090,8 +46775,7 @@ func init() {
 	t["UploadKmipServerCertRequestType"] = reflect.TypeOf((*UploadKmipServerCertRequestType)(nil)).Elem()
 }
 
-type UploadKmipServerCertResponse struct {
-}
+type UploadKmipServerCertResponse struct{}
 
 type UsbScanCodeSpec struct {
 	DynamicData
@@ -48308,8 +47992,7 @@ func init() {
 	t["ValidateCredentialsInGuestRequestType"] = reflect.TypeOf((*ValidateCredentialsInGuestRequestType)(nil)).Elem()
 }
 
-type ValidateCredentialsInGuestResponse struct {
-}
+type ValidateCredentialsInGuestResponse struct{}
 
 type ValidateHost ValidateHostRequestType
 
@@ -55381,8 +55064,7 @@ func init() {
 	t["setCustomValueRequestType"] = reflect.TypeOf((*SetCustomValueRequestType)(nil)).Elem()
 }
 
-type SetCustomValueResponse struct {
-}
+type SetCustomValueResponse struct{}
 
 type UnregisterVAppRequestType struct {
 	This ManagedObjectReference `xml:"_this"`

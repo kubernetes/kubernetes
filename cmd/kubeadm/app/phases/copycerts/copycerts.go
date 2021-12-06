@@ -77,7 +77,7 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 	return tokens[0].Token.ID, nil
 }
 
-//CreateCertificateKey returns a cryptographically secure random key
+// CreateCertificateKey returns a cryptographically secure random key
 func CreateCertificateKey() (string, error) {
 	randBytes, err := cryptoutil.CreateRandBytes(kubeadmconstants.CertificateKeySize)
 	if err != nil {
@@ -86,7 +86,7 @@ func CreateCertificateKey() (string, error) {
 	return hex.EncodeToString(randBytes), nil
 }
 
-//UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
+// UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
 func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
 	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)

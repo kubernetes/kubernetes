@@ -1525,7 +1525,6 @@ func TestUnmarshalClaim(t *testing.T) {
 				var n int
 				err := c.unmarshalClaim("aud", &n)
 				return n, err
-
 			},
 			wantErr: true,
 		},

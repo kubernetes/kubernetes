@@ -141,6 +141,7 @@ func (ed *Enum) Options() pref.ProtoMessage {
 	}
 	return descopts.Enum
 }
+
 func (ed *Enum) Values() pref.EnumValueDescriptors {
 	if ed.L1.eagerValues {
 		return &ed.L2.Values
@@ -275,9 +276,11 @@ func (fd *Field) TextName() string              { return fd.L1.StringName.getTex
 func (fd *Field) HasPresence() bool {
 	return fd.L1.Cardinality != pref.Repeated && (fd.L0.ParentFile.L1.Syntax == pref.Proto2 || fd.L1.Message != nil || fd.L1.ContainingOneof != nil)
 }
+
 func (fd *Field) HasOptionalKeyword() bool {
 	return (fd.L0.ParentFile.L1.Syntax == pref.Proto2 && fd.L1.Cardinality == pref.Optional && fd.L1.ContainingOneof == nil) || fd.L1.IsProto3Optional
 }
+
 func (fd *Field) IsPacked() bool {
 	if !fd.L1.HasPacked && fd.L0.ParentFile.L1.Syntax != pref.Proto2 && fd.L1.Cardinality == pref.Repeated {
 		switch fd.L1.Kind {
@@ -298,6 +301,7 @@ func (fd *Field) MapKey() pref.FieldDescriptor {
 	}
 	return fd.Message().Fields().ByNumber(genid.MapEntry_Key_field_number)
 }
+
 func (fd *Field) MapValue() pref.FieldDescriptor {
 	if !fd.IsMap() {
 		return nil
@@ -311,9 +315,11 @@ func (fd *Field) ContainingOneof() pref.OneofDescriptor      { return fd.L1.Cont
 func (fd *Field) ContainingMessage() pref.MessageDescriptor {
 	return fd.L0.Parent.(pref.MessageDescriptor)
 }
+
 func (fd *Field) Enum() pref.EnumDescriptor {
 	return fd.L1.Enum
 }
+
 func (fd *Field) Message() pref.MessageDescriptor {
 	if fd.L1.IsWeak {
 		if d, _ := protoregistry.GlobalFiles.FindDescriptorByName(fd.L1.Message.FullName()); d != nil {
@@ -342,6 +348,7 @@ func (fd *Field) EnforceUTF8() bool {
 func (od *Oneof) IsSynthetic() bool {
 	return od.L0.ParentFile.L1.Syntax == pref.Proto3 && len(od.L1.Fields.List) == 1 && od.L1.Fields.List[0].HasOptionalKeyword()
 }
+
 func (od *Oneof) Options() pref.ProtoMessage {
 	if f := od.L1.Options; f != nil {
 		return f()

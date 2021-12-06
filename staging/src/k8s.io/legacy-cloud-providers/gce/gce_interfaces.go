@@ -38,7 +38,6 @@ type CloudAddressService interface {
 	ReserveBetaRegionAddress(address *computebeta.Address, region string) error
 	GetBetaRegionAddress(name string, region string) (*computebeta.Address, error)
 	GetBetaRegionAddressByIP(region, ipAddress string) (*computebeta.Address, error)
-
 	getNetworkTierFromAddress(name, region string) (string, error)
 }
 

@@ -120,12 +120,10 @@ type gceInstance struct {
 	Type  string
 }
 
-var (
-	autoSubnetIPRange = &net.IPNet{
-		IP:   netutils.ParseIPSloppy("10.128.0.0"),
-		Mask: net.CIDRMask(9, 32),
-	}
-)
+var autoSubnetIPRange = &net.IPNet{
+	IP:   netutils.ParseIPSloppy("10.128.0.0"),
+	Mask: net.CIDRMask(9, 32),
+}
 
 var providerIDRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
 
@@ -369,7 +367,7 @@ func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key
 	return err
 }
 
-//hasFinalizer returns if the given service has the specified key in its list of finalizers.
+// hasFinalizer returns if the given service has the specified key in its list of finalizers.
 func hasFinalizer(service *v1.Service, key string) bool {
 	for _, finalizer := range service.ObjectMeta.Finalizers {
 		if finalizer == key {

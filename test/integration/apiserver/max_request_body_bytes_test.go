@@ -47,7 +47,6 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 		if !apierrors.IsRequestEntityTooLargeError(err) {
 			t.Errorf("expected requested entity too large err, got %v", err)
-
 		}
 	})
 
@@ -70,7 +69,6 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 		if !apierrors.IsRequestEntityTooLargeError(err) {
 			t.Errorf("expected requested entity too large err, got %v", err)
-
 		}
 	})
 	t.Run("Patch should limit the request body size", func(t *testing.T) {
@@ -81,7 +79,6 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 		if !apierrors.IsRequestEntityTooLargeError(err) {
 			t.Errorf("expected requested entity too large err, got %v", err)
-
 		}
 	})
 	t.Run("JSONPatchType should handle a patch just under the max limit", func(t *testing.T) {
@@ -180,7 +177,6 @@ func TestMaxResourceSize(t *testing.T) {
 		}
 		if !apierrors.IsRequestEntityTooLargeError(err) {
 			t.Errorf("expected requested entity too large err, got %v", err)
-
 		}
 	})
 

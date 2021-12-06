@@ -52,11 +52,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	// synchronizeTokenIDVerifierForTest should be set to true to force a
-	// wait until the token ID verifiers are ready.
-	synchronizeTokenIDVerifierForTest = false
-)
+// synchronizeTokenIDVerifierForTest should be set to true to force a
+// wait until the token ID verifiers are ready.
+var synchronizeTokenIDVerifierForTest = false
 
 type Options struct {
 	// IssuerURL is the URL the provider signs ID Tokens as. This will be the "iss"

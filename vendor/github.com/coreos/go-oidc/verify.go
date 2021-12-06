@@ -215,7 +215,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	distributedClaims := make(map[string]claimSource)
 
-	//step through the token to map claim names to claim sources"
+	// step through the token to map claim names to claim sources"
 	for cn, src := range token.ClaimNames {
 		if src == "" {
 			return nil, fmt.Errorf("oidc: failed to obtain source from claim name")

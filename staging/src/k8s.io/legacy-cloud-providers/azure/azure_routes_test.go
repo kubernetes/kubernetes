@@ -301,7 +301,7 @@ func TestCreateRoute(t *testing.T) {
 		routeTableClient.EXPECT().Get(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, "").Return(initialTable, test.getErr).MaxTimes(1)
 		routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, updatedTable, "").Return(test.createOrUpdateErr).MaxTimes(1)
 
-		//Here is the second invocation when route table doesn't exist
+		// Here is the second invocation when route table doesn't exist
 		routeTableClient.EXPECT().Get(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, "").Return(initialTable, test.secondGetErr).MaxTimes(1)
 
 		err := cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)

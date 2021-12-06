@@ -106,9 +106,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		// All created PVs, incl. the one in resource
 		pvNames sets.String
 	}
-	var (
-		l local
-	)
+	var l local
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.

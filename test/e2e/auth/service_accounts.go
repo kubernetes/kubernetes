@@ -280,7 +280,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   In the test cases 1c,3a,3b and 3c the ServiceTokenVolume MUST not be auto mounted.
 	*/
 	framework.ConformanceIt("should allow opting out of API token automount ", func() {
-
 		var err error
 		trueValue := true
 		falseValue := false
@@ -425,7 +424,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	  Description: Ensure that projected service account token is mounted.
 	*/
 	framework.ConformanceIt("should mount projected service account token", func() {
-
 		var (
 			podName         = "test-pod-" + string(uuid.NewUUID())
 			volumeName      = "test-volume"
@@ -681,7 +679,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   token against these endpoints.
 	*/
 	framework.ConformanceIt("ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer", func() {
-
 		// Allow the test pod access to the OIDC discovery non-resource URLs.
 		// The role should have already been automatically created as part of the
 		// RBAC bootstrap policy, but not the role binding. If RBAC is disabled,

@@ -89,12 +89,10 @@ func (t streamType) String() string {
 	}
 }
 
-var (
-	// linkHeartbeatMessage is a special message used as heartbeat message in
-	// link layer. It never conflicts with messages from raft because raft
-	// doesn't send out messages without From and To fields.
-	linkHeartbeatMessage = raftpb.Message{Type: raftpb.MsgHeartbeat}
-)
+// linkHeartbeatMessage is a special message used as heartbeat message in
+// link layer. It never conflicts with messages from raft because raft
+// doesn't send out messages without From and To fields.
+var linkHeartbeatMessage = raftpb.Message{Type: raftpb.MsgHeartbeat}
 
 func isLinkHeartbeatMessage(m *raftpb.Message) bool {
 	return m.Type == raftpb.MsgHeartbeat && m.From == 0 && m.To == 0

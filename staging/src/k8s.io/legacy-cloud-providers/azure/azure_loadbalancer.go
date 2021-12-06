@@ -1617,8 +1617,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 	lbFrontendIPConfigID string,
 	lbBackendPoolID string,
 	lbName string,
-	lbIdleTimeout *int32) ([]network.Probe, []network.LoadBalancingRule, error) {
-
+	lbIdleTimeout *int32) ([]network.Probe, []network.LoadBalancingRule, error,
+) {
 	var ports []v1.ServicePort
 	if wantLb {
 		ports = service.Spec.Ports

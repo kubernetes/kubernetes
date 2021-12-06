@@ -53,8 +53,9 @@ func (b *pickfirstBalancer) ResolverError(err error) {
 	switch b.state {
 	case connectivity.TransientFailure, connectivity.Idle, connectivity.Connecting:
 		// Set a failing picker if we don't have a good picker.
-		b.cc.UpdateState(balancer.State{ConnectivityState: connectivity.TransientFailure,
-			Picker: &picker{err: fmt.Errorf("name resolver error: %v", err)},
+		b.cc.UpdateState(balancer.State{
+			ConnectivityState: connectivity.TransientFailure,
+			Picker:            &picker{err: fmt.Errorf("name resolver error: %v", err)},
 		})
 	}
 	if logger.V(2) {
@@ -75,8 +76,9 @@ func (b *pickfirstBalancer) UpdateClientConnState(cs balancer.ClientConnState) e
 				logger.Errorf("pickfirstBalancer: failed to NewSubConn: %v", err)
 			}
 			b.state = connectivity.TransientFailure
-			b.cc.UpdateState(balancer.State{ConnectivityState: connectivity.TransientFailure,
-				Picker: &picker{err: fmt.Errorf("error creating connection: %v", err)},
+			b.cc.UpdateState(balancer.State{
+				ConnectivityState: connectivity.TransientFailure,
+				Picker:            &picker{err: fmt.Errorf("error creating connection: %v", err)},
 			})
 			return balancer.ErrBadResolverState
 		}

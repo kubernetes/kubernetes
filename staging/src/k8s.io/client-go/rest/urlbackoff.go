@@ -46,8 +46,7 @@ type URLBackoff struct {
 }
 
 // NoBackoff is a stub implementation, can be used for mocking or else as a default.
-type NoBackoff struct {
-}
+type NoBackoff struct{}
 
 func (n *NoBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
 	// do nothing.
@@ -92,7 +91,7 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 		klog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
 	}
 
-	//If we got this far, there is no backoff required for this URL anymore.
+	// If we got this far, there is no backoff required for this URL anymore.
 	b.Backoff.Reset(b.baseUrlKey(actualUrl))
 }
 

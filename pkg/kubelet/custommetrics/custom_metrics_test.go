@@ -24,7 +24,6 @@ import (
 )
 
 func TestGetCAdvisorCustomMetricsDefinitionPath(t *testing.T) {
-
 	regularContainer := &v1.Container{
 		Name: "test_container",
 	}

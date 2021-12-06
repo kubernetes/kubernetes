@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !purego && !appengine
 // +build !purego,!appengine
 
 package protoreflect
@@ -75,10 +76,12 @@ func valueOfString(v string) Value {
 	p := (*stringHeader)(unsafe.Pointer(&v))
 	return Value{typ: stringType, ptr: p.Data, num: uint64(len(v))}
 }
+
 func valueOfBytes(v []byte) Value {
 	p := (*sliceHeader)(unsafe.Pointer(&v))
 	return Value{typ: bytesType, ptr: p.Data, num: uint64(len(v))}
 }
+
 func valueOfIface(v interface{}) Value {
 	p := (*ifaceHeader)(unsafe.Pointer(&v))
 	return Value{typ: p.Type, ptr: p.Data}
@@ -88,10 +91,12 @@ func (v Value) getString() (x string) {
 	*(*stringHeader)(unsafe.Pointer(&x)) = stringHeader{Data: v.ptr, Len: int(v.num)}
 	return x
 }
+
 func (v Value) getBytes() (x []byte) {
 	*(*sliceHeader)(unsafe.Pointer(&x)) = sliceHeader{Data: v.ptr, Len: int(v.num), Cap: int(v.num)}
 	return x
 }
+
 func (v Value) getIface() (x interface{}) {
 	*(*ifaceHeader)(unsafe.Pointer(&x)) = ifaceHeader{Type: v.typ, Data: v.ptr}
 	return x

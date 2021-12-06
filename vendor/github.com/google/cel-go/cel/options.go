@@ -334,8 +334,7 @@ func Functions(funcs ...*functions.Overload) ProgramOption {
 // The vars value may either be an `interpreter.Activation` instance or a `map[string]interface{}`.
 func Globals(vars interface{}) ProgramOption {
 	return func(p *prog) (*prog, error) {
-		defaultVars, err :=
-			interpreter.NewActivation(vars)
+		defaultVars, err := interpreter.NewActivation(vars)
 		if err != nil {
 			return nil, err
 		}

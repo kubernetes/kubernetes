@@ -36,8 +36,11 @@ import (
 
 // This is the comment tag that carries parameters for open API generation.
 const tagName = "k8s:openapi-gen"
-const tagOptional = "optional"
-const tagDefault = "default"
+
+const (
+	tagOptional = "optional"
+	tagDefault  = "default"
+)
 
 // Known values for the tag.
 const (

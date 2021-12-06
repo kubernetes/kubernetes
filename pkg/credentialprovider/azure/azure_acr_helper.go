@@ -207,7 +207,7 @@ func performTokenExchange(
 func parseAssignments(statements string) (*map[string]string, error) {
 	var cursor int
 	result := make(map[string]string)
-	var errorMsg = fmt.Errorf("malformed header value: %s", statements)
+	errorMsg := fmt.Errorf("malformed header value: %s", statements)
 	for {
 		// parse key
 		equalIndex := nextOccurrence(statements, cursor, "=")

@@ -129,7 +129,7 @@ func TestCleanerExpiredAt(t *testing.T) {
 		t.Errorf("not using the queue, the length should be 0, now: %v", cleaner.queue.Len())
 	}
 
-	var conditionFunc = func() (bool, error) {
+	conditionFunc := func() (bool, error) {
 		if cleaner.queue.Len() == 1 {
 			return true, nil
 		}

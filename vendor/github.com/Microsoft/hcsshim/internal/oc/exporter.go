@@ -9,8 +9,7 @@ var _ = (trace.Exporter)(&LogrusExporter{})
 
 // LogrusExporter is an OpenCensus `trace.Exporter` that exports
 // `trace.SpanData` to logrus output.
-type LogrusExporter struct {
-}
+type LogrusExporter struct{}
 
 // ExportSpan exports `s` based on the the following rules:
 //

@@ -251,7 +251,7 @@ func (t *Trace) calculateStepThreshold() *time.Duration {
 	}
 
 	// the limit threshold is used when the threshold(
-	//remaining after subtracting that of the child trace) is getting very close to zero to prevent unnecessary logging
+	// remaining after subtracting that of the child trace) is getting very close to zero to prevent unnecessary logging
 	limitThreshold := *t.threshold / 4
 	if traceThreshold < limitThreshold {
 		traceThreshold = limitThreshold

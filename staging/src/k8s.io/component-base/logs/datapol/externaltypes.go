@@ -45,5 +45,4 @@ func byType(t reflect.Type) []string {
 	default:
 		return nil
 	}
-
 }

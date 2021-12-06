@@ -426,7 +426,6 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
 	// but using the secondary IP, so we run the same tests for each ClusterIP family
 	ginkgo.Describe("Granular Checks: Services Secondary IP Family [LinuxOnly]", func() {
-
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))

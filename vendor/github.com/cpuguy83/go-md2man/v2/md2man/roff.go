@@ -85,8 +85,7 @@ func (r *roffRenderer) RenderFooter(w io.Writer, ast *blackfriday.Node) {
 // RenderNode is called for each node in a markdown document; based on the node
 // type the equivalent roff output is sent to the writer
 func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-
-	var walkAction = blackfriday.GoToNext
+	walkAction := blackfriday.GoToNext
 
 	switch node.Type {
 	case blackfriday.Text:
@@ -164,9 +163,7 @@ func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering 
 }
 
 func (r *roffRenderer) handleText(w io.Writer, node *blackfriday.Node, entering bool) {
-	var (
-		start, end string
-	)
+	var start, end string
 	// handle special roff table cell text encapsulation
 	if node.Parent.Type == blackfriday.TableCell {
 		if len(node.Literal) > 30 {
@@ -251,7 +248,7 @@ func (r *roffRenderer) handleItem(w io.Writer, node *blackfriday.Node, entering 
 func (r *roffRenderer) handleTable(w io.Writer, node *blackfriday.Node, entering bool) {
 	if entering {
 		out(w, tableStart)
-		//call walker to count cells (and rows?) so format section can be produced
+		// call walker to count cells (and rows?) so format section can be produced
 		columns := countColumns(node)
 		out(w, strings.Repeat("l ", columns)+"\n")
 		out(w, strings.Repeat("l ", columns)+".\n")
@@ -261,9 +258,7 @@ func (r *roffRenderer) handleTable(w io.Writer, node *blackfriday.Node, entering
 }
 
 func (r *roffRenderer) handleTableCell(w io.Writer, node *blackfriday.Node, entering bool) {
-	var (
-		start, end string
-	)
+	var start, end string
 	if node.IsHeader {
 		start = codespanTag
 		end = codespanCloseTag

@@ -113,7 +113,6 @@ type BaseSingletonPredictionContext struct {
 }
 
 func NewBaseSingletonPredictionContext(parent PredictionContext, returnState int) *BaseSingletonPredictionContext {
-
 	s := new(BaseSingletonPredictionContext)
 	s.BasePredictionContext = NewBasePredictionContext(37)
 
@@ -213,7 +212,6 @@ type EmptyPredictionContext struct {
 }
 
 func NewEmptyPredictionContext() *EmptyPredictionContext {
-
 	p := new(EmptyPredictionContext)
 
 	p.BaseSingletonPredictionContext = NewBaseSingletonPredictionContext(nil, BasePredictionContextEmptyReturnState)
@@ -315,7 +313,7 @@ func (a *ArrayPredictionContext) hash() int {
 		h = murmurUpdate(h, r)
 	}
 
-	return murmurFinish(h, 2 * len(a.parents))
+	return murmurFinish(h, 2*len(a.parents))
 }
 
 func (a *ArrayPredictionContext) String() string {
@@ -707,7 +705,6 @@ func combineCommonParents(parents []PredictionContext) {
 }
 
 func getCachedBasePredictionContext(context PredictionContext, contextCache *PredictionContextCache, visited map[PredictionContext]PredictionContext) PredictionContext {
-
 	if context.isEmpty() {
 		return context
 	}

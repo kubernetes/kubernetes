@@ -59,7 +59,7 @@ func getForegroundOptions() metav1.DeleteOptions {
 }
 
 func getOrphanOptions() metav1.DeleteOptions {
-	var trueVar = true
+	trueVar := true
 	return metav1.DeleteOptions{OrphanDependents: &trueVar}
 }
 
@@ -69,15 +69,17 @@ func getPropagateOrphanOptions() metav1.DeleteOptions {
 }
 
 func getNonOrphanOptions() metav1.DeleteOptions {
-	var falseVar = false
+	falseVar := false
 	return metav1.DeleteOptions{OrphanDependents: &falseVar}
 }
 
-const garbageCollectedPodName = "test.pod.1"
-const independentPodName = "test.pod.2"
-const oneValidOwnerPodName = "test.pod.3"
-const toBeDeletedRCName = "test.rc.1"
-const remainingRCName = "test.rc.2"
+const (
+	garbageCollectedPodName = "test.pod.1"
+	independentPodName      = "test.pod.2"
+	oneValidOwnerPodName    = "test.pod.3"
+	toBeDeletedRCName       = "test.rc.1"
+	remainingRCName         = "test.rc.2"
+)
 
 func newPod(podName, podNamespace string, ownerReferences []metav1.OwnerReference) *v1.Pod {
 	for i := 0; i < len(ownerReferences); i++ {
@@ -319,6 +321,7 @@ func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
 func TestCrossNamespaceReferencesWithWatchCache(t *testing.T) {
 	testCrossNamespaceReferences(t, true)
 }
+
 func TestCrossNamespaceReferencesWithoutWatchCache(t *testing.T) {
 	testCrossNamespaceReferences(t, false)
 }
@@ -642,7 +645,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
-	var ret = true
+	ret := true
 	if len(pods.Items) != podNum {
 		ret = false
 		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))

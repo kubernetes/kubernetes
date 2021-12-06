@@ -266,7 +266,7 @@ func (prober *flexVolumeProber) initWatcher() error {
 func (prober *flexVolumeProber) createPluginDir() error {
 	if _, err := prober.fs.Stat(prober.pluginDir); os.IsNotExist(err) {
 		klog.Warningf("Flexvolume plugin directory at %s does not exist. Recreating.", prober.pluginDir)
-		err := prober.fs.MkdirAll(prober.pluginDir, 0755)
+		err := prober.fs.MkdirAll(prober.pluginDir, 0o755)
 		if err != nil {
 			return fmt.Errorf("error (re-)creating driver directory: %s", err)
 		}

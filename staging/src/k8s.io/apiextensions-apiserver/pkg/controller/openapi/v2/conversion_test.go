@@ -39,7 +39,7 @@ import (
 )
 
 func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
-	var spec = []byte(`description: Foo CRD for Testing
+	spec := []byte(`description: Foo CRD for Testing
 type: object
 properties:
   spec:

@@ -30,9 +30,11 @@ var (
 	paramsRegexp            = regexp.MustCompile(`\(.*\)$`)
 )
 
-const maxURLRuneCount = 2083
-const minURLRuneCount = 3
-const RF3339WithoutZone = "2006-01-02T15:04:05"
+const (
+	maxURLRuneCount   = 2083
+	minURLRuneCount   = 3
+	RF3339WithoutZone = "2006-01-02T15:04:05"
+)
 
 // SetFieldsRequiredByDefault causes validation to fail when struct fields
 // do not include validations or are not explicitly marked as exempt (using `valid:"-"` or `valid:"email,optional"`).
@@ -71,7 +73,6 @@ func IsEmail(str string) bool {
 
 // IsExistingEmail check if the string is an email of existing domain
 func IsExistingEmail(email string) bool {
-
 	if len(email) < 6 || len(email) > 254 {
 		return false
 	}
@@ -130,10 +131,10 @@ func IsURL(str string) bool {
 func IsRequestURL(rawurl string) bool {
 	url, err := url.ParseRequestURI(rawurl)
 	if err != nil {
-		return false //Couldn't even parse the rawurl
+		return false // Couldn't even parse the rawurl
 	}
 	if len(url.Scheme) == 0 {
-		return false //No Scheme found
+		return false // No Scheme found
 	}
 	return true
 }
@@ -154,8 +155,8 @@ func IsAlpha(str string) bool {
 	return rxAlpha.MatchString(str)
 }
 
-//IsUTFLetter check if the string contains only unicode letter characters.
-//Similar to IsAlpha but for all languages. Empty string is valid.
+// IsUTFLetter check if the string contains only unicode letter characters.
+// Similar to IsAlpha but for all languages. Empty string is valid.
 func IsUTFLetter(str string) bool {
 	if IsNull(str) {
 		return true
@@ -167,7 +168,6 @@ func IsUTFLetter(str string) bool {
 		}
 	}
 	return true
-
 }
 
 // IsAlphanumeric check if the string contains only letters and numbers. Empty string is valid.
@@ -184,12 +184,11 @@ func IsUTFLetterNumeric(str string) bool {
 		return true
 	}
 	for _, c := range str {
-		if !unicode.IsLetter(c) && !unicode.IsNumber(c) { //letters && numbers are ok
+		if !unicode.IsLetter(c) && !unicode.IsNumber(c) { // letters && numbers are ok
 			return false
 		}
 	}
 	return true
-
 }
 
 // IsNumeric check if the string contains only numbers. Empty string is valid.
@@ -214,12 +213,11 @@ func IsUTFNumeric(str string) bool {
 		str = strings.TrimPrefix(str, "+")
 	}
 	for _, c := range str {
-		if !unicode.IsNumber(c) { //numbers && minus sign are ok
+		if !unicode.IsNumber(c) { // numbers && minus sign are ok
 			return false
 		}
 	}
 	return true
-
 }
 
 // IsUTFDigit check if the string contains only unicode radix-10 decimal digits. Empty string is valid.
@@ -235,12 +233,11 @@ func IsUTFDigit(str string) bool {
 		str = strings.TrimPrefix(str, "+")
 	}
 	for _, c := range str {
-		if !unicode.IsDigit(c) { //digits && minus sign are ok
+		if !unicode.IsDigit(c) { // digits && minus sign are ok
 			return false
 		}
 	}
 	return true
-
 }
 
 // IsHexadecimal check if the string is a hexadecimal number.
@@ -323,12 +320,12 @@ func IsNull(str string) bool {
 
 // HasWhitespaceOnly checks the string only contains whitespace
 func HasWhitespaceOnly(str string) bool {
-    return len(str) > 0 && rxHasWhitespaceOnly.MatchString(str)
+	return len(str) > 0 && rxHasWhitespaceOnly.MatchString(str)
 }
 
 // HasWhitespace checks if the string contains any whitespace
 func HasWhitespace(str string) bool {
-    return len(str) > 0 && rxHasWhitespace.MatchString(str)
+	return len(str) > 0 && rxHasWhitespace.MatchString(str)
 }
 
 // IsByteLength check if the string's length (in bytes) falls in a range.
@@ -492,7 +489,7 @@ func IsBase64(str string) bool {
 // IsFilePath check is a string is Win or Unix file path and returns it's type.
 func IsFilePath(str string) (bool, int) {
 	if rxWinPath.MatchString(str) {
-		//check windows path limit see:
+		// check windows path limit see:
 		//  http://msdn.microsoft.com/en-us/library/aa365247(VS.85).aspx#maxpath
 		if len(str[3:]) > 32767 {
 			return false, Win
@@ -591,7 +588,6 @@ func IsHash(str string, algorithm string) bool {
 
 // IsDialString validates the given string for usage with the various Dial() functions
 func IsDialString(str string) bool {
-
 	if h, p, err := net.SplitHostPort(str); err == nil && h != "" && p != "" && (IsDNSName(h) || IsIP(h)) && IsPort(p) {
 		return true
 	}
@@ -922,7 +918,6 @@ func StringMatches(s string, params ...string) bool {
 
 // StringLength check string's length (including multi byte strings)
 func StringLength(str string, params ...string) bool {
-
 	if len(params) == 2 {
 		strLength := utf8.RuneCountInString(str)
 		min, _ := ToInt(params[0])
@@ -1121,10 +1116,10 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 				delete(options, validatorSpec)
 
 				switch v.Kind() {
-                case reflect.String,
-                    reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-                    reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-                    reflect.Float32, reflect.Float64:
+				case reflect.String,
+					reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+					reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+					reflect.Float32, reflect.Float64:
 					field := fmt.Sprint(v) // make value into string, then validate with regex
 					if result := validatefunc(field); !result && !negate || result && negate {
 						if customMsgExists {
@@ -1136,7 +1131,7 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 						return false, Error{t.Name, fmt.Errorf("%s does not validate as %s", field, validator), customMsgExists, stripParams(validatorSpec), []string{}}
 					}
 				default:
-					//Not Yet Supported Types (Fail here!)
+					// Not Yet Supported Types (Fail here!)
 					err := fmt.Errorf("Validator %s doesn't support kind %s for value %v", validator, v.Kind(), v)
 					return false, Error{t.Name, err, false, stripParams(validatorSpec), []string{}}
 				}

@@ -194,12 +194,10 @@ type portMapValue struct {
 	}
 }
 
-var (
-	// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
-	// the loopback address. May be checked for by callers of NewProxier to know whether
-	// the caller provided invalid input.
-	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
-)
+// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
+// the loopback address. May be checked for by callers of NewProxier to know whether
+// the caller provided invalid input.
+var ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
@@ -1019,8 +1017,11 @@ var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
 
 // Chains for NodePort services
 var iptablesContainerNodePortChain iptables.Chain = "KUBE-NODEPORT-CONTAINER"
-var iptablesHostNodePortChain iptables.Chain = "KUBE-NODEPORT-HOST"
-var iptablesNonLocalNodePortChain iptables.Chain = "KUBE-NODEPORT-NON-LOCAL"
+
+var (
+	iptablesHostNodePortChain     iptables.Chain = "KUBE-NODEPORT-HOST"
+	iptablesNonLocalNodePortChain iptables.Chain = "KUBE-NODEPORT-NON-LOCAL"
+)
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
@@ -1119,8 +1120,10 @@ func iptablesFlush(ipt iptables.Interface) error {
 var zeroIPv4 = netutils.ParseIPSloppy("0.0.0.0")
 var localhostIPv4 = netutils.ParseIPSloppy("127.0.0.1")
 
-var zeroIPv6 = netutils.ParseIPSloppy("::")
-var localhostIPv6 = netutils.ParseIPSloppy("::1")
+var (
+	zeroIPv6      = netutils.ParseIPSloppy("::")
+	localhostIPv6 = netutils.ParseIPSloppy("::1")
+)
 
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
 func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol v1.Protocol, service proxy.ServicePortName) []string {

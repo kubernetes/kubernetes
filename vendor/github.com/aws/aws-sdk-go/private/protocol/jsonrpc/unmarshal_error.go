@@ -34,7 +34,6 @@ func (u *UnmarshalTypedError) UnmarshalError(
 	resp *http.Response,
 	respMeta protocol.ResponseMetadata,
 ) (error, error) {
-
 	var buf bytes.Buffer
 	var jsonErr jsonErrorResponse
 	teeReader := io.TeeReader(resp.Body, &buf)

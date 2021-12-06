@@ -177,7 +177,7 @@ func (t Token) WillExpireIn(d time.Duration) bool {
 	return !t.Expires().After(time.Now().Add(d))
 }
 
-//OAuthToken return the current access token
+// OAuthToken return the current access token
 func (t *Token) OAuthToken() string {
 	return t.AccessToken
 }
@@ -190,8 +190,7 @@ type ServicePrincipalSecret interface {
 
 // ServicePrincipalNoSecret represents a secret type that contains no secret
 // meaning it is not valid for fetching a fresh token. This is used by Manual
-type ServicePrincipalNoSecret struct {
-}
+type ServicePrincipalNoSecret struct{}
 
 // SetAuthenticationValues is a method of the interface ServicePrincipalSecret
 // It only returns an error for the ServicePrincipalNoSecret type
@@ -632,7 +631,6 @@ func NewServicePrincipalTokenFromUsernamePassword(oauthConfig OAuthConfig, clien
 
 // NewServicePrincipalTokenFromAuthorizationCode creates a ServicePrincipalToken from the
 func NewServicePrincipalTokenFromAuthorizationCode(oauthConfig OAuthConfig, clientID string, clientSecret string, authorizationCode string, redirectURI string, resource string, callbacks ...TokenRefreshCallback) (*ServicePrincipalToken, error) {
-
 	if err := validateOAuthConfig(oauthConfig); err != nil {
 		return nil, err
 	}

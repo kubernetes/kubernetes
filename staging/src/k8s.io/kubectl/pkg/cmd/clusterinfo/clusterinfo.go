@@ -137,7 +137,6 @@ func (o *ClusterInfoOptions) Run() error {
 					link = o.Client.Host + "/api/" + o.Client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + name + "/proxy"
 				} else {
 					link = o.Client.Host + "/api/" + o.Client.GroupVersion.Group + "/" + o.Client.GroupVersion.Version + "/namespaces/" + service.ObjectMeta.Namespace + "/services/" + name + "/proxy"
-
 				}
 			}
 			name := service.ObjectMeta.Labels["kubernetes.io/name"]

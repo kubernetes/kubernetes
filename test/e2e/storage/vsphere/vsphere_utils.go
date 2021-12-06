@@ -105,12 +105,12 @@ func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState 
 		pollTime     = 10 * time.Second
 	)
 
-	var attachedState = map[bool]volumeState{
+	attachedState := map[bool]volumeState{
 		true:  volumeStateAttached,
 		false: volumeStateDetached,
 	}
 
-	var attachedStateMsg = map[volumeState]string{
+	attachedStateMsg := map[volumeState]string{
 		volumeStateAttached: "attached to",
 		volumeStateDetached: "detached from",
 	}
@@ -169,9 +169,7 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 
 // function to get vsphere persistent volume spec with given selector labels.
 func getVSpherePersistentVolumeClaimSpec(namespace string, labels map[string]string) *v1.PersistentVolumeClaim {
-	var (
-		pvc *v1.PersistentVolumeClaim
-	)
+	var pvc *v1.PersistentVolumeClaim
 	pvc = &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
@@ -403,7 +401,7 @@ func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, n
 			framework.ExpectNoError(err)
 		}
 		// Find common datastores among the specified zones
-		var datastoreCountMap = make(map[string]int)
+		datastoreCountMap := make(map[string]int)
 		numZones := len(zones)
 		var commonDatastores []string
 		for _, zone := range zones {
@@ -477,7 +475,7 @@ func getPathFromVMDiskPath(vmDiskPath string) string {
 	return datastorePathObj.Path
 }
 
-//getDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
+// getDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
 func getDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath, error) {
 	datastorePathObj := new(object.DatastorePath)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
@@ -496,7 +494,6 @@ func getVirtualDiskPage83Data(ctx context.Context, dc *object.Datacenter, diskPa
 	vdm := object.NewVirtualDiskManager(dc.Client())
 	// Returns uuid of vmdk virtual disk
 	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc)
-
 	if err != nil {
 		klog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
 		return "", err
@@ -513,7 +510,7 @@ func formatVirtualDiskUUID(uuid string) string {
 	return strings.ToLower(uuidWithNoHypens)
 }
 
-//isValidUUID checks if the string is a valid UUID.
+// isValidUUID checks if the string is a valid UUID.
 func isValidUUID(uuid string) bool {
 	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 	return r.MatchString(uuid)

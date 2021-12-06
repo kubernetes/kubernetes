@@ -115,7 +115,6 @@ func testPreStop(c clientset.Interface, ns string) {
 
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 		defer cancel()
 

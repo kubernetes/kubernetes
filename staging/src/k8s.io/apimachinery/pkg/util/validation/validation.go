@@ -28,11 +28,13 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-const qnameCharFmt string = "[A-Za-z0-9]"
-const qnameExtCharFmt string = "[-A-Za-z0-9_.]"
-const qualifiedNameFmt string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
-const qualifiedNameErrMsg string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
-const qualifiedNameMaxLength int = 63
+const (
+	qnameCharFmt           string = "[A-Za-z0-9]"
+	qnameExtCharFmt        string = "[-A-Za-z0-9_.]"
+	qualifiedNameFmt       string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
+	qualifiedNameErrMsg    string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
+	qualifiedNameMaxLength int    = 63
+)
 
 var qualifiedNameRegexp = regexp.MustCompile("^" + qualifiedNameFmt + "$")
 
@@ -153,8 +155,10 @@ func IsDomainPrefixedPath(fldPath *field.Path, dpPath string) field.ErrorList {
 	return allErrs
 }
 
-const labelValueFmt string = "(" + qualifiedNameFmt + ")?"
-const labelValueErrMsg string = "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
+const (
+	labelValueFmt    string = "(" + qualifiedNameFmt + ")?"
+	labelValueErrMsg string = "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
+)
 
 // LabelValueMaxLength is a label's max length
 const LabelValueMaxLength int = 63
@@ -175,8 +179,10 @@ func IsValidLabelValue(value string) []string {
 	return errs
 }
 
-const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
-const dns1123LabelErrMsg string = "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+const (
+	dns1123LabelFmt    string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+	dns1123LabelErrMsg string = "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+)
 
 // DNS1123LabelMaxLength is a label's max length in DNS (RFC 1123)
 const DNS1123LabelMaxLength int = 63
@@ -196,8 +202,10 @@ func IsDNS1123Label(value string) []string {
 	return errs
 }
 
-const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
-const dns1123SubdomainErrorMsg string = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character"
+const (
+	dns1123SubdomainFmt      string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
+	dns1123SubdomainErrorMsg string = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character"
+)
 
 // DNS1123SubdomainMaxLength is a subdomain's max length in DNS (RFC 1123)
 const DNS1123SubdomainMaxLength int = 253
@@ -217,8 +225,10 @@ func IsDNS1123Subdomain(value string) []string {
 	return errs
 }
 
-const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
+const (
+	dns1035LabelFmt    string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+	dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
+)
 
 // DNS1035LabelMaxLength is a label's max length in DNS (RFC 1035)
 const DNS1035LabelMaxLength int = 63
@@ -260,8 +270,10 @@ func IsWildcardDNS1123Subdomain(value string) []string {
 	return errs
 }
 
-const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
-const identifierErrMsg string = "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_'"
+const (
+	cIdentifierFmt   string = "[A-Za-z_][A-Za-z0-9_]*"
+	identifierErrMsg string = "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_'"
+)
 
 var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
 
@@ -315,8 +327,10 @@ func IsValidUserID(uid int64) []string {
 	return []string{InclusiveRangeError(minUserID, maxUserID)}
 }
 
-var portNameCharsetRegex = regexp.MustCompile("^[-a-z0-9]+$")
-var portNameOneLetterRegexp = regexp.MustCompile("[a-z]")
+var (
+	portNameCharsetRegex    = regexp.MustCompile("^[-a-z0-9]+$")
+	portNameOneLetterRegexp = regexp.MustCompile("[a-z]")
+)
 
 // IsValidPortName check that the argument is valid syntax. It must be
 // non-empty and no more than 15 characters long. It may contain only [-a-z0-9]
@@ -373,8 +387,10 @@ func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
 	return allErrors
 }
 
-const percentFmt string = "[0-9]+%"
-const percentErrMsg string = "a valid percent string must be a numeric string followed by an ending '%'"
+const (
+	percentFmt    string = "[0-9]+%"
+	percentErrMsg string = "a valid percent string must be a numeric string followed by an ending '%'"
+)
 
 var percentRegexp = regexp.MustCompile("^" + percentFmt + "$")
 
@@ -386,8 +402,10 @@ func IsValidPercent(percent string) []string {
 	return nil
 }
 
-const httpHeaderNameFmt string = "[-A-Za-z0-9]+"
-const httpHeaderNameErrMsg string = "a valid HTTP header must consist of alphanumeric characters or '-'"
+const (
+	httpHeaderNameFmt    string = "[-A-Za-z0-9]+"
+	httpHeaderNameErrMsg string = "a valid HTTP header must consist of alphanumeric characters or '-'"
+)
 
 var httpHeaderNameRegexp = regexp.MustCompile("^" + httpHeaderNameFmt + "$")
 
@@ -400,8 +418,10 @@ func IsHTTPHeaderName(value string) []string {
 	return nil
 }
 
-const envVarNameFmt = "[-._a-zA-Z][-._a-zA-Z0-9]*"
-const envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
+const (
+	envVarNameFmt              = "[-._a-zA-Z][-._a-zA-Z0-9]*"
+	envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
+)
 
 var envVarNameRegexp = regexp.MustCompile("^" + envVarNameFmt + "$")
 
@@ -416,8 +436,10 @@ func IsEnvVarName(value string) []string {
 	return errs
 }
 
-const configMapKeyFmt = `[-._a-zA-Z0-9]+`
-const configMapKeyErrMsg string = "a valid config key must consist of alphanumeric characters, '-', '_' or '.'"
+const (
+	configMapKeyFmt           = `[-._a-zA-Z0-9]+`
+	configMapKeyErrMsg string = "a valid config key must consist of alphanumeric characters, '-', '_' or '.'"
+)
 
 var configMapKeyRegexp = regexp.MustCompile("^" + configMapKeyFmt + "$")
 

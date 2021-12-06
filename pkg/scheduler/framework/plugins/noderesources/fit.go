@@ -32,10 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
-var _ framework.PreFilterPlugin = &Fit{}
-var _ framework.FilterPlugin = &Fit{}
-var _ framework.EnqueueExtensions = &Fit{}
-var _ framework.ScorePlugin = &Fit{}
+var (
+	_ framework.PreFilterPlugin   = &Fit{}
+	_ framework.FilterPlugin      = &Fit{}
+	_ framework.EnqueueExtensions = &Fit{}
+	_ framework.ScorePlugin       = &Fit{}
+)
 
 const (
 	// FitName is the name of the plugin used in the plugin registry and configurations.

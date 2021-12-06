@@ -9,9 +9,7 @@ type HNSVersion struct {
 	Minor int `json:"Minor"`
 }
 
-var (
-	HNSVersion1803 = HNSVersion{Major: 7, Minor: 2}
-)
+var HNSVersion1803 = HNSVersion{Major: 7, Minor: 2}
 
 func GetHNSGlobals() (*HNSGlobals, error) {
 	var version HNSVersion

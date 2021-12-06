@@ -245,5 +245,4 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
-
 })

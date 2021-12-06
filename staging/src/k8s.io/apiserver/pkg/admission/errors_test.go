@@ -48,12 +48,15 @@ func TestNewForbidden(t *testing.T) {
 	}
 }
 
-type fakeObj struct{}
-type fakeObjKind struct{}
+type (
+	fakeObj     struct{}
+	fakeObjKind struct{}
+)
 
 func (f *fakeObj) GetObjectKind() schema.ObjectKind {
 	return &fakeObjKind{}
 }
+
 func (f *fakeObj) DeepCopyObject() runtime.Object {
 	return f
 }

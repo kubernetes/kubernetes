@@ -52,21 +52,27 @@ const ()
 func invalidTypeConversionMsg(path string, err error) errors.Error {
 	return errors.New(errors.CompositeErrorCode, InvalidTypeConversionError, path, err)
 }
+
 func mustValidateOnlyOneSchemaMsg(path, additionalMsg string) errors.Error {
 	return errors.New(errors.CompositeErrorCode, MustValidateOnlyOneSchemaError, path, additionalMsg)
 }
+
 func mustValidateAtLeastOneSchemaMsg(path string) errors.Error {
 	return errors.New(errors.CompositeErrorCode, MustValidateAtLeastOneSchemaError, path)
 }
+
 func mustValidateAllSchemasMsg(path, additionalMsg string) errors.Error {
 	return errors.New(errors.CompositeErrorCode, MustValidateAllSchemasError, path, additionalMsg)
 }
+
 func mustNotValidatechemaMsg(path string) errors.Error {
 	return errors.New(errors.CompositeErrorCode, MustNotValidateSchemaError, path)
 }
+
 func hasADependencyMsg(path, depkey string) errors.Error {
 	return errors.New(errors.CompositeErrorCode, HasDependencyError, path, depkey)
 }
+
 func arrayDoesNotAllowAdditionalItemsMsg() errors.Error {
 	return errors.New(errors.CompositeErrorCode, ArrayDoesNotAllowAdditionalItemsError)
 }

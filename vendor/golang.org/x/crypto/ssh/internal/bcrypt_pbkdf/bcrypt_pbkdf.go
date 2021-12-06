@@ -11,6 +11,7 @@ package bcrypt_pbkdf
 import (
 	"crypto/sha512"
 	"errors"
+
 	"golang.org/x/crypto/blowfish"
 )
 

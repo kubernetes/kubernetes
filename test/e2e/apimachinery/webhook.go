@@ -1889,7 +1889,6 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 	ginkgo.By("Deleting the updated custom resource should be successful")
 	err = customResourceClient.Delete(context.TODO(), crInstanceName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
-
 }
 
 func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface, prune bool) {

@@ -330,7 +330,6 @@ func currentDSHash(dsc *daemonSetsController, ds *apps.DaemonSet) (string, error
 		return "", err
 	}
 	return cur.Labels[apps.DefaultDaemonSetUniqueLabelKey], nil
-
 }
 
 func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {

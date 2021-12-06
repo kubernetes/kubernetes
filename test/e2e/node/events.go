@@ -37,7 +37,6 @@ var _ = SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 
 	ginkgo.It("should be sent by kubelets and the scheduler about pods scheduling and running ", func() {
-
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 
 		ginkgo.By("creating the pod")

@@ -25,7 +25,7 @@ func SetupDirectories(t *testing.T, dirs ...string) Setup {
 	err = os.Chdir(d)
 	require.NoError(t, err)
 	for _, s := range dirs {
-		err = os.MkdirAll(s, 0700)
+		err = os.MkdirAll(s, 0o700)
 		require.NoError(t, err)
 	}
 	return Setup{Root: d}
@@ -33,9 +33,9 @@ func SetupDirectories(t *testing.T, dirs ...string) Setup {
 
 // writeFile writes a file under the test directory
 func (s Setup) WriteFile(t *testing.T, path string, value []byte) {
-	err := os.MkdirAll(filepath.Dir(filepath.Join(s.Root, path)), 0700)
+	err := os.MkdirAll(filepath.Dir(filepath.Join(s.Root, path)), 0o700)
 	require.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(s.Root, path), value, 0600)
+	err = ioutil.WriteFile(filepath.Join(s.Root, path), value, 0o600)
 	require.NoError(t, err)
 }
 

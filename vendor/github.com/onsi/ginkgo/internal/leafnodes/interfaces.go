@@ -12,7 +12,6 @@ type BasicNode interface {
 
 type SubjectNode interface {
 	BasicNode
-
 	Text() string
 	Flag() types.FlagType
 	Samples() int

@@ -40,10 +40,8 @@ const (
 	Global = "global"
 )
 
-var (
-	// locationRegexp is the format of regions/zone names in GCE.
-	locationRegexp = regexp.MustCompile("^[a-z](?:[-a-z0-9]+)?$")
-)
+// locationRegexp is the format of regions/zone names in GCE.
+var locationRegexp = regexp.MustCompile("^[a-z](?:[-a-z0-9]+)?$")
 
 // ZonalKey returns the key for a zonal resource.
 func ZonalKey(name, zone string) *Key {

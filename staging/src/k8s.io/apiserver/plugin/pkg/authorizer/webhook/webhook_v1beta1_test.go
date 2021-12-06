@@ -68,7 +68,7 @@ func TestV1beta1NewFromConfig(t *testing.T) {
 		{data.Key, clientKey},
 	}
 	for _, file := range files {
-		if err := ioutil.WriteFile(file.name, file.data, 0400); err != nil {
+		if err := ioutil.WriteFile(file.name, file.data, 0o400); err != nil {
 			t.Fatal(err)
 		}
 	}

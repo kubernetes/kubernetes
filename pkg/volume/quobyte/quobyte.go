@@ -54,12 +54,14 @@ type quobyteAPIConfig struct {
 	quobyteAPIServer string
 }
 
-var _ volume.VolumePlugin = &quobytePlugin{}
-var _ volume.PersistentVolumePlugin = &quobytePlugin{}
-var _ volume.DeletableVolumePlugin = &quobytePlugin{}
-var _ volume.ProvisionableVolumePlugin = &quobytePlugin{}
-var _ volume.Provisioner = &quobyteVolumeProvisioner{}
-var _ volume.Deleter = &quobyteVolumeDeleter{}
+var (
+	_ volume.VolumePlugin              = &quobytePlugin{}
+	_ volume.PersistentVolumePlugin    = &quobytePlugin{}
+	_ volume.DeletableVolumePlugin     = &quobytePlugin{}
+	_ volume.ProvisionableVolumePlugin = &quobytePlugin{}
+	_ volume.Provisioner               = &quobyteVolumeProvisioner{}
+	_ volume.Deleter                   = &quobyteVolumeDeleter{}
+)
 
 const (
 	quobytePluginName = "kubernetes.io/quobyte"
@@ -254,14 +256,14 @@ func (mounter *quobyteMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		return nil
 	}
 
-	os.MkdirAll(dir, 0750)
+	os.MkdirAll(dir, 0o750)
 	var options []string
 	options = append(options, "allow-usermapping-in-volumename")
 	if mounter.readOnly {
 		options = append(options, "ro")
 	}
 
-	//if a trailing slash is missing we add it here
+	// if a trailing slash is missing we add it here
 	mountOptions := util.JoinMountOptions(mounter.mountOptions, options)
 	if err := mounter.mounter.MountSensitiveWithoutSystemd(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", mountOptions, nil); err != nil {
 		return fmt.Errorf("quobyte: mount failed: %v", err)

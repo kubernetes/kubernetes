@@ -33,9 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-var (
-	_, clusterCIDRRange, _ = netutils.ParseCIDRSloppy("10.1.0.0/16")
-)
+var _, clusterCIDRRange, _ = netutils.ParseCIDRSloppy("10.1.0.0/16")
 
 type fakeEvent struct {
 	nodeName string

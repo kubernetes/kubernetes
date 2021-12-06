@@ -6,19 +6,16 @@ package antlr
 
 import (
 	"fmt"
-	"strings"
-
 	"strconv"
+	"strings"
 )
 
 type Recognizer interface {
 	GetLiteralNames() []string
 	GetSymbolicNames() []string
 	GetRuleNames() []string
-
 	Sempred(RuleContext, int, int) bool
 	Precpred(RuleContext, int) bool
-
 	GetState() int
 	SetState(int)
 	Action(RuleContext, int, int)
@@ -45,8 +42,10 @@ func NewBaseRecognizer() *BaseRecognizer {
 	return rec
 }
 
-var tokenTypeMapCache = make(map[string]int)
-var ruleIndexMapCache = make(map[string]int)
+var (
+	tokenTypeMapCache = make(map[string]int)
+	ruleIndexMapCache = make(map[string]int)
+)
 
 func (b *BaseRecognizer) checkVersion(toolVersion string) {
 	runtimeVersion := "4.9.2"
@@ -110,7 +109,6 @@ func (b *BaseRecognizer) SetState(v int) {
 // <p>Used for XPath and tree pattern compilation.</p>
 //
 func (b *BaseRecognizer) GetRuleIndexMap() map[string]int {
-
 	panic("Method not defined!")
 	//    var ruleNames = b.GetRuleNames()
 	//    if (ruleNames==nil) {

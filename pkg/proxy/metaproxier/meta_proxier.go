@@ -75,7 +75,6 @@ func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 func (proxier *metaProxier) OnServiceDelete(service *v1.Service) {
 	proxier.ipv4Proxier.OnServiceDelete(service)
 	proxier.ipv6Proxier.OnServiceDelete(service)
-
 }
 
 // OnServiceSynced is called once all the initial event handlers were
@@ -149,7 +148,6 @@ func (proxier *metaProxier) OnNodeUpdate(oldNode, node *v1.Node) {
 func (proxier *metaProxier) OnNodeDelete(node *v1.Node) {
 	proxier.ipv4Proxier.OnNodeDelete(node)
 	proxier.ipv6Proxier.OnNodeDelete(node)
-
 }
 
 // OnNodeSynced is called once all the initial event handlers were

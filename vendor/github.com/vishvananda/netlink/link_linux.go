@@ -1074,7 +1074,7 @@ func (h *Handle) linkModify(link Link, flags int) error {
 
 		req.Flags = uint16(tuntap.Flags)
 
-		if queues == 0 { //Legacy compatibility
+		if queues == 0 { // Legacy compatibility
 			queues = 1
 			if tuntap.Flags == 0 {
 				req.Flags = uint16(TUNTAP_DEFAULTS)
@@ -2861,7 +2861,6 @@ func addXfrmiAttrs(xfrmi *Xfrmi, linkInfo *nl.RtAttr) {
 	data := linkInfo.AddRtAttr(nl.IFLA_INFO_DATA, nil)
 	data.AddRtAttr(nl.IFLA_XFRM_LINK, nl.Uint32Attr(uint32(xfrmi.ParentIndex)))
 	data.AddRtAttr(nl.IFLA_XFRM_IF_ID, nl.Uint32Attr(xfrmi.Ifid))
-
 }
 
 func parseXfrmiData(link Link, data []syscall.NetlinkRouteAttr) {
@@ -2934,7 +2933,7 @@ type vethEthtoolStats struct {
 }
 
 func vethStatsDeserialize(b []byte) (vethEthtoolStats, error) {
-	var stats = vethEthtoolStats{}
+	stats := vethEthtoolStats{}
 	err := binary.Read(bytes.NewReader(b), nl.NativeEndian(), &stats)
 	return stats, err
 }

@@ -39,7 +39,6 @@ func NewDatastoreNamespaceManager(c *vim25.Client) *DatastoreNamespaceManager {
 // CreateDirectory creates a top-level directory on the given vsan datastore, using
 // the given user display name hint and opaque storage policy.
 func (nm DatastoreNamespaceManager) CreateDirectory(ctx context.Context, ds *Datastore, displayName string, policy string) (string, error) {
-
 	req := &types.CreateDirectory{
 		This:        nm.Reference(),
 		Datastore:   ds.Reference(),
@@ -57,7 +56,6 @@ func (nm DatastoreNamespaceManager) CreateDirectory(ctx context.Context, ds *Dat
 
 // DeleteDirectory deletes the given top-level directory from a vsan datastore.
 func (nm DatastoreNamespaceManager) DeleteDirectory(ctx context.Context, dc *Datacenter, datastorePath string) error {
-
 	req := &types.DeleteDirectory{
 		This:          nm.Reference(),
 		DatastorePath: datastorePath,

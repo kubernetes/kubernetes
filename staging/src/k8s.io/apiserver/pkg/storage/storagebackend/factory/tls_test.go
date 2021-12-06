@@ -39,8 +39,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -97,15 +99,15 @@ func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 		t.Fatal(err)
 	}
 	certFile = path.Join(tempDir, "etcdcert.pem")
-	if err := ioutil.WriteFile(certFile, []byte(testingcert.CertFileContent), 0644); err != nil {
+	if err := ioutil.WriteFile(certFile, []byte(testingcert.CertFileContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	keyFile = path.Join(tempDir, "etcdkey.pem")
-	if err := ioutil.WriteFile(keyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
+	if err := ioutil.WriteFile(keyFile, []byte(testingcert.KeyFileContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	caFile = path.Join(tempDir, "ca.pem")
-	if err := ioutil.WriteFile(caFile, []byte(testingcert.CAFileContent), 0644); err != nil {
+	if err := ioutil.WriteFile(caFile, []byte(testingcert.CAFileContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return certFile, keyFile, caFile

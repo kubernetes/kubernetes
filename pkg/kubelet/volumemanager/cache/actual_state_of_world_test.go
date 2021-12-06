@@ -109,7 +109,6 @@ func Test_MarkVolumeAsAttached_SuppliedVolumeName_Positive_NewVolume(t *testing.
 
 	// Act
 	err := asw.MarkVolumeAsAttached(volumeName, volumeSpec, "" /* nodeName */, devicePath)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
@@ -761,8 +760,7 @@ func verifyPodExistsInVolumeAsw(
 	expectedVolumeName v1.UniqueVolumeName,
 	expectedDevicePath string,
 	asw ActualStateOfWorld) {
-	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName)
+	podExistsInVolume, devicePath, err := asw.PodExistsInVolume(expectedPodName, expectedVolumeName)
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -803,8 +801,7 @@ func verifyPodDoesntExistInVolumeAsw(
 	volumeToCheck v1.UniqueVolumeName,
 	expectVolumeToExist bool,
 	asw ActualStateOfWorld) {
-	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(podToCheck, volumeToCheck)
+	podExistsInVolume, devicePath, err := asw.PodExistsInVolume(podToCheck, volumeToCheck)
 	if !expectVolumeToExist && err == nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume did not return error. Expected: <error indicating volume does not exist> Actual: <%v>", err)
@@ -833,8 +830,7 @@ func verifyVolumeExistsWithSpecNameInVolumeAsw(
 	expectedPodName volumetypes.UniquePodName,
 	expectedVolumeName string,
 	asw ActualStateOfWorld) {
-	podExistsInVolume :=
-		asw.VolumeExistsWithSpecName(expectedPodName, expectedVolumeName)
+	podExistsInVolume := asw.VolumeExistsWithSpecName(expectedPodName, expectedVolumeName)
 
 	if !podExistsInVolume {
 		t.Fatalf(
@@ -848,8 +844,7 @@ func verifyVolumeDoesntExistWithSpecNameInVolumeAsw(
 	podToCheck volumetypes.UniquePodName,
 	volumeToCheck string,
 	asw ActualStateOfWorld) {
-	podExistsInVolume :=
-		asw.VolumeExistsWithSpecName(podToCheck, volumeToCheck)
+	podExistsInVolume := asw.VolumeExistsWithSpecName(podToCheck, volumeToCheck)
 
 	if podExistsInVolume {
 		t.Fatalf(
@@ -863,8 +858,7 @@ func verifyVolumeSpecNameInVolumeAsw(
 	podToCheck volumetypes.UniquePodName,
 	volumeSpecs []*volume.Spec,
 	asw ActualStateOfWorld) {
-	mountedVolumes :=
-		asw.GetMountedVolumesForPod(podToCheck)
+	mountedVolumes := asw.GetMountedVolumesForPod(podToCheck)
 
 	for i, volume := range mountedVolumes {
 		if volume.InnerVolumeSpecName != volumeSpecs[i].Name() {

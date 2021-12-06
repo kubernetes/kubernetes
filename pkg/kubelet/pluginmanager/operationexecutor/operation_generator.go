@@ -50,7 +50,6 @@ type operationGenerator struct {
 
 // NewOperationGenerator is returns instance of operationGenerator
 func NewOperationGenerator(recorder record.EventRecorder) OperationGenerator {
-
 	return &operationGenerator{
 		recorder: recorder,
 	}
@@ -76,7 +75,6 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
-
 	registerPluginFunc := func() error {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
 		if err != nil {
@@ -136,7 +134,6 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 func (og *operationGenerator) GenerateUnregisterPluginFunc(
 	pluginInfo cache.PluginInfo,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
-
 	unregisterPluginFunc := func() error {
 		if pluginInfo.Handler == nil {
 			return fmt.Errorf("UnregisterPlugin error -- failed to get plugin handler for %s", pluginInfo.SocketPath)
@@ -183,7 +180,6 @@ func dial(unixSocketPath string, timeout time.Duration) (registerapi.Registratio
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
 	)
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %v", unixSocketPath, err)
 	}

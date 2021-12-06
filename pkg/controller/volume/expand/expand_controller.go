@@ -114,8 +114,8 @@ func NewExpandController(
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
 	csiMigratedPluginManager csimigration.PluginManager,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (ExpandController, error) {
-
+	filteredDialOptions *proxyutil.FilteredDialOptions) (ExpandController, error,
+) {
 	expc := &expandController{
 		kubeClient:               kubeClient,
 		cloud:                    cloud,
@@ -361,7 +361,6 @@ func (expc *expandController) runWorker(ctx context.Context) {
 func (expc *expandController) getPersistentVolume(ctx context.Context, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	volumeName := pvc.Spec.VolumeName
 	pv, err := expc.kubeClient.CoreV1().PersistentVolumes().Get(ctx, volumeName, metav1.GetOptions{})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PV %q: %v", volumeName, err)
 	}

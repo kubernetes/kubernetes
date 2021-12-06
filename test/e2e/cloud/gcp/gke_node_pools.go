@@ -28,7 +28,6 @@ import (
 )
 
 var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
-
 	f := framework.NewDefaultFramework("node-pools")
 
 	ginkgo.BeforeEach(func() {

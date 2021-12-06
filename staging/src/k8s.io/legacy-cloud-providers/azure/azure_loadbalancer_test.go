@@ -973,7 +973,6 @@ func TestConvertIPTagMapToSlice(t *testing.T) {
 				ipTagSlice := *c.expected
 				return to.String(ipTagSlice[i].IPTagType) < to.String(ipTagSlice[j].IPTagType)
 			})
-
 		}
 
 		assert.Equal(t, c.expected, actual, "TestCase[%d]: %s", i, c.desc)
@@ -1060,7 +1059,6 @@ func TestGetserviceIPTagRequestForPublicIP(t *testing.T) {
 				ipTagSlice := *c.expected.IPTags
 				return to.String(ipTagSlice[i].IPTagType) < to.String(ipTagSlice[j].IPTagType)
 			})
-
 		}
 
 		assert.Equal(t, actual, c.expected, "TestCase[%d]: %s", i, c.desc)
@@ -2061,7 +2059,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		},
 	}
 
-	//change to false to test that reconciliation will fix it (despite the fact that disable-tcp-reset was removed in 1.20)
+	// change to false to test that reconciliation will fix it (despite the fact that disable-tcp-reset was removed in 1.20)
 	(*slb5.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = to.BoolPtr(false)
 
 	expectedSLb5 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("rg"), to.StringPtr("testCluster"), to.StringPtr("aservice1"), service5, "Standard")
@@ -3040,7 +3038,6 @@ func TestReconcilePublicIP(t *testing.T) {
 					}
 
 					return network.PublicIPAddress{}, &retry.Error{HTTPStatusCode: http.StatusNotFound}
-
 				})
 				deleter := mockPIPsClient.EXPECT().Delete(gomock.Any(), "rg", *pip.Name).Return(nil).AnyTimes()
 				deleter.Do(func(ctx context.Context, resourceGroupName string, publicIPAddressName string) *retry.Error {

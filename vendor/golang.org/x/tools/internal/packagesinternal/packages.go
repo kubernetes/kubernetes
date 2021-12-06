@@ -9,8 +9,10 @@ import (
 	"golang.org/x/tools/internal/gocommand"
 )
 
-var GetForTest = func(p interface{}) string { return "" }
-var GetDepsErrors = func(p interface{}) []*PackageError { return nil }
+var (
+	GetForTest    = func(p interface{}) string { return "" }
+	GetDepsErrors = func(p interface{}) []*PackageError { return nil }
+)
 
 type PackageError struct {
 	ImportStack []string // shortest path from package named on command line to this one
@@ -24,5 +26,7 @@ var SetGoCmdRunner = func(config interface{}, runner *gocommand.Runner) {}
 
 var TypecheckCgo int
 
-var SetModFlag = func(config interface{}, value string) {}
-var SetModFile = func(config interface{}, value string) {}
+var (
+	SetModFlag = func(config interface{}, value string) {}
+	SetModFile = func(config interface{}, value string) {}
+)

@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VirtualMachineScaleSetsClient is the compute Client
@@ -128,25 +129,46 @@ func (client VirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxBatchInstancePercent", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxBatchInstancePercent", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
-								{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxBatchInstancePercent", Name: validation.InclusiveMinimum, Rule: int64(5), Chain: nil},
-							}},
-							{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyInstancePercent", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyInstancePercent", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
-									{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyInstancePercent", Name: validation.InclusiveMinimum, Rule: int64(5), Chain: nil},
-								}},
-							{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyUpgradedInstancePercent", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyUpgradedInstancePercent", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
-									{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyUpgradedInstancePercent", Name: validation.InclusiveMinimum, Rule: int64(0), Chain: nil},
-								}},
-						}},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.VirtualMachineScaleSetProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{
+										Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxBatchInstancePercent", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxBatchInstancePercent", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
+											{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxBatchInstancePercent", Name: validation.InclusiveMinimum, Rule: int64(5), Chain: nil},
+										},
+									},
+									{
+										Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyInstancePercent", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyInstancePercent", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
+											{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyInstancePercent", Name: validation.InclusiveMinimum, Rule: int64(5), Chain: nil},
+										},
+									},
+									{
+										Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyUpgradedInstancePercent", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyUpgradedInstancePercent", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
+											{Target: "parameters.VirtualMachineScaleSetProperties.UpgradePolicy.RollingUpgradePolicy.MaxUnhealthyUpgradedInstancePercent", Name: validation.InclusiveMinimum, Rule: int64(0), Chain: nil},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachineScaleSetsClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -393,8 +415,11 @@ func (client VirtualMachineScaleSetsClient) DeleteInstances(ctx context.Context,
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: VMInstanceIDs,
-			Constraints: []validation.Constraint{{Target: "VMInstanceIDs.InstanceIds", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: VMInstanceIDs,
+			Constraints: []validation.Constraint{{Target: "VMInstanceIDs.InstanceIds", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachineScaleSetsClient", "DeleteInstances", err.Error())
 	}
 
@@ -1934,8 +1959,11 @@ func (client VirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context,
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: VMInstanceIDs,
-			Constraints: []validation.Constraint{{Target: "VMInstanceIDs.InstanceIds", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: VMInstanceIDs,
+			Constraints: []validation.Constraint{{Target: "VMInstanceIDs.InstanceIds", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachineScaleSetsClient", "UpdateInstances", err.Error())
 	}
 

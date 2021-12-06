@@ -5,10 +5,8 @@ import (
 	"time"
 )
 
-var (
-	// weight factor
-	α = 0.125
-)
+// weight factor
+var α = 0.125
 
 type Status interface {
 	Total() int64

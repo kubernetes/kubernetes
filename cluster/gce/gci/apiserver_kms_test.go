@@ -45,9 +45,7 @@ type kubeAPIServerEnv struct {
 }
 
 func TestEncryptionProviderFlag(t *testing.T) {
-	var (
-		encryptionConfigFlag = "--encryption-provider-config"
-	)
+	encryptionConfigFlag := "--encryption-provider-config"
 
 	testCases := []struct {
 		desc                     string
@@ -178,7 +176,7 @@ func TestKMSIntegration(t *testing.T) {
 			c := newManifestTestCase(t, kubeAPIServerManifestFileName, kubeAPIServerStartFuncName, nil)
 			defer c.tearDown()
 
-			var e = kubeAPIServerEnv{
+			e := kubeAPIServerEnv{
 				KubeHome:                     c.kubeHome,
 				KubeAPIServerRunAsUser:       strconv.Itoa(os.Getuid()),
 				EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),

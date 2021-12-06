@@ -835,29 +835,27 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 // See pkg/scheduler/framework/plugins/selectorspread/selector_spread_perf_test.go
 // for the equivalent test.
 
-var (
-	tests = []struct {
-		name            string
-		existingPodsNum int
-		allNodesNum     int
-	}{
-		{
-			name:            "100nodes",
-			existingPodsNum: 1000,
-			allNodesNum:     100,
-		},
-		{
-			name:            "1000nodes",
-			existingPodsNum: 10000,
-			allNodesNum:     1000,
-		},
-		{
-			name:            "5000nodes",
-			existingPodsNum: 50000,
-			allNodesNum:     5000,
-		},
-	}
-)
+var tests = []struct {
+	name            string
+	existingPodsNum int
+	allNodesNum     int
+}{
+	{
+		name:            "100nodes",
+		existingPodsNum: 1000,
+		allNodesNum:     100,
+	},
+	{
+		name:            "1000nodes",
+		existingPodsNum: 10000,
+		allNodesNum:     1000,
+	},
+	{
+		name:            "5000nodes",
+		existingPodsNum: 50000,
+		allNodesNum:     5000,
+	},
+}
 
 func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 	for _, tt := range tests {

@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	defaultPerm = 0755
+	defaultPerm = 0o755
 	tmpTag      = "tmp_" // additional prefix to prevent accidental collisions
 )
 

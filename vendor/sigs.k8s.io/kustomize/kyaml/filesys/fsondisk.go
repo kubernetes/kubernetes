@@ -26,12 +26,12 @@ func (fsOnDisk) Create(name string) (File, error) { return os.Create(name) }
 
 // Mkdir delegates to os.Mkdir.
 func (fsOnDisk) Mkdir(name string) error {
-	return os.Mkdir(name, 0777|os.ModeDir)
+	return os.Mkdir(name, 0o777|os.ModeDir)
 }
 
 // MkdirAll delegates to os.MkdirAll.
 func (fsOnDisk) MkdirAll(name string) error {
-	return os.MkdirAll(name, 0777|os.ModeDir)
+	return os.MkdirAll(name, 0o777|os.ModeDir)
 }
 
 // RemoveAll delegates to os.RemoveAll.
@@ -128,7 +128,7 @@ func (fsOnDisk) ReadFile(name string) ([]byte, error) { return ioutil.ReadFile(n
 
 // WriteFile delegates to ioutil.WriteFile with read/write permissions.
 func (fsOnDisk) WriteFile(name string, c []byte) error {
-	return ioutil.WriteFile(name, c, 0666)
+	return ioutil.WriteFile(name, c, 0o666)
 }
 
 // Walk delegates to filepath.Walk.

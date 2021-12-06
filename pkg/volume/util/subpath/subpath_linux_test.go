@@ -35,8 +35,8 @@ import (
 )
 
 func TestSafeMakeDir(t *testing.T) {
-	defaultPerm := os.FileMode(0750) + os.ModeDir
-	maxPerm := os.FileMode(0777) + os.ModeDir
+	defaultPerm := os.FileMode(0o750) + os.ModeDir
+	maxPerm := os.FileMode(0o777) + os.ModeDir
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -74,7 +74,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"test/directory",
-			os.FileMode(0777) + os.ModeDir + os.ModeSetgid,
+			os.FileMode(0o777) + os.ModeDir + os.ModeSetgid,
 			false,
 		},
 		{
@@ -84,7 +84,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"test/directory",
-			os.FileMode(0777) + os.ModeDir + os.ModeSetuid,
+			os.FileMode(0o777) + os.ModeDir + os.ModeSetuid,
 			false,
 		},
 		{
@@ -94,13 +94,13 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"test/directory",
-			os.FileMode(0777) + os.ModeDir + os.ModeSticky,
+			os.FileMode(0o777) + os.ModeDir + os.ModeSticky,
 			false,
 		},
 		{
 			"directory-exists",
 			func(base string) error {
-				return os.MkdirAll(filepath.Join(base, "test/directory"), 0750)
+				return os.MkdirAll(filepath.Join(base, "test/directory"), 0o750)
 			},
 			"test/directory",
 			"test/directory",
@@ -295,7 +295,7 @@ func TestSafeMakeDir(t *testing.T) {
 }
 
 func TestRemoveEmptyDirs(t *testing.T) {
-	defaultPerm := os.FileMode(0750)
+	defaultPerm := os.FileMode(0o750)
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -409,7 +409,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 }
 
 func TestCleanSubPaths(t *testing.T) {
-	defaultPerm := os.FileMode(0750)
+	defaultPerm := os.FileMode(0o750)
 	testVol := "vol1"
 
 	tests := []struct {
@@ -662,7 +662,7 @@ func getTestPaths(base string) (string, string) {
 }
 
 func TestBindSubPath(t *testing.T) {
-	defaultPerm := os.FileMode(0750)
+	defaultPerm := os.FileMode(0o750)
 
 	tests := []struct {
 		name string
@@ -922,8 +922,8 @@ func TestBindSubPath(t *testing.T) {
 }
 
 func TestSubpath_PrepareSafeSubpath(t *testing.T) {
-	//complete code
-	defaultPerm := os.FileMode(0750)
+	// complete code
+	defaultPerm := os.FileMode(0o750)
 
 	tests := []struct {
 		name string
@@ -1059,7 +1059,7 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 }
 
 func TestSafeOpen(t *testing.T) {
-	defaultPerm := os.FileMode(0750)
+	defaultPerm := os.FileMode(0o750)
 
 	tests := []struct {
 		name string
@@ -1080,7 +1080,7 @@ func TestSafeOpen(t *testing.T) {
 		{
 			"directory-exists",
 			func(base string) error {
-				return os.MkdirAll(filepath.Join(base, "test/directory"), 0750)
+				return os.MkdirAll(filepath.Join(base, "test/directory"), 0o750)
 			},
 			"test/directory",
 			false,
@@ -1096,7 +1096,7 @@ func TestSafeOpen(t *testing.T) {
 		{
 			"escape-base-using-dots-2",
 			func(base string) error {
-				return os.MkdirAll(filepath.Join(base, "test"), 0750)
+				return os.MkdirAll(filepath.Join(base, "test"), 0o750)
 			},
 			"test/../../..",
 			true,
@@ -1261,7 +1261,7 @@ func createSocketFile(socketDir string) (string, error) {
 }
 
 func TestFindExistingPrefix(t *testing.T) {
-	defaultPerm := os.FileMode(0750)
+	defaultPerm := os.FileMode(0o750)
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -1285,7 +1285,7 @@ func TestFindExistingPrefix(t *testing.T) {
 		{
 			"directory-exists",
 			func(base string) error {
-				return os.MkdirAll(filepath.Join(base, "test/directory"), 0750)
+				return os.MkdirAll(filepath.Join(base, "test/directory"), 0o750)
 			},
 			"test/directory",
 			"test/directory",

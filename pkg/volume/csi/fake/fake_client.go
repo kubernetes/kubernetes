@@ -210,11 +210,11 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 	// "Creation of target_path is the responsibility of the SP."
 	// Our plugin depends on it.
 	if req.VolumeCapability.GetBlock() != nil {
-		if err := ioutil.WriteFile(req.TargetPath, []byte{}, 0644); err != nil {
+		if err := ioutil.WriteFile(req.TargetPath, []byte{}, 0o644); err != nil {
 			return nil, fmt.Errorf("cannot create target path %s for block file: %s", req.TargetPath, err)
 		}
 	} else {
-		if err := os.MkdirAll(req.TargetPath, 0755); err != nil {
+		if err := os.MkdirAll(req.TargetPath, 0o755); err != nil {
 			return nil, fmt.Errorf("cannot create target directory %s for mount: %s", req.TargetPath, err)
 		}
 	}

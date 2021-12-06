@@ -27,7 +27,6 @@ type SourceLocations interface {
 	// returning the first location if multiple exist for the same path.
 	// If no location exists for this descriptor, it returns the zero value.
 	ByDescriptor(desc Descriptor) SourceLocation
-
 	doNotImplement
 }
 

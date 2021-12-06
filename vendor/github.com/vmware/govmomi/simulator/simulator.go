@@ -190,7 +190,7 @@ func (s *Service) call(ctx *Context, method *Method) soap.HasFault {
 			d += int(rand.NormFloat64() * s.delay.DelayJitter * float64(d))
 		}
 		if d > 0 {
-			//fmt.Printf("Delaying method %s %d ms\n", name, d)
+			// fmt.Printf("Delaying method %s %d ms\n", name, d)
 			time.Sleep(time.Duration(d) * time.Millisecond)
 		}
 	}
@@ -487,7 +487,7 @@ func (s *Service) ServeDatastore(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case "PUT":
 		dir := path.Dir(p)
-		_ = os.MkdirAll(dir, 0700)
+		_ = os.MkdirAll(dir, 0o700)
 
 		f, err := os.Create(p)
 		if err != nil {
@@ -712,9 +712,7 @@ func (s *Server) Close() {
 	}
 }
 
-var (
-	vim25MapType = types.TypeFunc()
-)
+var vim25MapType = types.TypeFunc()
 
 func defaultMapType(name string) (reflect.Type, bool) {
 	typ, ok := vim25MapType(name)

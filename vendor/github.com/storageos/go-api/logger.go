@@ -8,14 +8,11 @@ import (
 	"github.com/storageos/go-api/types"
 )
 
-var (
-	// LoggerAPIPrefix is a partial path to the HTTP endpoint.
-	LoggerAPIPrefix = "logs"
-)
+// LoggerAPIPrefix is a partial path to the HTTP endpoint.
+var LoggerAPIPrefix = "logs"
 
 // LoggerConfig returns every cluster node's logging configuration.
 func (c *Client) LoggerConfig(opts types.ListOptions) ([]*types.Logger, error) {
-
 	listOpts := doOptions{
 		fieldSelector: opts.FieldSelector,
 		labelSelector: opts.LabelSelector,
@@ -38,14 +35,12 @@ func (c *Client) LoggerConfig(opts types.ListOptions) ([]*types.Logger, error) {
 		return nil, err
 	}
 	return loggers, nil
-
 }
 
 // LoggerUpdate patches updates to logging configuration.  Fields to update must
 // be listed in the Fields value, and if a list of Nodes is given it will only
 // apply to the nodes listed.  Returns the updated configuration.
 func (c *Client) LoggerUpdate(opts types.LoggerUpdateOptions) ([]*types.Logger, error) {
-
 	resp, err := c.do("PATCH", LoggerAPIPrefix+"/cluster/config", doOptions{
 		data:    opts,
 		context: context.Background(),

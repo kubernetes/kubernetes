@@ -86,7 +86,6 @@ func TestJSONFormatRegister(t *testing.T) {
 			errs := o.ValidateAndApply()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
-
 			}
 		})
 	}

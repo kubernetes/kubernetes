@@ -52,16 +52,20 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const execInfoEnv = "KUBERNETES_EXEC_INFO"
-const installHintVerboseHelp = `
+const (
+	execInfoEnv            = "KUBERNETES_EXEC_INFO"
+	installHintVerboseHelp = `
 
 It looks like you are trying to use a client-go credential plugin that is not installed.
 
 To learn more about this feature, consult the documentation available at:
       https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins`
+)
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 func init() {
 	install.Install(scheme)

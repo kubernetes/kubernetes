@@ -24,9 +24,7 @@ import (
 	"github.com/vmware/govmomi/vim25"
 )
 
-var (
-	siteID = "vcsim"
-)
+var siteID = "vcsim"
 
 // registrationInfo returns a ServiceRegistration populated with vcsim's OptionManager settings.
 // The complete list can be captured using: govc sso.service.ls -dump

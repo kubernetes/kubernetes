@@ -6,10 +6,8 @@ import (
 	"time"
 )
 
-var (
-	// std is the name of the standard logger in stdlib `log`
-	std = New()
-)
+// std is the name of the standard logger in stdlib `log`
+var std = New()
 
 func StandardLogger() *Logger {
 	return std

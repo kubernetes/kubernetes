@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 // Public API specification for libseccomp Go bindings

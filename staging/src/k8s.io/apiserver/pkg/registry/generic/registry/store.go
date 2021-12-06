@@ -223,8 +223,11 @@ type Store struct {
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
-var _ rest.TableConvertor = &Store{}
-var _ GenericStore = &Store{}
+
+var (
+	_ rest.TableConvertor = &Store{}
+	_ GenericStore        = &Store{}
+)
 
 const (
 	OptimisticLockErrorMsg        = "the object has been modified; please apply your changes to the latest version and try again"

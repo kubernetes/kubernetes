@@ -28,8 +28,7 @@ import (
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
-	successCase :=
-		`/dev/0 /path/to/0 type0 flags 0 0
+	successCase := `/dev/0 /path/to/0 type0 flags 0 0
 /dev/1    /path/to/1   type1	flags 1 1
 /dev/2 /path/to/2 type2 flags,1,2=3 2 2
 `
@@ -140,10 +139,14 @@ func setEquivalent(set1, set2 []string) bool {
 func TestGetDeviceNameFromMount(t *testing.T) {
 	fm := NewFakeMounter(
 		[]MountPoint{
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/111"},
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/222"},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/111",
+			},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/222",
+			},
 		})
 
 	tests := []struct {
@@ -195,7 +198,6 @@ func TestGetMountRefsByDev(t *testing.T) {
 	}
 
 	for i, test := range tests {
-
 		if refs, err := getMountRefsByDev(fm, test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
 			t.Errorf("%d. getMountRefsByDev(%q) = %v, %v; expected %v, nil", i, test.mountPath, refs, err, test.expectedRefs)
 		}
@@ -286,7 +288,6 @@ func TestPathWithinBase(t *testing.T) {
 		if PathWithinBase(test.fullPath, test.basePath) != test.expected {
 			t.Errorf("test %q failed: expected %v", test.name, test.expected)
 		}
-
 	}
 }
 
@@ -414,8 +415,10 @@ func TestSearchMountPoints(t *testing.T) {
 62 25 7:1 / /var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 95 25 7:1 / /var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 `,
-			[]string{"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
-				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test"},
+			[]string{
+				"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+			},
 			nil,
 		},
 	}
@@ -451,7 +454,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 		mountFlags       []string
 	}{
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -460,7 +462,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -469,7 +470,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -478,7 +478,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",

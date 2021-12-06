@@ -11,7 +11,7 @@ type GomegaFailWrapper struct {
 	TWithHelper TWithHelper
 }
 
-//A simple *testing.T interface wrapper
+// A simple *testing.T interface wrapper
 type GomegaTestingT interface {
 	Fatalf(format string, args ...interface{})
 }

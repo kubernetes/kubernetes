@@ -180,7 +180,7 @@ func (e *transformTest) createEncryptionConfig() (string, error) {
 
 	encryptionConfig := path.Join(tempDir, encryptionConfigFileName)
 
-	if err := ioutil.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0644); err != nil {
+	if err := ioutil.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0o644); err != nil {
 		os.RemoveAll(tempDir)
 		return "", fmt.Errorf("error while writing encryption config: %v", err)
 	}

@@ -40,8 +40,10 @@ type SelectorSpread struct {
 	statefulSets           appslisters.StatefulSetLister
 }
 
-var _ framework.PreScorePlugin = &SelectorSpread{}
-var _ framework.ScorePlugin = &SelectorSpread{}
+var (
+	_ framework.PreScorePlugin = &SelectorSpread{}
+	_ framework.ScorePlugin    = &SelectorSpread{}
+)
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

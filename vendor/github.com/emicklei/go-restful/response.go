@@ -14,7 +14,7 @@ import (
 // DefaultResponseMimeType is DEPRECATED, use DefaultResponseContentType(mime)
 var DefaultResponseMimeType string
 
-//PrettyPrintResponses controls the indentation feature of XML and JSON serialization
+// PrettyPrintResponses controls the indentation feature of XML and JSON serialization
 var PrettyPrintResponses = true
 
 // Response is a wrapper on the actual http ResponseWriter

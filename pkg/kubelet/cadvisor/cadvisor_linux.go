@@ -56,9 +56,12 @@ var _ Interface = new(cadvisorClient)
 // TODO(vmarmol): Make configurable.
 // The amount of time for which to keep stats in memory.
 const statsCacheDuration = 2 * time.Minute
-const maxHousekeepingInterval = 15 * time.Second
-const defaultHousekeepingInterval = 10 * time.Second
-const allowDynamicHousekeeping = true
+
+const (
+	maxHousekeepingInterval     = 15 * time.Second
+	defaultHousekeepingInterval = 10 * time.Second
+	allowDynamicHousekeeping    = true
+)
 
 func init() {
 	// Override cAdvisor flag defaults.
@@ -116,7 +119,7 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 
 	if _, err := os.Stat(rootPath); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(path.Clean(rootPath), 0750); err != nil {
+			if err := os.MkdirAll(path.Clean(rootPath), 0o750); err != nil {
 				return nil, fmt.Errorf("error creating root directory %q: %v", rootPath, err)
 			}
 		} else {

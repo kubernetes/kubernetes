@@ -287,8 +287,8 @@ func (o *ReconcileOptions) printResults(object runtime.Object,
 	missingSubjects, extraSubjects []rbacv1.Subject,
 	missingRules, extraRules []rbacv1.PolicyRule,
 	operation reconciliation.ReconcileOperation,
-	protected bool) {
-
+	protected bool,
+) {
 	o.PrintObject(object, o.Out)
 
 	caveat := ""

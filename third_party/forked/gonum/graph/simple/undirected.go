@@ -87,7 +87,6 @@ func (g *UndirectedGraph) RemoveNode(n graph.Node) {
 
 	g.freeIDs.Insert(n.ID())
 	g.usedIDs.Remove(n.ID())
-
 }
 
 // SetEdge adds e, an edge from one node to another. If the nodes do not exist, they are added.

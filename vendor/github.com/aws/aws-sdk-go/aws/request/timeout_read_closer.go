@@ -74,15 +74,15 @@ func adaptToResponseTimeoutError(req *Request) {
 //     svc.PutObjectWithContext(ctx, params, request.WithTimeoutReadCloser(30 * time.Second)
 func WithResponseReadTimeout(duration time.Duration) Option {
 	return func(r *Request) {
-
-		var timeoutHandler = NamedHandler{
+		timeoutHandler := NamedHandler{
 			HandlerResponseTimeout,
 			func(req *Request) {
 				req.HTTPResponse.Body = &timeoutReadCloser{
 					reader:   req.HTTPResponse.Body,
 					duration: duration,
 				}
-			}}
+			},
+		}
 
 		// remove the handler so we are not stomping over any new durations.
 		r.Handlers.Send.RemoveByName(HandlerResponseTimeout)

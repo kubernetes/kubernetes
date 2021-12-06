@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // PacketCapturesClient is the network Client
@@ -49,11 +50,17 @@ func (client PacketCapturesClient) Create(ctx context.Context, resourceGroupName
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.PacketCaptureParameters", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.PacketCaptureParameters.Target", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.PacketCaptureParameters", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{
+					{Target: "parameters.PacketCaptureParameters.Target", Name: validation.Null, Rule: true, Chain: nil},
 					{Target: "parameters.PacketCaptureParameters.StorageLocation", Name: validation.Null, Rule: true, Chain: nil},
-				}}}}}); err != nil {
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.PacketCapturesClient", "Create", err.Error())
 	}
 

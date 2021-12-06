@@ -211,7 +211,6 @@ metric output does not match expectation; want:
 got:
 
 %s`, wantBuf.String(), gotBuf.String())
-
 	}
 	return nil
 }

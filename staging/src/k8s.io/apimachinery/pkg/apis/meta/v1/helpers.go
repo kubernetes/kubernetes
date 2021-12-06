@@ -270,7 +270,7 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 	meta.SetOwnerReferences(existingMeta.GetOwnerReferences())
 	// managedFields must be preserved since it's been modified to
 	// track changed fields in the status update.
-	//meta.SetManagedFields(existingMeta.GetManagedFields())
+	// meta.SetManagedFields(existingMeta.GetManagedFields())
 }
 
 // MarshalJSON implements json.Marshaler
@@ -294,5 +294,7 @@ func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-var _ json.Marshaler = FieldsV1{}
-var _ json.Unmarshaler = &FieldsV1{}
+var (
+	_ json.Marshaler   = FieldsV1{}
+	_ json.Unmarshaler = &FieldsV1{}
+)

@@ -93,7 +93,6 @@ func (h *Handle) getNetNsId(attrType int, val uint32) (int, error) {
 	req.AddData(attr)
 
 	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWNSID)
-
 	if err != nil {
 		return 0, err
 	}

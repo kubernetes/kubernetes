@@ -7,10 +7,8 @@ import (
 // StaticProviderName provides a name of Static provider
 const StaticProviderName = "StaticProvider"
 
-var (
-	// ErrStaticCredentialsEmpty is emitted when static credentials are empty.
-	ErrStaticCredentialsEmpty = awserr.New("EmptyStaticCreds", "static credentials are empty", nil)
-)
+// ErrStaticCredentialsEmpty is emitted when static credentials are empty.
+var ErrStaticCredentialsEmpty = awserr.New("EmptyStaticCreds", "static credentials are empty", nil)
 
 // A StaticProvider is a set of credentials which are set programmatically,
 // and will never expire.

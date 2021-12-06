@@ -59,7 +59,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 		return &c
 	}
 
-	var schemaWithValidationExpression = unmarshallSchema([]byte(`{
+	schemaWithValidationExpression := unmarshallSchema([]byte(`{
 	   "type":"object",
 	   "properties":{
 		  "spec":{
@@ -144,7 +144,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 
 	ginkgo.It("MUST fail create of a custom resource definition that contains a x-kubernetes-validator rule that refers to a property that do not exist", func() {
 		ginkgo.By("Defining a custom resource definition with a validation rule that refers to a property that do not exist")
-		var schemaWithInvalidValidationRule = unmarshallSchema([]byte(`{
+		schemaWithInvalidValidationRule := unmarshallSchema([]byte(`{
 		   "type":"object",
 		   "properties":{
 			  "spec":{

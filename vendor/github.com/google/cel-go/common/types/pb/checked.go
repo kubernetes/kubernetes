@@ -39,7 +39,8 @@ var (
 		protoreflect.Fixed64Kind:  checkedUint,
 		protoreflect.Sfixed32Kind: checkedInt,
 		protoreflect.Sfixed64Kind: checkedInt,
-		protoreflect.StringKind:   checkedString}
+		protoreflect.StringKind:   checkedString,
+	}
 
 	// CheckedWellKnowns map from qualified proto type name to expr.Type for
 	// well-known proto types.
@@ -81,13 +82,20 @@ var (
 	// Json-based type equivalents.
 	checkedNull = &exprpb.Type{
 		TypeKind: &exprpb.Type_Null{
-			Null: structpb.NullValue_NULL_VALUE}}
+			Null: structpb.NullValue_NULL_VALUE,
+		},
+	}
 	checkedListDyn = &exprpb.Type{
 		TypeKind: &exprpb.Type_ListType_{
-			ListType: &exprpb.Type_ListType{ElemType: checkedDyn}}}
+			ListType: &exprpb.Type_ListType{ElemType: checkedDyn},
+		},
+	}
 	checkedMapStringDyn = &exprpb.Type{
 		TypeKind: &exprpb.Type_MapType_{
 			MapType: &exprpb.Type_MapType{
 				KeyType:   checkedString,
-				ValueType: checkedDyn}}}
+				ValueType: checkedDyn,
+			},
+		},
+	}
 )

@@ -251,14 +251,11 @@ func dummySetFSInfo(path string) {
 	}
 }
 
-type VolumeProvider1 struct {
-}
+type VolumeProvider1 struct{}
 
-type VolumeProvider2 struct {
-}
+type VolumeProvider2 struct{}
 
-type testVolumeQuota struct {
-}
+type testVolumeQuota struct{}
 
 func logAllMaps(where string) {
 	fmt.Printf("Maps at %s\n", where)
@@ -309,8 +306,10 @@ func logAllMaps(where string) {
 	fmt.Printf("End maps %s\n", where)
 }
 
-var testIDQuotaMap = make(map[common.QuotaID]string)
-var testQuotaIDMap = make(map[string]common.QuotaID)
+var (
+	testIDQuotaMap = make(map[common.QuotaID]string)
+	testQuotaIDMap = make(map[string]common.QuotaID)
+)
 
 func (*VolumeProvider1) GetQuotaApplier(mountpoint string, backingDev string) common.LinuxVolumeQuotaApplier {
 	if strings.HasPrefix(mountpoint, "/quota1") {

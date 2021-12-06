@@ -45,8 +45,8 @@ func extractHostFromPath(pathStr string) string {
 	return extractHostFromHostPort(path.Base(pathStr))
 }
 
-//mustSplit2 returns the values from strings.SplitN(s, sep, 2).
-//If sep is not found, it returns ("", "", false) instead.
+// mustSplit2 returns the values from strings.SplitN(s, sep, 2).
+// If sep is not found, it returns ("", "", false) instead.
 func mustSplit2(s, sep string) (string, string) {
 	spl := strings.SplitN(s, sep, 2)
 	if len(spl) < 2 {

@@ -77,7 +77,6 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 
 // CreateServiceAccount creates the necessary serviceaccounts that kubeadm uses/might use, if they don't already exist.
 func CreateServiceAccount(client clientset.Interface) error {
-
 	return apiclient.CreateOrUpdateServiceAccount(client, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      KubeProxyServiceAccountName,

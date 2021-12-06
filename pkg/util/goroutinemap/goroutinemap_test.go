@@ -49,7 +49,6 @@ func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 
 	// Act
 	err := grm.Run(operationName, operation)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)
@@ -85,7 +84,6 @@ func Test_NewGoRoutineMap_Positive_SingleOpWithExpBackoff(t *testing.T) {
 
 	// Act
 	err := grm.Run(operationName, operation)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("NewGoRoutine failed. Expected: <no error> Actual: <%v>", err)

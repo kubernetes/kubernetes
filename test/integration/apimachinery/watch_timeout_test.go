@@ -90,7 +90,6 @@ func TestWebsocketWatchClientTimeout(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			u, _ := url.Parse(s.URL)
 			apiURL := "ws://" + u.Host + tc.path
 			wsc, err := websocket.NewConfig(apiURL, apiURL)

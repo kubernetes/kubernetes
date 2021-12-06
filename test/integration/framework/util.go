@@ -215,7 +215,6 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 			}
 			return false
 		}
-
 	}
 	if !silent {
 		klog.Infof("Couldn't find condition %v on node %v", conditionType, node.Name)

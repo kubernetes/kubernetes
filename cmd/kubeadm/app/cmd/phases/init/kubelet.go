@@ -29,12 +29,10 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 )
 
-var (
-	kubeletStartPhaseExample = cmdutil.Examples(`
+var kubeletStartPhaseExample = cmdutil.Examples(`
 		# Writes a dynamic environment file with kubelet flags from a InitConfiguration file.
 		kubeadm init phase kubelet-start --config config.yaml
 		`)
-)
 
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
 func NewKubeletStartPhase() workflow.Phase {

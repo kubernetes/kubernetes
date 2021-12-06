@@ -129,7 +129,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 	// bindPathTarget is in /var/lib/kubelet and thus reachable without any
 	// translation even to containerized kubelet.
 	bindParent := filepath.Dir(bindPathTarget)
-	err = os.MkdirAll(bindParent, 0750)
+	err = os.MkdirAll(bindParent, 0o750)
 	if err != nil && !os.IsExist(err) {
 		return false, "", fmt.Errorf("error creating directory %s: %s", bindParent, err)
 	}
@@ -140,7 +140,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 	}
 
 	if t.Mode()&os.ModeDir > 0 {
-		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
+		if err = os.Mkdir(bindPathTarget, 0o750); err != nil && !os.IsExist(err) {
 			return false, "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
 		}
 	} else {
@@ -148,7 +148,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		// A file is enough for all possible targets (symlink, device, pipe,
 		// socket, ...), bind-mounting them into a file correctly changes type
 		// of the target file.
-		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0o640); err != nil {
 			return false, "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
 		}
 	}

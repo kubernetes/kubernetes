@@ -422,7 +422,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 type fakeQueue struct {
@@ -547,13 +546,17 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
 			jobs: []runtime.Object{
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
-				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+					Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}},
+				}},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
 			},
 			expected: []*batchv1.Job{
-				{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+				{ObjectMeta: metav1.ObjectMeta{
+					Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}},
+				}},
 			},
 		},
 		{

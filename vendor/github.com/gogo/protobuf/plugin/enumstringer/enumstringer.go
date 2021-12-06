@@ -96,7 +96,6 @@ func (p *enumstringer) Generate(file *generator.FileDescriptor) {
 	if !p.atleastOne {
 		return
 	}
-
 }
 
 func init() {

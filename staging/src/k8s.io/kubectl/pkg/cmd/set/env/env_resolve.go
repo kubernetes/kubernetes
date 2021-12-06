@@ -62,7 +62,6 @@ func getSecretRefValue(client kubernetes.Interface, namespace string, store *Res
 		return string(data), nil
 	}
 	return "", fmt.Errorf("key %s not found in secret %s", secretSelector.Key, secretSelector.Name)
-
 }
 
 // getConfigMapRefValue returns the value of a configmap in the supplied namespace

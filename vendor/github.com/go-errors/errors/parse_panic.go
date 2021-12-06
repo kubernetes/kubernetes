@@ -31,12 +31,10 @@ func ParsePanic(text string) (*Error, error) {
 			} else {
 				return nil, Errorf("bugsnag.panicParser: Invalid line (no prefix): %s", line)
 			}
-
 		} else if state == "seek" {
 			if strings.HasPrefix(line, "goroutine ") && strings.HasSuffix(line, "[running]:") {
 				state = "parsing"
 			}
-
 		} else if state == "parsing" {
 			if line == "" {
 				state = "done"

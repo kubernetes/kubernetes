@@ -310,8 +310,10 @@ func (macvtap Macvtap) Type() string {
 	return "macvtap"
 }
 
-type TuntapMode uint16
-type TuntapFlag uint16
+type (
+	TuntapMode uint16
+	TuntapFlag uint16
+)
 
 // Tuntap links created via /dev/tun/tap, but can be destroyed via netlink
 type Tuntap struct {
@@ -506,6 +508,7 @@ var bondModeToString = map[BondMode]string{
 	BOND_MODE_BALANCE_TLB:   "balance-tlb",
 	BOND_MODE_BALANCE_ALB:   "balance-alb",
 }
+
 var StringToBondModeMap = map[string]BondMode{
 	"balance-rr":    BOND_MODE_BALANCE_RR,
 	"active-backup": BOND_MODE_ACTIVE_BACKUP,
@@ -593,6 +596,7 @@ var bondXmitHashPolicyToString = map[BondXmitHashPolicy]string{
 	BOND_XMIT_HASH_POLICY_ENCAP2_3: "encap2+3",
 	BOND_XMIT_HASH_POLICY_ENCAP3_4: "encap3+4",
 }
+
 var StringToBondXmitHashPolicyMap = map[string]BondXmitHashPolicy{
 	"layer2":   BOND_XMIT_HASH_POLICY_LAYER2,
 	"layer3+4": BOND_XMIT_HASH_POLICY_LAYER3_4,
@@ -632,6 +636,7 @@ var bondLacpRateToString = map[BondLacpRate]string{
 	BOND_LACP_RATE_SLOW: "slow",
 	BOND_LACP_RATE_FAST: "fast",
 }
+
 var StringToBondLacpRateMap = map[string]BondLacpRate{
 	"slow": BOND_LACP_RATE_SLOW,
 	"fast": BOND_LACP_RATE_FAST,

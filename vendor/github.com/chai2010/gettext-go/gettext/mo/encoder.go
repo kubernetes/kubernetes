@@ -51,8 +51,8 @@ func encodeData(hdr *moHeader, f *File) []byte {
 	sort.Sort(byMessages(msgList))
 
 	var buf bytes.Buffer
-	var msgIdPosList = make([]moStrPos, len(msgList))
-	var msgStrPosList = make([]moStrPos, len(msgList))
+	msgIdPosList := make([]moStrPos, len(msgList))
+	msgStrPosList := make([]moStrPos, len(msgList))
 	for i, v := range msgList {
 		// write msgid
 		msgId := encodeMsgId(v)
@@ -107,6 +107,7 @@ type byMessages []Message
 func (d byMessages) Len() int {
 	return len(d)
 }
+
 func (d byMessages) Less(i, j int) bool {
 	if a, b := d[i].MsgContext, d[j].MsgContext; a != b {
 		return a < b
@@ -119,6 +120,7 @@ func (d byMessages) Less(i, j int) bool {
 	}
 	return false
 }
+
 func (d byMessages) Swap(i, j int) {
 	d[i], d[j] = d[j], d[i]
 }

@@ -18,7 +18,7 @@ func Each(array []interface{}, iterator Iterator) {
 
 // Map iterates over the slice and apply ResultIterator to every item. Returns new slice as a result.
 func Map(array []interface{}, iterator ResultIterator) []interface{} {
-	var result = make([]interface{}, len(array))
+	result := make([]interface{}, len(array))
 	for index, data := range array {
 		result[index] = iterator(data, index)
 	}
@@ -37,7 +37,7 @@ func Find(array []interface{}, iterator ConditionIterator) interface{} {
 
 // Filter iterates over the slice and apply ConditionIterator to every item. Returns new slice.
 func Filter(array []interface{}, iterator ConditionIterator) []interface{} {
-	var result = make([]interface{}, 0)
+	result := make([]interface{}, 0)
 	for index, data := range array {
 		if iterator(data, index) {
 			result = append(result, data)

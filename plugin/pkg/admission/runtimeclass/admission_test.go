@@ -159,7 +159,6 @@ func TestSetOverhead(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			attrs := admission.NewAttributesRecord(tc.pod, nil, core.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
 			errs := setOverhead(attrs, tc.pod, tc.runtimeClass)
@@ -512,7 +511,6 @@ func TestValidate(t *testing.T) {
 	o := NewObjectInterfacesForTest()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			attrs := admission.NewAttributesRecord(tc.pod, nil, core.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
 			errs := rt.Validate(context.TODO(), attrs, o)

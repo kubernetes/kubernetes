@@ -37,7 +37,6 @@ func TestIPVar(t *testing.T) {
 		expectErr bool
 		expectVal string
 	}{
-
 		{
 			argc:      "blah --ip=1.2.3.4",
 			expectVal: "1.2.3.4",
@@ -85,7 +84,6 @@ func TestIPPortVar(t *testing.T) {
 		expectErr bool
 		expectVal string
 	}{
-
 		{
 			desc:      "valid ipv4 1",
 			argc:      "blah --ipport=0.0.0.0",
@@ -345,5 +343,4 @@ func TestTaintsVar(t *testing.T) {
 			t.Errorf("[%v] unexpected taints:\n\texpected:\n\t\t%#v\n\tgot:\n\t\t%#v", i, c.t, taints)
 		}
 	}
-
 }

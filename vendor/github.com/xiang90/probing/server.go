@@ -10,8 +10,7 @@ func NewHandler() http.Handler {
 	return &httpHealth{}
 }
 
-type httpHealth struct {
-}
+type httpHealth struct{}
 
 type Health struct {
 	OK  bool

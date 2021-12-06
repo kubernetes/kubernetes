@@ -6,8 +6,7 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
-type SucceedMatcher struct {
-}
+type SucceedMatcher struct{}
 
 func (matcher *SucceedMatcher) Match(actual interface{}) (success bool, err error) {
 	// is purely nil?

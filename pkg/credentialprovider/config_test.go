@@ -30,7 +30,7 @@ func TestReadDockerConfigFile(t *testing.T) {
 	configJSONFileName := "config.json"
 	var fileInfo *os.File
 
-	//test dockerconfig json
+	// test dockerconfig json
 	inputDockerconfigJSONFile := "{ \"auths\": { \"http://foo.example.com\":{\"auth\":\"Zm9vOmJhcgo=\",\"email\":\"foo@example.com\"}}}"
 
 	preferredPath, err := ioutil.TempDir("", "test_foo_bar_dockerconfigjson_")
@@ -45,8 +45,8 @@ func TestReadDockerConfigFile(t *testing.T) {
 	}
 
 	if _, err := os.Stat(absDockerConfigFileLocation); os.IsNotExist(err) {
-		//create test cfg file
-		fileInfo, err = os.OpenFile(absDockerConfigFileLocation, os.O_CREATE|os.O_RDWR, 0664)
+		// create test cfg file
+		fileInfo, err = os.OpenFile(absDockerConfigFileLocation, os.O_CREATE|os.O_RDWR, 0o664)
 		if err != nil {
 			t.Fatalf("While trying to create file %s: %v", absDockerConfigFileLocation, err)
 		}
@@ -62,6 +62,7 @@ func TestReadDockerConfigFile(t *testing.T) {
 		t.Errorf("Getting docker config file fail : %v preferredPath : %q", err, preferredPath)
 	}
 }
+
 func TestDockerConfigJsonJSONDecode(t *testing.T) {
 	// Fake values for testing.
 	input := []byte(`{"auths": {"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}}`)

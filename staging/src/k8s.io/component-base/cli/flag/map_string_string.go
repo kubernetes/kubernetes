@@ -98,7 +98,6 @@ func (m *MapStringString) Set(value string) error {
 	v := strings.TrimSpace(arr[1])
 	(*m.Map)[k] = v
 	return nil
-
 }
 
 // Type implements github.com/spf13/pflag.Value

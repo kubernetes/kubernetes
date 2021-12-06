@@ -95,14 +95,18 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 	}
 	now := metav1.Now()
 	oldNamespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10", DeletionTimestamp: &now,
-			Labels: map[string]string{v1.LabelMetadataName: "foo"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo", ResourceVersion: "10", DeletionTimestamp: &now,
+			Labels: map[string]string{v1.LabelMetadataName: "foo"},
+		},
 		Spec:   api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes"}},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now,
-			Labels: map[string]string{v1.LabelMetadataName: "foo"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now,
+			Labels: map[string]string{v1.LabelMetadataName: "foo"},
+		},
 		Status: api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
 	StatusStrategy.PrepareForUpdate(ctx, namespace, oldNamespace)
@@ -130,14 +134,18 @@ func TestNamespaceFinalizeStrategy(t *testing.T) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	oldNamespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10",
-			Labels: map[string]string{v1.LabelMetadataName: "foo"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo", ResourceVersion: "10",
+			Labels: map[string]string{v1.LabelMetadataName: "foo"},
+		},
 		Spec:   api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes", "example.com/org"}},
 		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "9",
-			Labels: map[string]string{v1.LabelMetadataName: "foo"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo", ResourceVersion: "9",
+			Labels: map[string]string{v1.LabelMetadataName: "foo"},
+		},
 		Spec:   api.NamespaceSpec{Finalizers: []api.FinalizerName{"example.com/foo"}},
 		Status: api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}

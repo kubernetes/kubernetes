@@ -29,7 +29,6 @@ import (
 // properly expose them
 // return error on any failure
 func readGlusterLog(path string, podName string) error {
-
 	var line1 string
 	var line2 string
 	linecount := 0

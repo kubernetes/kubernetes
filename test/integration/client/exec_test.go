@@ -733,7 +733,7 @@ func (e *execPlugin) rotateToken(newToken string, lifetime time.Duration) {
 			"token": %q
 		}
 	}`, expirationTimestamp, newToken)
-	if err := os.WriteFile(e.outputFile.Name(), []byte(newOutput), 0644); err != nil {
+	if err := os.WriteFile(e.outputFile.Name(), []byte(newOutput), 0o644); err != nil {
 		e.t.Fatal(err)
 	}
 }
@@ -988,7 +988,6 @@ func assertInformerEvents(t *testing.T, informerSpy *informerSpy, created, updat
 	if diff := cmp.Diff([]interface{}{deleted}, informerSpy.deletes, objectMetaSansResourceVersionComparer); diff != "" {
 		t.Errorf("unexpected deleted event(s), -want, +got:\n%s", diff)
 	}
-
 }
 
 func TestExecPluginGlobalCache(t *testing.T) {

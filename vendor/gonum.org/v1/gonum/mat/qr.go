@@ -262,5 +262,4 @@ func (qr *QR) SolveVecTo(dst *VecDense, trans bool, b Vector) error {
 		dst.reuseAsNonZeroed(c)
 	}
 	return qr.SolveTo(dst.asDense(), trans, bm)
-
 }

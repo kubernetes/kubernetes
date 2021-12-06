@@ -144,8 +144,7 @@ func init() {
 // both immediately. There is no other code location between argument
 // parsing and starting of the test suite where those test could be
 // defined.
-type testDriverParameter struct {
-}
+type testDriverParameter struct{}
 
 var _ flag.Value = testDriverParameter{}
 
@@ -261,7 +260,6 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPatt
 	if !supported {
 		e2eskipper.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
 	}
-
 }
 
 func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {

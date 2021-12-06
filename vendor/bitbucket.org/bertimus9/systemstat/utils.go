@@ -11,14 +11,14 @@ func notImplemented(fn string) {
 }
 
 func getSimpleCPUAverage(first CPUSample, second CPUSample) (avg SimpleCPUAverage) {
-	//walltimediff := second.Time.Sub(first.Time)
-	//dT := float64(first.Total - second.Total)
+	// walltimediff := second.Time.Sub(first.Time)
+	// dT := float64(first.Total - second.Total)
 
 	dI := float64(second.Idle - first.Idle)
 	dTot := float64(second.Total - first.Total)
 	avg.IdlePct = dI / dTot * 100
 	avg.BusyPct = (dTot - dI) * 100 / dTot
-	//log.Printf("cpu idle ticks %f, total ticks %f, idle pct %f, busy pct %f\n", dI, dTot, avg.IdlePct, avg.BusyPct)
+	// log.Printf("cpu idle ticks %f, total ticks %f, idle pct %f, busy pct %f\n", dI, dTot, avg.IdlePct, avg.BusyPct)
 	return
 }
 

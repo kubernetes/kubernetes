@@ -1,4 +1,5 @@
-//+build !windows
+//go:build !windows
+// +build !windows
 
 /*
 Copyright (c) 2017 VMware, Inc. All Rights Reserved.

@@ -25,7 +25,6 @@ import (
 
 type validationItem interface {
 	proto.SchemaVisitor
-
 	Errors() []error
 	Path() *proto.Path
 }

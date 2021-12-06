@@ -71,7 +71,6 @@ type REST struct {
 
 // NewStorage returns a RESTStorage object that will work against pods.
 func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
-
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Pod{} },
 		NewListFunc:              func() runtime.Object { return &api.PodList{} },

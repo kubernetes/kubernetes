@@ -17,9 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"testing"
+
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestValidateListOptions(t *testing.T) {

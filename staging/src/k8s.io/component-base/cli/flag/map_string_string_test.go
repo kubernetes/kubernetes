@@ -53,86 +53,122 @@ func TestSetMapStringString(t *testing.T) {
 		err    string
 	}{
 		// we initialize the map with a default key that should be cleared by Set
-		{"clears defaults", []string{""},
+		{
+			"clears defaults",
+			[]string{""},
 			NewMapStringString(&map[string]string{"default": ""}),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{},
 				NoSplit:     false,
-			}, ""},
+			}, "",
+		},
 		// make sure we still allocate for "initialized" maps where Map was initially set to a nil map
-		{"allocates map if currently nil", []string{""},
+		{
+			"allocates map if currently nil",
+			[]string{""},
 			&MapStringString{initialized: true, Map: &nilMap},
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{},
 				NoSplit:     false,
-			}, ""},
+			}, "",
+		},
 		// for most cases, we just reuse nilMap, which should be allocated by Set, and is reset before each test case
-		{"empty", []string{""},
+		{
+			"empty",
+			[]string{""},
 			NewMapStringString(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{},
 				NoSplit:     false,
-			}, ""},
-		{"one key", []string{"one=foo"},
+			}, "",
+		},
+		{
+			"one key",
+			[]string{"one=foo"},
 			NewMapStringString(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{"one": "foo"},
 				NoSplit:     false,
-			}, ""},
-		{"two keys", []string{"one=foo,two=bar"},
+			}, "",
+		},
+		{
+			"two keys",
+			[]string{"one=foo,two=bar"},
 			NewMapStringString(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{"one": "foo", "two": "bar"},
 				NoSplit:     false,
-			}, ""},
-		{"one key, multi flag invocation only", []string{"one=foo,bar"},
+			}, "",
+		},
+		{
+			"one key, multi flag invocation only",
+			[]string{"one=foo,bar"},
 			NewMapStringStringNoSplit(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{"one": "foo,bar"},
 				NoSplit:     true,
-			}, ""},
-		{"two keys, multi flag invocation only", []string{"one=foo,bar", "two=foo,bar"},
+			}, "",
+		},
+		{
+			"two keys, multi flag invocation only",
+			[]string{"one=foo,bar", "two=foo,bar"},
 			NewMapStringStringNoSplit(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{"one": "foo,bar", "two": "foo,bar"},
 				NoSplit:     true,
-			}, ""},
-		{"two keys, multiple Set invocations", []string{"one=foo", "two=bar"},
+			}, "",
+		},
+		{
+			"two keys, multiple Set invocations",
+			[]string{"one=foo", "two=bar"},
 			NewMapStringString(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{"one": "foo", "two": "bar"},
 				NoSplit:     false,
-			}, ""},
-		{"two keys with space", []string{"one=foo, two=bar"},
+			}, "",
+		},
+		{
+			"two keys with space",
+			[]string{"one=foo, two=bar"},
 			NewMapStringString(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{"one": "foo", "two": "bar"},
 				NoSplit:     false,
-			}, ""},
-		{"empty key", []string{"=foo"},
+			}, "",
+		},
+		{
+			"empty key",
+			[]string{"=foo"},
 			NewMapStringString(&nilMap),
 			&MapStringString{
 				initialized: true,
 				Map:         &map[string]string{"": "foo"},
 				NoSplit:     false,
-			}, ""},
-		{"missing value", []string{"one"},
+			}, "",
+		},
+		{
+			"missing value",
+			[]string{"one"},
 			NewMapStringString(&nilMap),
 			nil,
-			"malformed pair, expect string=string"},
-		{"no target", []string{"a:foo"},
+			"malformed pair, expect string=string",
+		},
+		{
+			"no target",
+			[]string{"a:foo"},
 			NewMapStringString(nil),
 			nil,
-			"no target (nil pointer to map[string]string)"},
+			"no target (nil pointer to map[string]string)",
+		},
 	}
 	for _, c := range cases {
 		nilMap = nil

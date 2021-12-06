@@ -408,7 +408,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	var localSchemeBuilder = runtime.SchemeBuilder{
+	localSchemeBuilder := runtime.SchemeBuilder{
 		appsv1.AddToScheme,
 		batchv1.AddToScheme,
 	}

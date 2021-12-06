@@ -30,14 +30,12 @@ import (
 	"k8s.io/metrics/pkg/client/custom_metrics/scheme"
 )
 
-var (
-	// MetricVersions is the set of metric versions accepted by the converter.
-	MetricVersions = []schema.GroupVersion{
-		cmv1beta2.SchemeGroupVersion,
-		cmv1beta1.SchemeGroupVersion,
-		cmint.SchemeGroupVersion,
-	}
-)
+// MetricVersions is the set of metric versions accepted by the converter.
+var MetricVersions = []schema.GroupVersion{
+	cmv1beta2.SchemeGroupVersion,
+	cmv1beta1.SchemeGroupVersion,
+	cmint.SchemeGroupVersion,
+}
 
 // MetricConverter knows how to convert between external MetricValue versions.
 type MetricConverter struct {

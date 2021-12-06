@@ -455,7 +455,6 @@ func TestFsUserFrom(t *testing.T) {
 }
 
 func TestGenerateVolumeName(t *testing.T) {
-
 	// Normal operation, no truncate
 	v1 := GenerateVolumeName("kubernetes", "pv-cinder-abcde", 255)
 	if v1 != "kubernetes-dynamic-pv-cinder-abcde" {

@@ -50,10 +50,8 @@ const (
 	separators = `[._-]`
 )
 
-var (
-	// identifierRe defines the pattern for valid identifiers.
-	identifierRe = regexp.MustCompile(reAnchor(alphanum + reGroup(separators+reGroup(alphanum)) + "*"))
-)
+// identifierRe defines the pattern for valid identifiers.
+var identifierRe = regexp.MustCompile(reAnchor(alphanum + reGroup(separators+reGroup(alphanum)) + "*"))
 
 // Validate returns nil if the string s is a valid identifier.
 //

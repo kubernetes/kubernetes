@@ -347,7 +347,6 @@ func TestGracePeriodScenarios(t *testing.T) {
 
 	for _, test := range tc {
 		t.Run(test.name, func(t *testing.T) {
-
 			// Use a custom fatal behavior with panic/recover so that we can test failure scenarios where
 			// os.Exit() would normally be called
 			cmdutil.BehaviorOnFatal(func(actualErrOut string, actualExitCode int) {

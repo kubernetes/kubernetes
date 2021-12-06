@@ -36,9 +36,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
-var (
-	fakeCacheTTL = 2 * time.Second
-)
+var fakeCacheTTL = 2 * time.Second
 
 func TestStandardAttachDisk(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -175,7 +173,7 @@ func TestGetDataDisks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	var testCases = []struct {
+	testCases := []struct {
 		desc              string
 		nodeName          types.NodeName
 		isDataDiskNull    bool

@@ -47,8 +47,10 @@ type collector struct {
 }
 
 func newCollector(id string, getContainerPids func() ([]string, error), interval time.Duration, numberOfNUMANodes int, vendorID string, inHostNamespace bool) *collector {
-	return &collector{id: id, interval: interval, getContainerPids: getContainerPids, numberOfNUMANodes: numberOfNUMANodes,
-		vendorID: vendorID, mu: sync.Mutex{}, inHostNamespace: inHostNamespace}
+	return &collector{
+		id: id, interval: interval, getContainerPids: getContainerPids, numberOfNUMANodes: numberOfNUMANodes,
+		vendorID: vendorID, mu: sync.Mutex{}, inHostNamespace: inHostNamespace,
+	}
 }
 
 func (c *collector) setup() error {

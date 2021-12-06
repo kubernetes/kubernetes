@@ -102,7 +102,6 @@ func (s *snapshottableTestSuite) SkipUnsupportedTests(driver storageframework.Te
 }
 
 func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
-
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshotting")
@@ -165,7 +164,6 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				err := storageutils.TryFunc(cleanupSteps[i])
 				framework.ExpectNoError(err, "while running cleanup steps")
 			}
-
 		}
 		ginkgo.AfterEach(func() {
 			cleanup()

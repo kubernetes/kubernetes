@@ -58,9 +58,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 		containerStatsPollingPeriod = 500 * time.Millisecond
 	)
 
-	var (
-		rc *ResourceCollector
-	)
+	var rc *ResourceCollector
 
 	f := framework.NewDefaultFramework("density-test")
 
@@ -470,7 +468,8 @@ func getPodStartLatency(node string) (e2emetrics.KubeletLatencyMetrics, error) {
 					e2emetrics.KubeletLatencyMetric{
 						Quantile: quantile,
 						Method:   kubemetrics.PodStartDurationKey,
-						Latency:  time.Duration(int(sample.Value)) * time.Microsecond})
+						Latency:  time.Duration(int(sample.Value)) * time.Microsecond,
+					})
 			}
 		}
 	}

@@ -388,7 +388,8 @@ type Float float64
 func (f Float) String() string { return strconv.FormatFloat(float64(f), 'g', 6, 64) }
 func (f Float) Type() string   { return "float" }
 func (f Float) Freeze()        {} // immutable
-func (f Float) Truth() Bool    { return f != 0.0 }
+func (f Float) Truth() Bool { return f != 0.0 }
+
 func (f Float) Hash() (uint32, error) {
 	// Equal float and int values must yield the same hash.
 	// TODO(adonovan): opt: if f is non-integral, and thus not equal
@@ -523,6 +524,7 @@ func (si stringIterable) String() string {
 		return si.s.String() + "." + etype + "s()"
 	}
 }
+
 func (si stringIterable) Type() string {
 	if si.codepoints {
 		return "codepoints"
@@ -640,6 +642,7 @@ func (b *Builtin) Freeze() {
 		b.recv.Freeze()
 	}
 }
+
 func (b *Builtin) Hash() (uint32, error) {
 	h := hashString(b.name)
 	if b.recv != nil {

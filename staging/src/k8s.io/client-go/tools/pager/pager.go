@@ -28,8 +28,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-const defaultPageSize = 500
-const defaultPageBufferSize = 10
+const (
+	defaultPageSize       = 500
+	defaultPageBufferSize = 10
+)
 
 // ListPageFunc returns a list object for the given list options.
 type ListPageFunc func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error)

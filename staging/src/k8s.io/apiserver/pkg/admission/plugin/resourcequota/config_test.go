@@ -64,11 +64,13 @@ limitedResources:
 			expectConfig: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{APIGroup: "", Resource: "persistentvolumeclaims", MatchContains: []string{".storageclass.storage.k8s.io/requests.storage"}},
-					{APIGroup: "", Resource: "pods", MatchScopes: []corev1.ScopedResourceSelectorRequirement{
-						{ScopeName: "PriorityClass", Operator: "In", Values: []string{"cluster-services"}},
+					{
+						APIGroup: "", Resource: "pods", MatchScopes: []corev1.ScopedResourceSelectorRequirement{
+							{ScopeName: "PriorityClass", Operator: "In", Values: []string{"cluster-services"}},
+						},
 					},
-					},
-				}},
+				},
+			},
 		},
 		{
 			name: "valid v1beta1 config",
@@ -91,11 +93,13 @@ limitedResources:
 			expectConfig: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{APIGroup: "", Resource: "persistentvolumeclaims", MatchContains: []string{".storageclass.storage.k8s.io/requests.storage"}},
-					{APIGroup: "", Resource: "pods", MatchScopes: []corev1.ScopedResourceSelectorRequirement{
-						{ScopeName: "PriorityClass", Operator: "In", Values: []string{"cluster-services"}},
+					{
+						APIGroup: "", Resource: "pods", MatchScopes: []corev1.ScopedResourceSelectorRequirement{
+							{ScopeName: "PriorityClass", Operator: "In", Values: []string{"cluster-services"}},
+						},
 					},
-					},
-				}},
+				},
+			},
 		},
 		{
 			name: "valid v1 config",
@@ -118,11 +122,13 @@ limitedResources:
 			expectConfig: &resourcequotaapi.Configuration{
 				LimitedResources: []resourcequotaapi.LimitedResource{
 					{APIGroup: "", Resource: "persistentvolumeclaims", MatchContains: []string{".storageclass.storage.k8s.io/requests.storage"}},
-					{APIGroup: "", Resource: "pods", MatchScopes: []corev1.ScopedResourceSelectorRequirement{
-						{ScopeName: "PriorityClass", Operator: "In", Values: []string{"cluster-services"}},
+					{
+						APIGroup: "", Resource: "pods", MatchScopes: []corev1.ScopedResourceSelectorRequirement{
+							{ScopeName: "PriorityClass", Operator: "In", Values: []string{"cluster-services"}},
+						},
 					},
-					},
-				}},
+				},
+			},
 		},
 	}
 

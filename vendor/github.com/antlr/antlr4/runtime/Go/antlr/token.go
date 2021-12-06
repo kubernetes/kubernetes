@@ -26,13 +26,10 @@ type Token interface {
 	GetStop() int
 	GetLine() int
 	GetColumn() int
-
 	GetText() string
 	SetText(s string)
-
 	GetTokenIndex() int
 	SetTokenIndex(v int)
-
 	GetTokenSource() TokenSource
 	GetInputStream() CharStream
 }
@@ -122,7 +119,6 @@ type CommonToken struct {
 }
 
 func NewCommonToken(source *TokenSourceCharStreamPair, tokenType, channel, start, stop int) *CommonToken {
-
 	t := new(CommonToken)
 
 	t.BaseToken = new(BaseToken)
@@ -145,7 +141,7 @@ func NewCommonToken(source *TokenSourceCharStreamPair, tokenType, channel, start
 // An empty {@link Pair} which is used as the default value of
 // {@link //source} for tokens that do not have a source.
 
-//CommonToken.EMPTY_SOURCE = [ nil, nil ]
+// CommonToken.EMPTY_SOURCE = [ nil, nil ]
 
 // Constructs a New{@link CommonToken} as a copy of another {@link Token}.
 //

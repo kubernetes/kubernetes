@@ -29,12 +29,10 @@ const (
 	NormalExpectedRegex = "^kubeadm version: &version\\.Info{Major:\".+\", Minor:\".+\", GitVersion:\".+\", GitCommit:\".+\", GitTreeState:\".+\", BuildDate:\".+\", GoVersion:\".+\", Compiler:\".+\", Platform:\".+\"}\n$"
 )
 
-var (
-	VersionInfo = []string{"major", "minor", "gitVersion", "gitCommit", "gitTreeState", "buildDate", "goVersion", "compiler", "platform"}
-)
+var VersionInfo = []string{"major", "minor", "gitVersion", "gitCommit", "gitTreeState", "buildDate", "goVersion", "compiler", "platform"}
 
 func TestCmdVersion(t *testing.T) {
-	var versionTest = []struct {
+	versionTest := []struct {
 		name     string
 		args     string
 		regex    string
@@ -77,7 +75,7 @@ func TestCmdVersion(t *testing.T) {
 }
 
 func TestCmdVersionOutputJsonOrYaml(t *testing.T) {
-	var versionTest = []struct {
+	versionTest := []struct {
 		name     string
 		args     string
 		format   string

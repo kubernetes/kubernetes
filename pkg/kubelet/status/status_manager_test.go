@@ -1207,7 +1207,6 @@ func TestMergePodStatus(t *testing.T) {
 			t.Errorf("test case %q failed, expect: %+v, got %+v", tc.desc, tc.expectPodStatus, output)
 		}
 	}
-
 }
 
 func statusEqual(left, right v1.PodStatus) bool {

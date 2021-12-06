@@ -57,17 +57,15 @@ type mergingWalker struct {
 // comparable type.
 type mergeRule func(w *mergingWalker)
 
-var (
-	ruleKeepRHS = mergeRule(func(w *mergingWalker) {
-		if w.rhs != nil {
-			v := w.rhs.Unstructured()
-			w.out = &v
-		} else if w.lhs != nil {
-			v := w.lhs.Unstructured()
-			w.out = &v
-		}
-	})
-)
+var ruleKeepRHS = mergeRule(func(w *mergingWalker) {
+	if w.rhs != nil {
+		v := w.rhs.Unstructured()
+		w.out = &v
+	} else if w.lhs != nil {
+		v := w.lhs.Unstructured()
+		w.out = &v
+	}
+})
 
 // merge sets w.out.
 func (w *mergingWalker) merge(prefixFn func() string) (errs ValidationErrors) {

@@ -37,7 +37,8 @@ var (
 func NewLocation(line, column int) Location {
 	return &SourceLocation{
 		line:   line,
-		column: column}
+		column: column,
+	}
 }
 
 // Line returns the 1-based line of the location.

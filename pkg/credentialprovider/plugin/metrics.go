@@ -59,6 +59,5 @@ func registerMetrics() {
 	registerOnce.Do(func() {
 		legacyregistry.MustRegister(kubeletCredentialProviderPluginErrors)
 		legacyregistry.MustRegister(kubeletCredentialProviderPluginDuration)
-
 	})
 }

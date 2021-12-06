@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -107,7 +108,6 @@ func (c *CgroupsValidator) validateCgroupSubsystems(cgroups, subsystems []string
 		missing = append(missing, cgroup)
 	}
 	return missing
-
 }
 
 func (c *CgroupsValidator) getCgroupV1Subsystems() ([]string, error) {

@@ -428,7 +428,6 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 				t.Errorf("expected error but got none")
 			} else if !testcase.shouldErr && len(errs) > 0 {
 				t.Errorf("expected no error but received errors: %v", errs.ToAggregate())
-
 			}
 		})
 	}

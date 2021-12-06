@@ -74,7 +74,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (strin
 				}
 
 				klog.V(4).Infof("found a disk, location: %q, lun: %q", location, arr[arrLen-1])
-				//last element of location field is LUN number, e.g.
+				// last element of location field is LUN number, e.g.
 				//		"location":  "Integrated : Adapter 3 : Port 0 : Target 0 : LUN 1"
 				l, err := strconv.Atoi(arr[arrLen-1])
 				if err != nil {

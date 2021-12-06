@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	t0 = time.Date(2019, 01, 01, 0, 0, 0, 0, time.UTC)
+	t0 = time.Date(2019, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
 	t1 = t0.Add(time.Second)
 	t2 = t1.Add(time.Second)
 	t3 = t2.Add(time.Second)
@@ -182,13 +182,14 @@ func (s subject) doExpect(expected time.Time) {
 func createPod(namespace, ttServiceName string, readyTime time.Time) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: ttServiceName},
-		Status: v1.PodStatus{Conditions: []v1.PodCondition{
-			{
-				Type:               v1.PodReady,
-				Status:             v1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(readyTime),
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:               v1.PodReady,
+					Status:             v1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(readyTime),
+				},
 			},
-		},
 		},
 	}
 }

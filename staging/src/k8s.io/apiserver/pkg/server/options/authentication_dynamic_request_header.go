@@ -25,8 +25,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var _ dynamiccertificates.ControllerRunner = &DynamicRequestHeaderController{}
-var _ dynamiccertificates.CAContentProvider = &DynamicRequestHeaderController{}
+var (
+	_ dynamiccertificates.ControllerRunner  = &DynamicRequestHeaderController{}
+	_ dynamiccertificates.CAContentProvider = &DynamicRequestHeaderController{}
+)
 
 var _ headerrequest.RequestHeaderAuthRequestProvider = &DynamicRequestHeaderController{}
 

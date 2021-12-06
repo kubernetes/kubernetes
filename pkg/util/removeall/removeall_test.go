@@ -116,7 +116,7 @@ func TestRemoveAllOneFilesystem(t *testing.T) {
 		for _, item := range test.items {
 			if strings.HasSuffix(item, "/") {
 				item = strings.TrimRight(item, "/")
-				if err = os.Mkdir(path.Join(tmpDir, item), 0777); err != nil {
+				if err = os.Mkdir(path.Join(tmpDir, item), 0o777); err != nil {
 					t.Fatalf("error creating %s: %v", item, err)
 				}
 			} else {
@@ -236,7 +236,7 @@ func TestRemoveDirsOneFilesystem(t *testing.T) {
 		for _, item := range test.items {
 			if strings.HasSuffix(item, "/") {
 				item = strings.TrimRight(item, "/")
-				if err = os.Mkdir(path.Join(tmpDir, item), 0777); err != nil {
+				if err = os.Mkdir(path.Join(tmpDir, item), 0o777); err != nil {
 					t.Fatalf("error creating %s: %v", item, err)
 				}
 			} else {

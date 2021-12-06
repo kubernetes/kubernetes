@@ -23,9 +23,11 @@ import (
 	"k8s.io/gengo/types"
 )
 
-const tagUnionMember = "union"
-const tagUnionDeprecated = "unionDeprecated"
-const tagUnionDiscriminator = "unionDiscriminator"
+const (
+	tagUnionMember        = "union"
+	tagUnionDeprecated    = "unionDeprecated"
+	tagUnionDiscriminator = "unionDiscriminator"
+)
 
 type union struct {
 	discriminator         string

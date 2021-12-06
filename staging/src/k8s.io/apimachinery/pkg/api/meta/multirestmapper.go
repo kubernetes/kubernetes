@@ -24,9 +24,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
-var (
-	_ ResettableRESTMapper = MultiRESTMapper{}
-)
+var _ ResettableRESTMapper = MultiRESTMapper{}
 
 // MultiRESTMapper is a wrapper for multiple RESTMappers.
 type MultiRESTMapper []RESTMapper

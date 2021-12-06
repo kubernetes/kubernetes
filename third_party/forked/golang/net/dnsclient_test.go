@@ -15,7 +15,7 @@ import (
 )
 
 func TestReverseaddr(t *testing.T) {
-	var revAddrTests = []struct {
+	revAddrTests := []struct {
 		Addr      string
 		Reverse   string
 		ErrPrefix string

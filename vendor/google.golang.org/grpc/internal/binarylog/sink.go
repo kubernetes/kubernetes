@@ -29,11 +29,9 @@ import (
 	pb "google.golang.org/grpc/binarylog/grpc_binarylog_v1"
 )
 
-var (
-	// DefaultSink is the sink where the logs will be written to. It's exported
-	// for the binarylog package to update.
-	DefaultSink Sink = &noopSink{} // TODO(blog): change this default (file in /tmp).
-)
+// DefaultSink is the sink where the logs will be written to. It's exported
+// for the binarylog package to update.
+var DefaultSink Sink = &noopSink{} // TODO(blog): change this default (file in /tmp).
 
 // Sink writes log entry into the binary log sink.
 //

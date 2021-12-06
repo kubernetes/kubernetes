@@ -35,8 +35,7 @@ var (
 )
 
 // DebugFlags adds handlers for flags under /debug/flags.
-type DebugFlags struct {
-}
+type DebugFlags struct{}
 
 // Install registers the APIServer's flags handler.
 func (f DebugFlags) Install(c *mux.PathRecorderMux, flag string, handler func(http.ResponseWriter, *http.Request)) {

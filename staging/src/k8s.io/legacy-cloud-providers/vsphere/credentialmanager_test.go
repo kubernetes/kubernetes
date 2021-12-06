@@ -284,7 +284,7 @@ func TestParseSecretConfig(t *testing.T) {
 		testIP         = "10.20.30.40"
 		testServerFQIN = "ExAmple.com"
 	)
-	var testcases = []struct {
+	testcases := []struct {
 		testName      string
 		data          map[string][]byte
 		config        map[string]*Credential

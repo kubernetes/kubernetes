@@ -221,17 +221,21 @@ fieldLoop:
 func (mi *MessageInfo) New() protoreflect.Message {
 	return mi.MessageOf(reflect.New(mi.GoReflectType.Elem()).Interface())
 }
+
 func (mi *MessageInfo) Zero() protoreflect.Message {
 	return mi.MessageOf(reflect.Zero(mi.GoReflectType).Interface())
 }
+
 func (mi *MessageInfo) Descriptor() protoreflect.MessageDescriptor {
 	return mi.Desc
 }
+
 func (mi *MessageInfo) Enum(i int) protoreflect.EnumType {
 	mi.init()
 	fd := mi.Desc.Fields().Get(i)
 	return Export{}.EnumTypeOf(mi.fieldTypes[fd.Number()])
 }
+
 func (mi *MessageInfo) Message(i int) protoreflect.MessageType {
 	mi.init()
 	fd := mi.Desc.Fields().Get(i)
@@ -254,12 +258,15 @@ type mapEntryType struct {
 func (mt mapEntryType) New() protoreflect.Message {
 	return nil
 }
+
 func (mt mapEntryType) Zero() protoreflect.Message {
 	return nil
 }
+
 func (mt mapEntryType) Descriptor() protoreflect.MessageDescriptor {
 	return mt.desc
 }
+
 func (mt mapEntryType) Enum(i int) protoreflect.EnumType {
 	fd := mt.desc.Fields().Get(i)
 	if fd.Enum() == nil {
@@ -267,6 +274,7 @@ func (mt mapEntryType) Enum(i int) protoreflect.EnumType {
 	}
 	return Export{}.EnumTypeOf(mt.valType)
 }
+
 func (mt mapEntryType) Message(i int) protoreflect.MessageType {
 	fd := mt.desc.Fields().Get(i)
 	if fd.Message() == nil {

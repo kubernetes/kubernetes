@@ -27,7 +27,7 @@ import (
 
 func TestSummary(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		SummaryOpts
 		registryVersion     *semver.Version
@@ -114,7 +114,7 @@ func TestSummary(t *testing.T) {
 
 func TestSummaryVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		SummaryOpts
 		labels              []string
@@ -209,7 +209,7 @@ func TestSummaryWithLabelValueAllowList(t *testing.T) {
 		Name:      "metric_allowlist_test",
 		Subsystem: "subsystem",
 	}
-	var tests = []struct {
+	tests := []struct {
 		desc               string
 		labelValues        [][]string
 		expectMetricValues map[string]int

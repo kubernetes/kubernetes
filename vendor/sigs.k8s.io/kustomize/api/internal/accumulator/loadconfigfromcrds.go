@@ -25,8 +25,10 @@ type OpenAPIDefinition struct {
 	Dependencies []string
 }
 
-type myProperties = map[string]spec.Schema
-type nameToApiMap map[string]OpenAPIDefinition
+type (
+	myProperties = map[string]spec.Schema
+	nameToApiMap map[string]OpenAPIDefinition
+)
 
 // LoadConfigFromCRDs parse CRD schemas from paths into a TransformerConfig
 func LoadConfigFromCRDs(
@@ -170,7 +172,8 @@ func loadCrdIntoConfig(
 					builtinconfig.NameBackReferences{
 						Gvk: resid.Gvk{Kind: kind, Version: version},
 						Referrers: []types.FieldSpec{
-							makeFs(theGvk, append(path, propName, nameKey))},
+							makeFs(theGvk, append(path, propName, nameKey)),
+						},
 					})
 				if err != nil {
 					return

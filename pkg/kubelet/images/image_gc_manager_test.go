@@ -34,8 +34,10 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
-var zero time.Time
-var sandboxImage = "k8s.gcr.io/pause-amd64:latest"
+var (
+	zero         time.Time
+	sandboxImage = "k8s.gcr.io/pause-amd64:latest"
+)
 
 func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provider) (*realImageGCManager, *containertest.FakeRuntime) {
 	fakeRuntime := &containertest.FakeRuntime{}
@@ -55,6 +57,7 @@ func (im *realImageGCManager) imageRecordsLen() int {
 	defer im.imageRecordsLock.Unlock()
 	return len(im.imageRecords)
 }
+
 func (im *realImageGCManager) getImageRecord(name string) (*imageRecord, bool) {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()

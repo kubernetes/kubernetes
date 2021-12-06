@@ -321,7 +321,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 						Partition: func() *int32 {
 							i := int32(3)
 							return &i
-						}()}
+						}(),
+					}
 				}(),
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
@@ -376,7 +377,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 						Partition: func() *int32 {
 							i := int32(2)
 							return &i
-						}()}
+						}(),
+					}
 				}(),
 			}
 			ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -387,7 +389,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 							Partition: func() *int32 {
 								i := int32(2)
 								return &i
-							}()}
+							}(),
+						}
 					}(),
 				}
 			})
@@ -497,7 +500,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 				ss.Name,
 				ss.Status.CurrentRevision,
 				updateRevision))
-
 		})
 
 		// Do not mark this as Conformance.
@@ -902,7 +904,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deleting the StatefulSet via deleteCollection.
 		*/
 		framework.ConformanceIt("should list, patch and delete a collection of StatefulSets", func() {
-
 			ssPatchReplicas := int32(2)
 			ssPatchImage := imageutils.GetE2EImage(imageutils.Pause)
 			one := int64(1)
@@ -1034,7 +1035,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 			defer cancel()
 
 			_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-
 				if e, ok := event.Object.(*appsv1.StatefulSet); ok {
 					found := e.ObjectMeta.Name == ss.ObjectMeta.Name &&
 						e.ObjectMeta.Namespace == ss.ObjectMeta.Namespace &&
@@ -1072,7 +1072,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ctx, cancel = context.WithTimeout(context.Background(), statefulSetTimeout)
 
 			_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-
 				defer cancel()
 				if e, ok := event.Object.(*appsv1.StatefulSet); ok {
 					found := e.ObjectMeta.Name == ss.ObjectMeta.Name &&
@@ -1529,6 +1528,7 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
 	}
 }
+
 func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
 	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))

@@ -171,7 +171,6 @@ func ValidateFieldValidation(fldPath *field.Path, fieldValidation string) field.
 		allErrs = append(allErrs, field.NotSupported(fldPath, fieldValidation, allowedFieldValidationValues.List()))
 	}
 	return allErrs
-
 }
 
 const UninitializedStatusUpdateErrorMsg string = `must not update status when the object is uninitialized`
@@ -272,8 +271,10 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	return allErrs
 }
 
-const conditionReasonFmt string = "[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?"
-const conditionReasonErrMsg string = "a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and must end with an alphanumeric character or '_'"
+const (
+	conditionReasonFmt    string = "[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?"
+	conditionReasonErrMsg string = "a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and must end with an alphanumeric character or '_'"
+)
 
 var conditionReasonRegexp = regexp.MustCompile("^" + conditionReasonFmt + "$")
 

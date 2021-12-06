@@ -62,15 +62,19 @@ var podDirCountMap = make(map[types.UID]int)
 var quotaSizeMap = make(map[common.QuotaID]int64)
 var quotaLock sync.RWMutex
 
-var supportsQuotasMap = make(map[string]bool)
-var supportsQuotasLock sync.RWMutex
+var (
+	supportsQuotasMap  = make(map[string]bool)
+	supportsQuotasLock sync.RWMutex
+)
 
 // Directory -> backingDev
 var backingDevMap = make(map[string]string)
 var backingDevLock sync.RWMutex
 
-var mountpointMap = make(map[string]string)
-var mountpointLock sync.RWMutex
+var (
+	mountpointMap  = make(map[string]string)
+	mountpointLock sync.RWMutex
+)
 
 var providers = []common.LinuxVolumeQuotaProvider{
 	&common.VolumeProvider{},

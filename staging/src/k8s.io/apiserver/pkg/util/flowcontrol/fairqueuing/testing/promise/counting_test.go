@@ -71,6 +71,7 @@ func TestCountingWriteOnceSet(t *testing.T) {
 	time.Sleep(time.Second) // give it a chance to misbehave
 	goGetAndExpect(t, clock, counter, wr, gots, aval)
 }
+
 func TestCountingWriteOnceCancel(t *testing.T) {
 	oldTime := time.Now()
 	cval := &oldTime
@@ -138,7 +139,6 @@ func goGetExpectNotYet(t *testing.T, clk *testeventclock.Fake, grc counter.GoRou
 	case <-time.After(time.Second):
 		t.Log("Good: Get did not return yet")
 	}
-
 }
 
 func goGetAndExpect(t *testing.T, clk *testeventclock.Fake, grc counter.GoRoutineCounter, wr promise.WriteOnce, gots chan interface{}, expected interface{}) {

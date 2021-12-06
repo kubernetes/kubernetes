@@ -51,8 +51,10 @@ var waitingMark = &requestWatermark{
 	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
 }
 
-var atomicMutatingExecuting, atomicReadOnlyExecuting int32
-var atomicMutatingWaiting, atomicReadOnlyWaiting int32
+var (
+	atomicMutatingExecuting, atomicReadOnlyExecuting int32
+	atomicMutatingWaiting, atomicReadOnlyWaiting     int32
+)
 
 // newInitializationSignal is defined for testing purposes.
 var newInitializationSignal = utilflowcontrol.NewInitializationSignal
@@ -106,7 +108,8 @@ func WithPriorityAndFairness(
 				FlowSchemaName:    fs.Name,
 				FlowSchemaUID:     fs.UID,
 				PriorityLevelName: pl.Name,
-				PriorityLevelUID:  pl.UID}
+				PriorityLevelUID:  pl.UID,
+			}
 
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))

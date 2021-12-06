@@ -40,7 +40,7 @@ func (matcher *BeTemporallyMatcher) Match(actual interface{}) (bool, error) {
 		return false, fmt.Errorf("Unknown comparator: %s", matcher.Comparator)
 	}
 
-	var threshold = time.Millisecond
+	threshold := time.Millisecond
 	if len(matcher.Threshold) == 1 {
 		threshold = matcher.Threshold[0]
 	}

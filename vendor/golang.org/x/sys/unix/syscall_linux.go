@@ -2177,7 +2177,7 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 			// Root can read and write any file.
 			return nil
 		}
-		if st.Mode&0111 != 0 {
+		if st.Mode&0o111 != 0 {
 			// Root can execute any file that anybody can execute.
 			return nil
 		}

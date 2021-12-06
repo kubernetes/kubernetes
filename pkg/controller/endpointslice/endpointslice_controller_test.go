@@ -1526,7 +1526,6 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 			if endpointsliceutil.IsStaleInformerCacheErr(err) != testcase.expectError {
 				t.Fatalf("Expected error because informer cache is outdated")
 			}
-
 		})
 	}
 }

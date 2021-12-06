@@ -3,9 +3,8 @@ package spec
 import (
 	"fmt"
 	"io"
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/onsi/ginkgo/internal/containernode"
 	"github.com/onsi/ginkgo/internal/leafnodes"

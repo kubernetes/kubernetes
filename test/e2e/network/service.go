@@ -94,23 +94,21 @@ const (
 	svcReadyTimeout = 1 * time.Minute
 )
 
-var (
-	defaultServeHostnameService = v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: defaultServeHostnameServiceName,
+var defaultServeHostnameService = v1.Service{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: defaultServeHostnameServiceName,
+	},
+	Spec: v1.ServiceSpec{
+		Ports: []v1.ServicePort{{
+			Port:       int32(defaultServeHostnameServicePort),
+			TargetPort: intstr.FromInt(9376),
+			Protocol:   v1.ProtocolTCP,
+		}},
+		Selector: map[string]string{
+			"name": defaultServeHostnameServiceName,
 		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{
-				Port:       int32(defaultServeHostnameServicePort),
-				TargetPort: intstr.FromInt(9376),
-				Protocol:   v1.ProtocolTCP,
-			}},
-			Selector: map[string]string{
-				"name": defaultServeHostnameServiceName,
-			},
-		},
-	}
-)
+	},
+}
 
 // portsByPodName is a map that maps pod name to container ports.
 type portsByPodName map[string][]int
@@ -541,7 +539,7 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	if bufsize == 0 {
 		bufsize = 4096
 	}
-	var buf = make([]byte, bufsize)
+	buf := make([]byte, bufsize)
 	n, err := con.Read(buf)
 	if err != nil {
 		ret.Error = err
@@ -758,7 +756,7 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.Logf("cleaning load balancer resource for %s", lb)
 			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
-		//reset serviceLBNames
+		// reset serviceLBNames
 		serviceLBNames = []string{}
 	})
 
@@ -1117,7 +1115,6 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should work after restarting apiserver [Disruptive]", func() {
-
 		if !framework.ProviderIs("gke") {
 			e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(kubeAPIServerLabelName, cs, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
 		}
@@ -2018,7 +2015,6 @@ var _ = common.SIGDescribe("Services", func() {
 		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
 			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
-
 			if err != nil {
 				if strings.Contains(err.Error(), expectedErr) {
 					framework.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
@@ -2515,7 +2511,6 @@ var _ = common.SIGDescribe("Services", func() {
 		When patching a service the action MUST be validated.
 	*/
 	framework.ConformanceIt("should complete a service status lifecycle", func() {
-
 		ns := f.Namespace.Name
 		svcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
 		svcClient := f.ClientSet.CoreV1().Services(ns)
@@ -2741,7 +2736,6 @@ var _ = common.SIGDescribe("Services", func() {
 		one service after deleting the service collection.
 	*/
 	framework.ConformanceIt("should delete a collection of services", func() {
-
 		ns := f.Namespace.Name
 		svcClient := f.ClientSet.CoreV1().Services(ns)
 		svcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
@@ -2795,7 +2789,6 @@ var _ = common.SIGDescribe("Services", func() {
 				}
 				_, err := svcClient.Create(context.TODO(), &svc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "failed to create Service")
-
 			}()
 		}
 
@@ -2813,7 +2806,6 @@ var _ = common.SIGDescribe("Services", func() {
 
 		framework.Logf("Collection of services has been deleted")
 	})
-
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of

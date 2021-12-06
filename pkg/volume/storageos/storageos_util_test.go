@@ -30,14 +30,16 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-var testVolName = "storageos-test-vol"
-var testPVName = "storageos-test-pv"
-var testNamespace = "storageos-test-namespace"
-var testSize = 1
-var testDesc = "testdescription"
-var testPool = "testpool"
-var testFSType = "ext2"
-var testVolUUID = "01c43d34-89f8-83d3-422b-43536a0f25e6"
+var (
+	testVolName   = "storageos-test-vol"
+	testPVName    = "storageos-test-pv"
+	testNamespace = "storageos-test-namespace"
+	testSize      = 1
+	testDesc      = "testdescription"
+	testPool      = "testpool"
+	testFSType    = "ext2"
+	testVolUUID   = "01c43d34-89f8-83d3-422b-43536a0f25e6"
+)
 
 func GetAPIConfig() *storageosAPIConfig {
 	return &storageosAPIConfig{
@@ -77,8 +79,8 @@ func (f fakeAPI) Volume(namespace string, ref string) (*storageostypes.Volume, e
 	}
 	return nil, fmt.Errorf("not found")
 }
-func (f fakeAPI) VolumeCreate(opts storageostypes.VolumeCreateOptions) (*storageostypes.Volume, error) {
 
+func (f fakeAPI) VolumeCreate(opts storageostypes.VolumeCreateOptions) (*storageostypes.Volume, error) {
 	// Append a label from the api
 	labels := opts.Labels
 	labels["labelfromapi"] = "apilabel"
@@ -94,21 +96,24 @@ func (f fakeAPI) VolumeCreate(opts storageostypes.VolumeCreateOptions) (*storage
 		Labels:      labels,
 	}, nil
 }
+
 func (f fakeAPI) VolumeMount(opts storageostypes.VolumeMountOptions) error {
 	return nil
 }
+
 func (f fakeAPI) VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error {
 	return nil
 }
+
 func (f fakeAPI) VolumeDelete(opts storageostypes.DeleteOptions) error {
 	return nil
 }
+
 func (f fakeAPI) Node(ref string) (*storageostypes.Node, error) {
 	return &storageostypes.Node{}, nil
 }
 
 func TestCreateVolume(t *testing.T) {
-
 	tmpDir, err := utiltesting.MkTmpdir("storageos_test")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)

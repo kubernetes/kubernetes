@@ -151,6 +151,7 @@ type TestPlugin struct {
 func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreFilterAddPodStatus), "injected status")
 }
+
 func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreFilterRemovePodStatus), "injected status")
 }
@@ -263,8 +264,7 @@ func (pl *TestPreFilterWithExtensionsPlugin) PreFilterExtensions() framework.Pre
 	return pl
 }
 
-type TestDuplicatePlugin struct {
-}
+type TestDuplicatePlugin struct{}
 
 func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
@@ -292,6 +292,7 @@ type TestPermitPlugin struct {
 func (pp *TestPermitPlugin) Name() string {
 	return permitPlugin
 }
+
 func (pp *TestPermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
 	return framework.NewStatus(framework.Wait), 10 * time.Second
 }
@@ -351,20 +352,26 @@ var state = &framework.CycleState{}
 
 // Pod is only used for logging errors.
 var pod = &v1.Pod{}
+
 var node = &v1.Node{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: nodeName,
 	},
 }
-var lowPriority, highPriority = int32(0), int32(1000)
-var lowPriorityPod = &v1.Pod{
-	ObjectMeta: metav1.ObjectMeta{UID: "low"},
-	Spec:       v1.PodSpec{Priority: &lowPriority},
-}
+
+var (
+	lowPriority, highPriority = int32(0), int32(1000)
+	lowPriorityPod            = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "low"},
+		Spec:       v1.PodSpec{Priority: &lowPriority},
+	}
+)
+
 var highPriorityPod = &v1.Pod{
 	ObjectMeta: metav1.ObjectMeta{UID: "high"},
 	Spec:       v1.PodSpec{Priority: &highPriority},
 }
+
 var nodes = []*v1.Node{
 	{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
 	{ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
@@ -958,7 +965,7 @@ func TestRunScorePlugins(t *testing.T) {
 		},
 		{
 			name: "single ScoreWithNormalize plugin",
-			//registry: registry,
+			// registry: registry,
 			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
@@ -1205,7 +1212,8 @@ func TestFilterPlugins(t *testing.T) {
 				{
 					name: "TestPlugin",
 					inj: injectedResult{
-						FilterStatus: int(framework.UnschedulableAndUnresolvable)},
+						FilterStatus: int(framework.UnschedulableAndUnresolvable),
+					},
 				},
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected filter status").WithFailedPlugin("TestPlugin"),
@@ -1269,7 +1277,6 @@ func TestFilterPlugins(t *testing.T) {
 			name: "SuccessAndErrorFilters",
 			plugins: []*TestPlugin{
 				{
-
 					name: "TestPlugin1",
 					inj:  injectedResult{FilterStatus: int(framework.Success)},
 				},

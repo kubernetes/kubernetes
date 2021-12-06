@@ -37,19 +37,16 @@ const (
 	kubeProxyDaemonSetName          = "kube-proxy"
 )
 
-var (
-	kubeProxyConfigMapResource = &authv1.ResourceAttributes{
-		Namespace: kubeSystemNamespace,
-		Name:      kubeProxyConfigMap,
-		Resource:  "configmaps",
-		Verb:      "get",
-	}
-)
+var kubeProxyConfigMapResource = &authv1.ResourceAttributes{
+	Namespace: kubeSystemNamespace,
+	Name:      kubeProxyConfigMap,
+	Resource:  "configmaps",
+	Verb:      "get",
+}
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the proxy addon as expected
 var _ = Describe("proxy addon", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("proxy")
 

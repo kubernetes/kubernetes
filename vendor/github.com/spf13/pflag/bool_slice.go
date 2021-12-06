@@ -22,7 +22,6 @@ func newBoolSliceValue(val []bool, p *[]bool) *boolSliceValue {
 // Set converts, and assigns, the comma-separated boolean argument string representation as the []bool value of this flag.
 // If Set is called on a flag that already has a []bool assigned, the newly converted values will be appended.
 func (s *boolSliceValue) Set(val string) error {
-
 	// remove all quote characters
 	rmQuote := strings.NewReplacer(`"`, "", `'`, "", "`", "")
 
@@ -60,7 +59,6 @@ func (s *boolSliceValue) Type() string {
 
 // String defines a "native" format for this boolean slice flag value.
 func (s *boolSliceValue) String() string {
-
 	boolStrSlice := make([]string, len(*s.value))
 	for i, b := range *s.value {
 		boolStrSlice[i] = strconv.FormatBool(b)

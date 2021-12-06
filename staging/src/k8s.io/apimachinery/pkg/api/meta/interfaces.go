@@ -44,34 +44,24 @@ type Type metav1.Type
 type MetadataAccessor interface {
 	APIVersion(obj runtime.Object) (string, error)
 	SetAPIVersion(obj runtime.Object, version string) error
-
 	Kind(obj runtime.Object) (string, error)
 	SetKind(obj runtime.Object, kind string) error
-
 	Namespace(obj runtime.Object) (string, error)
 	SetNamespace(obj runtime.Object, namespace string) error
-
 	Name(obj runtime.Object) (string, error)
 	SetName(obj runtime.Object, name string) error
-
 	GenerateName(obj runtime.Object) (string, error)
 	SetGenerateName(obj runtime.Object, name string) error
-
 	UID(obj runtime.Object) (types.UID, error)
 	SetUID(obj runtime.Object, uid types.UID) error
-
 	SelfLink(obj runtime.Object) (string, error)
 	SetSelfLink(obj runtime.Object, selfLink string) error
-
 	Labels(obj runtime.Object) (map[string]string, error)
 	SetLabels(obj runtime.Object, labels map[string]string) error
-
 	Annotations(obj runtime.Object) (map[string]string, error)
 	SetAnnotations(obj runtime.Object, annotations map[string]string) error
-
 	Continue(obj runtime.Object) (string, error)
 	SetContinue(obj runtime.Object, c string) error
-
 	runtime.ResourceVersioner
 }
 
@@ -129,7 +119,6 @@ type RESTMapper interface {
 	// version search is provided. Otherwise identifies a preferred resource mapping for
 	// the provided version(s).
 	RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error)
-
 	ResourceSingularizer(resource string) (singular string, err error)
 }
 

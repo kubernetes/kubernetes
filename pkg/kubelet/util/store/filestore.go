@@ -103,7 +103,7 @@ func (f *FileStore) getPathByKey(key string) string {
 func ensureDirectory(fs utilfs.Filesystem, path string) error {
 	if _, err := fs.Stat(path); err != nil {
 		// MkdirAll returns nil if directory already exists.
-		return fs.MkdirAll(path, 0755)
+		return fs.MkdirAll(path, 0o755)
 	}
 	return nil
 }

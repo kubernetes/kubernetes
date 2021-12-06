@@ -34,9 +34,11 @@ type auditHandler struct {
 	ae    *auditinternal.Event
 }
 
-var _ Interface = &auditHandler{}
-var _ MutationInterface = &auditHandler{}
-var _ ValidationInterface = &auditHandler{}
+var (
+	_ Interface           = &auditHandler{}
+	_ MutationInterface   = &auditHandler{}
+	_ ValidationInterface = &auditHandler{}
+)
 
 // WithAudit is a decorator for a admission phase. It saves annotations
 // of attribute into the audit event. Attributes passed to the Admit and

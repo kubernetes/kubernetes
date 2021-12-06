@@ -49,7 +49,6 @@ func TestTranslationStability(t *testing.T) {
 		name string
 		pv   *v1.PersistentVolume
 	}{
-
 		{
 			name: "GCE PD PV Source",
 			pv: &v1.PersistentVolume{
@@ -393,7 +392,6 @@ func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {
 				t.Errorf("PV name %s not sufficiently unique for different volumes", pv1.Name)
 			}
 		})
-
 	}
 }
 

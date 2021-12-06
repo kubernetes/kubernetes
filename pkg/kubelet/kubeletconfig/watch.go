@@ -17,9 +17,10 @@ limitations under the License.
 package kubeletconfig
 
 import (
-	"k8s.io/klog/v2"
 	"math/rand"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"

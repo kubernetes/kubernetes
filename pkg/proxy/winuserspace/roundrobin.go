@@ -39,8 +39,8 @@ var (
 
 type affinityState struct {
 	clientIP string
-	//clientProtocol  api.Protocol //not yet used
-	//sessionCookie   string       //not yet used
+	// clientProtocol  api.Protocol //not yet used
+	// sessionCookie   string       //not yet used
 	endpoint string
 	lastUsed time.Time
 }
@@ -92,7 +92,7 @@ func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType
 // This assumes that lb.lock is already held.
 func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType v1.ServiceAffinity, ttlSeconds int) *balancerState {
 	if ttlSeconds == 0 {
-		ttlSeconds = int(v1.DefaultClientIPServiceAffinitySeconds) //default to 3 hours if not specified.  Should 0 be unlimited instead????
+		ttlSeconds = int(v1.DefaultClientIPServiceAffinitySeconds) // default to 3 hours if not specified.  Should 0 be unlimited instead????
 	}
 
 	if _, exists := lb.services[svcPort]; !exists {

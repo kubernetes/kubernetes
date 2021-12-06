@@ -126,9 +126,7 @@ func IsPodSecurityPolicyEnabled(kubeClient clientset.Interface) bool {
 	return isPSPEnabled
 }
 
-var (
-	privilegedPSPOnce sync.Once
-)
+var privilegedPSPOnce sync.Once
 
 // CreatePrivilegedPSPBinding creates the privileged PSP & role
 func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string) {

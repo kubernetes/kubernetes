@@ -81,7 +81,7 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 		vendoredName = fmt.Sprintf("%s~%s", vendorName, plugName)
 	}
 	pluginDir := filepath.Join(tmpDir, vendoredName)
-	err := os.MkdirAll(pluginDir, 0777)
+	err := os.MkdirAll(pluginDir, 0o777)
 	if err != nil {
 		t.Errorf("Failed to create plugin: %v", err)
 	}
@@ -90,7 +90,7 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 	if err != nil {
 		t.Errorf("Failed to install plugin")
 	}
-	err = f.Chmod(0777)
+	err = f.Chmod(0o777)
 	if err != nil {
 		t.Errorf("Failed to set exec perms on plugin")
 	}

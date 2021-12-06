@@ -66,7 +66,8 @@ func TestResourcesLocal(t *testing.T) {
 	opts := SetResourcesOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../testdata/controller.yaml"}},
+			Filenames: []string{"../../../testdata/controller.yaml"},
+		},
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
 		Requests:          "cpu=200m,memory=512Mi",
@@ -114,7 +115,8 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	opts := SetResourcesOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"}},
+			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"},
+		},
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
 		Requests:          "cpu=200m,memory=512Mi",

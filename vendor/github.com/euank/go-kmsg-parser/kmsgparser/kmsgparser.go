@@ -117,7 +117,6 @@ func (p *parser) SeekEnd() error {
 // exit when the given reader is closed.
 // Closing the passed in reader will cause the goroutine to exit.
 func (p *parser) Parse() <-chan Message {
-
 	output := make(chan Message, 1)
 
 	go func() {

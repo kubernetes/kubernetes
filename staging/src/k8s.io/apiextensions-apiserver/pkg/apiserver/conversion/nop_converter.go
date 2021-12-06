@@ -23,8 +23,7 @@ import (
 )
 
 // nopConverter is a converter that only sets the apiVersion fields, but does not real conversion.
-type nopConverter struct {
-}
+type nopConverter struct{}
 
 var _ crConverterInterface = &nopConverter{}
 

@@ -52,14 +52,14 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
-		defaultMode := int32(0400)
+		defaultMode := int32(0o400)
 		doProjectedConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		defaultMode := int32(0o440) /* setting fsGroup sets mode to at least 440 */
 		doProjectedConfigMapE2EWithoutMappings(f, true, 1001, &defaultMode)
 	})
 
@@ -94,7 +94,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
-		mode := int32(0400)
+		mode := int32(0o400)
 		doProjectedConfigMapE2EWithMappings(f, false, 0, &mode)
 	})
 
@@ -413,7 +413,6 @@ var _ = SIGDescribe("Projected configMap", func() {
 							Projected: &v1.ProjectedVolumeSource{
 								Sources: []v1.VolumeProjection{
 									{
-
 										ConfigMap: &v1.ConfigMapProjection{
 											LocalObjectReference: v1.LocalObjectReference{
 												Name: name,
@@ -451,21 +450,20 @@ var _ = SIGDescribe("Projected configMap", func() {
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"content of file \"/etc/projected-configmap-volume/data-1\": value-1",
 		})
-
 	})
 
-	//The pod is in pending during volume creation until the configMap objects are available
-	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timout exception unless it is marked optional.
-	//Slow (~5 mins)
+	// The pod is in pending during volume creation until the configMap objects are available
+	// or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timout exception unless it is marked optional.
+	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/projected-configmap-volumes"
 		pod, err := createNonOptionalConfigMapPod(f, volumeMountPath)
 		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
 	})
 
-	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
+	// ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
 	// the volume setup will error unless it is marked optional, during the pod creation.
-	//Slow (~5 mins)
+	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/configmap-volumes"
 		pod, err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath)
@@ -501,7 +499,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool,
 	}
 
 	if defaultMode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.DefaultMode = defaultMode
+		// pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.DefaultMode = defaultMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
 	}
 
@@ -548,7 +546,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 	}
 
 	if itemMode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
+		// pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = itemMode
 	}
 

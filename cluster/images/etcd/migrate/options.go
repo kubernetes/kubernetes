@@ -27,9 +27,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	supportedEtcdVersions = []string{"3.0.17", "3.1.12", "3.2.24", "3.3.17", "3.4.13", "3.5.1"}
-)
+var supportedEtcdVersions = []string{"3.0.17", "3.1.12", "3.2.24", "3.3.17", "3.4.13", "3.5.1"}
 
 const (
 	etcdNameEnv           = "ETCD_NAME"

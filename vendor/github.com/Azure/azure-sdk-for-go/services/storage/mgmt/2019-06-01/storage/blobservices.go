@@ -8,11 +8,12 @@ package storage
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // BlobServicesClient is the the Azure Storage Management API.
@@ -50,15 +51,26 @@ func (client BlobServicesClient) GetServiceProperties(ctx context.Context, resou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.BlobServicesClient", "GetServiceProperties", err.Error())
 	}
 
@@ -142,15 +154,26 @@ func (client BlobServicesClient) List(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.BlobServicesClient", "List", err.Error())
 	}
 
@@ -236,37 +259,71 @@ func (client BlobServicesClient) SetServiceProperties(ctx context.Context, resou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy.Days", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy.Days", Name: validation.InclusiveMaximum, Rule: int64(365), Chain: nil},
-							{Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy.Days", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-						}},
-					}},
-					{Target: "parameters.BlobServicePropertiesProperties.RestorePolicy", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties.RestorePolicy.Enabled", Name: validation.Null, Rule: true, Chain: nil},
-							{Target: "parameters.BlobServicePropertiesProperties.RestorePolicy.Days", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties.RestorePolicy.Days", Name: validation.InclusiveMaximum, Rule: int64(365), Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.BlobServicePropertiesProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy.Days", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy.Days", Name: validation.InclusiveMaximum, Rule: int64(365), Chain: nil},
+									{Target: "parameters.BlobServicePropertiesProperties.DeleteRetentionPolicy.Days", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+								},
+							},
+						},
+					},
+					{
+						Target: "parameters.BlobServicePropertiesProperties.RestorePolicy", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "parameters.BlobServicePropertiesProperties.RestorePolicy.Enabled", Name: validation.Null, Rule: true, Chain: nil},
+							{
+								Target: "parameters.BlobServicePropertiesProperties.RestorePolicy.Days", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{Target: "parameters.BlobServicePropertiesProperties.RestorePolicy.Days", Name: validation.InclusiveMaximum, Rule: int64(365), Chain: nil},
 									{Target: "parameters.BlobServicePropertiesProperties.RestorePolicy.Days", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-								}},
-						}},
-					{Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy.Days", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy.Days", Name: validation.InclusiveMaximum, Rule: int64(365), Chain: nil},
-								{Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy.Days", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-							}},
-						}},
-				}}}}}); err != nil {
+								},
+							},
+						},
+					},
+					{
+						Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy.Days", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy.Days", Name: validation.InclusiveMaximum, Rule: int64(365), Chain: nil},
+									{Target: "parameters.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy.Days", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.BlobServicesClient", "SetServiceProperties", err.Error())
 	}
 

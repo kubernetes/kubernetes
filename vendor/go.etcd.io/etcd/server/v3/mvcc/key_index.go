@@ -23,9 +23,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	ErrRevisionNotFound = errors.New("mvcc: revision not found")
-)
+var ErrRevisionNotFound = errors.New("mvcc: revision not found")
 
 // keyIndex stores the revisions of a key in the backend.
 // Each keyIndex has at least one key generation.

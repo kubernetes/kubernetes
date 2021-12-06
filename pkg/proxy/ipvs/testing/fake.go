@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+
 	"k8s.io/utils/net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -125,6 +126,7 @@ func (h *FakeNetlinkHandle) GetLocalAddresses(dev string) (sets.String, error) {
 	}
 	return res, nil
 }
+
 func (h *FakeNetlinkHandle) GetAllLocalAddresses() (sets.String, error) {
 	res := sets.NewString()
 	// List all addresses from all available network interfaces.

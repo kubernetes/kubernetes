@@ -117,7 +117,6 @@ func Wrap(e interface{}, skip int) *Error {
 // up the stack to start the stacktrace. 0 is from the current call,
 // 1 from its caller, etc.
 func WrapPrefix(e interface{}, prefix string, skip int) *Error {
-
 	err := Wrap(e, 1+skip)
 
 	if err.prefix != "" {
@@ -129,14 +128,12 @@ func WrapPrefix(e interface{}, prefix string, skip int) *Error {
 		stack:  err.stack,
 		prefix: prefix,
 	}
-
 }
 
 // Is detects whether the error is equal to a given error. Errors
 // are considered equal by this function if they are the same object,
 // or if they both contain the same error inside an errors.Error.
 func Is(e error, original error) bool {
-
 	if e == original {
 		return true
 	}
@@ -161,7 +158,6 @@ func Errorf(format string, a ...interface{}) *Error {
 
 // Error returns the underlying error's message.
 func (err *Error) Error() string {
-
 	msg := err.Err.Error()
 	if err.prefix != "" {
 		msg = fmt.Sprintf("%s: %s", err.prefix, msg)

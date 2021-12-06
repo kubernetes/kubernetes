@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // WatchersClient is the network Client
@@ -49,10 +50,17 @@ func (client WatchersClient) CheckConnectivity(ctx context.Context, resourceGrou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.Source", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.Source.ResourceID", Name: validation.Null, Rule: true, Chain: nil}}},
-				{Target: "parameters.Destination", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{
+					Target: "parameters.Source", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{{Target: "parameters.Source.ResourceID", Name: validation.Null, Rule: true, Chain: nil}},
+				},
+				{Target: "parameters.Destination", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "CheckConnectivity", err.Error())
 	}
 
@@ -371,11 +379,18 @@ func (client WatchersClient) GetAzureReachabilityReport(ctx context.Context, res
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.ProviderLocation", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.ProviderLocation.Country", Name: validation.Null, Rule: true, Chain: nil}}},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{
+					Target: "parameters.ProviderLocation", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{{Target: "parameters.ProviderLocation.Country", Name: validation.Null, Rule: true, Chain: nil}},
+				},
 				{Target: "parameters.StartTime", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "parameters.EndTime", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+				{Target: "parameters.EndTime", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "GetAzureReachabilityReport", err.Error())
 	}
 
@@ -461,8 +476,11 @@ func (client WatchersClient) GetFlowLogStatus(ctx context.Context, resourceGroup
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "GetFlowLogStatus", err.Error())
 	}
 
@@ -548,9 +566,14 @@ func (client WatchersClient) GetNetworkConfigurationDiagnostic(ctx context.Conte
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "parameters.Profiles", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
+				{Target: "parameters.Profiles", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "GetNetworkConfigurationDiagnostic", err.Error())
 	}
 
@@ -636,10 +659,15 @@ func (client WatchersClient) GetNextHop(ctx context.Context, resourceGroupName s
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
 				{Target: "parameters.SourceIPAddress", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "parameters.DestinationIPAddress", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+				{Target: "parameters.DestinationIPAddress", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "GetNextHop", err.Error())
 	}
 
@@ -804,12 +832,20 @@ func (client WatchersClient) GetTroubleshooting(ctx context.Context, resourceGro
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "parameters.TroubleshootingProperties", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "parameters.TroubleshootingProperties.StorageID", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
+				{
+					Target: "parameters.TroubleshootingProperties", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{
+						{Target: "parameters.TroubleshootingProperties.StorageID", Name: validation.Null, Rule: true, Chain: nil},
 						{Target: "parameters.TroubleshootingProperties.StoragePath", Name: validation.Null, Rule: true, Chain: nil},
-					}}}}}); err != nil {
+					},
+				},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "GetTroubleshooting", err.Error())
 	}
 
@@ -895,8 +931,11 @@ func (client WatchersClient) GetTroubleshootingResult(ctx context.Context, resou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "GetTroubleshootingResult", err.Error())
 	}
 
@@ -982,8 +1021,11 @@ func (client WatchersClient) GetVMSecurityRules(ctx context.Context, resourceGro
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "GetVMSecurityRules", err.Error())
 	}
 
@@ -1295,20 +1337,34 @@ func (client WatchersClient) SetFlowLogConfiguration(ctx context.Context, resour
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "parameters.FlowLogProperties", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "parameters.FlowLogProperties.StorageID", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
+				{
+					Target: "parameters.FlowLogProperties", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{
+						{Target: "parameters.FlowLogProperties.StorageID", Name: validation.Null, Rule: true, Chain: nil},
 						{Target: "parameters.FlowLogProperties.Enabled", Name: validation.Null, Rule: true, Chain: nil},
-					}},
-				{Target: "parameters.FlowAnalyticsConfiguration", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration", Name: validation.Null, Rule: true,
-						Chain: []validation.Constraint{{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.Enabled", Name: validation.Null, Rule: true, Chain: nil},
-							{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.WorkspaceID", Name: validation.Null, Rule: true, Chain: nil},
-							{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.WorkspaceRegion", Name: validation.Null, Rule: true, Chain: nil},
-							{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.WorkspaceResourceID", Name: validation.Null, Rule: true, Chain: nil},
-						}},
-					}}}}}); err != nil {
+					},
+				},
+				{
+					Target: "parameters.FlowAnalyticsConfiguration", Name: validation.Null, Rule: false,
+					Chain: []validation.Constraint{
+						{
+							Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration", Name: validation.Null, Rule: true,
+							Chain: []validation.Constraint{
+								{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.Enabled", Name: validation.Null, Rule: true, Chain: nil},
+								{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.WorkspaceID", Name: validation.Null, Rule: true, Chain: nil},
+								{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.WorkspaceRegion", Name: validation.Null, Rule: true, Chain: nil},
+								{Target: "parameters.FlowAnalyticsConfiguration.NetworkWatcherFlowAnalyticsConfiguration.WorkspaceResourceID", Name: validation.Null, Rule: true, Chain: nil},
+							},
+						},
+					},
+				},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "SetFlowLogConfiguration", err.Error())
 	}
 
@@ -1473,12 +1529,17 @@ func (client WatchersClient) VerifyIPFlow(ctx context.Context, resourceGroupName
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{Target: "parameters.TargetResourceID", Name: validation.Null, Rule: true, Chain: nil},
 				{Target: "parameters.LocalPort", Name: validation.Null, Rule: true, Chain: nil},
 				{Target: "parameters.RemotePort", Name: validation.Null, Rule: true, Chain: nil},
 				{Target: "parameters.LocalIPAddress", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "parameters.RemoteIPAddress", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+				{Target: "parameters.RemoteIPAddress", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WatchersClient", "VerifyIPFlow", err.Error())
 	}
 

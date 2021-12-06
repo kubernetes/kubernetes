@@ -92,11 +92,15 @@ type numaOrSocketsFirstFuncs interface {
 	sortAvailableCores() []int
 }
 
-type numaFirst struct{ acc *cpuAccumulator }
-type socketsFirst struct{ acc *cpuAccumulator }
+type (
+	numaFirst    struct{ acc *cpuAccumulator }
+	socketsFirst struct{ acc *cpuAccumulator }
+)
 
-var _ numaOrSocketsFirstFuncs = (*numaFirst)(nil)
-var _ numaOrSocketsFirstFuncs = (*socketsFirst)(nil)
+var (
+	_ numaOrSocketsFirstFuncs = (*numaFirst)(nil)
+	_ numaOrSocketsFirstFuncs = (*socketsFirst)(nil)
+)
 
 // If NUMA nodes are higher in the memory hierarchy than sockets, then we take
 // from the set of NUMA Nodes as the first level.

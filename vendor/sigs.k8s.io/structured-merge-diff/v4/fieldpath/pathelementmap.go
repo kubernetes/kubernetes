@@ -47,6 +47,7 @@ type sortedPathElementValues []pathElementValue
 // Implement the sort interface; this would permit bulk creation, which would
 // be faster than doing it one at a time via Insert.
 func (spev sortedPathElementValues) Len() int { return len(spev) }
+
 func (spev sortedPathElementValues) Less(i, j int) bool {
 	return spev[i].PathElement.Less(spev[j].PathElement)
 }

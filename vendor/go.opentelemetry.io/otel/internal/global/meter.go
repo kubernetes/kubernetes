@@ -114,11 +114,13 @@ type syncHandle struct {
 	initialize sync.Once
 }
 
-var _ metric.MeterProvider = &meterProvider{}
-var _ metric.MeterImpl = &meterImpl{}
-var _ metric.InstrumentImpl = &syncImpl{}
-var _ metric.BoundSyncImpl = &syncHandle{}
-var _ metric.AsyncImpl = &asyncImpl{}
+var (
+	_ metric.MeterProvider  = &meterProvider{}
+	_ metric.MeterImpl      = &meterImpl{}
+	_ metric.InstrumentImpl = &syncImpl{}
+	_ metric.BoundSyncImpl  = &syncHandle{}
+	_ metric.AsyncImpl      = &asyncImpl{}
+)
 
 func (inst *instrument) Descriptor() metric.Descriptor {
 	return inst.descriptor
@@ -256,7 +258,6 @@ func (m *meterImpl) NewAsyncInstrument(
 	desc metric.Descriptor,
 	runner metric.AsyncRunner,
 ) (metric.AsyncImpl, error) {
-
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

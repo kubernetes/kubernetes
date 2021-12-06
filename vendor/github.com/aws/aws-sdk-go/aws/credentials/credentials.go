@@ -110,7 +110,6 @@ type Provider interface {
 // ProviderWithContext is a Provider that can retrieve credentials with a Context
 type ProviderWithContext interface {
 	Provider
-
 	RetrieveWithContext(Context) (Value, error)
 }
 

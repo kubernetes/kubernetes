@@ -206,6 +206,6 @@ func (p *Collector) RetrieveWithFilter(ctx context.Context, objs []types.Managed
 
 // RetrieveOne calls Retrieve with a single managed object reference via Collector.Retrieve().
 func (p *Collector) RetrieveOne(ctx context.Context, obj types.ManagedObjectReference, ps []string, dst interface{}) error {
-	var objs = []types.ManagedObjectReference{obj}
+	objs := []types.ManagedObjectReference{obj}
 	return p.Retrieve(ctx, objs, ps, dst)
 }

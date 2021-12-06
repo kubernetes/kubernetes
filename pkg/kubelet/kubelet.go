@@ -775,8 +775,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
 	// which affects node ready status. This function must be called before Kubelet is initialized so that the Node
 	// ReadyState is accurate with the storage state.
-	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
+	klet.volumePluginMgr, err = NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
 	if err != nil {
 		return nil, err
 	}
@@ -1284,22 +1283,22 @@ func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
 	pluginRegistrationDir := kl.getPluginsRegistrationDir()
 	pluginsDir := kl.getPluginsDir()
-	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getRootDir(), 0o750); err != nil {
 		return fmt.Errorf("error creating root directory: %v", err)
 	}
 	if err := kl.hostutil.MakeRShared(kl.getRootDir()); err != nil {
 		return fmt.Errorf("error configuring root directory: %v", err)
 	}
-	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getPodsDir(), 0o750); err != nil {
 		return fmt.Errorf("error creating pods directory: %v", err)
 	}
-	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getPluginsDir(), 0o750); err != nil {
 		return fmt.Errorf("error creating plugins directory: %v", err)
 	}
-	if err := os.MkdirAll(kl.getPluginsRegistrationDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getPluginsRegistrationDir(), 0o750); err != nil {
 		return fmt.Errorf("error creating plugins registry directory: %v", err)
 	}
-	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getPodResourcesDir(), 0o750); err != nil {
 		return fmt.Errorf("error creating podresources directory: %v", err)
 	}
 	if selinux.SELinuxEnabled() {
@@ -1381,7 +1380,7 @@ func (kl *Kubelet) initializeModules() error {
 
 	// If the container logs directory does not exist, create it.
 	if _, err := os.Stat(ContainerLogsDir); err != nil {
-		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
+		if err := kl.os.MkdirAll(ContainerLogsDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directory %q: %v", ContainerLogsDir, err)
 		}
 	}
@@ -1931,7 +1930,8 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  reason,
-		Message: "Pod " + message})
+		Message: "Pod " + message,
+	})
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package winfile
@@ -9,7 +10,7 @@ import (
 )
 
 // issue also described here
-//https://codereview.appspot.com/8203043/
+// https://codereview.appspot.com/8203043/
 
 // https://github.com/jnwhiteh/golang/blob/master/src/pkg/syscall/syscall_windows.go#L218
 func Open(path string, mode int, perm uint32) (fd syscall.Handle, err error) {

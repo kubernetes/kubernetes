@@ -85,7 +85,8 @@ func (rn *RawNode) Propose(data []byte) error {
 		From: rn.raft.id,
 		Entries: []pb.Entry{
 			{Data: data},
-		}})
+		},
+	})
 }
 
 // ProposeConfChange proposes a config change. See (Node).ProposeConfChange for

@@ -92,21 +92,27 @@ func InitExtensionInfo(xi *ExtensionInfo, xd pref.ExtensionDescriptor, goType re
 func (xi *ExtensionInfo) New() pref.Value {
 	return xi.lazyInit().New()
 }
+
 func (xi *ExtensionInfo) Zero() pref.Value {
 	return xi.lazyInit().Zero()
 }
+
 func (xi *ExtensionInfo) ValueOf(v interface{}) pref.Value {
 	return xi.lazyInit().PBValueOf(reflect.ValueOf(v))
 }
+
 func (xi *ExtensionInfo) InterfaceOf(v pref.Value) interface{} {
 	return xi.lazyInit().GoValueOf(v).Interface()
 }
+
 func (xi *ExtensionInfo) IsValidValue(v pref.Value) bool {
 	return xi.lazyInit().IsValidPB(v)
 }
+
 func (xi *ExtensionInfo) IsValidInterface(v interface{}) bool {
 	return xi.lazyInit().IsValidGo(reflect.ValueOf(v))
 }
+
 func (xi *ExtensionInfo) TypeDescriptor() pref.ExtensionTypeDescriptor {
 	if atomic.LoadUint32(&xi.init) < extensionInfoDescInit {
 		xi.lazyInitSlow()
@@ -151,6 +157,7 @@ type extensionTypeDescriptor struct {
 func (xtd *extensionTypeDescriptor) Type() pref.ExtensionType {
 	return xtd.xi
 }
+
 func (xtd *extensionTypeDescriptor) Descriptor() pref.ExtensionDescriptor {
 	return xtd.ExtensionDescriptor
 }

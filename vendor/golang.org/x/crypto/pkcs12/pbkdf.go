@@ -10,9 +10,7 @@ import (
 	"math/big"
 )
 
-var (
-	one = big.NewInt(1)
-)
+var one = big.NewInt(1)
 
 // sha1Sum returns the SHA-1 hash of in.
 func sha1Sum(in []byte) []byte {

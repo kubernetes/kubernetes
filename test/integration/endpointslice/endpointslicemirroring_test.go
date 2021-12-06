@@ -230,7 +230,6 @@ func TestEndpointSliceMirroring(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestEndpointSliceMirroringUpdates(t *testing.T) {

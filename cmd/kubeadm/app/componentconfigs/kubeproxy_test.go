@@ -135,7 +135,6 @@ func runKubeProxyFromTest(t *testing.T, perform func(gvk schema.GroupVersionKind
 	yaml := fmt.Sprintf("apiVersion: %s\nkind: %s\nclusterCIDR: %s", kubeProxyHandler.GroupVersion, kind, clusterCIDR)
 
 	cfg, err := perform(gvk, yaml)
-
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
 	}

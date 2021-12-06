@@ -47,7 +47,7 @@ func namedTestingTArg(node *ast.FuncDecl) string {
  */
 func blockStatementFromDescribe(desc *ast.CallExpr) *ast.BlockStmt {
 	var funcLit *ast.FuncLit
-	var found = false
+	found := false
 
 	for _, node := range desc.Args {
 		switch node := node.(type) {

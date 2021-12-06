@@ -86,7 +86,7 @@ func (s *Service) pollOperation(ctx context.Context, op operation) error {
 		// returning ctx.Err().
 		select {
 		case <-ctx.Done():
-      klog.V(5).Infof("op.pollOperation(%v, %v) not completed, poll count = %d, ctx.Err = %v", ctx, op, pollCount, ctx.Err())
+			klog.V(5).Infof("op.pollOperation(%v, %v) not completed, poll count = %d, ctx.Err = %v", ctx, op, pollCount, ctx.Err())
 			return ctx.Err()
 		default:
 			// ctx is not canceled, continue immediately
@@ -100,7 +100,7 @@ func (s *Service) pollOperation(ctx context.Context, op operation) error {
 			klog.V(5).Infof("op.isDone(%v) error; op = %v, poll count = %d, err = %v, retrying", ctx, op, pollCount, err)
 			return err
 		case done:
-                        klog.V(5).Infof("op.isDone(%v) complete; op = %v, poll count = %d, op.err = %v", ctx, op, pollCount, op.error())
+			klog.V(5).Infof("op.isDone(%v) complete; op = %v, poll count = %d, op.err = %v", ctx, op, pollCount, op.error())
 			return op.error()
 		}
 	}

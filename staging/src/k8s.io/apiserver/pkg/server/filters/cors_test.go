@@ -157,13 +157,11 @@ func TestCORSAllowedMethods(t *testing.T) {
 			t.Errorf("Unexpected allowed method %v, Expected only %#v", test.method, response.Header.Get("Access-Control-Allow-Methods"))
 		}
 	}
-
 }
 
 func TestCompileRegex(t *testing.T) {
 	uncompiledRegexes := []string{"endsWithMe$", "^startingWithMe"}
 	regexes, err := compileRegexps(uncompiledRegexes)
-
 	if err != nil {
 		t.Errorf("Failed to compile legal regexes: '%v': %v", uncompiledRegexes, err)
 	}

@@ -337,7 +337,7 @@ func (c *Cron) Stop() context.Context {
 
 // entrySnapshot returns a copy of the current cron entry list.
 func (c *Cron) entrySnapshot() []Entry {
-	var entries = make([]Entry, len(c.entries))
+	entries := make([]Entry, len(c.entries))
 	for i, e := range c.entries {
 		entries[i] = *e
 	}

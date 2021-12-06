@@ -133,7 +133,6 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 			framework.Failf("Expected IngressClass.spec.parameters.scope to be set to 'Namespace', got %v", scope)
 		}
 	})
-
 })
 
 func createIngressClass(cs clientset.Interface, name string, isDefault bool, uniqueName string) (*networkingv1.IngressClass, error) {
@@ -196,7 +195,6 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		- The ingressclass resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
 	framework.ConformanceIt(" should support creating IngressClass API operations", func() {
-
 		// Setup
 		icClient := f.ClientSet.NetworkingV1().IngressClasses()
 		icVersion := "v1"
@@ -322,5 +320,4 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(ics.Items), 0, "filtered list should have 0 items")
 	})
-
 })

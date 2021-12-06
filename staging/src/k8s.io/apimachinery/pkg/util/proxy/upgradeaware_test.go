@@ -217,7 +217,8 @@ func TestServeHTTP(t *testing.T) {
 			responseHeader: map[string]string{
 				"Header1":                      "value1",
 				"Access-Control-Allow-Origin":  "some.server",
-				"Access-Control-Allow-Methods": "GET"},
+				"Access-Control-Allow-Methods": "GET",
+			},
 			expectedRespHeader: map[string]string{
 				"Header1": "value1",
 			},
@@ -393,7 +394,6 @@ func (fn RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func TestProxyUpgrade(t *testing.T) {
-
 	localhostPool := x509.NewCertPool()
 	if !localhostPool.AppendCertsFromPEM(localhostCert) {
 		t.Errorf("error setting up localhostCert pool")
@@ -1056,7 +1056,6 @@ func TestErrorPropagation(t *testing.T) {
 }
 
 func TestProxyRedirectsforRootPath(t *testing.T) {
-
 	tests := []struct {
 		name               string
 		method             string

@@ -817,7 +817,6 @@ func TestNoResourceFoundMessage(t *testing.T) {
 	o := NewLogsOptions(streams, false)
 	o.Selector = "foo"
 	err := o.Complete(tf, cmd, []string{})
-
 	if err != nil {
 		t.Fatalf("Unexpected error, expected none, got %v", err)
 	}

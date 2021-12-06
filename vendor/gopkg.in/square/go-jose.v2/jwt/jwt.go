@@ -19,9 +19,10 @@ package jwt
 
 import (
 	"fmt"
+	"strings"
+
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/json"
-	"strings"
 )
 
 // JSONWebToken represents a JSON Web Token (as specified in RFC7519).

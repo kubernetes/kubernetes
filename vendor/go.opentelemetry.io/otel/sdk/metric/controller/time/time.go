@@ -32,15 +32,16 @@ type Ticker interface {
 	C() <-chan lib.Time
 }
 
-type RealClock struct {
-}
+type RealClock struct{}
 
 type RealTicker struct {
 	ticker *lib.Ticker
 }
 
-var _ Clock = RealClock{}
-var _ Ticker = RealTicker{}
+var (
+	_ Clock  = RealClock{}
+	_ Ticker = RealTicker{}
+)
 
 func (RealClock) Now() time.Time {
 	return time.Now()

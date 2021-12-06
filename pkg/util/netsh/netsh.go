@@ -80,7 +80,6 @@ func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
 		}
 	}
 	return false, fmt.Errorf("error checking portproxy rule: %v: %s", err, out)
-
 }
 
 // DeletePortProxyRule deletes the specified portproxy rule.  If the rule did not exist, return error.

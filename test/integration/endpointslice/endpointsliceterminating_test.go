@@ -258,7 +258,6 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{
 					LabelSelector: discovery.LabelServiceName + "=" + svc.Name,
 				})
-
 				if err != nil {
 					return false, err
 				}
@@ -295,7 +294,6 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{
 					LabelSelector: discovery.LabelServiceName + "=" + svc.Name,
 				})
-
 				if err != nil {
 					return false, err
 				}

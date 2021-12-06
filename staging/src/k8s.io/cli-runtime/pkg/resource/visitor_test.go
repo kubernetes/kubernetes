@@ -60,7 +60,6 @@ func TestVisitorHttpGet(t *testing.T) {
 					return 0, "", nil, fmt.Errorf("Failed to get http")
 				}
 				return 0, "", nil, fmt.Errorf("Unexpected error")
-
 			},
 			expectedErr: fmt.Errorf("Failed to get http"),
 			args: httpArgs{
@@ -90,7 +89,6 @@ func TestVisitorHttpGet(t *testing.T) {
 				assert.Equal(t, "hello", url)
 				i++
 				return 300, "Status", nil, nil
-
 			},
 			args: httpArgs{
 				duration: 0,
@@ -105,7 +103,6 @@ func TestVisitorHttpGet(t *testing.T) {
 				assert.Equal(t, "hello", url)
 				i++
 				return 501, "Status", nil, nil
-
 			},
 			args: httpArgs{
 				duration: 0,
@@ -118,7 +115,6 @@ func TestVisitorHttpGet(t *testing.T) {
 			name: "Test attempts less than 1 results in an error",
 			httpRetries: func(url string) (int, string, io.ReadCloser, error) {
 				return 200, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
-
 			},
 			args: httpArgs{
 				duration: 0,
@@ -136,7 +132,6 @@ func TestVisitorHttpGet(t *testing.T) {
 					return 200, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
 				}
 				return 501, "Status", nil, nil
-
 			},
 			args: httpArgs{
 				duration: 0,
@@ -218,7 +213,7 @@ func TestExpandPathsToFileVisitors(t *testing.T) {
 		filepath.Join(testDir, "b.yml"),
 	}
 	for _, fp := range filePaths {
-		if err := os.MkdirAll(filepath.Dir(fp), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(fp), 0o700); err != nil {
 			t.Fatal(err)
 		}
 		func() {

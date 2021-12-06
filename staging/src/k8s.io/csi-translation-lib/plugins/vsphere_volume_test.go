@@ -306,7 +306,8 @@ func TestTranslatevSphereInTreeInlineVolumeToCSI(t *testing.T) {
 						VolumePath: "[vsanDatastore] volume/inlinevolume.vmdk",
 						FSType:     "ext4",
 					},
-				}},
+				},
+			},
 			csiPV: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("%s-%s", VSphereDriverName, "[vsanDatastore] volume/inlinevolume.vmdk"),

@@ -406,8 +406,8 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 func (jm *ControllerV2) syncCronJob(
 	ctx context.Context,
 	cj *batchv1.CronJob,
-	js []*batchv1.Job) (*batchv1.CronJob, *time.Duration, error) {
-
+	js []*batchv1.Job) (*batchv1.CronJob, *time.Duration, error,
+) {
 	cj = cj.DeepCopy()
 	now := jm.now()
 
@@ -538,7 +538,8 @@ func (jm *ControllerV2) syncCronJob(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getJobName(cj, *scheduledTime),
 			Namespace: cj.Namespace,
-		}}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
+		},
+	}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", scheduledTime)
 		t := nextScheduledTimeDuration(sched, now)
 		return cj, t, nil

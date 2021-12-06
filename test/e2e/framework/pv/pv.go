@@ -59,11 +59,10 @@ const (
 	volumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
 )
 
-var (
-	// SELinuxLabel is common selinux labels.
-	SELinuxLabel = &v1.SELinuxOptions{
-		Level: "s0:c0,c1"}
-)
+// SELinuxLabel is common selinux labels.
+var SELinuxLabel = &v1.SELinuxOptions{
+	Level: "s0:c0,c1",
+}
 
 type pvval struct{}
 
@@ -619,7 +618,6 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 
 // MakePersistentVolumeClaim returns a PVC API Object based on the PersistentVolumeClaimConfig.
 func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.PersistentVolumeClaim {
-
 	if len(cfg.AccessModes) == 0 {
 		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce)
 	}

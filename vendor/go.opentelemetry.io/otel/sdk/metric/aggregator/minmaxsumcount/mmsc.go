@@ -42,8 +42,10 @@ type (
 	}
 )
 
-var _ export.Aggregator = &Aggregator{}
-var _ aggregation.MinMaxSumCount = &Aggregator{}
+var (
+	_ export.Aggregator          = &Aggregator{}
+	_ aggregation.MinMaxSumCount = &Aggregator{}
+)
 
 // New returns a new aggregator for computing the min, max, sum, and
 // count.

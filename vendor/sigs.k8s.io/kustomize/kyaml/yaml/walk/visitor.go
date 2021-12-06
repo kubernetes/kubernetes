@@ -18,9 +18,7 @@ const (
 // Visitor is invoked by walk with source and destination node pairs
 type Visitor interface {
 	VisitMap(Sources, *openapi.ResourceSchema) (*yaml.RNode, error)
-
 	VisitScalar(Sources, *openapi.ResourceSchema) (*yaml.RNode, error)
-
 	VisitList(Sources, *openapi.ResourceSchema, ListKind) (*yaml.RNode, error)
 }
 

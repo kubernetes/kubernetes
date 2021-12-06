@@ -30,7 +30,6 @@ import (
 
 // Test for #101370
 func TestConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(t *testing.T) {
-
 	type args struct {
 		in        *autoscaling.HorizontalPodAutoscalerSpec
 		out       *autoscalingv1.HorizontalPodAutoscalerSpec

@@ -472,8 +472,10 @@ func (m *mux) newChannel(chanType string, direction channelDirection, extraData 
 	return ch
 }
 
-var errUndecided = errors.New("ssh: must Accept or Reject channel")
-var errDecidedAlready = errors.New("ssh: can call Accept or Reject only once")
+var (
+	errUndecided      = errors.New("ssh: must Accept or Reject channel")
+	errDecidedAlready = errors.New("ssh: can call Accept or Reject only once")
+)
 
 type extChannel struct {
 	code uint32
@@ -541,7 +543,8 @@ func (ch *channel) CloseWrite() error {
 	}
 	ch.sentEOF = true
 	return ch.sendMessage(channelEOFMsg{
-		PeersID: ch.remoteId})
+		PeersID: ch.remoteId,
+	})
 }
 
 func (ch *channel) Close() error {
@@ -550,7 +553,8 @@ func (ch *channel) Close() error {
 	}
 
 	return ch.sendMessage(channelCloseMsg{
-		PeersID: ch.remoteId})
+		PeersID: ch.remoteId,
+	})
 }
 
 // Extended returns an io.ReadWriter that sends and receives data on the given,

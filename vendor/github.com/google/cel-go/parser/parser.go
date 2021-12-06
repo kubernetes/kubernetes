@@ -179,7 +179,7 @@ func (rl *recursionListener) EnterEveryRule(ctx antlr.ParserRuleContext) {
 	ruleIndex := ctx.GetRuleIndex()
 	depth, found := rl.ruleTypeDepth[ruleIndex]
 	if !found {
-		var counter = 1
+		counter := 1
 		rl.ruleTypeDepth[ruleIndex] = &counter
 		depth = &counter
 	} else {
@@ -405,7 +405,6 @@ func (p *parser) Visit(tree antlr.ParseTree) interface{} {
 		return p.reportError(common.NoLocation, "unknown parse element encountered: %s", txt)
 	}
 	return p.helper.newExpr(common.NoLocation)
-
 }
 
 // Visit a parse tree produced by CELParser#start.
@@ -749,7 +748,6 @@ func (p *parser) VisitDouble(ctx *gen.DoubleContext) interface{} {
 		return p.reportError(ctx, "invalid double literal")
 	}
 	return p.helper.newLiteralDouble(ctx, f)
-
 }
 
 // Visit a parse tree produced by CELParser#String.
@@ -779,7 +777,9 @@ func (p *parser) VisitNull(ctx *gen.NullContext) interface{} {
 	return p.helper.newLiteral(ctx,
 		&exprpb.Constant{
 			ConstantKind: &exprpb.Constant_NullValue{
-				NullValue: structpb.NullValue_NULL_VALUE}})
+				NullValue: structpb.NullValue_NULL_VALUE,
+			},
+		})
 }
 
 func (p *parser) visitList(ctx gen.IExprListContext) []*exprpb.Expr {

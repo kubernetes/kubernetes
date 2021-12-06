@@ -165,7 +165,7 @@ type ImageMeta struct {
 	// In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 	ImageTag string `json:"imageTag,omitempty"`
 
-	//TODO: evaluate if we need also a ImageName based on user feedbacks
+	// TODO: evaluate if we need also a ImageName based on user feedbacks
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

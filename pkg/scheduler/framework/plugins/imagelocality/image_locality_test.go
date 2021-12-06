@@ -34,7 +34,6 @@ func TestImageLocalityPriority(t *testing.T) {
 	test40250 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
-
 				Image: "gcr.io/40",
 			},
 			{
@@ -231,11 +230,9 @@ func TestImageLocalityPriority(t *testing.T) {
 	}{
 		{
 			// Pod: gcr.io/40 gcr.io/250
-
 			// Node1
 			// Image: gcr.io/40:latest 40MB
 			// Score: 0 (40M/2 < 23M, min-threshold)
-
 			// Node2
 			// Image: gcr.io/250:latest 250MB
 			// Score: 100 * (250M/2 - 23M)/(1000M * 2 - 23M) = 5
@@ -246,11 +243,9 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 		{
 			// Pod: gcr.io/40 gcr.io/300
-
 			// Node1
 			// Image: gcr.io/40:latest 40MB, gcr.io/300:latest 300MB
 			// Score: 100 * ((40M + 300M)/2 - 23M)/(1000M * 2 - 23M) = 7
-
 			// Node2
 			// Image: not present
 			// Score: 0
@@ -261,11 +256,9 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 		{
 			// Pod: gcr.io/4000 gcr.io/10
-
 			// Node1
 			// Image: gcr.io/4000:latest 2000MB
 			// Score: 100 (4000 * 1/2 >= 1000M * 2, max-threshold)
-
 			// Node2
 			// Image: gcr.io/10:latest 10MB
 			// Score: 0 (10M/2 < 23M, min-threshold)
@@ -276,15 +269,12 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 		{
 			// Pod: gcr.io/4000 gcr.io/10
-
 			// Node1
 			// Image: gcr.io/4000:latest 4000MB
 			// Score: 100 * (4000M/3 - 23M)/(1000M * 2 - 23M) = 66
-
 			// Node2
 			// Image: gcr.io/10:latest 10MB
 			// Score: 0 (10M*1/3 < 23M, min-threshold)
-
 			// Node3
 			// Image:
 			// Score: 0
@@ -295,15 +285,12 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 		{
 			// Pod: gcr.io/300 gcr.io/600 gcr.io/900
-
 			// Node1
 			// Image: gcr.io/600:latest 600MB, gcr.io/900:latest 900MB
 			// Score: 100 * (600M * 2/3 + 900M * 2/3 - 23M) / (1000M * 3 - 23M) = 32
-
 			// Node2
 			// Image: gcr.io/300:latest 300MB, gcr.io/600:latest 600MB, gcr.io/900:latest 900MB
 			// Score: 100 * (300M * 1/3 + 600M * 2/3 + 900M * 2/3 - 23M) / (1000M *3 - 23M) = 36
-
 			// Node3
 			// Image:
 			// Score: 0
@@ -314,11 +301,9 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 		{
 			// Pod: gcr.io/30 gcr.io/40
-
 			// Node1
 			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB gcr.io/40:latest 40MB
 			// Score: 100 * (30M + 40M * 1/2 - 23M) / (1000M * 2 - 23M) = 1
-
 			// Node2
 			// Image: 100 * (30M - 23M) / (1000M * 2 - 23M) = 0
 			// Score: 0

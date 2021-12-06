@@ -274,7 +274,7 @@ func (r *rangeAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 		allocated.allocatedCIDRs[idx] = podCIDR
 	}
 
-	//queue the assignment
+	// queue the assignment
 	klog.V(4).Infof("Putting node %s with CIDR %v into the work queue", node.Name, allocated.allocatedCIDRs)
 	r.nodeCIDRUpdateChannel <- allocated
 	return nil

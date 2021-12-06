@@ -23,8 +23,7 @@ import (
 )
 
 // FakeNetsh is a no-op implementation of the netsh Interface
-type FakeNetsh struct {
-}
+type FakeNetsh struct{}
 
 // NewFake returns a fakenetsh no-op implementation of the netsh Interface
 func NewFake() *FakeNetsh {

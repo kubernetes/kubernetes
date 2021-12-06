@@ -295,7 +295,6 @@ func isValidAuthzMode(authzMode string) bool {
 
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
 func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
-
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	caFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
 

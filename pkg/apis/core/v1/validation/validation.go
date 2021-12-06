@@ -29,8 +29,10 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
-const isNegativeErrorMsg string = `must be greater than or equal to 0`
-const isNotIntegerErrorMsg string = `must be an integer`
+const (
+	isNegativeErrorMsg   string = `must be greater than or equal to 0`
+	isNotIntegerErrorMsg string = `must be an integer`
+)
 
 // ValidateResourceRequirements will check if any of the resource
 // Limits/Requests are of a valid value. Any incorrect value will be added to

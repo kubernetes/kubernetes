@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package winterm
@@ -12,8 +13,8 @@ func (h *windowsAnsiEventHandler) clearRange(attributes uint16, fromCoord COORD,
 
 	var err error
 
-	var coordStart = COORD{}
-	var coordEnd = COORD{}
+	coordStart := COORD{}
+	coordEnd := COORD{}
 
 	xCurrent, yCurrent := fromCoord.X, fromCoord.Y
 	xEnd, yEnd := toCoord.X, toCoord.Y

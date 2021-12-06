@@ -43,7 +43,7 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
-		//Only for Windows containers
+		// Only for Windows containers
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		cs = f.ClientSet
 	})
@@ -109,8 +109,8 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
-		//If DirectX version issues caused by supsequent windows releases occur, these tests need to do version checks
-		//based on  the windows version running the test.
+		// If DirectX version issues caused by supsequent windows releases occur, these tests need to do version checks
+		// based on  the windows version running the test.
 		dxdiagDirectxVersion := "DirectX Version: DirectX 12"
 		defaultNs := f.Namespace.Name
 		_, dxdiagDirectxVersionErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)

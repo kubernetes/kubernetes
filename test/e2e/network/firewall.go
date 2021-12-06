@@ -51,7 +51,7 @@ const (
 )
 
 var _ = common.SIGDescribe("Firewall rule", func() {
-	var firewallTestName = "firewall-test"
+	firewallTestName := "firewall-test"
 	f := framework.NewDefaultFramework(firewallTestName)
 
 	var cs clientset.Interface

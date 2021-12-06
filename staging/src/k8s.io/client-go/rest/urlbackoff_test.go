@@ -53,9 +53,11 @@ func TestURLBackoffFunctionality(t *testing.T) {
 	// Now test that backoff increases, then recovers.
 	// 200 and 300 should both result in clearing the backoff.
 	// all others like 429 should result in increased backoff.
-	seconds := []int{0,
+	seconds := []int{
+		0,
 		1, 2, 4, 8, 0,
-		1, 2}
+		1, 2,
+	}
 	returnCodes := []int{
 		429, 500, 501, 502, 300,
 		500, 501, 502,

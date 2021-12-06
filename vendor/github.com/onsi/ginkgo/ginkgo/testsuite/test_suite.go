@@ -30,7 +30,7 @@ func PrecompiledTestSuite(path string) (TestSuite, error) {
 		return TestSuite{}, errors.New("this is not a .test binary")
 	}
 
-	if info.Mode()&0111 == 0 {
+	if info.Mode()&0o111 == 0 {
 		return TestSuite{}, errors.New("this is not executable")
 	}
 

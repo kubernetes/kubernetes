@@ -16,7 +16,6 @@ func (cli *Client) NodeList(ctx context.Context, options types.NodeListOptions) 
 
 	if options.Filters.Len() > 0 {
 		filterJSON, err := filters.ToJSON(options.Filters)
-
 		if err != nil {
 			return nil, err
 		}

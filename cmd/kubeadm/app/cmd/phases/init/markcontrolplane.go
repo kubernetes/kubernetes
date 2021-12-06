@@ -25,15 +25,13 @@ import (
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 )
 
-var (
-	markControlPlaneExample = cmdutil.Examples(`
+var markControlPlaneExample = cmdutil.Examples(`
 		# Applies control-plane label and taint to the current node, functionally equivalent to what executed by kubeadm init.
 		kubeadm init phase mark-control-plane --config config.yaml
 
 		# Applies control-plane label and taint to a specific node
 		kubeadm init phase mark-control-plane --node-name myNode
 		`)
-)
 
 // NewMarkControlPlanePhase creates a kubeadm workflow phase that implements mark-controlplane checks.
 func NewMarkControlPlanePhase() workflow.Phase {

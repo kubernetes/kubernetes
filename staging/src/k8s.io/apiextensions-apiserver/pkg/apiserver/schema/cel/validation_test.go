@@ -38,7 +38,8 @@ func TestValidationExpressions(t *testing.T) {
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
-		{name: "integers",
+		{
+			name: "integers",
 			// 1st obj and schema args are for "self.val1" field, 2nd for "self.val2" and so on.
 			obj:    objs(math.MaxInt64, math.MaxInt64, math.MaxInt32, math.MaxInt32, math.MaxInt64, math.MaxInt64),
 			schema: schemas(integerType, integerType, int32Type, int32Type, int64Type, int64Type),
@@ -58,7 +59,8 @@ func TestValidationExpressions(t *testing.T) {
 				"1 / 0 == 1 / 0":     "division by zero",
 			},
 		},
-		{name: "numbers",
+		{
+			name:   "numbers",
 			obj:    objs(math.MaxFloat64, math.MaxFloat64, math.MaxFloat32, math.MaxFloat32, math.MaxFloat64, math.MaxFloat64, int64(1)),
 			schema: schemas(numberType, numberType, floatType, floatType, doubleType, doubleType, doubleType),
 			valid: []string{
@@ -77,7 +79,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val7 == 1.0",
 			},
 		},
-		{name: "unicode strings",
+		{
+			name:   "unicode strings",
 			obj:    objs("Rook takes 👑", "Rook takes 👑"),
 			schema: schemas(stringType, stringType),
 			valid: []string{
@@ -108,7 +111,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.lowerAscii() == 'rook takes 👑'",
 			},
 		},
-		{name: "escaped strings",
+		{
+			name:   "escaped strings",
 			obj:    objs("l1\nl2", "l1\nl2"),
 			schema: schemas(stringType, stringType),
 			valid: []string{
@@ -116,7 +120,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 == '''l1\nl2'''",
 			},
 		},
-		{name: "bytes",
+		{
+			name:   "bytes",
 			obj:    objs("QUI=", "QUI="),
 			schema: schemas(byteType, byteType),
 			valid: []string{
@@ -128,7 +133,8 @@ func TestValidationExpressions(t *testing.T) {
 				"size(self.val1) == 2",
 			},
 		},
-		{name: "booleans",
+		{
+			name:   "booleans",
 			obj:    objs(true, true, false, false),
 			schema: schemas(booleanType, booleanType, booleanType, booleanType),
 			valid: []string{
@@ -138,7 +144,8 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.val1) == bool",
 			},
 		},
-		{name: "duration format",
+		{
+			name:   "duration format",
 			obj:    objs("1h2m3s4ms", "1h2m3s4ms"),
 			schema: schemas(durationFormat, durationFormat),
 			valid: []string{
@@ -151,7 +158,8 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.val1) == google.protobuf.Duration",
 			},
 		},
-		{name: "date format",
+		{
+			name:   "date format",
 			obj:    objs("1997-07-16", "1997-07-16"),
 			schema: schemas(dateFormat, dateFormat),
 			valid: []string{
@@ -162,7 +170,8 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.val1) == google.protobuf.Timestamp",
 			},
 		},
-		{name: "date-time format",
+		{
+			name:   "date-time format",
 			obj:    objs("2011-08-18T19:03:37.010000000+01:00", "2011-08-18T19:03:37.010000000+01:00"),
 			schema: schemas(dateTimeFormat, dateTimeFormat),
 			valid: []string{
@@ -179,8 +188,9 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.val1) == google.protobuf.Timestamp",
 			},
 		},
-		{name: "enums",
-			obj: map[string]interface{}{"enumStr": "Pending"},
+		{
+			name: "enums",
+			obj:  map[string]interface{}{"enumStr": "Pending"},
 			schema: objectTypePtr(map[string]schema.Structural{"enumStr": {
 				Generic: schema.Generic{
 					Type: "string",
@@ -200,7 +210,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.enumStr in ['Pending', 'Available']",
 			},
 		},
-		{name: "conversions",
+		{
+			name:   "conversions",
 			obj:    objs(int64(10), 10.0, 10.49, 10.5, true, "10", "MTA=", "3723.004s", "1h2m3s4ms", "2011-08-18T19:03:37.01+01:00", "2011-08-18T19:03:37.01+01:00", "2011-08-18T00:00:00Z", "2011-08-18"),
 			schema: schemas(integerType, numberType, numberType, numberType, booleanType, stringType, byteType, stringType, durationFormat, stringType, dateTimeFormat, stringType, dateFormat),
 			valid: []string{
@@ -225,7 +236,8 @@ func TestValidationExpressions(t *testing.T) {
 				"string(self.val13) == self.val12",
 			},
 		},
-		{name: "lists",
+		{
+			name:   "lists",
 			obj:    objs([]interface{}{1, 2, 3}, []interface{}{1, 2, 3}),
 			schema: schemas(listType(&integerType), listType(&integerType)),
 			valid: []string{
@@ -237,7 +249,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 + [4, 5] == [1, 2, 3, 4, 5]",
 			},
 		},
-		{name: "listSets",
+		{
+			name:   "listSets",
 			obj:    objs([]interface{}{"a", "b", "c"}, []interface{}{"a", "c", "b"}),
 			schema: schemas(listSetType(&stringType), listSetType(&stringType)),
 			valid: []string{
@@ -251,7 +264,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 + ['c', 'd'] == ['a', 'b', 'c', 'd']",
 			},
 		},
-		{name: "listMaps",
+		{
+			name: "listMaps",
 			obj: map[string]interface{}{
 				"objs": []interface{}{
 					[]interface{}{
@@ -292,7 +306,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.objs[0] == {'k': 'a', 'v': '1'}": "no matching overload for '_==_'", // objects cannot be compared against a data literal map
 			},
 		},
-		{name: "maps",
+		{
+			name:   "maps",
 			obj:    objs(map[string]interface{}{"k1": "a", "k2": "b"}, map[string]interface{}{"k2": "b", "k1": "a"}),
 			schema: schemas(mapType(&stringType), mapType(&stringType)),
 			valid: []string{
@@ -302,7 +317,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 == {'k1': 'a', 'k2': 'b'}",
 			},
 		},
-		{name: "objects",
+		{
+			name: "objects",
 			obj: map[string]interface{}{
 				"objs": []interface{}{
 					map[string]interface{}{"f1": "a", "f2": "b"},
@@ -322,7 +338,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.objs[0] == {'f1': 'a', 'f2': 'b'}": "found no matching overload for '_==_'", // objects cannot be compared against a data literal map
 			},
 		},
-		{name: "object access",
+		{
+			name: "object access",
 			obj: map[string]interface{}{
 				"a": map[string]interface{}{
 					"b": 1,
@@ -365,7 +382,8 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.a1.d2.e2)": "no such key: d2",                 // has only checks last element in path, when d2 is absent in value, this is an error
 			},
 		},
-		{name: "map access",
+		{
+			name: "map access",
 			obj: map[string]interface{}{
 				"val": map[string]interface{}{
 					"b": 1,
@@ -399,7 +417,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val['c'] == 1": "no such key: c",
 			},
 		},
-		{name: "listMap access",
+		{
+			name: "listMap access",
 			obj: map[string]interface{}{
 				"listMap": []interface{}{
 					map[string]interface{}{"k": "a1", "v": "b1"},
@@ -446,7 +465,6 @@ func TestValidationExpressions(t *testing.T) {
 			errors: map[string]string{
 				// test comprehensions where the field used in predicates is unset on all but one of the elements: (error cases)
 				// - without has checks:
-
 				// if all() predicate evaluates to false or error for all elements, any error encountered is raised
 				"self.listMap.all(m, m.v2 == 'z')": "no such key: v2",
 				// exists one() is stricter than map() or exists(), it requires exactly one predicate evaluate to true and the rest
@@ -459,7 +477,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.listMap.map(m, m.v2 == 'z', m.v2).size() == 1": "no such key: v2",
 			},
 		},
-		{name: "list access",
+		{
+			name: "list access",
 			obj: map[string]interface{}{
 				"array": []interface{}{1, 1, 2, 2, 3, 3, 4, 5},
 			},
@@ -483,7 +502,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.array[100] == 0": "index out of bounds: 100",
 			},
 		},
-		{name: "listSet access",
+		{
+			name: "listSet access",
 			obj: map[string]interface{}{
 				"set": []interface{}{1, 2, 3, 4, 5},
 			},
@@ -504,7 +524,8 @@ func TestValidationExpressions(t *testing.T) {
 				"size(self.set) == 5",
 			},
 		},
-		{name: "typemeta and objectmeta access specified",
+		{
+			name: "typemeta and objectmeta access specified",
 			obj: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
@@ -532,7 +553,8 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.metadata.namespace)": "undefined field 'namespace'",
 			},
 		},
-		{name: "typemeta and objectmeta access not specified",
+		{
+			name: "typemeta and objectmeta access not specified",
 			obj: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
@@ -563,7 +585,8 @@ func TestValidationExpressions(t *testing.T) {
 		},
 
 		// Kubernetes special types
-		{name: "embedded object",
+		{
+			name: "embedded object",
 			obj: map[string]interface{}{
 				"embedded": map[string]interface{}{
 					"apiVersion": "v1",
@@ -600,7 +623,8 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded.spec)":               "undefined field 'spec'",
 			},
 		},
-		{name: "embedded object with properties",
+		{
+			name: "embedded object with properties",
 			obj: map[string]interface{}{
 				"embedded": map[string]interface{}{
 					"apiVersion": "v1",
@@ -649,7 +673,8 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded.metadata.namespace)": "undefined field 'namespace'",
 			},
 		},
-		{name: "embedded object with preserve unknown",
+		{
+			name: "embedded object with preserve unknown",
 			obj: map[string]interface{}{
 				"embedded": map[string]interface{}{
 					"apiVersion": "v1",
@@ -690,7 +715,8 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded.spec)": "undefined field 'spec'",
 			},
 		},
-		{name: "string in intOrString",
+		{
+			name: "string in intOrString",
 			obj: map[string]interface{}{
 				"something": "25%",
 			},
@@ -711,7 +737,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.something == 1": "no such overload",
 			},
 		},
-		{name: "int in intOrString",
+		{
+			name: "int in intOrString",
 			obj: map[string]interface{}{
 				"something": int64(1),
 			},
@@ -732,7 +759,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.something == 'anything'": "no such overload",
 			},
 		},
-		{name: "null in intOrString",
+		{
+			name: "null in intOrString",
 			obj: map[string]interface{}{
 				"something": nil,
 			},
@@ -746,7 +774,8 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.something) == int": "no such key",
 			},
 		},
-		{name: "percent comparison using intOrString",
+		{
+			name: "percent comparison using intOrString",
 			obj: map[string]interface{}{
 				"min":       "50%",
 				"current":   5,
@@ -764,7 +793,8 @@ func TestValidationExpressions(t *testing.T) {
 				"type(self.min) == int ? self.current <= self.min : double(self.current) / double(self.available) >= double(self.min.replace('%', '')) / 100.0",
 			},
 		},
-		{name: "preserve unknown fields",
+		{
+			name: "preserve unknown fields",
 			obj: map[string]interface{}{
 				"withUnknown": map[string]interface{}{
 					"field1": "a",
@@ -869,7 +899,8 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.anyvalField2)": "undefined field 'anyvalField2'",
 			},
 		},
-		{name: "known and unknown fields",
+		{
+			name: "known and unknown fields",
 			obj: map[string]interface{}{
 				"withUnknown": map[string]interface{}{
 					"known":   1,
@@ -944,7 +975,8 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.withUnknown.unknown)": "undefined field 'unknown'",
 			},
 		},
-		{name: "field nullability",
+		{
+			name: "field nullability",
 			obj: map[string]interface{}{
 				"setPlainStr":          "v1",
 				"setDefaultedStr":      "v2",
@@ -991,7 +1023,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.setNullableStr != null":    "no matching overload for '_!=_' applied to '(string, null)",
 			},
 		},
-		{name: "null values in container types",
+		{
+			name: "null values in container types",
 			obj: map[string]interface{}{
 				"m": map[string]interface{}{
 					"a": nil,
@@ -1033,7 +1066,8 @@ func TestValidationExpressions(t *testing.T) {
 				//"self.s[0] == null": "found no matching overload for '_==_' applied to '(string, null)",
 			},
 		},
-		{name: "escaping",
+		{
+			name: "escaping",
 			obj: map[string]interface{}{
 				// RESERVED symbols defined in the CEL lexer
 				"true": 1, "false": 2, "null": 3, "in": 4, "as": 5,
@@ -1127,7 +1161,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.__illegal__ == 301": "undefined field '__illegal__'",
 			},
 		},
-		{name: "map keys are not escaped",
+		{
+			name: "map keys are not escaped",
 			obj: map[string]interface{}{
 				"m": map[string]interface{}{
 					"@":   1,
@@ -1146,7 +1181,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.m['👑'] == 5",
 			},
 		},
-		{name: "object types are not accessible",
+		{
+			name: "object types are not accessible",
 			obj: map[string]interface{}{
 				"nestedInMap": map[string]interface{}{
 					"k1": map[string]interface{}{
@@ -1184,12 +1220,12 @@ func TestValidationExpressions(t *testing.T) {
 			errors: map[string]string{
 				// Note that errors, like the below, do print the type name, but it changes each time a CRD is updated.
 				// Type name printed in the below error will be of the form "<uuid>.nestedInList.@idx".
-
 				// Developers may not cast the type of variables as a string:
 				"string(type(self.nestedInList[0])).endsWith('.nestedInList.@idx')": "found no matching overload for 'string' applied to '(type",
 			},
 		},
-		{name: "listMaps with unsupported identity characters in property names",
+		{
+			name: "listMaps with unsupported identity characters in property names",
 			obj: map[string]interface{}{
 				"objs": []interface{}{
 					[]interface{}{
@@ -1227,7 +1263,8 @@ func TestValidationExpressions(t *testing.T) {
 				"self.objs[0][0].k! == '1'": "Syntax error: mismatched input '!' expecting",
 			},
 		},
-		{name: "container type composition",
+		{
+			name: "container type composition",
 			obj: map[string]interface{}{
 				"obj": map[string]interface{}{
 					"field": "a",
@@ -1317,7 +1354,8 @@ func TestValidationExpressions(t *testing.T) {
 			},
 			errors: map[string]string{},
 		},
-		{name: "invalid data",
+		{
+			name: "invalid data",
 			obj: map[string]interface{}{
 				"o":           []interface{}{},
 				"m":           []interface{}{},
@@ -1388,7 +1426,6 @@ func TestValidationExpressions(t *testing.T) {
 					}
 				})
 			}
-
 		})
 	}
 }

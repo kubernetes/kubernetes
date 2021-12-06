@@ -46,7 +46,7 @@ func TestNewFakeKubeRegistry(t *testing.T) {
 		},
 	)
 
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		metric   *metrics.Counter
 		expected string

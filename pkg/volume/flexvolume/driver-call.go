@@ -68,9 +68,7 @@ const (
 	StatusNotSupported = "Not supported"
 )
 
-var (
-	errTimeout = fmt.Errorf("timeout")
-)
+var errTimeout = fmt.Errorf("timeout")
 
 // DriverCall implements the basic contract between FlexVolume and its driver.
 // The caller is responsible for providing the required args.
@@ -167,7 +165,6 @@ type OptionsForDriver map[string]string
 
 // NewOptionsForDriver create driver options given volume spec
 func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions map[string]string) (OptionsForDriver, error) {
-
 	volSourceFSType, err := getFSType(spec)
 	if err != nil {
 		return nil, err

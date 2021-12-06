@@ -21,11 +21,13 @@ import (
 	"time"
 )
 
-var time0 = time.Unix(1000, 0)
-var time1 = time.Unix(1001, 0)
-var time2 = time.Unix(1012, 0)
-var identicalErrorDelay = 10 * time.Second
-var testCount = 0
+var (
+	time0               = time.Unix(1000, 0)
+	time1               = time.Unix(1001, 0)
+	time2               = time.Unix(1012, 0)
+	identicalErrorDelay = 10 * time.Second
+	testCount           = 0
+)
 
 const (
 	mesg1 = "This is a message"
@@ -49,7 +51,7 @@ func checkThatNot(t *testing.T, r *LogReduction, m, id string) {
 }
 
 func TestLogReduction(t *testing.T) {
-	var timeToReturn = time0
+	timeToReturn := time0
 	nowfunc = func() time.Time { return timeToReturn }
 	r := NewLogReduction(identicalErrorDelay)
 	checkThat(t, r, mesg1, id1)    // 1

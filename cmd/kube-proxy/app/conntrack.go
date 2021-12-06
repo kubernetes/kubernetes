@@ -140,5 +140,5 @@ func readIntStringFile(filename string) (int, error) {
 }
 
 func writeIntStringFile(filename string, value int) error {
-	return ioutil.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
+	return ioutil.WriteFile(filename, []byte(strconv.Itoa(value)), 0o640)
 }

@@ -26,8 +26,10 @@ import (
 
 type unionCAContent []CAContentProvider
 
-var _ CAContentProvider = &unionCAContent{}
-var _ ControllerRunner = &unionCAContent{}
+var (
+	_ CAContentProvider = &unionCAContent{}
+	_ ControllerRunner  = &unionCAContent{}
+)
 
 // NewUnionCAContentProvider returns a CAContentProvider that is a union of other CAContentProviders
 func NewUnionCAContentProvider(caContentProviders ...CAContentProvider) CAContentProvider {

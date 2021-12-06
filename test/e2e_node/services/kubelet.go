@@ -355,11 +355,11 @@ func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path s
 	}
 	// create the directory, if it does not exist
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	// write the file
-	if err := ioutil.WriteFile(path, data, 0755); err != nil {
+	if err := ioutil.WriteFile(path, data, 0o755); err != nil {
 		return err
 	}
 	return nil
@@ -398,7 +398,7 @@ contexts:
   name: local-context
 current-context: local-context`, framework.TestContext.BearerToken, getAPIServerClientURL()))
 
-	if err := ioutil.WriteFile(path, kubeconfig, 0666); err != nil {
+	if err := ioutil.WriteFile(path, kubeconfig, 0o666); err != nil {
 		return err
 	}
 	return nil
@@ -407,7 +407,7 @@ current-context: local-context`, framework.TestContext.BearerToken, getAPIServer
 func createRootDirectory(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			return os.MkdirAll(path, os.FileMode(0755))
+			return os.MkdirAll(path, os.FileMode(0o755))
 		}
 		return err
 	}

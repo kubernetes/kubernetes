@@ -645,7 +645,6 @@ func TestHugePageLimits(t *testing.T) {
 				t.Errorf("unexpected result, expected: %v, actual: %v", testcase.expected, resultValue)
 			}
 		})
-
 	}
 }
 

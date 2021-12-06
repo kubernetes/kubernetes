@@ -42,9 +42,11 @@ type managedFieldsValidatingAdmissionController struct {
 	wrap admission.Interface
 }
 
-var _ admission.Interface = &managedFieldsValidatingAdmissionController{}
-var _ admission.MutationInterface = &managedFieldsValidatingAdmissionController{}
-var _ admission.ValidationInterface = &managedFieldsValidatingAdmissionController{}
+var (
+	_ admission.Interface           = &managedFieldsValidatingAdmissionController{}
+	_ admission.MutationInterface   = &managedFieldsValidatingAdmissionController{}
+	_ admission.ValidationInterface = &managedFieldsValidatingAdmissionController{}
+)
 
 // Handles calls the wrapped admission.Interface if applicable
 func (admit *managedFieldsValidatingAdmissionController) Handles(operation admission.Operation) bool {

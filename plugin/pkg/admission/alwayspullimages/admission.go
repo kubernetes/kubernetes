@@ -54,8 +54,10 @@ type AlwaysPullImages struct {
 	*admission.Handler
 }
 
-var _ admission.MutationInterface = &AlwaysPullImages{}
-var _ admission.ValidationInterface = &AlwaysPullImages{}
+var (
+	_ admission.MutationInterface   = &AlwaysPullImages{}
+	_ admission.ValidationInterface = &AlwaysPullImages{}
+)
 
 // Admit makes an admission decision based on the request attributes
 func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {

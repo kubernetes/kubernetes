@@ -58,7 +58,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 			framework.Logf("cleaning gce resource for %s", lb)
 			framework.TestContext.CloudConfig.Provider.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
-		//reset serviceLBNames
+		// reset serviceLBNames
 		serviceLBNames = []string{}
 	})
 	ginkgo.It("should be able to create and tear down a standard-tier load balancer [Slow]", func() {

@@ -77,7 +77,7 @@ func TestGetKubeletKubeConfigPath(t *testing.T) {
 }
 
 func TestGetStaticPodFilepath(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		componentName, manifestsDir, expected string
 	}{
 		{
@@ -111,7 +111,7 @@ func TestGetStaticPodFilepath(t *testing.T) {
 }
 
 func TestEtcdSupportedVersion(t *testing.T) {
-	var supportedEtcdVersion = map[uint8]string{
+	supportedEtcdVersion := map[uint8]string{
 		13: "3.2.24",
 		14: "3.3.10",
 		15: "3.3.10",
@@ -119,7 +119,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		17: "3.4.3-0",
 		18: "3.4.3-0",
 	}
-	var tests = []struct {
+	tests := []struct {
 		kubernetesVersion string
 		expectedVersion   *version.Version
 		expectedWarning   bool
@@ -173,7 +173,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 }
 
 func TestGetKubernetesServiceCIDR(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		svcSubnetList string
 		isDualStack   bool
 		expected      string

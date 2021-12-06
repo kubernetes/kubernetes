@@ -102,7 +102,8 @@ func TestRecycleSync(t *testing.T) {
 			withMessage("No recycler plugin found for the volume!", newVolumeArray("volume6-3", "1Gi", "uid6-3", "claim6-3", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle, classEmpty)),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"}, noerrors, testSyncVolume,
+			[]string{"Warning VolumeFailedRecycle"},
+			noerrors, testSyncVolume,
 		},
 		{
 			// recycle failure - Recycle returns error
@@ -111,7 +112,8 @@ func TestRecycleSync(t *testing.T) {
 			withMessage("Recycle failed: Mock plugin error: no recycleCalls configured", newVolumeArray("volume6-4", "1Gi", "uid6-4", "claim6-4", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle, classEmpty)),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"}, noerrors,
+			[]string{"Warning VolumeFailedRecycle"},
+			noerrors,
 			wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume),
 		},
 		{
@@ -121,7 +123,8 @@ func TestRecycleSync(t *testing.T) {
 			withMessage("Recycle failed: Mock recycle error", newVolumeArray("volume6-5", "1Gi", "uid6-5", "claim6-5", v1.VolumeFailed, v1.PersistentVolumeReclaimRecycle, classEmpty)),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"}, noerrors,
+			[]string{"Warning VolumeFailedRecycle"},
+			noerrors,
 			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("Mock recycle error")}, testSyncVolume),
 		},
 		{
@@ -188,7 +191,8 @@ func TestRecycleSync(t *testing.T) {
 			withMessage("Volume has unrecognized PersistentVolumeReclaimPolicy", newVolumeArray("volume6-10", "1Gi", "uid6-10", "claim6-10", v1.VolumeFailed, "Unknown", classEmpty)),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeUnknownReclaimPolicy"}, noerrors, testSyncVolume,
+			[]string{"Warning VolumeUnknownReclaimPolicy"},
+			noerrors, testSyncVolume,
 		},
 		{
 			// volume is used by a running pod - failure expected
@@ -197,7 +201,8 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-11", "1Gi", "uid6-11", "runningClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
 			noclaims,
 			noclaims,
-			[]string{"Normal VolumeFailedRecycle"}, noerrors, testSyncVolume,
+			[]string{"Normal VolumeFailedRecycle"},
+			noerrors, testSyncVolume,
 		},
 		{
 			// volume is used by a pending pod - failure expected
@@ -206,7 +211,8 @@ func TestRecycleSync(t *testing.T) {
 			newVolumeArray("volume6-12", "1Gi", "uid6-12", "pendingClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
 			noclaims,
 			noclaims,
-			[]string{"Normal VolumeFailedRecycle"}, noerrors, testSyncVolume,
+			[]string{"Normal VolumeFailedRecycle"},
+			noerrors, testSyncVolume,
 		},
 		{
 			// volume is used by a completed pod - recycle succeeds
@@ -258,7 +264,8 @@ func TestRecycleMultiSync(t *testing.T) {
 			newVolumeArray("volume7-1", "1Gi", "", "claim7-1", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedRecycle"}, noerrors,
+			[]string{"Warning VolumeFailedRecycle"},
+			noerrors,
 			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("Mock recycle error"), nil}, testSyncVolume),
 		},
 	}

@@ -222,7 +222,6 @@ func (v *volumeClient) Stats(
 
 	err := req.Do().Unmarshal(stats)
 	return stats, err
-
 }
 
 // UsedSize returns allocated volume size.
@@ -238,7 +237,6 @@ func (v *volumeClient) UsedSize(
 
 // Active Requests on all volume.
 func (v *volumeClient) GetActiveRequests() (*api.ActiveRequests, error) {
-
 	requests := &api.ActiveRequests{}
 	resp := v.c.Get().Resource(volumePath + "/requests").Instance("vol_id").Do()
 

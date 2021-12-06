@@ -121,7 +121,6 @@ func (b *Blob) BreakLeaseWithBreakPeriod(breakPeriodInSeconds int, options *Leas
 
 // breakLeaseCommon is common code for both version of BreakLease (with and without break period)
 func (b *Blob) breakLeaseCommon(headers map[string]string, options *LeaseOptions) (breakTimeout int, err error) {
-
 	respHeaders, err := b.leaseCommonPut(headers, http.StatusAccepted, options)
 	if err != nil {
 		return 0, err

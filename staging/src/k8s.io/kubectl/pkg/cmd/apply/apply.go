@@ -405,7 +405,6 @@ func (o *ApplyOptions) SetObjects(infos []*resource.Info) {
 
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
-
 	if o.PreProcessorFn != nil {
 		klog.V(4).Infof("Running apply pre-processor function")
 		if err := o.PreProcessorFn(); err != nil {
@@ -652,7 +651,6 @@ func (o *ApplyOptions) shouldPrintObject() bool {
 }
 
 func (o *ApplyOptions) printObjects() error {
-
 	if !o.shouldPrintObject() {
 		return nil
 	}
@@ -720,7 +718,6 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 // objects not applied. The returned function is the standard
 // apply post processor.
 func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
-
 	return func() error {
 		if err := o.printObjects(); err != nil {
 			return err

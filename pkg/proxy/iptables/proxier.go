@@ -110,8 +110,10 @@ func (lkct LinuxKernelCompatTester) IsCompatible() error {
 	return err
 }
 
-const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
-const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
+const (
+	sysctlRouteLocalnet      = "net/ipv4/conf/all/route_localnet"
+	sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
+)
 
 // internal struct for string service information
 type serviceInfo struct {
@@ -565,7 +567,6 @@ func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 // object is observed.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.OnServiceUpdate(service, nil)
-
 }
 
 // OnServiceSynced is called once all the initial event handlers were

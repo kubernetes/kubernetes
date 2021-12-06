@@ -55,7 +55,8 @@ func TestAPIServerTracing(t *testing.T) {
 	srv := grpc.NewServer()
 	traceservice.RegisterTraceServiceServer(srv, &traceServer{
 		traceFound: traceFound,
-		filterFunc: containsNodeListSpan})
+		filterFunc: containsNodeListSpan,
+	})
 
 	go srv.Serve(listener)
 	defer srv.Stop()
@@ -70,7 +71,7 @@ func TestAPIServerTracing(t *testing.T) {
 	if err := ioutil.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
 apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: TracingConfiguration
-endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
+endpoint: %s`, listener.Addr().String())), os.FileMode(0o755)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,7 +135,7 @@ type traceServer struct {
 }
 
 func (t *traceServer) Export(ctx context.Context, req *traceservice.ExportTraceServiceRequest) (*traceservice.ExportTraceServiceResponse, error) {
-	var emptyValue = traceservice.ExportTraceServiceResponse{}
+	emptyValue := traceservice.ExportTraceServiceResponse{}
 	if t.filterFunc(req) {
 		t.traceFound <- struct{}{}
 	}

@@ -603,7 +603,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 
 	for _, volume := range volumesNeedUpdate {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
-			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
+			// TODO: the devicePath might not be correct for some volume plugins: see issue #54108
 			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath)
 		if err != nil {
 			klog.ErrorS(err, "Could not add volume information to actual state of world", "pod", klog.KObj(volume.pod))

@@ -11,8 +11,11 @@ import (
 
 // Suppress unused import errors
 var _ = fmt.Printf
-var _ = reflect.Copy
-var _ = strconv.Itoa
+
+var (
+	_ = reflect.Copy
+	_ = strconv.Itoa
+)
 
 var parserATN = []uint16{
 	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 38, 211,
@@ -118,6 +121,7 @@ var literalNames = []string{
 	"'['", "']'", "'{'", "'}'", "'('", "')'", "'.'", "','", "'-'", "'!'", "'?'",
 	"':'", "'+'", "'*'", "'/'", "'%'", "'true'", "'false'", "'null'",
 }
+
 var symbolicNames = []string{
 	"", "EQUALS", "NOT_EQUALS", "IN", "LESS", "LESS_EQUALS", "GREATER_EQUALS",
 	"GREATER", "LOGICAL_AND", "LOGICAL_OR", "LBRACKET", "RPRACKET", "LBRACE",
@@ -238,7 +242,7 @@ type StartContext struct {
 }
 
 func NewEmptyStartContext() *StartContext {
-	var p = new(StartContext)
+	p := new(StartContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_start
 	return p
@@ -247,7 +251,7 @@ func NewEmptyStartContext() *StartContext {
 func (*StartContext) IsStartContext() {}
 
 func NewStartContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StartContext {
-	var p = new(StartContext)
+	p := new(StartContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -268,7 +272,7 @@ func (s *StartContext) EOF() antlr.TerminalNode {
 }
 
 func (s *StartContext) Expr() IExprContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -331,7 +335,7 @@ func (p *CELParser) Start() (localctx IStartContext) {
 	{
 		p.SetState(26)
 
-		var _x = p.Expr()
+		_x := p.Expr()
 
 		localctx.(*StartContext).e = _x
 	}
@@ -388,7 +392,7 @@ type ExprContext struct {
 }
 
 func NewEmptyExprContext() *ExprContext {
-	var p = new(ExprContext)
+	p := new(ExprContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_expr
 	return p
@@ -397,7 +401,7 @@ func NewEmptyExprContext() *ExprContext {
 func (*ExprContext) IsExprContext() {}
 
 func NewExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExprContext {
-	var p = new(ExprContext)
+	p := new(ExprContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -426,8 +430,8 @@ func (s *ExprContext) SetE1(v IConditionalOrContext) { s.e1 = v }
 func (s *ExprContext) SetE2(v IExprContext) { s.e2 = v }
 
 func (s *ExprContext) AllConditionalOr() []IConditionalOrContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IConditionalOrContext)(nil)).Elem())
-	var tst = make([]IConditionalOrContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*IConditionalOrContext)(nil)).Elem())
+	tst := make([]IConditionalOrContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -439,7 +443,7 @@ func (s *ExprContext) AllConditionalOr() []IConditionalOrContext {
 }
 
 func (s *ExprContext) ConditionalOr(i int) IConditionalOrContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IConditionalOrContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IConditionalOrContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -449,7 +453,7 @@ func (s *ExprContext) ConditionalOr(i int) IConditionalOrContext {
 }
 
 func (s *ExprContext) Expr() IExprContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -513,7 +517,7 @@ func (p *CELParser) Expr() (localctx IExprContext) {
 	{
 		p.SetState(29)
 
-		var _x = p.ConditionalOr()
+		_x := p.ConditionalOr()
 
 		localctx.(*ExprContext).e = _x
 	}
@@ -525,14 +529,14 @@ func (p *CELParser) Expr() (localctx IExprContext) {
 		{
 			p.SetState(30)
 
-			var _m = p.Match(CELParserQUESTIONMARK)
+			_m := p.Match(CELParserQUESTIONMARK)
 
 			localctx.(*ExprContext).op = _m
 		}
 		{
 			p.SetState(31)
 
-			var _x = p.ConditionalOr()
+			_x := p.ConditionalOr()
 
 			localctx.(*ExprContext).e1 = _x
 		}
@@ -543,7 +547,7 @@ func (p *CELParser) Expr() (localctx IExprContext) {
 		{
 			p.SetState(33)
 
-			var _x = p.Expr()
+			_x := p.Expr()
 
 			localctx.(*ExprContext).e2 = _x
 		}
@@ -605,7 +609,7 @@ type ConditionalOrContext struct {
 }
 
 func NewEmptyConditionalOrContext() *ConditionalOrContext {
-	var p = new(ConditionalOrContext)
+	p := new(ConditionalOrContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_conditionalOr
 	return p
@@ -614,7 +618,7 @@ func NewEmptyConditionalOrContext() *ConditionalOrContext {
 func (*ConditionalOrContext) IsConditionalOrContext() {}
 
 func NewConditionalOrContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConditionalOrContext {
-	var p = new(ConditionalOrContext)
+	p := new(ConditionalOrContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -647,8 +651,8 @@ func (s *ConditionalOrContext) GetE1() []IConditionalAndContext { return s.e1 }
 func (s *ConditionalOrContext) SetE1(v []IConditionalAndContext) { s.e1 = v }
 
 func (s *ConditionalOrContext) AllConditionalAnd() []IConditionalAndContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IConditionalAndContext)(nil)).Elem())
-	var tst = make([]IConditionalAndContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*IConditionalAndContext)(nil)).Elem())
+	tst := make([]IConditionalAndContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -660,7 +664,7 @@ func (s *ConditionalOrContext) AllConditionalAnd() []IConditionalAndContext {
 }
 
 func (s *ConditionalOrContext) ConditionalAnd(i int) IConditionalAndContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IConditionalAndContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IConditionalAndContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -724,7 +728,7 @@ func (p *CELParser) ConditionalOr() (localctx IConditionalOrContext) {
 	{
 		p.SetState(37)
 
-		var _x = p.ConditionalAnd()
+		_x := p.ConditionalAnd()
 
 		localctx.(*ConditionalOrContext).e = _x
 	}
@@ -736,7 +740,7 @@ func (p *CELParser) ConditionalOr() (localctx IConditionalOrContext) {
 		{
 			p.SetState(38)
 
-			var _m = p.Match(CELParserLOGICAL_OR)
+			_m := p.Match(CELParserLOGICAL_OR)
 
 			localctx.(*ConditionalOrContext).s9 = _m
 		}
@@ -744,7 +748,7 @@ func (p *CELParser) ConditionalOr() (localctx IConditionalOrContext) {
 		{
 			p.SetState(39)
 
-			var _x = p.ConditionalAnd()
+			_x := p.ConditionalAnd()
 
 			localctx.(*ConditionalOrContext)._conditionalAnd = _x
 		}
@@ -810,7 +814,7 @@ type ConditionalAndContext struct {
 }
 
 func NewEmptyConditionalAndContext() *ConditionalAndContext {
-	var p = new(ConditionalAndContext)
+	p := new(ConditionalAndContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_conditionalAnd
 	return p
@@ -819,7 +823,7 @@ func NewEmptyConditionalAndContext() *ConditionalAndContext {
 func (*ConditionalAndContext) IsConditionalAndContext() {}
 
 func NewConditionalAndContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConditionalAndContext {
-	var p = new(ConditionalAndContext)
+	p := new(ConditionalAndContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -852,8 +856,8 @@ func (s *ConditionalAndContext) GetE1() []IRelationContext { return s.e1 }
 func (s *ConditionalAndContext) SetE1(v []IRelationContext) { s.e1 = v }
 
 func (s *ConditionalAndContext) AllRelation() []IRelationContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IRelationContext)(nil)).Elem())
-	var tst = make([]IRelationContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*IRelationContext)(nil)).Elem())
+	tst := make([]IRelationContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -865,7 +869,7 @@ func (s *ConditionalAndContext) AllRelation() []IRelationContext {
 }
 
 func (s *ConditionalAndContext) Relation(i int) IRelationContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IRelationContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IRelationContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -929,7 +933,7 @@ func (p *CELParser) ConditionalAnd() (localctx IConditionalAndContext) {
 	{
 		p.SetState(45)
 
-		var _x = p.relation(0)
+		_x := p.relation(0)
 
 		localctx.(*ConditionalAndContext).e = _x
 	}
@@ -941,7 +945,7 @@ func (p *CELParser) ConditionalAnd() (localctx IConditionalAndContext) {
 		{
 			p.SetState(46)
 
-			var _m = p.Match(CELParserLOGICAL_AND)
+			_m := p.Match(CELParserLOGICAL_AND)
 
 			localctx.(*ConditionalAndContext).s8 = _m
 		}
@@ -949,7 +953,7 @@ func (p *CELParser) ConditionalAnd() (localctx IConditionalAndContext) {
 		{
 			p.SetState(47)
 
-			var _x = p.relation(0)
+			_x := p.relation(0)
 
 			localctx.(*ConditionalAndContext)._relation = _x
 		}
@@ -987,7 +991,7 @@ type RelationContext struct {
 }
 
 func NewEmptyRelationContext() *RelationContext {
-	var p = new(RelationContext)
+	p := new(RelationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_relation
 	return p
@@ -996,7 +1000,7 @@ func NewEmptyRelationContext() *RelationContext {
 func (*RelationContext) IsRelationContext() {}
 
 func NewRelationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *RelationContext {
-	var p = new(RelationContext)
+	p := new(RelationContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -1013,7 +1017,7 @@ func (s *RelationContext) GetOp() antlr.Token { return s.op }
 func (s *RelationContext) SetOp(v antlr.Token) { s.op = v }
 
 func (s *RelationContext) Calc() ICalcContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICalcContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*ICalcContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1023,8 +1027,8 @@ func (s *RelationContext) Calc() ICalcContext {
 }
 
 func (s *RelationContext) AllRelation() []IRelationContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IRelationContext)(nil)).Elem())
-	var tst = make([]IRelationContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*IRelationContext)(nil)).Elem())
+	tst := make([]IRelationContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -1036,7 +1040,7 @@ func (s *RelationContext) AllRelation() []IRelationContext {
 }
 
 func (s *RelationContext) Relation(i int) IRelationContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IRelationContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IRelationContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -1133,14 +1137,14 @@ func (p *CELParser) relation(_p int) (localctx IRelationContext) {
 			}
 			p.SetState(57)
 
-			var _lt = p.GetTokenStream().LT(1)
+			_lt := p.GetTokenStream().LT(1)
 
 			localctx.(*RelationContext).op = _lt
 
 			_la = p.GetTokenStream().LA(1)
 
 			if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CELParserEQUALS)|(1<<CELParserNOT_EQUALS)|(1<<CELParserIN)|(1<<CELParserLESS)|(1<<CELParserLESS_EQUALS)|(1<<CELParserGREATER_EQUALS)|(1<<CELParserGREATER))) != 0) {
-				var _ri = p.GetErrorHandler().RecoverInline(p)
+				_ri := p.GetErrorHandler().RecoverInline(p)
 
 				localctx.(*RelationContext).op = _ri
 			} else {
@@ -1185,7 +1189,7 @@ type CalcContext struct {
 }
 
 func NewEmptyCalcContext() *CalcContext {
-	var p = new(CalcContext)
+	p := new(CalcContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_calc
 	return p
@@ -1194,7 +1198,7 @@ func NewEmptyCalcContext() *CalcContext {
 func (*CalcContext) IsCalcContext() {}
 
 func NewCalcContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CalcContext {
-	var p = new(CalcContext)
+	p := new(CalcContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -1211,7 +1215,7 @@ func (s *CalcContext) GetOp() antlr.Token { return s.op }
 func (s *CalcContext) SetOp(v antlr.Token) { s.op = v }
 
 func (s *CalcContext) Unary() IUnaryContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IUnaryContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IUnaryContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1221,8 +1225,8 @@ func (s *CalcContext) Unary() IUnaryContext {
 }
 
 func (s *CalcContext) AllCalc() []ICalcContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*ICalcContext)(nil)).Elem())
-	var tst = make([]ICalcContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*ICalcContext)(nil)).Elem())
+	tst := make([]ICalcContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -1234,7 +1238,7 @@ func (s *CalcContext) AllCalc() []ICalcContext {
 }
 
 func (s *CalcContext) Calc(i int) ICalcContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICalcContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*ICalcContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -1335,14 +1339,14 @@ func (p *CELParser) calc(_p int) (localctx ICalcContext) {
 				}
 				p.SetState(68)
 
-				var _lt = p.GetTokenStream().LT(1)
+				_lt := p.GetTokenStream().LT(1)
 
 				localctx.(*CalcContext).op = _lt
 
 				_la = p.GetTokenStream().LA(1)
 
 				if !(((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CELParserSTAR)|(1<<CELParserSLASH)|(1<<CELParserPERCENT))) != 0) {
-					var _ri = p.GetErrorHandler().RecoverInline(p)
+					_ri := p.GetErrorHandler().RecoverInline(p)
 
 					localctx.(*CalcContext).op = _ri
 				} else {
@@ -1364,14 +1368,14 @@ func (p *CELParser) calc(_p int) (localctx ICalcContext) {
 				}
 				p.SetState(71)
 
-				var _lt = p.GetTokenStream().LT(1)
+				_lt := p.GetTokenStream().LT(1)
 
 				localctx.(*CalcContext).op = _lt
 
 				_la = p.GetTokenStream().LA(1)
 
 				if !(_la == CELParserMINUS || _la == CELParserPLUS) {
-					var _ri = p.GetErrorHandler().RecoverInline(p)
+					_ri := p.GetErrorHandler().RecoverInline(p)
 
 					localctx.(*CalcContext).op = _ri
 				} else {
@@ -1411,7 +1415,7 @@ type UnaryContext struct {
 }
 
 func NewEmptyUnaryContext() *UnaryContext {
-	var p = new(UnaryContext)
+	p := new(UnaryContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_unary
 	return p
@@ -1420,7 +1424,7 @@ func NewEmptyUnaryContext() *UnaryContext {
 func (*UnaryContext) IsUnaryContext() {}
 
 func NewUnaryContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *UnaryContext {
-	var p = new(UnaryContext)
+	p := new(UnaryContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -1451,7 +1455,7 @@ type LogicalNotContext struct {
 }
 
 func NewLogicalNotContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *LogicalNotContext {
-	var p = new(LogicalNotContext)
+	p := new(LogicalNotContext)
 
 	p.UnaryContext = NewEmptyUnaryContext()
 	p.parser = parser
@@ -1473,7 +1477,7 @@ func (s *LogicalNotContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *LogicalNotContext) Member() IMemberContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1509,7 +1513,7 @@ type MemberExprContext struct {
 }
 
 func NewMemberExprContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MemberExprContext {
-	var p = new(MemberExprContext)
+	p := new(MemberExprContext)
 
 	p.UnaryContext = NewEmptyUnaryContext()
 	p.parser = parser
@@ -1523,7 +1527,7 @@ func (s *MemberExprContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *MemberExprContext) Member() IMemberContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1561,7 +1565,7 @@ type NegateContext struct {
 }
 
 func NewNegateContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NegateContext {
-	var p = new(NegateContext)
+	p := new(NegateContext)
 
 	p.UnaryContext = NewEmptyUnaryContext()
 	p.parser = parser
@@ -1583,7 +1587,7 @@ func (s *NegateContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *NegateContext) Member() IMemberContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1659,7 +1663,7 @@ func (p *CELParser) Unary() (localctx IUnaryContext) {
 			{
 				p.SetState(79)
 
-				var _m = p.Match(CELParserEXCLAM)
+				_m := p.Match(CELParserEXCLAM)
 
 				localctx.(*LogicalNotContext).s19 = _m
 			}
@@ -1686,7 +1690,7 @@ func (p *CELParser) Unary() (localctx IUnaryContext) {
 				{
 					p.SetState(85)
 
-					var _m = p.Match(CELParserMINUS)
+					_m := p.Match(CELParserMINUS)
 
 					localctx.(*NegateContext).s18 = _m
 				}
@@ -1727,7 +1731,7 @@ type MemberContext struct {
 }
 
 func NewEmptyMemberContext() *MemberContext {
-	var p = new(MemberContext)
+	p := new(MemberContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_member
 	return p
@@ -1736,7 +1740,7 @@ func NewEmptyMemberContext() *MemberContext {
 func (*MemberContext) IsMemberContext() {}
 
 func NewMemberContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberContext {
-	var p = new(MemberContext)
+	p := new(MemberContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -1769,7 +1773,7 @@ type SelectOrCallContext struct {
 }
 
 func NewSelectOrCallContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *SelectOrCallContext {
-	var p = new(SelectOrCallContext)
+	p := new(SelectOrCallContext)
 
 	p.MemberContext = NewEmptyMemberContext()
 	p.parser = parser
@@ -1799,7 +1803,7 @@ func (s *SelectOrCallContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *SelectOrCallContext) Member() IMemberContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1813,7 +1817,7 @@ func (s *SelectOrCallContext) IDENTIFIER() antlr.TerminalNode {
 }
 
 func (s *SelectOrCallContext) ExprList() IExprListContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprListContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprListContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1849,7 +1853,7 @@ type PrimaryExprContext struct {
 }
 
 func NewPrimaryExprContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PrimaryExprContext {
-	var p = new(PrimaryExprContext)
+	p := new(PrimaryExprContext)
 
 	p.MemberContext = NewEmptyMemberContext()
 	p.parser = parser
@@ -1863,7 +1867,7 @@ func (s *PrimaryExprContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *PrimaryExprContext) Primary() IPrimaryContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IPrimaryContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IPrimaryContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1901,7 +1905,7 @@ type IndexContext struct {
 }
 
 func NewIndexContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IndexContext {
-	var p = new(IndexContext)
+	p := new(IndexContext)
 
 	p.MemberContext = NewEmptyMemberContext()
 	p.parser = parser
@@ -1923,7 +1927,7 @@ func (s *IndexContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *IndexContext) Member() IMemberContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1933,7 +1937,7 @@ func (s *IndexContext) Member() IMemberContext {
 }
 
 func (s *IndexContext) Expr() IExprContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -1971,7 +1975,7 @@ type CreateMessageContext struct {
 }
 
 func NewCreateMessageContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *CreateMessageContext {
-	var p = new(CreateMessageContext)
+	p := new(CreateMessageContext)
 
 	p.MemberContext = NewEmptyMemberContext()
 	p.parser = parser
@@ -1993,7 +1997,7 @@ func (s *CreateMessageContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *CreateMessageContext) Member() IMemberContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -2003,7 +2007,7 @@ func (s *CreateMessageContext) Member() IMemberContext {
 }
 
 func (s *CreateMessageContext) FieldInitializerList() IFieldInitializerListContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFieldInitializerListContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IFieldInitializerListContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -2101,14 +2105,14 @@ func (p *CELParser) member(_p int) (localctx IMemberContext) {
 				{
 					p.SetState(97)
 
-					var _m = p.Match(CELParserDOT)
+					_m := p.Match(CELParserDOT)
 
 					localctx.(*SelectOrCallContext).op = _m
 				}
 				{
 					p.SetState(98)
 
-					var _m = p.Match(CELParserIDENTIFIER)
+					_m := p.Match(CELParserIDENTIFIER)
 
 					localctx.(*SelectOrCallContext).id = _m
 				}
@@ -2119,7 +2123,7 @@ func (p *CELParser) member(_p int) (localctx IMemberContext) {
 					{
 						p.SetState(99)
 
-						var _m = p.Match(CELParserLPAREN)
+						_m := p.Match(CELParserLPAREN)
 
 						localctx.(*SelectOrCallContext).open = _m
 					}
@@ -2131,11 +2135,10 @@ func (p *CELParser) member(_p int) (localctx IMemberContext) {
 						{
 							p.SetState(100)
 
-							var _x = p.ExprList()
+							_x := p.ExprList()
 
 							localctx.(*SelectOrCallContext).args = _x
 						}
-
 					}
 					{
 						p.SetState(103)
@@ -2155,14 +2158,14 @@ func (p *CELParser) member(_p int) (localctx IMemberContext) {
 				{
 					p.SetState(107)
 
-					var _m = p.Match(CELParserLBRACKET)
+					_m := p.Match(CELParserLBRACKET)
 
 					localctx.(*IndexContext).op = _m
 				}
 				{
 					p.SetState(108)
 
-					var _x = p.Expr()
+					_x := p.Expr()
 
 					localctx.(*IndexContext).index = _x
 				}
@@ -2182,7 +2185,7 @@ func (p *CELParser) member(_p int) (localctx IMemberContext) {
 				{
 					p.SetState(112)
 
-					var _m = p.Match(CELParserLBRACE)
+					_m := p.Match(CELParserLBRACE)
 
 					localctx.(*CreateMessageContext).op = _m
 				}
@@ -2194,11 +2197,10 @@ func (p *CELParser) member(_p int) (localctx IMemberContext) {
 					{
 						p.SetState(113)
 
-						var _x = p.FieldInitializerList()
+						_x := p.FieldInitializerList()
 
 						localctx.(*CreateMessageContext).entries = _x
 					}
-
 				}
 				p.SetState(117)
 				p.GetErrorHandler().Sync(p)
@@ -2209,7 +2211,6 @@ func (p *CELParser) member(_p int) (localctx IMemberContext) {
 						p.SetState(116)
 						p.Match(CELParserCOMMA)
 					}
-
 				}
 				{
 					p.SetState(119)
@@ -2244,7 +2245,7 @@ type PrimaryContext struct {
 }
 
 func NewEmptyPrimaryContext() *PrimaryContext {
-	var p = new(PrimaryContext)
+	p := new(PrimaryContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_primary
 	return p
@@ -2253,7 +2254,7 @@ func NewEmptyPrimaryContext() *PrimaryContext {
 func (*PrimaryContext) IsPrimaryContext() {}
 
 func NewPrimaryContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PrimaryContext {
-	var p = new(PrimaryContext)
+	p := new(PrimaryContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -2284,7 +2285,7 @@ type CreateListContext struct {
 }
 
 func NewCreateListContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *CreateListContext {
-	var p = new(CreateListContext)
+	p := new(CreateListContext)
 
 	p.PrimaryContext = NewEmptyPrimaryContext()
 	p.parser = parser
@@ -2306,7 +2307,7 @@ func (s *CreateListContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *CreateListContext) ExprList() IExprListContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprListContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprListContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -2344,7 +2345,7 @@ type CreateStructContext struct {
 }
 
 func NewCreateStructContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *CreateStructContext {
-	var p = new(CreateStructContext)
+	p := new(CreateStructContext)
 
 	p.PrimaryContext = NewEmptyPrimaryContext()
 	p.parser = parser
@@ -2366,7 +2367,7 @@ func (s *CreateStructContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *CreateStructContext) MapInitializerList() IMapInitializerListContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMapInitializerListContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IMapInitializerListContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -2402,7 +2403,7 @@ type ConstantLiteralContext struct {
 }
 
 func NewConstantLiteralContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ConstantLiteralContext {
-	var p = new(ConstantLiteralContext)
+	p := new(ConstantLiteralContext)
 
 	p.PrimaryContext = NewEmptyPrimaryContext()
 	p.parser = parser
@@ -2416,7 +2417,7 @@ func (s *ConstantLiteralContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *ConstantLiteralContext) Literal() ILiteralContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*ILiteralContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*ILiteralContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -2453,7 +2454,7 @@ type NestedContext struct {
 }
 
 func NewNestedContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NestedContext {
-	var p = new(NestedContext)
+	p := new(NestedContext)
 
 	p.PrimaryContext = NewEmptyPrimaryContext()
 	p.parser = parser
@@ -2471,7 +2472,7 @@ func (s *NestedContext) GetRuleContext() antlr.RuleContext {
 }
 
 func (s *NestedContext) Expr() IExprContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -2511,7 +2512,7 @@ type IdentOrGlobalCallContext struct {
 }
 
 func NewIdentOrGlobalCallContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IdentOrGlobalCallContext {
-	var p = new(IdentOrGlobalCallContext)
+	p := new(IdentOrGlobalCallContext)
 
 	p.PrimaryContext = NewEmptyPrimaryContext()
 	p.parser = parser
@@ -2545,7 +2546,7 @@ func (s *IdentOrGlobalCallContext) IDENTIFIER() antlr.TerminalNode {
 }
 
 func (s *IdentOrGlobalCallContext) ExprList() IExprListContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprListContext)(nil)).Elem(), 0)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprListContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
@@ -2612,16 +2613,15 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 			{
 				p.SetState(125)
 
-				var _m = p.Match(CELParserDOT)
+				_m := p.Match(CELParserDOT)
 
 				localctx.(*IdentOrGlobalCallContext).leadingDot = _m
 			}
-
 		}
 		{
 			p.SetState(128)
 
-			var _m = p.Match(CELParserIDENTIFIER)
+			_m := p.Match(CELParserIDENTIFIER)
 
 			localctx.(*IdentOrGlobalCallContext).id = _m
 		}
@@ -2632,7 +2632,7 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 			{
 				p.SetState(129)
 
-				var _m = p.Match(CELParserLPAREN)
+				_m := p.Match(CELParserLPAREN)
 
 				localctx.(*IdentOrGlobalCallContext).op = _m
 			}
@@ -2644,11 +2644,10 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 				{
 					p.SetState(130)
 
-					var _x = p.ExprList()
+					_x := p.ExprList()
 
 					localctx.(*IdentOrGlobalCallContext).args = _x
 				}
-
 			}
 			{
 				p.SetState(133)
@@ -2667,7 +2666,7 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 		{
 			p.SetState(137)
 
-			var _x = p.Expr()
+			_x := p.Expr()
 
 			localctx.(*NestedContext).e = _x
 		}
@@ -2682,7 +2681,7 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 		{
 			p.SetState(140)
 
-			var _m = p.Match(CELParserLBRACKET)
+			_m := p.Match(CELParserLBRACKET)
 
 			localctx.(*CreateListContext).op = _m
 		}
@@ -2694,11 +2693,10 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 			{
 				p.SetState(141)
 
-				var _x = p.ExprList()
+				_x := p.ExprList()
 
 				localctx.(*CreateListContext).elems = _x
 			}
-
 		}
 		p.SetState(145)
 		p.GetErrorHandler().Sync(p)
@@ -2709,7 +2707,6 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 				p.SetState(144)
 				p.Match(CELParserCOMMA)
 			}
-
 		}
 		{
 			p.SetState(147)
@@ -2722,7 +2719,7 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 		{
 			p.SetState(148)
 
-			var _m = p.Match(CELParserLBRACE)
+			_m := p.Match(CELParserLBRACE)
 
 			localctx.(*CreateStructContext).op = _m
 		}
@@ -2734,11 +2731,10 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 			{
 				p.SetState(149)
 
-				var _x = p.MapInitializerList()
+				_x := p.MapInitializerList()
 
 				localctx.(*CreateStructContext).entries = _x
 			}
-
 		}
 		p.SetState(153)
 		p.GetErrorHandler().Sync(p)
@@ -2749,7 +2745,6 @@ func (p *CELParser) Primary() (localctx IPrimaryContext) {
 				p.SetState(152)
 				p.Match(CELParserCOMMA)
 			}
-
 		}
 		{
 			p.SetState(155)
@@ -2802,7 +2797,7 @@ type ExprListContext struct {
 }
 
 func NewEmptyExprListContext() *ExprListContext {
-	var p = new(ExprListContext)
+	p := new(ExprListContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_exprList
 	return p
@@ -2811,7 +2806,7 @@ func NewEmptyExprListContext() *ExprListContext {
 func (*ExprListContext) IsExprListContext() {}
 
 func NewExprListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExprListContext {
-	var p = new(ExprListContext)
+	p := new(ExprListContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -2832,8 +2827,8 @@ func (s *ExprListContext) GetE() []IExprContext { return s.e }
 func (s *ExprListContext) SetE(v []IExprContext) { s.e = v }
 
 func (s *ExprListContext) AllExpr() []IExprContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExprContext)(nil)).Elem())
-	var tst = make([]IExprContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*IExprContext)(nil)).Elem())
+	tst := make([]IExprContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -2845,7 +2840,7 @@ func (s *ExprListContext) AllExpr() []IExprContext {
 }
 
 func (s *ExprListContext) Expr(i int) IExprContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -2910,7 +2905,7 @@ func (p *CELParser) ExprList() (localctx IExprListContext) {
 	{
 		p.SetState(159)
 
-		var _x = p.Expr()
+		_x := p.Expr()
 
 		localctx.(*ExprListContext)._expr = _x
 	}
@@ -2928,7 +2923,7 @@ func (p *CELParser) ExprList() (localctx IExprListContext) {
 			{
 				p.SetState(161)
 
-				var _x = p.Expr()
+				_x := p.Expr()
 
 				localctx.(*ExprListContext)._expr = _x
 			}
@@ -3002,7 +2997,7 @@ type FieldInitializerListContext struct {
 }
 
 func NewEmptyFieldInitializerListContext() *FieldInitializerListContext {
-	var p = new(FieldInitializerListContext)
+	p := new(FieldInitializerListContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_fieldInitializerList
 	return p
@@ -3011,7 +3006,7 @@ func NewEmptyFieldInitializerListContext() *FieldInitializerListContext {
 func (*FieldInitializerListContext) IsFieldInitializerListContext() {}
 
 func NewFieldInitializerListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FieldInitializerListContext {
-	var p = new(FieldInitializerListContext)
+	p := new(FieldInitializerListContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -3056,8 +3051,8 @@ func (s *FieldInitializerListContext) IDENTIFIER(i int) antlr.TerminalNode {
 }
 
 func (s *FieldInitializerListContext) AllExpr() []IExprContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExprContext)(nil)).Elem())
-	var tst = make([]IExprContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*IExprContext)(nil)).Elem())
+	tst := make([]IExprContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -3069,7 +3064,7 @@ func (s *FieldInitializerListContext) AllExpr() []IExprContext {
 }
 
 func (s *FieldInitializerListContext) Expr(i int) IExprContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -3134,7 +3129,7 @@ func (p *CELParser) FieldInitializerList() (localctx IFieldInitializerListContex
 	{
 		p.SetState(167)
 
-		var _m = p.Match(CELParserIDENTIFIER)
+		_m := p.Match(CELParserIDENTIFIER)
 
 		localctx.(*FieldInitializerListContext)._IDENTIFIER = _m
 	}
@@ -3142,7 +3137,7 @@ func (p *CELParser) FieldInitializerList() (localctx IFieldInitializerListContex
 	{
 		p.SetState(168)
 
-		var _m = p.Match(CELParserCOLON)
+		_m := p.Match(CELParserCOLON)
 
 		localctx.(*FieldInitializerListContext).s21 = _m
 	}
@@ -3150,7 +3145,7 @@ func (p *CELParser) FieldInitializerList() (localctx IFieldInitializerListContex
 	{
 		p.SetState(169)
 
-		var _x = p.Expr()
+		_x := p.Expr()
 
 		localctx.(*FieldInitializerListContext)._expr = _x
 	}
@@ -3168,7 +3163,7 @@ func (p *CELParser) FieldInitializerList() (localctx IFieldInitializerListContex
 			{
 				p.SetState(171)
 
-				var _m = p.Match(CELParserIDENTIFIER)
+				_m := p.Match(CELParserIDENTIFIER)
 
 				localctx.(*FieldInitializerListContext)._IDENTIFIER = _m
 			}
@@ -3176,7 +3171,7 @@ func (p *CELParser) FieldInitializerList() (localctx IFieldInitializerListContex
 			{
 				p.SetState(172)
 
-				var _m = p.Match(CELParserCOLON)
+				_m := p.Match(CELParserCOLON)
 
 				localctx.(*FieldInitializerListContext).s21 = _m
 			}
@@ -3184,7 +3179,7 @@ func (p *CELParser) FieldInitializerList() (localctx IFieldInitializerListContex
 			{
 				p.SetState(173)
 
-				var _x = p.Expr()
+				_x := p.Expr()
 
 				localctx.(*FieldInitializerListContext)._expr = _x
 			}
@@ -3251,7 +3246,7 @@ type MapInitializerListContext struct {
 }
 
 func NewEmptyMapInitializerListContext() *MapInitializerListContext {
-	var p = new(MapInitializerListContext)
+	p := new(MapInitializerListContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_mapInitializerList
 	return p
@@ -3260,7 +3255,7 @@ func NewEmptyMapInitializerListContext() *MapInitializerListContext {
 func (*MapInitializerListContext) IsMapInitializerListContext() {}
 
 func NewMapInitializerListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapInitializerListContext {
-	var p = new(MapInitializerListContext)
+	p := new(MapInitializerListContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -3293,8 +3288,8 @@ func (s *MapInitializerListContext) SetKeys(v []IExprContext) { s.keys = v }
 func (s *MapInitializerListContext) SetValues(v []IExprContext) { s.values = v }
 
 func (s *MapInitializerListContext) AllExpr() []IExprContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IExprContext)(nil)).Elem())
-	var tst = make([]IExprContext, len(ts))
+	ts := s.GetTypedRuleContexts(reflect.TypeOf((*IExprContext)(nil)).Elem())
+	tst := make([]IExprContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
@@ -3306,7 +3301,7 @@ func (s *MapInitializerListContext) AllExpr() []IExprContext {
 }
 
 func (s *MapInitializerListContext) Expr(i int) IExprContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), i)
+	t := s.GetTypedRuleContext(reflect.TypeOf((*IExprContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
@@ -3371,7 +3366,7 @@ func (p *CELParser) MapInitializerList() (localctx IMapInitializerListContext) {
 	{
 		p.SetState(179)
 
-		var _x = p.Expr()
+		_x := p.Expr()
 
 		localctx.(*MapInitializerListContext)._expr = _x
 	}
@@ -3379,7 +3374,7 @@ func (p *CELParser) MapInitializerList() (localctx IMapInitializerListContext) {
 	{
 		p.SetState(180)
 
-		var _m = p.Match(CELParserCOLON)
+		_m := p.Match(CELParserCOLON)
 
 		localctx.(*MapInitializerListContext).s21 = _m
 	}
@@ -3387,7 +3382,7 @@ func (p *CELParser) MapInitializerList() (localctx IMapInitializerListContext) {
 	{
 		p.SetState(181)
 
-		var _x = p.Expr()
+		_x := p.Expr()
 
 		localctx.(*MapInitializerListContext)._expr = _x
 	}
@@ -3405,7 +3400,7 @@ func (p *CELParser) MapInitializerList() (localctx IMapInitializerListContext) {
 			{
 				p.SetState(183)
 
-				var _x = p.Expr()
+				_x := p.Expr()
 
 				localctx.(*MapInitializerListContext)._expr = _x
 			}
@@ -3413,7 +3408,7 @@ func (p *CELParser) MapInitializerList() (localctx IMapInitializerListContext) {
 			{
 				p.SetState(184)
 
-				var _m = p.Match(CELParserCOLON)
+				_m := p.Match(CELParserCOLON)
 
 				localctx.(*MapInitializerListContext).s21 = _m
 			}
@@ -3421,7 +3416,7 @@ func (p *CELParser) MapInitializerList() (localctx IMapInitializerListContext) {
 			{
 				p.SetState(185)
 
-				var _x = p.Expr()
+				_x := p.Expr()
 
 				localctx.(*MapInitializerListContext)._expr = _x
 			}
@@ -3453,7 +3448,7 @@ type LiteralContext struct {
 }
 
 func NewEmptyLiteralContext() *LiteralContext {
-	var p = new(LiteralContext)
+	p := new(LiteralContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
 	p.RuleIndex = CELParserRULE_literal
 	return p
@@ -3462,7 +3457,7 @@ func NewEmptyLiteralContext() *LiteralContext {
 func (*LiteralContext) IsLiteralContext() {}
 
 func NewLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LiteralContext {
-	var p = new(LiteralContext)
+	p := new(LiteralContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
@@ -3492,7 +3487,7 @@ type BytesContext struct {
 }
 
 func NewBytesContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BytesContext {
-	var p = new(BytesContext)
+	p := new(BytesContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3541,7 +3536,7 @@ type UintContext struct {
 }
 
 func NewUintContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *UintContext {
-	var p = new(UintContext)
+	p := new(UintContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3590,7 +3585,7 @@ type NullContext struct {
 }
 
 func NewNullContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NullContext {
-	var p = new(NullContext)
+	p := new(NullContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3635,7 +3630,7 @@ type BoolFalseContext struct {
 }
 
 func NewBoolFalseContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BoolFalseContext {
-	var p = new(BoolFalseContext)
+	p := new(BoolFalseContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3680,7 +3675,7 @@ type StringContext struct {
 }
 
 func NewStringContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *StringContext {
-	var p = new(StringContext)
+	p := new(StringContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3730,7 +3725,7 @@ type DoubleContext struct {
 }
 
 func NewDoubleContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DoubleContext {
-	var p = new(DoubleContext)
+	p := new(DoubleContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3787,7 +3782,7 @@ type BoolTrueContext struct {
 }
 
 func NewBoolTrueContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BoolTrueContext {
-	var p = new(BoolTrueContext)
+	p := new(BoolTrueContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3833,7 +3828,7 @@ type IntContext struct {
 }
 
 func NewIntContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IntContext {
-	var p = new(IntContext)
+	p := new(IntContext)
 
 	p.LiteralContext = NewEmptyLiteralContext()
 	p.parser = parser
@@ -3919,16 +3914,15 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 			{
 				p.SetState(192)
 
-				var _m = p.Match(CELParserMINUS)
+				_m := p.Match(CELParserMINUS)
 
 				localctx.(*IntContext).sign = _m
 			}
-
 		}
 		{
 			p.SetState(195)
 
-			var _m = p.Match(CELParserNUM_INT)
+			_m := p.Match(CELParserNUM_INT)
 
 			localctx.(*IntContext).tok = _m
 		}
@@ -3939,7 +3933,7 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(196)
 
-			var _m = p.Match(CELParserNUM_UINT)
+			_m := p.Match(CELParserNUM_UINT)
 
 			localctx.(*UintContext).tok = _m
 		}
@@ -3955,16 +3949,15 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 			{
 				p.SetState(197)
 
-				var _m = p.Match(CELParserMINUS)
+				_m := p.Match(CELParserMINUS)
 
 				localctx.(*DoubleContext).sign = _m
 			}
-
 		}
 		{
 			p.SetState(200)
 
-			var _m = p.Match(CELParserNUM_FLOAT)
+			_m := p.Match(CELParserNUM_FLOAT)
 
 			localctx.(*DoubleContext).tok = _m
 		}
@@ -3975,7 +3968,7 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(201)
 
-			var _m = p.Match(CELParserSTRING)
+			_m := p.Match(CELParserSTRING)
 
 			localctx.(*StringContext).tok = _m
 		}
@@ -3986,7 +3979,7 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(202)
 
-			var _m = p.Match(CELParserBYTES)
+			_m := p.Match(CELParserBYTES)
 
 			localctx.(*BytesContext).tok = _m
 		}
@@ -3997,7 +3990,7 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(203)
 
-			var _m = p.Match(CELParserTRUE)
+			_m := p.Match(CELParserTRUE)
 
 			localctx.(*BoolTrueContext).tok = _m
 		}
@@ -4008,7 +4001,7 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(204)
 
-			var _m = p.Match(CELParserFALSE)
+			_m := p.Match(CELParserFALSE)
 
 			localctx.(*BoolFalseContext).tok = _m
 		}
@@ -4019,7 +4012,7 @@ func (p *CELParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(205)
 
-			var _m = p.Match(CELParserNULL)
+			_m := p.Match(CELParserNULL)
 
 			localctx.(*NullContext).tok = _m
 		}

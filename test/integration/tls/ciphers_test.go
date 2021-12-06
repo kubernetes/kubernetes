@@ -34,7 +34,6 @@ func runBasicSecureAPIServer(t *testing.T, ciphers []string) (kubeapiservertesti
 }
 
 func TestAPICiphers(t *testing.T) {
-
 	basicServerCiphers := []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305", "TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_RSA_WITH_AES_256_CBC_SHA", "TLS_RSA_WITH_AES_128_GCM_SHA256", "TLS_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"}
 
 	tearDown, port := runBasicSecureAPIServer(t, basicServerCiphers)
@@ -61,7 +60,6 @@ func TestAPICiphers(t *testing.T) {
 }
 
 func runTestAPICiphers(t *testing.T, testID int, kubePort int, clientCiphers []uint16, expectedError bool) {
-
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			MaxVersion:         tls.VersionTLS12, // Limit to TLS1.2 to allow cipher configuration

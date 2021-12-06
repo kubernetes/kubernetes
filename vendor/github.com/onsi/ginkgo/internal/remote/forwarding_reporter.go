@@ -16,7 +16,7 @@ import (
 	"github.com/onsi/ginkgo/types"
 )
 
-//An interface to net/http's client to allow the injection of fakes under test
+// An interface to net/http's client to allow the injection of fakes under test
 type Poster interface {
 	Post(url string, bodyType string, body io.Reader) (resp *http.Response, err error)
 }
@@ -58,10 +58,10 @@ func NewForwardingReporter(config config.DefaultReporterConfigType, serverHost s
 		}
 
 		if !config.Verbose {
-			//if verbose is true then the GinkgoWriter emits to stdout.  Don't _also_ redirect GinkgoWriter output as that will result in duplication.
+			// if verbose is true then the GinkgoWriter emits to stdout.  Don't _also_ redirect GinkgoWriter output as that will result in duplication.
 			ginkgoWriter.AndRedirectTo(reporter.debugFile)
 		}
-		outputInterceptor.StreamTo(reporter.debugFile) //This is not working
+		outputInterceptor.StreamTo(reporter.debugFile) // This is not working
 
 		stenographer := stenographer.New(false, true, reporter.debugFile)
 		config.Succinct = false

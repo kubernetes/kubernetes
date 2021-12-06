@@ -171,7 +171,6 @@ var _ = SIGDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive][NodeFeatu
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			summary := eventuallyGetSummary()
 

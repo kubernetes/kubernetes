@@ -81,12 +81,10 @@ var (
 		source <(kubeadm completion zsh)`)
 )
 
-var (
-	completionShells = map[string]func(out io.Writer, cmd *cobra.Command) error{
-		"bash": runCompletionBash,
-		"zsh":  runCompletionZsh,
-	}
-)
+var completionShells = map[string]func(out io.Writer, cmd *cobra.Command) error{
+	"bash": runCompletionBash,
+	"zsh":  runCompletionZsh,
+}
 
 // GetSupportedShells returns a list of supported shells
 func GetSupportedShells() []string {

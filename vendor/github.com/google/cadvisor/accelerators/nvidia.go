@@ -256,7 +256,7 @@ func (nc *nvidiaCollector) UpdateStats(stats *info.ContainerStats) error {
 		if err != nil {
 			return fmt.Errorf("error while getting gpu memory info: %v", err)
 		}
-		//TODO: Use housekeepingInterval
+		// TODO: Use housekeepingInterval
 		utilizationGPU, err := device.AverageGPUUtilization(10 * time.Second)
 		if err != nil {
 			return fmt.Errorf("error while getting gpu utilization: %v", err)

@@ -842,5 +842,6 @@ var Versions = map[string]release{
     proxy . *
     cache 30
     reload
-}`},
+}`,
+	},
 }

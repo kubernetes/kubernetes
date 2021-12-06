@@ -404,8 +404,10 @@ func (w Wait) IsDeleted(event watch.Event) (bool, error) {
 	}
 }
 
-type isCondMetFunc func(event watch.Event) (bool, error)
-type checkCondFunc func(obj *unstructured.Unstructured) (bool, error)
+type (
+	isCondMetFunc func(event watch.Event) (bool, error)
+	checkCondFunc func(obj *unstructured.Unstructured) (bool, error)
+)
 
 // getObjAndCheckCondition will make a List query to the API server to get the object and check if the condition is met using check function.
 // If the condition is not met, it will make a Watch query to the server and pass in the condMet function

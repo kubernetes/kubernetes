@@ -106,7 +106,6 @@ func humanateBigBytes(s, base *big.Int, sizes []string) string {
 	}
 
 	return fmt.Sprintf(f, val, suffix)
-
 }
 
 // BigBytes produces a human readable representation of an SI size.

@@ -93,7 +93,6 @@ type configurationWrapper interface {
 	// We use it to log the type name of the configuration object being ensured.
 	// It is either 'PriorityLevelConfiguration' or 'FlowSchema'
 	TypeName() string
-
 	configurationClient
 	specCopier
 }

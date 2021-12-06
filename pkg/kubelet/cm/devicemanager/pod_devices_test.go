@@ -132,7 +132,6 @@ func TestResourceDeviceInstanceFilter(t *testing.T) {
 	resp = devs.Filter(cond)
 	expected = `{"bar":{"dev-bar1":{"ID":"bar1"}},"baz":{"dev-baz1":{"ID":"baz1"}},"foo":{"dev-foo1":{"ID":"foo1"}}}`
 	expectResourceDeviceInstances(t, resp, expected)
-
 }
 
 func expectResourceDeviceInstances(t *testing.T, resp ResourceDeviceInstances, expected string) {

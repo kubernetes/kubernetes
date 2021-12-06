@@ -210,6 +210,7 @@ func NewRootUpdateSubresourceAction(resource schema.GroupVersionResource, subres
 
 	return action
 }
+
 func NewUpdateSubresourceAction(resource schema.GroupVersionResource, subresource string, namespace string, object runtime.Object) UpdateActionImpl {
 	action := UpdateActionImpl{}
 	action.Verb = "update"
@@ -355,6 +356,7 @@ type ListRestrictions struct {
 	Labels labels.Selector
 	Fields fields.Selector
 }
+
 type WatchRestrictions struct {
 	Labels          labels.Selector
 	Fields          fields.Selector
@@ -440,15 +442,19 @@ type ActionImpl struct {
 func (a ActionImpl) GetNamespace() string {
 	return a.Namespace
 }
+
 func (a ActionImpl) GetVerb() string {
 	return a.Verb
 }
+
 func (a ActionImpl) GetResource() schema.GroupVersionResource {
 	return a.Resource
 }
+
 func (a ActionImpl) GetSubresource() string {
 	return a.Subresource
 }
+
 func (a ActionImpl) Matches(verb, resource string) bool {
 	// Stay backwards compatible.
 	if !strings.Contains(resource, "/") {
@@ -463,6 +469,7 @@ func (a ActionImpl) Matches(verb, resource string) bool {
 		strings.EqualFold(topresource, a.Resource.Resource) &&
 		strings.EqualFold(subresource, a.Subresource)
 }
+
 func (a ActionImpl) DeepCopy() Action {
 	ret := a
 	return ret

@@ -61,7 +61,6 @@ type CertKeyContentProvider interface {
 // well as optional explicit names.
 type SNICertKeyContentProvider interface {
 	Notifier
-
 	CertKeyContentProvider
 	// SNINames provides names used for SNI. May return nil.
 	SNINames() []string

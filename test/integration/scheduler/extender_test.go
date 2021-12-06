@@ -47,8 +47,10 @@ const (
 	extendedResourceName = "foo.com/bar"
 )
 
-type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
-type priorityFunc func(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPriorityList, error)
+type (
+	fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
+	priorityFunc func(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPriorityList, error)
+)
 
 type priorityConfig struct {
 	function priorityFunc
@@ -194,7 +196,7 @@ func (e *Extender) Filter(args *extenderv1.ExtenderArgs) (*extenderv1.ExtenderFi
 func (e *Extender) Prioritize(args *extenderv1.ExtenderArgs) (*extenderv1.HostPriorityList, error) {
 	result := extenderv1.HostPriorityList{}
 	combinedScores := map[string]int64{}
-	var nodes = &v1.NodeList{Items: []v1.Node{}}
+	nodes := &v1.NodeList{Items: []v1.Node{}}
 
 	if e.nodeCacheCapable {
 		for _, nodeName := range *args.NodeNames {

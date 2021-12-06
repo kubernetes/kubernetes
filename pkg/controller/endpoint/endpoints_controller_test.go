@@ -47,17 +47,21 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-var alwaysReady = func() bool { return true }
-var neverReady = func() bool { return false }
-var emptyNodeName string
-var triggerTime = time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
-var triggerTimeString = triggerTime.Format(time.RFC3339Nano)
-var oldTriggerTimeString = triggerTime.Add(-time.Hour).Format(time.RFC3339Nano)
+var (
+	alwaysReady          = func() bool { return true }
+	neverReady           = func() bool { return false }
+	emptyNodeName        string
+	triggerTime          = time.Date(2018, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
+	triggerTimeString    = triggerTime.Format(time.RFC3339Nano)
+	oldTriggerTimeString = triggerTime.Add(-time.Hour).Format(time.RFC3339Nano)
+)
 
-var ipv4only = []v1.IPFamily{v1.IPv4Protocol}
-var ipv6only = []v1.IPFamily{v1.IPv6Protocol}
-var ipv4ipv6 = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
-var ipv6ipv4 = []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
+var (
+	ipv4only = []v1.IPFamily{v1.IPv4Protocol}
+	ipv6only = []v1.IPFamily{v1.IPv6Protocol}
+	ipv4ipv6 = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+	ipv6ipv4 = []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
+)
 
 func testPod(namespace string, id int, nPorts int, isReady bool, ipFamilies []v1.IPFamily) *v1.Pod {
 	p := &v1.Pod{
@@ -162,7 +166,6 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 // block endpoint "DELETE" requestsi will wait on a blockDelete signal to delete endpoint. If controller is nil, a error will
 // be sent in the response.
 func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointController, endpoint *v1.Endpoints, blockDelete, blockNextAction chan struct{}, namespace string) *httptest.Server {
-
 	handlerFunc := func(res http.ResponseWriter, req *http.Request) {
 		if controller == nil {
 			res.WriteHeader(http.StatusInternalServerError)
@@ -198,7 +201,6 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 		http.Error(res, "", http.StatusNotFound)
 	})
 	return httptest.NewServer(mux)
-
 }
 
 type endpointController struct {
@@ -856,7 +858,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 }
 
 func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		podsSynced            func() bool
 		servicesSynced        func() bool
 		endpointsSynced       func() bool
@@ -1397,7 +1399,6 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestLastTriggerChangeTimeAnnotation(t *testing.T) {

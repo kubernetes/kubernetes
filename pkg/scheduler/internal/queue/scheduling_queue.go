@@ -649,7 +649,6 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 				break
 			}
 		}
-
 	}
 	return podsToMove
 }

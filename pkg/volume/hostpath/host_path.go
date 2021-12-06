@@ -52,11 +52,13 @@ type hostPathPlugin struct {
 	config volume.VolumeConfig
 }
 
-var _ volume.VolumePlugin = &hostPathPlugin{}
-var _ volume.PersistentVolumePlugin = &hostPathPlugin{}
-var _ volume.RecyclableVolumePlugin = &hostPathPlugin{}
-var _ volume.DeletableVolumePlugin = &hostPathPlugin{}
-var _ volume.ProvisionableVolumePlugin = &hostPathPlugin{}
+var (
+	_ volume.VolumePlugin              = &hostPathPlugin{}
+	_ volume.PersistentVolumePlugin    = &hostPathPlugin{}
+	_ volume.RecyclableVolumePlugin    = &hostPathPlugin{}
+	_ volume.DeletableVolumePlugin     = &hostPathPlugin{}
+	_ volume.ProvisionableVolumePlugin = &hostPathPlugin{}
+)
 
 const (
 	hostPathPluginName = "kubernetes.io/host-path"
@@ -306,7 +308,7 @@ func (r *hostPathProvisioner) Provision(selectedNode *v1.Node, allowedTopologies
 		pv.Spec.AccessModes = r.plugin.GetAccessModes()
 	}
 
-	return pv, os.MkdirAll(pv.Spec.HostPath.Path, 0750)
+	return pv, os.MkdirAll(pv.Spec.HostPath.Path, 0o750)
 }
 
 // hostPathDeleter deletes a hostPath PV from the cluster.
@@ -476,7 +478,7 @@ func checkTypeInternal(ftc hostPathTypeChecker, pathType *v1.HostPathType) error
 // If pathname already exists as a directory, no error is returned.
 // If pathname already exists as a file, an error is returned.
 func makeDir(pathname string) error {
-	err := os.MkdirAll(pathname, os.FileMode(0755))
+	err := os.MkdirAll(pathname, os.FileMode(0o755))
 	if err != nil {
 		if !os.IsExist(err) {
 			return err
@@ -488,7 +490,7 @@ func makeDir(pathname string) error {
 // makeFile creates an empty file.
 // If pathname already exists, whether a file or directory, no error is returned.
 func makeFile(pathname string) error {
-	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0o644))
 	if f != nil {
 		f.Close()
 	}

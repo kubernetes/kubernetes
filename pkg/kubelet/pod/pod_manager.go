@@ -93,7 +93,6 @@ type Manager interface {
 	// IsMirrorPodOf returns true if mirrorPod is a correct representation of
 	// pod; false otherwise.
 	IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool
-
 	MirrorClient
 }
 

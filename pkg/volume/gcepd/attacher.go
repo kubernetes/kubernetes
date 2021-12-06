@@ -300,7 +300,7 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 				// in windows, as we use mklink, only need to MkdirAll for parent directory
 				dir = filepath.Dir(deviceMountPath)
 			}
-			if err := os.MkdirAll(dir, 0750); err != nil {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				return fmt.Errorf("MountDevice:CreateDirectory failed with %s", err)
 			}
 			notMnt = true

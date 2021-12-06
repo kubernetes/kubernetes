@@ -87,12 +87,10 @@ type GSSAPIServer interface {
 	DeleteSecContext() error
 }
 
-var (
-	// OpenSSH supports Kerberos V5 mechanism only for GSS-API authentication,
-	// so we also support the krb5 mechanism only.
-	// See RFC 1964 section 1.
-	krb5Mesh = asn1.ObjectIdentifier{1, 2, 840, 113554, 1, 2, 2}
-)
+// OpenSSH supports Kerberos V5 mechanism only for GSS-API authentication,
+// so we also support the krb5 mechanism only.
+// See RFC 1964 section 1.
+var krb5Mesh = asn1.ObjectIdentifier{1, 2, 840, 113554, 1, 2, 2}
 
 // The GSS-API authentication method is initiated when the client sends an SSH_MSG_USERAUTH_REQUEST
 // See RFC 4462 section 3.2.

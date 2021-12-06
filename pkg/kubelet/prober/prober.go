@@ -68,7 +68,6 @@ type prober struct {
 func newProber(
 	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorder) *prober {
-
 	const followNonLocalRedirects = false
 	return &prober{
 		exec:          execprobe.New(),

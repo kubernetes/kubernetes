@@ -194,7 +194,7 @@ func TestFileExistingCheck(t *testing.T) {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 	defer os.Remove(f.Name())
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		check         FileExistingCheck
 		expectedError bool
@@ -233,7 +233,7 @@ func TestFileAvailableCheck(t *testing.T) {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 	defer os.Remove(f.Name())
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		check         FileAvailableCheck
 		expectedError bool
@@ -272,7 +272,7 @@ func TestFileContentCheck(t *testing.T) {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 	defer os.Remove(f.Name())
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		check         FileContentCheck
 		expectedError bool
@@ -340,7 +340,7 @@ func TestDirAvailableCheck(t *testing.T) {
 		t.Fatalf("failed creating directory: %v", err)
 	}
 	defer os.RemoveAll(fileDir)
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		check         DirAvailableCheck
 		expectedError bool
@@ -386,7 +386,7 @@ func TestPortOpenCheck(t *testing.T) {
 		t.Fatalf("could not listen on local network: %v", err)
 	}
 	defer ln.Close()
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		check         PortOpenCheck
 		expectedError bool
@@ -416,7 +416,7 @@ func TestPortOpenCheck(t *testing.T) {
 }
 
 func TestRunChecks(t *testing.T) {
-	var tokenTest = []struct {
+	tokenTest := []struct {
 		p        []Checker
 		expected bool
 		output   string
@@ -454,13 +454,14 @@ func TestRunChecks(t *testing.T) {
 		}
 	}
 }
+
 func TestConfigRootCAs(t *testing.T) {
 	f, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-cafile")
 	if err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed creating temp CA file\n\tactual:%v", err)
 	}
 	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0o644); err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
@@ -480,6 +481,7 @@ func TestConfigRootCAs(t *testing.T) {
 		)
 	}
 }
+
 func TestConfigCertAndKey(t *testing.T) {
 	certFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-certfile")
 	if err != nil {
@@ -489,7 +491,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 	defer os.Remove(certFile.Name())
-	if err := ioutil.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
+	if err := ioutil.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0o644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp CertFile file %s\n\tactual:%v",
 			certFile.Name(),
@@ -505,7 +507,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 	defer os.Remove(keyFile.Name())
-	if err := ioutil.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
+	if err := ioutil.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0o644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp KeyFile file %s\n\tactual:%v",
 			keyFile.Name(),
@@ -537,41 +539,41 @@ func TestConfigCertAndKey(t *testing.T) {
 }
 
 func TestKubernetesVersionCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		check          KubernetesVersionCheck
 		expectWarnings bool
 	}{
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //Same version
+				KubeadmVersion:    "v1.6.6", // Same version
 				KubernetesVersion: "v1.6.6",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion version older than KubeadmVersion
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion version older than KubeadmVersion
 				KubernetesVersion: "v1.5.5",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
 				KubernetesVersion: "v1.6.7",
 			},
 			expectWarnings: false,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
 				KubernetesVersion: "v1.7.0-alpha.0",
 			},
 			expectWarnings: true,
 		},
 		{
 			check: KubernetesVersionCheck{
-				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/stable
+				KubeadmVersion:    "v1.6.6", // KubernetesVersion newer than KubeadmVersion, in a different minor/stable
 				KubernetesVersion: "v1.7.0",
 			},
 			expectWarnings: true,
@@ -600,7 +602,7 @@ func TestKubernetesVersionCheck(t *testing.T) {
 }
 
 func TestHTTPProxyCIDRCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		check          HTTPProxyCIDRCheck
 		expectWarnings bool
 	}{
@@ -660,7 +662,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 }
 
 func TestHTTPProxyCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name           string
 		check          HTTPProxyCheck
 		expectWarnings bool
@@ -836,7 +838,7 @@ func TestKubeletVersionCheck(t *testing.T) {
 }
 
 func TestSetHasItemOrAll(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		ignoreSet      sets.String
 		testString     string
 		expectedResult bool
@@ -959,7 +961,7 @@ func TestImagePullCheck(t *testing.T) {
 }
 
 func TestNumCPUCheck(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		numCPU      int
 		numErrors   int
 		numWarnings int
@@ -987,7 +989,7 @@ func TestMemCheck(t *testing.T) {
 		t.Skip("unsupported OS for memory check test ")
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		minimum        uint64
 		expectedErrors int
 	}{

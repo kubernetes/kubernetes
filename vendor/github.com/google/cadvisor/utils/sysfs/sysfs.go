@@ -55,13 +55,11 @@ const (
 	cpuDirPattern  = "cpu*[0-9]"
 	nodeDirPattern = "node*[0-9]"
 
-	//HugePagesNrFile name of nr_hugepages file in sysfs
+	// HugePagesNrFile name of nr_hugepages file in sysfs
 	HugePagesNrFile = "nr_hugepages"
 )
 
-var (
-	nodeDir = "/sys/devices/system/node/"
-)
+var nodeDir = "/sys/devices/system/node/"
 
 type CacheInfo struct {
 	// cache id
@@ -100,7 +98,6 @@ type SysFs interface {
 	GetBlockDeviceScheduler(string) (string, error)
 	// Get device major:minor number string.
 	GetBlockDeviceNumbers(string) (string, error)
-
 	GetNetworkDevices() ([]os.FileInfo, error)
 	GetNetworkAddress(string) (string, error)
 	GetNetworkMtu(string) (string, error)
@@ -111,7 +108,6 @@ type SysFs interface {
 	GetCaches(id int) ([]os.FileInfo, error)
 	// Get information for a cache accessible from the given cpu.
 	GetCacheInfo(cpu int, cache string) (CacheInfo, error)
-
 	GetSystemUUID() (string, error)
 	// IsCPUOnline determines if CPU status from kernel hotplug machanism standpoint.
 	// See: https://www.kernel.org/doc/html/latest/core-api/cpu_hotplug.html

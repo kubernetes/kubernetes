@@ -152,8 +152,7 @@ type userAuthRequestMsg struct {
 }
 
 // Used for debug printouts of packets.
-type userAuthSuccessMsg struct {
-}
+type userAuthSuccessMsg struct{}
 
 // See RFC 4252, section 5.1
 const msgUserAuthFailure = 51
@@ -198,8 +197,10 @@ type channelOpenMsg struct {
 	TypeSpecificData []byte `ssh:"rest"`
 }
 
-const msgChannelExtendedData = 95
-const msgChannelData = 94
+const (
+	msgChannelExtendedData = 95
+	msgChannelData         = 94
+)
 
 // Used for debug print outs of packets.
 type channelDataMsg struct {

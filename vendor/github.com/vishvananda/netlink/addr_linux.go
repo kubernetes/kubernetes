@@ -402,13 +402,15 @@ func addrSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-c
 					continue
 				}
 
-				ch <- AddrUpdate{LinkAddress: *addr.IPNet,
+				ch <- AddrUpdate{
+					LinkAddress: *addr.IPNet,
 					LinkIndex:   ifindex,
 					NewAddr:     msgType == unix.RTM_NEWADDR,
 					Flags:       addr.Flags,
 					Scope:       addr.Scope,
 					PreferedLft: addr.PreferedLft,
-					ValidLft:    addr.ValidLft}
+					ValidLft:    addr.ValidLft,
+				}
 			}
 		}
 	}()

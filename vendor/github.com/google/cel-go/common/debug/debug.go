@@ -41,8 +41,7 @@ type Writer interface {
 	Buffer(e *exprpb.Expr)
 }
 
-type emptyDebugAdorner struct {
-}
+type emptyDebugAdorner struct{}
 
 var emptyAdorner Adorner = &emptyDebugAdorner{}
 

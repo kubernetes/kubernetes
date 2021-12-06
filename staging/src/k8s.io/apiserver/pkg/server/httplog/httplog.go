@@ -75,8 +75,10 @@ type respLogger struct {
 	logStacktracePred StacktracePred
 }
 
-var _ http.ResponseWriter = &respLogger{}
-var _ responsewriter.UserProvidedDecorator = &respLogger{}
+var (
+	_ http.ResponseWriter                  = &respLogger{}
+	_ responsewriter.UserProvidedDecorator = &respLogger{}
+)
 
 func (rl *respLogger) Unwrap() http.ResponseWriter {
 	return rl.w

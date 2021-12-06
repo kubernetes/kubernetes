@@ -10,7 +10,6 @@ import (
 
 // ServerVersion returns the server's version and runtime info.
 func (c *Client) ServerVersion(ctx context.Context) (*types.VersionInfo, error) {
-
 	// Send as unversioned
 	resp, err := c.do("GET", "version", doOptions{context: ctx, unversioned: true})
 	if err != nil {

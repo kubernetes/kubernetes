@@ -27,8 +27,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const ENV_VERIFY = "ETCD_VERIFY"
-const ENV_VERIFY_ALL_VALUE = "all"
+const (
+	ENV_VERIFY           = "ETCD_VERIFY"
+	ENV_VERIFY_ALL_VALUE = "all"
+)
 
 type Config struct {
 	// DataDir is a root directory where the data being verified are stored.

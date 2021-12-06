@@ -50,7 +50,7 @@ func (a *TypeRef) Equals(b *TypeRef) bool {
 		if *a.NamedType != *b.NamedType {
 			return false
 		}
-		//return true
+		// return true
 	}
 	return a.Inlined.Equals(&b.Inlined)
 }

@@ -200,13 +200,11 @@ func TestTranslateInTreeInlineVolumeToCSI(t *testing.T) {
 					t.Errorf("Got PV volumeHandle: %v, expected :%v", got.Spec.CSI.VolumeHandle, normalVolumeID)
 				}
 			}
-
 		})
 	}
 }
 
 func TestGetAwsRegionFromZones(t *testing.T) {
-
 	cases := []struct {
 		name      string
 		zones     []string

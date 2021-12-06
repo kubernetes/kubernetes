@@ -195,7 +195,6 @@ type Renderer interface {
 	// Header and footer
 	DocumentHeader(out *bytes.Buffer)
 	DocumentFooter(out *bytes.Buffer)
-
 	GetFlags() int
 }
 
@@ -234,7 +233,8 @@ func (p *parser) getRef(refid string) (ref *reference, found bool) {
 				title:    []byte(r.Title),
 				noteId:   0,
 				hasBlock: false,
-				text:     []byte(r.Text)}, true
+				text:     []byte(r.Text),
+			}, true
 		}
 	}
 	// refs are case insensitive
@@ -329,7 +329,8 @@ func MarkdownCommon(input []byte) []byte {
 	// set up the HTML renderer
 	renderer := HtmlRenderer(commonHtmlFlags, "", "")
 	return MarkdownOptions(input, renderer, Options{
-		Extensions: commonExtensions})
+		Extensions: commonExtensions,
+	})
 }
 
 // Markdown is the main rendering function.
@@ -341,7 +342,8 @@ func MarkdownCommon(input []byte) []byte {
 // LatexRenderer, respectively.
 func Markdown(input []byte, renderer Renderer, extensions int) []byte {
 	return MarkdownOptions(input, renderer, Options{
-		Extensions: extensions})
+		Extensions: extensions,
+	})
 }
 
 // MarkdownOptions is just like Markdown but takes additional options through

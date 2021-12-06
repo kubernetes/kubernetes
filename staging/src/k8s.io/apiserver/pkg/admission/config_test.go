@@ -188,7 +188,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 	require.NoError(t, apiserverapiv1.AddToScheme(scheme))
 
 	for testName, testCase := range testCases {
-		if err = ioutil.WriteFile(configFileName, []byte(testCase.ConfigBody), 0644); err != nil {
+		if err = ioutil.WriteFile(configFileName, []byte(testCase.ConfigBody), 0o644); err != nil {
 			t.Fatalf("unexpected err writing temp file: %v", err)
 		}
 		config, err := ReadAdmissionConfiguration(testCase.PluginNames, configFileName, scheme)
@@ -297,7 +297,7 @@ func TestEmbeddedConfiguration(t *testing.T) {
 		require.NoError(t, apiserverapiv1alpha1.AddToScheme(scheme))
 		require.NoError(t, apiserverapiv1.AddToScheme(scheme))
 
-		if err = ioutil.WriteFile(configFileName, []byte(test.ConfigBody), 0644); err != nil {
+		if err = ioutil.WriteFile(configFileName, []byte(test.ConfigBody), 0o644); err != nil {
 			t.Errorf("[%s] unexpected err writing temp file: %v", desc, err)
 			continue
 		}

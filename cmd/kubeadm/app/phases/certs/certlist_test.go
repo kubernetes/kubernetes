@@ -82,7 +82,6 @@ func TestCAPointersValid(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			certMap := test.certs.AsMap()
 
 			for _, cert := range test.certs {
@@ -207,7 +206,6 @@ func TestCreateCertificateChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("couldn't verify daughter cert: %v", err)
 	}
-
 }
 
 func parseCertAndKey(basePath string, t *testing.T) (*x509.Certificate, crypto.PrivateKey) {

@@ -101,6 +101,7 @@ func RetryKVClient(c *Client) pb.KVClient {
 		kc: pb.NewKVClient(c.conn),
 	}
 }
+
 func (rkv *retryKVClient) Range(ctx context.Context, in *pb.RangeRequest, opts ...grpc.CallOption) (resp *pb.RangeResponse, err error) {
 	return rkv.kc.Range(ctx, in, append(opts, withRetryPolicy(repeatable))...)
 }

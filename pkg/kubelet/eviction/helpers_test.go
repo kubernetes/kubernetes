@@ -18,11 +18,12 @@ package eviction
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/diff"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1243,7 +1244,6 @@ func TestSortByEvictionPriority(t *testing.T) {
 					t.Errorf("At index %d, expected threshold with signal %s, but got %s", i, tc.expected[i].Signal, tc.thresholds[i].Signal)
 				}
 			}
-
 		})
 	}
 }

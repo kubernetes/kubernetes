@@ -202,7 +202,6 @@ func (o EventsOptions) Run() error {
 			el.Items = append(el.Items, newEvents.Items...)
 			return newEvents, nil
 		})
-
 	if err != nil {
 		return err
 	}

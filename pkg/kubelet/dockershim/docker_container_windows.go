@@ -137,7 +137,6 @@ func copyGMSACredSpecToRegistryValue(credSpec string) (string, error) {
 // The value's name is a purely random suffix appended to `gMSARegistryValueNamePrefix`.
 func gMSARegistryValueName() (string, error) {
 	randomSuffix, err := randomString(gMSARegistryValueNameSuffixRandomBytes)
-
 	if err != nil {
 		return "", fmt.Errorf("error when generating gMSA registry value name: %v", err)
 	}

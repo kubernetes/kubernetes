@@ -155,7 +155,6 @@ func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certifica
 
 // writeTestKubeconfig is a utility for creating a test kubeconfig with an embedded certificate
 func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer) *x509.Certificate {
-
 	cfg := &pkiutil.CertConfig{
 		Config: certutil.Config{
 			CommonName:   "test-common-name",

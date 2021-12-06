@@ -80,11 +80,13 @@ func (p *Plugin) ValidateInitialization() error {
 	return nil
 }
 
-var _ admission.MutationInterface = &Plugin{}
-var _ admission.ValidationInterface = &Plugin{}
-var _ genericadmissioninit.WantsAuthorizer = &Plugin{}
-var _ genericadmissioninit.WantsExternalKubeInformerFactory = &Plugin{}
-var auditKeyPrefix = strings.ToLower(PluginName) + "." + policy.GroupName + ".k8s.io"
+var (
+	_              admission.MutationInterface                           = &Plugin{}
+	_              admission.ValidationInterface                         = &Plugin{}
+	_              genericadmissioninit.WantsAuthorizer                  = &Plugin{}
+	_              genericadmissioninit.WantsExternalKubeInformerFactory = &Plugin{}
+	auditKeyPrefix                                                       = strings.ToLower(PluginName) + "." + policy.GroupName + ".k8s.io"
+)
 
 // newPlugin creates a new PSP admission plugin.
 func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *Plugin {

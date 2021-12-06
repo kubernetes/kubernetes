@@ -296,6 +296,7 @@ func (r *REST) StorageVersion() runtime.GroupVersioner {
 func (r *REST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
+
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -316,6 +317,7 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
+
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }

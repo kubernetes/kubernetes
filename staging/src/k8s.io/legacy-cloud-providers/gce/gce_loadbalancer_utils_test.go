@@ -72,9 +72,7 @@ func fakeLoadbalancerServiceHelper(lbType string, annotationKey string) *v1.Serv
 	}
 }
 
-var (
-	FilewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
-)
+var FilewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 
 func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v1.Node, error) {
 	nodes := []*v1.Node{}
@@ -196,7 +194,6 @@ func assertExternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.S
 	healthcheck, err := gce.GetHTTPHealthCheck(hcName)
 	require.Error(t, err)
 	assert.Nil(t, healthcheck)
-
 }
 
 func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {

@@ -73,7 +73,8 @@ func newIngress() networking.Ingress {
 
 func TestIngressStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	apiRequest := genericapirequest.RequestInfo{APIGroup: "networking.k8s.io",
+	apiRequest := genericapirequest.RequestInfo{
+		APIGroup:   "networking.k8s.io",
 		APIVersion: "v1",
 		Resource:   "ingresses",
 	}

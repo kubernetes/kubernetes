@@ -119,7 +119,7 @@ controllerLeaders:
 				t.Fatal(err)
 			}
 			defer os.Remove(configFile.Name())
-			err = ioutil.WriteFile(configFile.Name(), []byte(tc.content), os.FileMode(0755))
+			err = ioutil.WriteFile(configFile.Name(), []byte(tc.content), os.FileMode(0o755))
 			if err != nil {
 				t.Fatal(err)
 			}

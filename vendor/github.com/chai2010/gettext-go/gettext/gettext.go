@@ -4,13 +4,9 @@
 
 package gettext
 
-var (
-	defaultManager = newDomainManager()
-)
+var defaultManager = newDomainManager()
 
-var (
-	DefaultLocale = getDefaultLocale() // use $(LC_MESSAGES) or $(LANG) or "default"
-)
+var DefaultLocale = getDefaultLocale() // use $(LC_MESSAGES) or $(LANG) or "default"
 
 // SetLocale sets and queries the program's current locale.
 //

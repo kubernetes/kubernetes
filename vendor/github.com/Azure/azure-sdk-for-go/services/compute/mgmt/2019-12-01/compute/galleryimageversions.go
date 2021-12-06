@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // GalleryImageVersionsClient is the compute Client
@@ -53,9 +54,14 @@ func (client GalleryImageVersionsClient) CreateOrUpdate(ctx context.Context, res
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: galleryImageVersion,
-			Constraints: []validation.Constraint{{Target: "galleryImageVersion.GalleryImageVersionProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "galleryImageVersion.GalleryImageVersionProperties.StorageProfile", Name: validation.Null, Rule: true, Chain: nil}}}}}}); err != nil {
+		{
+			TargetValue: galleryImageVersion,
+			Constraints: []validation.Constraint{{
+				Target: "galleryImageVersion.GalleryImageVersionProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{{Target: "galleryImageVersion.GalleryImageVersionProperties.StorageProfile", Name: validation.Null, Rule: true, Chain: nil}},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.GalleryImageVersionsClient", "CreateOrUpdate", err.Error())
 	}
 

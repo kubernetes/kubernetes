@@ -140,8 +140,10 @@ func encodeSecret(node *yaml.RNode) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	m := map[string]interface{}{"kind": "Secret", "type": values["type"],
-		"name": values["metadata/name"], "data": values["data"]}
+	m := map[string]interface{}{
+		"kind": "Secret", "type": values["type"],
+		"name": values["metadata/name"], "data": values["data"],
+	}
 	if _, ok := values["stringData"].(map[string]interface{}); ok {
 		m["stringData"] = values["stringData"]
 	}

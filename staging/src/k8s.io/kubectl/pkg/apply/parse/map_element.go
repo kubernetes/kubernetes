@@ -54,8 +54,8 @@ type schemaFn func(key string) proto.Schema
 func (v ElementBuildingVisitor) createMapValues(
 	schemaFn schemaFn,
 	meta apply.FieldMetaImpl,
-	data apply.MapElementData) (map[string]apply.Element, error) {
-
+	data apply.MapElementData) (map[string]apply.Element, error,
+) {
 	// Collate each key in the map
 	values := map[string]apply.Element{}
 	for _, key := range keysUnion(data.GetRecordedMap(), data.GetLocalMap(), data.GetRemoteMap()) {

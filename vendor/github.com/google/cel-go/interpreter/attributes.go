@@ -82,7 +82,6 @@ type Qualifier interface {
 // Non-constant qualifiers are of Attribute type.
 type ConstantQualifier interface {
 	Qualifier
-
 	Value() ref.Val
 }
 

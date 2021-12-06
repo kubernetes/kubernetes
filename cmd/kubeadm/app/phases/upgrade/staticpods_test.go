@@ -160,22 +160,22 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 	}
 
 	realManifestDir := filepath.Join(kubernetesDir, constants.ManifestsSubDirName)
-	if err := os.Mkdir(realManifestDir, 0700); err != nil {
+	if err := os.Mkdir(realManifestDir, 0o700); err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a realManifestDir for the upgrade")
 	}
 
 	upgradedManifestDir := filepath.Join(kubernetesDir, "upgraded-manifests")
-	if err := os.Mkdir(upgradedManifestDir, 0700); err != nil {
+	if err := os.Mkdir(upgradedManifestDir, 0o700); err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a upgradedManifestDir for the upgrade")
 	}
 
 	backupManifestDir := filepath.Join(kubernetesDir, "backup-manifests")
-	if err := os.Mkdir(backupManifestDir, 0700); err != nil {
+	if err := os.Mkdir(backupManifestDir, 0o700); err != nil {
 		return nil, errors.Wrap(err, "couldn't create a backupManifestDir for the upgrade")
 	}
 
 	backupEtcdDir := filepath.Join(kubernetesDir, "kubeadm-backup-etcd")
-	if err := os.Mkdir(backupEtcdDir, 0700); err != nil {
+	if err := os.Mkdir(backupEtcdDir, 0o700); err != nil {
 		return nil, err
 	}
 
@@ -204,6 +204,7 @@ func (spm *fakeStaticPodPathManager) PatchesDir() string {
 func (spm *fakeStaticPodPathManager) RealManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.realManifestDir)
 }
+
 func (spm *fakeStaticPodPathManager) RealManifestDir() string {
 	return spm.realManifestDir
 }
@@ -211,6 +212,7 @@ func (spm *fakeStaticPodPathManager) RealManifestDir() string {
 func (spm *fakeStaticPodPathManager) TempManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.tempManifestDir)
 }
+
 func (spm *fakeStaticPodPathManager) TempManifestDir() string {
 	return spm.tempManifestDir
 }
@@ -218,6 +220,7 @@ func (spm *fakeStaticPodPathManager) TempManifestDir() string {
 func (spm *fakeStaticPodPathManager) BackupManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.backupManifestDir)
 }
+
 func (spm *fakeStaticPodPathManager) BackupManifestDir() string {
 	return spm.backupManifestDir
 }
@@ -894,7 +897,6 @@ func getEmbeddedCerts(tmpDir, kubeConfig string) ([]*x509.Certificate, error) {
 }
 
 func TestGetPathManagerForUpgrade(t *testing.T) {
-
 	externalEtcd := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			Etcd: kubeadmapi.Etcd{
@@ -982,7 +984,6 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestGetEtcdImageTagFromStaticPod(t *testing.T) {
@@ -1006,7 +1007,7 @@ spec:
 	}
 	defer os.RemoveAll(manifestsDir)
 
-	if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+	if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0o644); err != nil {
 		t.Fatalf("Unable to create test static pod manifest: %v", err)
 	}
 

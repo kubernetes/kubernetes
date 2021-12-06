@@ -1,9 +1,9 @@
 package concurrent
 
 import (
-	"os"
-	"log"
 	"io/ioutil"
+	"log"
+	"os"
 )
 
 // ErrorLogger is used to print out error, can be set to writer other than stderr

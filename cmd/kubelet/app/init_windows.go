@@ -34,7 +34,7 @@ const (
 // getPriorityValue returns the value associated with a Windows process priorityClass
 // Ref: https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/setpriority-method-in-class-win32-process
 func getPriorityValue(priorityClassName string) uint32 {
-	var priorityClassMap = map[string]uint32{
+	priorityClassMap := map[string]uint32{
 		"IDLE_PRIORITY_CLASS":         uint32(64),
 		"BELOW_NORMAL_PRIORITY_CLASS": uint32(16384),
 		"NORMAL_PRIORITY_CLASS":       uint32(32),

@@ -140,7 +140,6 @@ func (t *TestRunner) CompileTo(path string) error {
 	cmd := exec.Command("go", args...)
 
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		if len(output) > 0 {
 			return fmt.Errorf("Failed to compile %s:\n\n%s", t.Suite.PackageName, output)
@@ -354,14 +353,14 @@ func (t *TestRunner) runParallelGinkgoSuite() RunResult {
 		res = res.Merge(<-completions)
 	}
 
-	//all test processes are done, at this point
-	//we should be able to wait for the aggregator to tell us that it's done
+	// all test processes are done, at this point
+	// we should be able to wait for the aggregator to tell us that it's done
 
 	select {
 	case <-result:
 		fmt.Println("")
 	case <-time.After(time.Second):
-		//the aggregator never got back to us!  something must have gone wrong
+		// the aggregator never got back to us!  something must have gone wrong
 		fmt.Println(`
 	 -------------------------------------------------------------------
 	|                                                                   |
@@ -548,7 +547,7 @@ func (t *TestRunner) combineCoverprofiles() {
 	}
 
 	coverageFilepath := filepath.Join(t.Suite.Path, finalFilename)
-	ioutil.WriteFile(coverageFilepath, []byte(finalOutput), 0666)
+	ioutil.WriteFile(coverageFilepath, []byte(finalOutput), 0o666)
 
 	t.CoverageFile = coverageFilepath
 }

@@ -117,7 +117,7 @@ func TestSaveVolumeData(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		specVolID := fmt.Sprintf("spec-volid-%d", i)
 		mountDir := filepath.Join(getTargetPath(testPodUID, specVolID, plug.host), "/mount")
-		if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
+		if err := os.MkdirAll(mountDir, 0o755); err != nil && !os.IsNotExist(err) {
 			t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 		}
 

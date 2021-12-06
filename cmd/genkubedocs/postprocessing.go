@@ -45,7 +45,7 @@ func MarkdownPostProcessing(cmd *cobra.Command, dir string, processor func(strin
 
 	processedMarkDown := processor(string(markdownBytes))
 
-	return ioutil.WriteFile(filename, []byte(processedMarkDown), 0644)
+	return ioutil.WriteFile(filename, []byte(processedMarkDown), 0o644)
 }
 
 // cleanupForInclude parts of markdown that will make difficult to use it as include in the website:

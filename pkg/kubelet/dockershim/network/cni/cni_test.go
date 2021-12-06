@@ -52,7 +52,7 @@ import (
 // Returns .in file path, .out file path, and .env file path
 func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, binName string, confName, podIP string) (string, string, string) {
 	for _, dir := range []string{testBinDir, testConfDir, testDataDir} {
-		err := os.MkdirAll(dir, 0777)
+		err := os.MkdirAll(dir, 0o777)
 		if err != nil {
 			t.Fatalf("Failed to create test plugin dir %s: %v", dir, err)
 		}
@@ -112,7 +112,7 @@ echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA
 		t.Fatalf("Failed to write plugin exec - %v", err)
 	}
 
-	err = f.Chmod(0777)
+	err = f.Chmod(0o777)
 	if err != nil {
 		t.Fatalf("Failed to set exec perms on plugin")
 	}

@@ -353,7 +353,6 @@ func TestValidateFlags(t *testing.T) {
 		description string
 		expectFatal bool
 	}{
-
 		{
 			taintOpts:   TaintOptions{selector: "myLabel=X", all: false},
 			description: "With Selector and without All flag",

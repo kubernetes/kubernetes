@@ -22,7 +22,6 @@ import (
 )
 
 func (c *Client) NodeAdd(request *api.NodeAddRequest) (*api.NodeInfoResponse, error) {
-
 	// Marshal request to JSON
 	buffer, err := json.Marshal(request)
 	if err != nil {
@@ -72,7 +71,6 @@ func (c *Client) NodeAdd(request *api.NodeAddRequest) (*api.NodeInfoResponse, er
 }
 
 func (c *Client) NodeInfo(id string) (*api.NodeInfoResponse, error) {
-
 	// Create request
 	req, err := http.NewRequest("GET", c.host+"/nodes/"+id, nil)
 	if err != nil {
@@ -106,7 +104,6 @@ func (c *Client) NodeInfo(id string) (*api.NodeInfoResponse, error) {
 }
 
 func (c *Client) NodeDelete(id string) error {
-
 	// Create a request
 	req, err := http.NewRequest("DELETE", c.host+"/nodes/"+id, nil)
 	if err != nil {

@@ -21,6 +21,7 @@ package kubelet
 
 import (
 	"fmt"
+
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 )
@@ -32,6 +33,5 @@ func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
 	nonMasqueradeCIDR string) error {
-
 	return fmt.Errorf("trying to use docker runtime when Kubelet was compiled without docker support")
 }

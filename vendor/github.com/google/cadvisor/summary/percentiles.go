@@ -24,9 +24,11 @@ import (
 	info "github.com/google/cadvisor/info/v2"
 )
 
-const secondsToMilliSeconds = 1000
-const milliSecondsToNanoSeconds = 1000000
-const secondsToNanoSeconds = secondsToMilliSeconds * milliSecondsToNanoSeconds
+const (
+	secondsToMilliSeconds     = 1000
+	milliSecondsToNanoSeconds = 1000000
+	secondsToNanoSeconds      = secondsToMilliSeconds * milliSecondsToNanoSeconds
+)
 
 type Uint64Slice []uint64
 

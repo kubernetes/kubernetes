@@ -58,7 +58,7 @@ type NodeManager struct {
 	nodeInfoMap map[string]*NodeInfo
 	// Maps node name to node structure
 	registeredNodes map[string]*v1.Node
-	//CredentialsManager
+	// CredentialsManager
 	credentialManager *SecretCredentialManager
 
 	// Mutexes
@@ -86,8 +86,8 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 		datacenter *vclib.Datacenter
 	}
 
-	var mutex = &sync.Mutex{}
-	var globalErrMutex = &sync.Mutex{}
+	mutex := &sync.Mutex{}
+	globalErrMutex := &sync.Mutex{}
 	var queueChannel chan *VmSearch
 	var wg sync.WaitGroup
 	var globalErr *error
@@ -259,7 +259,6 @@ func (nm *NodeManager) UnRegisterNode(node *v1.Node) error {
 
 func (nm *NodeManager) RediscoverNode(nodeName k8stypes.NodeName) error {
 	node, err := nm.GetNode(nodeName)
-
 	if err != nil {
 		return err
 	}

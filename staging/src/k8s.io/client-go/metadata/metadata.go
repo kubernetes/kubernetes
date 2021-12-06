@@ -35,10 +35,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-var deleteScheme = runtime.NewScheme()
-var parameterScheme = runtime.NewScheme()
-var deleteOptionsCodec = serializer.NewCodecFactory(deleteScheme)
-var dynamicParameterCodec = runtime.NewParameterCodec(parameterScheme)
+var (
+	deleteScheme          = runtime.NewScheme()
+	parameterScheme       = runtime.NewScheme()
+	deleteOptionsCodec    = serializer.NewCodecFactory(deleteScheme)
+	dynamicParameterCodec = runtime.NewParameterCodec(parameterScheme)
+)
 
 var versionV1 = schema.GroupVersion{Version: "v1"}
 

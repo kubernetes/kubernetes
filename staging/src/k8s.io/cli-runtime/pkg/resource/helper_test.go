@@ -360,9 +360,10 @@ func TestHelperList(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Header:     header(),
 				Body: objBody(&corev1.PodList{
-					Items: []corev1.Pod{{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-					},
+					Items: []corev1.Pod{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+						},
 					},
 				}),
 			},
@@ -446,9 +447,10 @@ func TestHelperListSelectorCombination(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Header:     header(),
 		Body: objBody(&corev1.PodList{
-			Items: []corev1.Pod{{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			},
+			Items: []corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				},
 			},
 		}),
 	}

@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !windows
 // +build !windows
 
 package procfs
@@ -27,10 +28,8 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-var (
-	// match the header line before each mapped zone in /proc/pid/smaps
-	procSMapsHeaderLine = regexp.MustCompile(`^[a-f0-9].*$`)
-)
+// match the header line before each mapped zone in /proc/pid/smaps
+var procSMapsHeaderLine = regexp.MustCompile(`^[a-f0-9].*$`)
 
 type ProcSMapsRollup struct {
 	// Amount of the mapping that is currently resident in RAM

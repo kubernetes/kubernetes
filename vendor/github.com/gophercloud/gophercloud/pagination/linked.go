@@ -40,7 +40,7 @@ func (current LinkedPageBase) NextPageURL() (string, error) {
 	}
 
 	for {
-		key, path = path[0], path[1:len(path)]
+		key, path = path[0], path[1:]
 
 		value, ok := submap[key]
 		if !ok {

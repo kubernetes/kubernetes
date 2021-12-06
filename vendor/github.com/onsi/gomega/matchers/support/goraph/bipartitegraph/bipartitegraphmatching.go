@@ -151,7 +151,6 @@ func (bg *BipartiteGraph) createSLAPGuideLayers(matching EdgeSet) (guideLayers [
 					used[leftNode.ID] = true
 				}
 			}
-
 		}
 
 		if len(currentLayer) == 0 {

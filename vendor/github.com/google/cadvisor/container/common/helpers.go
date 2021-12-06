@@ -218,7 +218,6 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 }
 
 func getControllerPath(cgroupPaths map[string]string, controllerName string, cgroup2UnifiedMode bool) (string, bool) {
-
 	ok := false
 	path := ""
 

@@ -35,7 +35,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	defer removeAll(dirName, t)
 
 	fileName := filepath.Join(dirName, "test_pod_config")
-	err = ioutil.WriteFile(fileName, []byte{1, 2, 3}, 0555)
+	err = ioutil.WriteFile(fileName, []byte{1, 2, 3}, 0o555)
 	if err != nil {
 		t.Fatalf("unable to write test file %#v", err)
 	}

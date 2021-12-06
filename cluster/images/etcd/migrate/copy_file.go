@@ -35,7 +35,7 @@ func copyFile(source, dest string) error {
 	}
 
 	dir := filepath.Dir(dest)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("unable to create directory [%s]: %q", dir, err)
 	}
 	df, err := os.Create(dest)

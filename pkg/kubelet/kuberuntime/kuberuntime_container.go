@@ -312,7 +312,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 	logDir := BuildContainerLogsDirectory(pod.Namespace, pod.Name, pod.UID, container.Name)
-	err = m.osInterface.MkdirAll(logDir, 0755)
+	err = m.osInterface.MkdirAll(logDir, 0o755)
 	if err != nil {
 		return nil, cleanupAction, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
 	}
@@ -411,7 +411,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			// open(2) to create the file, so the final mode used is "mode &
 			// ~umask". But we want to make sure the specified mode is used
 			// in the file no matter what the umask is.
-			if err := m.osInterface.Chmod(containerLogPath, 0666); err != nil {
+			if err := m.osInterface.Chmod(containerLogPath, 0o666); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
 			}
 

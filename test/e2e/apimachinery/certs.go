@@ -53,7 +53,7 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err != nil {
 		framework.Failf("Failed to create a temp file for ca cert generation %v", err)
 	}
-	if err := ioutil.WriteFile(caCertFile.Name(), utils.EncodeCertPEM(signingCert), 0644); err != nil {
+	if err := ioutil.WriteFile(caCertFile.Name(), utils.EncodeCertPEM(signingCert), 0o644); err != nil {
 		framework.Failf("Failed to write CA cert %v", err)
 	}
 	key, err := utils.NewPrivateKey()
@@ -79,14 +79,14 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err != nil {
 		framework.Failf("Failed to create a temp file for key generation %v", err)
 	}
-	if err = ioutil.WriteFile(certFile.Name(), utils.EncodeCertPEM(signedCert), 0600); err != nil {
+	if err = ioutil.WriteFile(certFile.Name(), utils.EncodeCertPEM(signedCert), 0o600); err != nil {
 		framework.Failf("Failed to write cert file %v", err)
 	}
 	privateKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(key)
 	if err != nil {
 		framework.Failf("Failed to marshal key %v", err)
 	}
-	if err = ioutil.WriteFile(keyFile.Name(), privateKeyPEM, 0644); err != nil {
+	if err = ioutil.WriteFile(keyFile.Name(), privateKeyPEM, 0o644); err != nil {
 		framework.Failf("Failed to write key file %v", err)
 	}
 	return &certContext{

@@ -84,12 +84,12 @@ func GetPreferredDockercfgPath() string {
 	return preferredPath
 }
 
-//DefaultDockercfgPaths returns default search paths of .dockercfg
+// DefaultDockercfgPaths returns default search paths of .dockercfg
 func DefaultDockercfgPaths() []string {
 	return []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
 }
 
-//DefaultDockerConfigJSONPaths returns default search paths of .docker/config.json
+// DefaultDockerConfigJSONPaths returns default search paths of .docker/config.json
 func DefaultDockerConfigJSONPaths() []string {
 	return []string{GetPreferredDockercfgPath(), workingDirPath, homeJSONDirPath, rootJSONDirPath}
 }
@@ -153,10 +153,9 @@ func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error
 		return cfg, nil
 	}
 	return nil, fmt.Errorf("couldn't find valid %s after checking in %v", configJSONFileName, searchPaths)
-
 }
 
-//ReadSpecificDockerConfigJSONFile attempts to read docker configJSON from a given file path.
+// ReadSpecificDockerConfigJSONFile attempts to read docker configJSON from a given file path.
 func ReadSpecificDockerConfigJSONFile(filePath string) (cfg DockerConfig, err error) {
 	var contents []byte
 
@@ -293,7 +292,6 @@ func (ident DockerConfigEntry) MarshalJSON() ([]byte, error) {
 // decodeDockerConfigFieldAuth deserializes the "auth" field from dockercfg into a
 // username and a password. The format of the auth field is base64(<username>:<password>).
 func decodeDockerConfigFieldAuth(field string) (username, password string, err error) {
-
 	var decoded []byte
 
 	// StdEncoding can only decode padded string

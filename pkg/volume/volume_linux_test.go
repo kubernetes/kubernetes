@@ -154,7 +154,6 @@ func TestSkipPermissionChange(t *testing.T) {
 
 			if test.permissionMatch {
 				mask |= execMask
-
 			}
 			if test.sgidMatch {
 				mask |= os.ModeSetgid
@@ -174,7 +173,6 @@ func TestSkipPermissionChange(t *testing.T) {
 			if ok != test.skipPermssion {
 				t.Errorf("for %s expected skipPermission to be %v got %v", test.description, test.skipPermssion, ok)
 			}
-
 		})
 	}
 }
@@ -258,7 +256,7 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 			fsGroupChangePolicy: &onrootMismatch,
 			setupFunc: func(path string) error {
 				// change mode of root folder to be right
-				err := os.Chmod(path, 0770)
+				err := os.Chmod(path, 0o770)
 				if err != nil {
 					return err
 				}
@@ -363,7 +361,7 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 			fsGroup:     nil,
 			setupFunc: func(path string) error {
 				filename := filepath.Join(path, "file.txt")
-				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o755)
 				if err != nil {
 					return err
 				}
@@ -383,7 +381,7 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 			fsGroup:     &fsGroup,
 			setupFunc: func(path string) error {
 				filename := filepath.Join(path, "file.txt")
-				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o755)
 				if err != nil {
 					return err
 				}
@@ -403,7 +401,7 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 			fsGroup:     &fsGroup,
 			setupFunc: func(path string) error {
 				filename := filepath.Join(path, "file.txt")
-				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o755)
 				if err != nil {
 					return err
 				}

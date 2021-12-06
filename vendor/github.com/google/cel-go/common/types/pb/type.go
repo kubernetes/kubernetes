@@ -180,7 +180,10 @@ func (fd *FieldDescription) CheckedType() *exprpb.Type {
 		return &exprpb.Type{
 			TypeKind: &exprpb.Type_ListType_{
 				ListType: &exprpb.Type_ListType{
-					ElemType: fd.typeDefToType()}}}
+					ElemType: fd.typeDefToType(),
+				},
+			},
+		}
 	}
 	return fd.typeDefToType()
 }
@@ -339,22 +342,26 @@ type Map struct {
 
 func checkedMessageType(name string) *exprpb.Type {
 	return &exprpb.Type{
-		TypeKind: &exprpb.Type_MessageType{MessageType: name}}
+		TypeKind: &exprpb.Type_MessageType{MessageType: name},
+	}
 }
 
 func checkedPrimitive(primitive exprpb.Type_PrimitiveType) *exprpb.Type {
 	return &exprpb.Type{
-		TypeKind: &exprpb.Type_Primitive{Primitive: primitive}}
+		TypeKind: &exprpb.Type_Primitive{Primitive: primitive},
+	}
 }
 
 func checkedWellKnown(wellKnown exprpb.Type_WellKnownType) *exprpb.Type {
 	return &exprpb.Type{
-		TypeKind: &exprpb.Type_WellKnown{WellKnown: wellKnown}}
+		TypeKind: &exprpb.Type_WellKnown{WellKnown: wellKnown},
+	}
 }
 
 func checkedWrap(t *exprpb.Type) *exprpb.Type {
 	return &exprpb.Type{
-		TypeKind: &exprpb.Type_Wrapper{Wrapper: t.GetPrimitive()}}
+		TypeKind: &exprpb.Type_Wrapper{Wrapper: t.GetPrimitive()},
+	}
 }
 
 // unwrap unwraps the provided proto.Message value, potentially based on the description if the
@@ -511,22 +518,20 @@ func zeroValueOf(msg proto.Message) proto.Message {
 	return msg
 }
 
-var (
-	zeroValueMap = map[string]proto.Message{
-		"google.protobuf.Any":         &anypb.Any{},
-		"google.protobuf.Duration":    &dpb.Duration{},
-		"google.protobuf.ListValue":   &structpb.ListValue{},
-		"google.protobuf.Struct":      &structpb.Struct{},
-		"google.protobuf.Timestamp":   &tpb.Timestamp{},
-		"google.protobuf.Value":       &structpb.Value{},
-		"google.protobuf.BoolValue":   wrapperspb.Bool(false),
-		"google.protobuf.BytesValue":  wrapperspb.Bytes([]byte{}),
-		"google.protobuf.DoubleValue": wrapperspb.Double(0.0),
-		"google.protobuf.FloatValue":  wrapperspb.Float(0.0),
-		"google.protobuf.Int32Value":  wrapperspb.Int32(0),
-		"google.protobuf.Int64Value":  wrapperspb.Int64(0),
-		"google.protobuf.StringValue": wrapperspb.String(""),
-		"google.protobuf.UInt32Value": wrapperspb.UInt32(0),
-		"google.protobuf.UInt64Value": wrapperspb.UInt64(0),
-	}
-)
+var zeroValueMap = map[string]proto.Message{
+	"google.protobuf.Any":         &anypb.Any{},
+	"google.protobuf.Duration":    &dpb.Duration{},
+	"google.protobuf.ListValue":   &structpb.ListValue{},
+	"google.protobuf.Struct":      &structpb.Struct{},
+	"google.protobuf.Timestamp":   &tpb.Timestamp{},
+	"google.protobuf.Value":       &structpb.Value{},
+	"google.protobuf.BoolValue":   wrapperspb.Bool(false),
+	"google.protobuf.BytesValue":  wrapperspb.Bytes([]byte{}),
+	"google.protobuf.DoubleValue": wrapperspb.Double(0.0),
+	"google.protobuf.FloatValue":  wrapperspb.Float(0.0),
+	"google.protobuf.Int32Value":  wrapperspb.Int32(0),
+	"google.protobuf.Int64Value":  wrapperspb.Int64(0),
+	"google.protobuf.StringValue": wrapperspb.String(""),
+	"google.protobuf.UInt32Value": wrapperspb.UInt32(0),
+	"google.protobuf.UInt64Value": wrapperspb.UInt64(0),
+}

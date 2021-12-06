@@ -74,7 +74,6 @@ func (ident RegistryConfigEntry) MarshalJSON() ([]byte, error) {
 // decodeRegistryConfigFieldAuth deserializes the "auth" field from dockercfg into a
 // username and a password. The format of the auth field is base64(<username>:<password>).
 func decodeRegistryConfigFieldAuth(field string) (username, password string, err error) {
-
 	var decoded []byte
 
 	// StdEncoding can only decode padded string

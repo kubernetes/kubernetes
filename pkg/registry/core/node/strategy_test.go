@@ -195,6 +195,7 @@ func TestDropFields(t *testing.T) {
 		}()
 	}
 }
+
 func TestValidateUpdate(t *testing.T) {
 	tests := []struct {
 		oldNode api.Node
@@ -256,6 +257,7 @@ func TestValidateUpdate(t *testing.T) {
 		}
 	}
 }
+
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		node  api.Node
@@ -306,17 +308,26 @@ func TestWarningOnUpdateAndCreate(t *testing.T) {
 		node        api.Node
 		warningText string
 	}{
-		{api.Node{},
+		{
 			api.Node{},
-			""},
-		{api.Node{},
+			api.Node{},
+			"",
+		},
+		{
+			api.Node{},
 			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
-			"spec.configSource"},
-		{api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			"spec.configSource",
+		},
+		{
 			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
-			"spec.configSource"},
-		{api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
-			api.Node{}, ""},
+			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			"spec.configSource",
+		},
+		{
+			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			api.Node{},
+			"",
+		},
 	}
 	for i, test := range tests {
 		warnings := (nodeStrategy{}).WarningsOnUpdate(context.Background(), &test.node, &test.oldNode)

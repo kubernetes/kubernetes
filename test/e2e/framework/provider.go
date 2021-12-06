@@ -88,20 +88,15 @@ func SetupProviderConfig(providerName string) (ProviderInterface, error) {
 type ProviderInterface interface {
 	FrameworkBeforeEach(f *Framework)
 	FrameworkAfterEach(f *Framework)
-
 	ResizeGroup(group string, size int32) error
 	GetGroupNodes(group string) ([]string, error)
 	GroupSize(group string) (int, error)
-
 	DeleteNode(node *v1.Node) error
-
 	CreatePD(zone string) (string, error)
 	DeletePD(pdName string) error
 	CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error)
 	DeletePVSource(pvSource *v1.PersistentVolumeSource) error
-
 	CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string)
-
 	EnsureLoadBalancerResourcesDeleted(ip, portRange string) error
 	LoadBalancerSrcRanges() []string
 	EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service))

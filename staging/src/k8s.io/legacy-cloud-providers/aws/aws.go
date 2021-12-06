@@ -341,29 +341,19 @@ type EC2 interface {
 	CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error)
 	// Delete an EBS volume
 	DeleteVolume(*ec2.DeleteVolumeInput) (*ec2.DeleteVolumeOutput, error)
-
 	ModifyVolume(*ec2.ModifyVolumeInput) (*ec2.ModifyVolumeOutput, error)
-
 	DescribeVolumeModifications(*ec2.DescribeVolumesModificationsInput) ([]*ec2.VolumeModification, error)
-
 	DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error)
-
 	CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error)
 	DeleteSecurityGroup(request *ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error)
-
 	AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
 	RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error)
-
 	DescribeSubnets(*ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error)
-
 	CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error)
-
 	DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error)
 	CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error)
 	DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error)
-
 	ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error)
-
 	DescribeVpcs(input *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
 }
 
@@ -379,17 +369,12 @@ type ELB interface {
 	SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancerPoliciesForBackendServerInput) (*elb.SetLoadBalancerPoliciesForBackendServerOutput, error)
 	SetLoadBalancerPoliciesOfListener(input *elb.SetLoadBalancerPoliciesOfListenerInput) (*elb.SetLoadBalancerPoliciesOfListenerOutput, error)
 	DescribeLoadBalancerPolicies(input *elb.DescribeLoadBalancerPoliciesInput) (*elb.DescribeLoadBalancerPoliciesOutput, error)
-
 	DetachLoadBalancerFromSubnets(*elb.DetachLoadBalancerFromSubnetsInput) (*elb.DetachLoadBalancerFromSubnetsOutput, error)
 	AttachLoadBalancerToSubnets(*elb.AttachLoadBalancerToSubnetsInput) (*elb.AttachLoadBalancerToSubnetsOutput, error)
-
 	CreateLoadBalancerListeners(*elb.CreateLoadBalancerListenersInput) (*elb.CreateLoadBalancerListenersOutput, error)
 	DeleteLoadBalancerListeners(*elb.DeleteLoadBalancerListenersInput) (*elb.DeleteLoadBalancerListenersOutput, error)
-
 	ApplySecurityGroupsToLoadBalancer(*elb.ApplySecurityGroupsToLoadBalancerInput) (*elb.ApplySecurityGroupsToLoadBalancerOutput, error)
-
 	ConfigureHealthCheck(*elb.ConfigureHealthCheckInput) (*elb.ConfigureHealthCheckOutput, error)
-
 	DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error)
 	ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttributesInput) (*elb.ModifyLoadBalancerAttributesOutput, error)
 }
@@ -397,32 +382,24 @@ type ELB interface {
 // ELBV2 is a simple pass-through of AWS' ELBV2 client interface, which allows for testing
 type ELBV2 interface {
 	AddTags(input *elbv2.AddTagsInput) (*elbv2.AddTagsOutput, error)
-
 	CreateLoadBalancer(*elbv2.CreateLoadBalancerInput) (*elbv2.CreateLoadBalancerOutput, error)
 	DescribeLoadBalancers(*elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error)
 	DeleteLoadBalancer(*elbv2.DeleteLoadBalancerInput) (*elbv2.DeleteLoadBalancerOutput, error)
-
 	ModifyLoadBalancerAttributes(*elbv2.ModifyLoadBalancerAttributesInput) (*elbv2.ModifyLoadBalancerAttributesOutput, error)
 	DescribeLoadBalancerAttributes(*elbv2.DescribeLoadBalancerAttributesInput) (*elbv2.DescribeLoadBalancerAttributesOutput, error)
-
 	CreateTargetGroup(*elbv2.CreateTargetGroupInput) (*elbv2.CreateTargetGroupOutput, error)
 	DescribeTargetGroups(*elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error)
 	ModifyTargetGroup(*elbv2.ModifyTargetGroupInput) (*elbv2.ModifyTargetGroupOutput, error)
 	DeleteTargetGroup(*elbv2.DeleteTargetGroupInput) (*elbv2.DeleteTargetGroupOutput, error)
-
 	DescribeTargetHealth(input *elbv2.DescribeTargetHealthInput) (*elbv2.DescribeTargetHealthOutput, error)
-
 	DescribeTargetGroupAttributes(*elbv2.DescribeTargetGroupAttributesInput) (*elbv2.DescribeTargetGroupAttributesOutput, error)
 	ModifyTargetGroupAttributes(*elbv2.ModifyTargetGroupAttributesInput) (*elbv2.ModifyTargetGroupAttributesOutput, error)
-
 	RegisterTargets(*elbv2.RegisterTargetsInput) (*elbv2.RegisterTargetsOutput, error)
 	DeregisterTargets(*elbv2.DeregisterTargetsInput) (*elbv2.DeregisterTargetsOutput, error)
-
 	CreateListener(*elbv2.CreateListenerInput) (*elbv2.CreateListenerOutput, error)
 	DescribeListeners(*elbv2.DescribeListenersInput) (*elbv2.DescribeListenersOutput, error)
 	DeleteListener(*elbv2.DeleteListenerInput) (*elbv2.DeleteListenerOutput, error)
 	ModifyListener(*elbv2.ModifyListenerInput) (*elbv2.ModifyListenerOutput, error)
-
 	WaitUntilLoadBalancersDeleted(*elbv2.DescribeLoadBalancersInput) error
 }
 
@@ -530,12 +507,14 @@ type InstanceGroupInfo interface {
 	CurrentSize() (int, error)
 }
 
-var _ cloudprovider.Interface = (*Cloud)(nil)
-var _ cloudprovider.Instances = (*Cloud)(nil)
-var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
-var _ cloudprovider.Routes = (*Cloud)(nil)
-var _ cloudprovider.Zones = (*Cloud)(nil)
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+var (
+	_ cloudprovider.Interface    = (*Cloud)(nil)
+	_ cloudprovider.Instances    = (*Cloud)(nil)
+	_ cloudprovider.LoadBalancer = (*Cloud)(nil)
+	_ cloudprovider.Routes       = (*Cloud)(nil)
+	_ cloudprovider.Zones        = (*Cloud)(nil)
+	_ cloudprovider.PVLabeler    = (*Cloud)(nil)
+)
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type Cloud struct {
@@ -617,9 +596,9 @@ type CloudConfig struct {
 		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
 		DisableSecurityGroupIngress bool
 
-		//AWS has a hard limit of 500 security groups. For large clusters creating a security group for each ELB
-		//can cause the max number of security groups to be reached. If this is set instead of creating a new
-		//Security group for each ELB this security group will be used instead.
+		// AWS has a hard limit of 500 security groups. For large clusters creating a security group for each ELB
+		// can cause the max number of security groups to be reached. If this is set instead of creating a new
+		// Security group for each ELB this security group will be used instead.
 		ElbSecurityGroup string
 
 		//During the instantiation of an new AWS cloud provider, the detected region
@@ -825,7 +804,6 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 		Config:            *awsConfig,
 		SharedConfigState: session.SharedConfigEnable,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -1031,7 +1009,6 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 	requestTime := time.Now()
 	for {
 		response, err := s.ec2.DescribeVolumes(request)
-
 		if err != nil {
 			recordAWSMetric("describe_volume", 0, err)
 			return nil, err
@@ -1514,7 +1491,7 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
-			//TODO: It would be nice to be able to determine the reason for the failure,
+			// TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
 			klog.V(4).Info("Could not determine public IP from AWS metadata.")
 		} else {
@@ -1523,7 +1500,7 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 
 		localHostname, err := c.metadata.GetMetadata("local-hostname")
 		if err != nil || len(localHostname) == 0 {
-			//TODO: It would be nice to be able to determine the reason for the failure,
+			// TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
 			klog.V(4).Info("Could not determine private DNS from AWS metadata.")
 		} else {
@@ -1536,7 +1513,7 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 
 		externalDNS, err := c.metadata.GetMetadata("public-hostname")
 		if err != nil || len(externalDNS) == 0 {
-			//TODO: It would be nice to be able to determine the reason for the failure,
+			// TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
 			klog.V(4).Info("Could not determine public DNS from AWS metadata.")
 		} else {
@@ -1872,7 +1849,6 @@ func (c *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) 
 	}
 
 	return zone, nil
-
 }
 
 func isAWSErrorInstanceNotFound(err error) bool {
@@ -1946,8 +1922,8 @@ func (c *Cloud) getMountDevice(
 	i *awsInstance,
 	info *ec2.Instance,
 	volumeID EBSVolumeID,
-	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
-
+	assign bool) (assigned mountDevice, alreadyAttached bool, err error,
+) {
 	deviceMappings := map[mountDevice]EBSVolumeID{}
 	volumeStatus := map[EBSVolumeID]string{} // for better logging of volume status
 	for _, blockDevice := range info.BlockDeviceMappings {
@@ -2107,7 +2083,6 @@ func (d *awsDisk) describeVolumeModification() (*ec2.VolumeModification, error) 
 		VolumeIds: []*string{volumeID.awsString()},
 	}
 	volumeMods, err := d.ec2.DescribeVolumeModifications(request)
-
 	if err != nil {
 		return nil, fmt.Errorf("error describing volume modification %s with %v", volumeID, err)
 	}
@@ -2146,7 +2121,6 @@ func (d *awsDisk) modifyVolume(requestGiB int64) (int64, error) {
 
 	checkForResize := func() (bool, error) {
 		volumeModification, err := d.describeVolumeModification()
-
 		if err != nil {
 			return false, err
 		}
@@ -2437,7 +2411,6 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 	}
 
 	attachment, err := disk.waitForAttachmentStatus("attached", awsInstance.awsID, ec2Device, alreadyAttached)
-
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
 			c.applyUnSchedulableTaint(nodeName, "Volume stuck in attaching state - node needs reboot to fix impaired state.")
@@ -2696,7 +2669,6 @@ func (c *Cloud) DeleteDisk(volumeName KubernetesVolumeID) (bool, error) {
 
 func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) (bool, error) {
 	info, err := disk.describeVolume()
-
 	if err != nil {
 		klog.Errorf("Error describing volume %q: %q", disk.awsID, err)
 		// if for some reason we can not describe volume we will return error
@@ -3714,7 +3686,7 @@ func (c *Cloud) buildELBSecurityGroupList(serviceName types.NamespacedName, load
 	var err error
 	var securityGroupID string
 	// We do not want to make changes to a Global defined SG
-	var setupSg = false
+	setupSg := false
 
 	sgList := getSGListFromAnnotation(annotations[ServiceAnnotationLoadBalancerSecurityGroups])
 
@@ -4665,7 +4637,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		// Note that this is annoying: the load balancer disappears from the API immediately, but it is still
 		// deleting in the background.  We get a DependencyViolation until the load balancer has deleted itself
 
-		var loadBalancerSGs = aws.StringValueSlice(lb.SecurityGroups)
+		loadBalancerSGs := aws.StringValueSlice(lb.SecurityGroups)
 
 		describeRequest := &ec2.DescribeSecurityGroupsInput{}
 		describeRequest.Filters = []*ec2.Filter{
@@ -4691,7 +4663,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			sgID := aws.StringValue(sg.GroupId)
 
 			if sgID == c.cfg.Global.ElbSecurityGroup {
-				//We don't want to delete a security group that was defined in the Cloud Configuration.
+				// We don't want to delete a security group that was defined in the Cloud Configuration.
 				continue
 			}
 			if sgID == "" {
@@ -5042,8 +5014,8 @@ func setNodeDisk(
 	nodeDiskMap map[types.NodeName]map[KubernetesVolumeID]bool,
 	volumeID KubernetesVolumeID,
 	nodeName types.NodeName,
-	check bool) {
-
+	check bool,
+) {
 	volumeMap := nodeDiskMap[nodeName]
 
 	if volumeMap == nil {

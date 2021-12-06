@@ -28,14 +28,14 @@ type HostComputeLoadBalancer struct {
 	Flags                LoadBalancerFlags         `json:",omitempty"` // 0: None, 1: EnableDirectServerReturn
 }
 
-//LoadBalancerFlags modify settings for a loadbalancer.
+// LoadBalancerFlags modify settings for a loadbalancer.
 type LoadBalancerFlags uint32
 
 var (
 	// LoadBalancerFlagsNone is the default.
 	LoadBalancerFlagsNone LoadBalancerFlags = 0
 	// LoadBalancerFlagsDSR enables Direct Server Return (DSR)
-	LoadBalancerFlagsDSR LoadBalancerFlags = 1
+	LoadBalancerFlagsDSR  LoadBalancerFlags = 1
 	LoadBalancerFlagsIPv6 LoadBalancerFlags = 2
 )
 

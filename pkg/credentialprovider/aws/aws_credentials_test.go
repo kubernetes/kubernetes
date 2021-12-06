@@ -31,9 +31,11 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-const user = "foo"
-const password = "1234567890abcdef" // Fake value for testing.
-const email = "not@val.id"
+const (
+	user     = "foo"
+	password = "1234567890abcdef" // Fake value for testing.
+	email    = "not@val.id"
+)
 
 // Mock implementation
 // randomizePassword is used to check for a cache hit to verify the password
@@ -69,7 +71,7 @@ func (p *testTokenGetter) GetAuthorizationToken(input *ecr.GetAuthorizationToken
 	output := &ecr.GetAuthorizationTokenOutput{
 		AuthorizationData: []*ecr.AuthorizationData{data},
 	}
-	return output, nil //p.svc.GetAuthorizationToken(input)
+	return output, nil // p.svc.GetAuthorizationToken(input)
 }
 
 func TestRegistryPatternMatch(t *testing.T) {
@@ -122,7 +124,6 @@ func TestParseRepoURLPass(t *testing.T) {
 	registry := "123456789012.dkr.ecr.lala-land-1.amazonaws.com"
 	image := path.Join(registry, port, "foo/bar")
 	parsedURL, err := parseRepoURL(image)
-
 	if err != nil {
 		t.Errorf("Could not parse URL: %s, err: %v", image, err)
 	}

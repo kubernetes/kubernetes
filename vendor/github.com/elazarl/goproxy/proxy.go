@@ -66,6 +66,7 @@ func (proxy *ProxyHttpServer) filterRequest(r *http.Request, ctx *ProxyCtx) (req
 	}
 	return
 }
+
 func (proxy *ProxyHttpServer) filterResponse(respOrig *http.Response, ctx *ProxyCtx) (resp *http.Response) {
 	resp = respOrig
 	for _, h := range proxy.respHandlers {
@@ -97,7 +98,7 @@ func removeProxyHeaders(ctx *ProxyCtx, r *http.Request) {
 
 // Standard net/http function. Shouldn't be used directly, http.Serve will use it.
 func (proxy *ProxyHttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//r.Header["X-Forwarded-For"] = w.RemoteAddr()
+	// r.Header["X-Forwarded-For"] = w.RemoteAddr()
 	if r.Method == "CONNECT" {
 		proxy.handleHttps(w, r)
 	} else {

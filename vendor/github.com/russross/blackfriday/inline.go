@@ -151,7 +151,6 @@ func codeSpan(p *parser, out *bytes.Buffer, data []byte, offset int) int {
 	}
 
 	return end
-
 }
 
 // newline preceded by two spaces becomes <br>
@@ -821,8 +820,10 @@ func isEndOfLink(char byte) bool {
 	return isspace(char) || char == '<'
 }
 
-var validUris = [][]byte{[]byte("http://"), []byte("https://"), []byte("ftp://"), []byte("mailto://")}
-var validPaths = [][]byte{[]byte("/"), []byte("./"), []byte("../")}
+var (
+	validUris  = [][]byte{[]byte("http://"), []byte("https://"), []byte("ftp://"), []byte("mailto://")}
+	validPaths = [][]byte{[]byte("/"), []byte("./"), []byte("../")}
+)
 
 func isSafeLink(link []byte) bool {
 	for _, path := range validPaths {
@@ -904,7 +905,6 @@ func tagLength(data []byte, autolink *int) int {
 			} else {
 				i++
 			}
-
 		}
 
 		if i >= len(data) {

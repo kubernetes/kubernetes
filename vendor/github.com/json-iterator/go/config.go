@@ -211,6 +211,7 @@ func (cfg *frozenConfig) useNumber(extension DecoderExtension) {
 		}
 	}}
 }
+
 func (cfg *frozenConfig) getTagKey() string {
 	tagKey := cfg.configBeforeFrozen.TagKey
 	if tagKey == "" {
@@ -225,8 +226,7 @@ func (cfg *frozenConfig) RegisterExtension(extension Extension) {
 	cfg.configBeforeFrozen = copied
 }
 
-type lossyFloat32Encoder struct {
-}
+type lossyFloat32Encoder struct{}
 
 func (encoder *lossyFloat32Encoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	stream.WriteFloat32Lossy(*((*float32)(ptr)))
@@ -236,8 +236,7 @@ func (encoder *lossyFloat32Encoder) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*float32)(ptr)) == 0
 }
 
-type lossyFloat64Encoder struct {
-}
+type lossyFloat64Encoder struct{}
 
 func (encoder *lossyFloat64Encoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	stream.WriteFloat64Lossy(*((*float64)(ptr)))
@@ -255,8 +254,7 @@ func (cfg *frozenConfig) marshalFloatWith6Digits(extension EncoderExtension) {
 	extension[reflect2.TypeOfPtr((*float64)(nil)).Elem()] = &lossyFloat64Encoder{}
 }
 
-type htmlEscapedStringEncoder struct {
-}
+type htmlEscapedStringEncoder struct{}
 
 func (encoder *htmlEscapedStringEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	str := *((*string)(ptr))

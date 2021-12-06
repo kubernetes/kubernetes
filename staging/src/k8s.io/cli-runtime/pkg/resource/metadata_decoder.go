@@ -30,7 +30,6 @@ type metadataValidatingDecoder struct {
 
 func (m *metadataValidatingDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	obj, gvk, err := m.decoder.Decode(data, defaults, into)
-
 	// if we already errored, return
 	if err != nil {
 		return obj, gvk, err

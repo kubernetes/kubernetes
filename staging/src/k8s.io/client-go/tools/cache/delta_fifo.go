@@ -232,16 +232,12 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 	return f
 }
 
-var (
-	_ = Queue(&DeltaFIFO{}) // DeltaFIFO is a Queue
-)
+var _ = Queue(&DeltaFIFO{}) // DeltaFIFO is a Queue
 
-var (
-	// ErrZeroLengthDeltasObject is returned in a KeyError if a Deltas
-	// object with zero length is encountered (should be impossible,
-	// but included for completeness).
-	ErrZeroLengthDeltasObject = errors.New("0 length Deltas object; can't get key")
-)
+// ErrZeroLengthDeltasObject is returned in a KeyError if a Deltas
+// object with zero length is encountered (should be impossible,
+// but included for completeness).
+var ErrZeroLengthDeltasObject = errors.New("0 length Deltas object; can't get key")
 
 // Close the queue.
 func (f *DeltaFIFO) Close() {

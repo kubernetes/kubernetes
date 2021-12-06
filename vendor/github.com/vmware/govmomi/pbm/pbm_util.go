@@ -62,7 +62,7 @@ func CreateCapabilityProfileSpec(pbmCreateSpec CapabilityProfileCreateSpec) (*ty
 		},
 		Constraints: &types.PbmCapabilitySubProfileConstraints{
 			SubProfiles: []types.PbmCapabilitySubProfile{
-				types.PbmCapabilitySubProfile{
+				{
 					Capability: capabilities,
 				},
 			},
@@ -117,7 +117,7 @@ func createCapabilityInstances(rules []Capability) ([]types.PbmCapabilityInstanc
 			propertyInstances = append(propertyInstances, property)
 		}
 		constraintInstances := []types.PbmCapabilityConstraintInstance{
-			types.PbmCapabilityConstraintInstance{
+			{
 				PropertyInstance: propertyInstances,
 			},
 		}

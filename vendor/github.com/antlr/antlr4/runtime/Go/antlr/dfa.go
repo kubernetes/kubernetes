@@ -17,15 +17,15 @@ type DFA struct {
 
 	// states is all the DFA states. Use Map to get the old state back; Set can only
 	// indicate whether it is there.
-	states map[int]*DFAState
+	states   map[int]*DFAState
 	statesMu sync.RWMutex
 
-	s0 *DFAState
+	s0   *DFAState
 	s0Mu sync.RWMutex
 
 	// precedenceDfa is the backing field for isPrecedenceDfa and setPrecedenceDfa.
 	// True if the DFA is for a precedence decision and false otherwise.
-	precedenceDfa bool
+	precedenceDfa   bool
 	precedenceDfaMu sync.RWMutex
 }
 

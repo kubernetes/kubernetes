@@ -33,7 +33,6 @@ import (
 // This cache contains a map of socket file path to plugin information of
 // all plugins attached to this node.
 type ActualStateOfWorld interface {
-
 	// GetRegisteredPlugins generates and returns a list of plugins
 	// that are successfully registered plugins in the current actual state of world.
 	GetRegisteredPlugins() []PluginInfo

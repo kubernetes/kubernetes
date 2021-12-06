@@ -44,7 +44,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			false,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test2",
@@ -56,7 +57,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			false,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test3",
@@ -68,7 +70,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			true,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test4",
@@ -80,7 +83,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			true,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test5",
@@ -93,7 +97,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			true,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test6",
@@ -106,7 +111,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			false,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test7",
@@ -119,7 +125,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			true,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test8",
@@ -132,7 +139,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			false,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test9",
@@ -145,7 +153,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			true,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test10",
@@ -158,7 +167,8 @@ func TestValidateEventForCoreV1Events(t *testing.T) {
 				},
 			},
 			false,
-		}, {
+		},
+		{
 			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test11",

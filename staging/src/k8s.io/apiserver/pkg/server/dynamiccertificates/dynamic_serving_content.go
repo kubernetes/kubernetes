@@ -49,8 +49,10 @@ type DynamicCertKeyPairContent struct {
 	queue workqueue.RateLimitingInterface
 }
 
-var _ CertKeyContentProvider = &DynamicCertKeyPairContent{}
-var _ ControllerRunner = &DynamicCertKeyPairContent{}
+var (
+	_ CertKeyContentProvider = &DynamicCertKeyPairContent{}
+	_ ControllerRunner       = &DynamicCertKeyPairContent{}
+)
 
 // NewDynamicServingContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
 func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {

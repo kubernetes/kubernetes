@@ -62,7 +62,6 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 -----END EC PRIVATE KEY-----`
 
 func TestServiceAccountTokenCreate(t *testing.T) {
-
 	// Build client config, clientset, and informers
 	sk, err := keyutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
 	if err != nil {

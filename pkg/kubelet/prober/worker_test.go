@@ -181,8 +181,7 @@ func TestInitialDelay(t *testing.T) {
 
 		// 100 seconds later...
 		laterStatus := getTestRunningStatusWithStarted(probeType != startup)
-		laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time =
-			time.Now().Add(-100 * time.Second)
+		laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time = time.Now().Add(-100 * time.Second)
 		m.statusManager.SetPodStatus(w.pod, laterStatus)
 
 		// Second call should succeed (already waited).

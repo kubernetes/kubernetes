@@ -33,8 +33,7 @@ func (cne *customNumberExtension) CreateDecoder(typ reflect2.Type) jsoniter.ValD
 	return nil
 }
 
-type customNumberDecoder struct {
-}
+type customNumberDecoder struct{}
 
 func (customNumberDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
 	switch iter.WhatIsNext() {

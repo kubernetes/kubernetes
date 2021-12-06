@@ -40,7 +40,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// cfgFiles is in cluster_test.go
-	var tests = []struct {
+	tests := []struct {
 		name         string
 		fileContents []byte
 		expectErr    bool
@@ -84,7 +84,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 			cfgPath := filepath.Join(tmpdir, rt.name)
-			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0o644)
 			if err != nil {
 				t.Errorf("Couldn't create file: %v", err)
 				return

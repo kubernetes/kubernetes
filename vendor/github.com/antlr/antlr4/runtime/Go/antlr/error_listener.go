@@ -21,8 +21,7 @@ type ErrorListener interface {
 	ReportContextSensitivity(recognizer Parser, dfa *DFA, startIndex, stopIndex, prediction int, configs ATNConfigSet)
 }
 
-type DefaultErrorListener struct {
-}
+type DefaultErrorListener struct{}
 
 func NewDefaultErrorListener() *DefaultErrorListener {
 	return new(DefaultErrorListener)

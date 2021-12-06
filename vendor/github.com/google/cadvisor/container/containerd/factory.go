@@ -31,8 +31,10 @@ import (
 	"github.com/google/cadvisor/watcher"
 )
 
-var ArgContainerdEndpoint = flag.String("containerd", "/run/containerd/containerd.sock", "containerd endpoint")
-var ArgContainerdNamespace = flag.String("containerd-namespace", "k8s.io", "containerd namespace")
+var (
+	ArgContainerdEndpoint  = flag.String("containerd", "/run/containerd/containerd.sock", "containerd endpoint")
+	ArgContainerdNamespace = flag.String("containerd-namespace", "k8s.io", "containerd namespace")
+)
 
 var containerdEnvMetadataWhiteList = flag.String("containerd_env_metadata_whitelist", "", "DEPRECATED: this flag will be removed, please use `env_metadata_whitelist`. A comma-separated list of environment variable keys matched with specified prefix that needs to be collected for containerd containers")
 

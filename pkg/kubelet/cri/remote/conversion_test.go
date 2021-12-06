@@ -176,7 +176,6 @@ func fillField(field reflect.Value, v int) {
 	case reflect.Struct:
 		fillFieldsOffset(field.Addr().Interface(), v)
 	}
-
 }
 
 func assertEqual(t *testing.T, a, b proto.Message) {

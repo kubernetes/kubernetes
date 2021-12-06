@@ -23,6 +23,7 @@ package perf
 // #include <perfmon/pfmlib.h>
 // #include <stdlib.h>
 import "C"
+
 import (
 	"fmt"
 	"io/ioutil"
@@ -138,7 +139,6 @@ type uncoreCollector struct {
 }
 
 func NewUncoreCollector(cgroupPath string, events PerfEvents, cpuToSocket map[int]int) stats.Collector {
-
 	if cgroupPath != rootPerfEventPath {
 		// Uncore metric doesn't exists for cgroups, only for entire platform.
 		return &stats.NoopCollector{}
@@ -270,7 +270,7 @@ func parseEventName(eventName string) (string, string) {
 	// First "/" separate pmu prefix and event name
 	// ex. "uncore_imc_0/cas_count_read" -> uncore_imc_0 and cas_count_read.
 	splittedEvent := strings.SplitN(eventName, "/", 2)
-	var pmuPrefix = ""
+	pmuPrefix := ""
 	if len(splittedEvent) == 2 {
 		pmuPrefix = splittedEvent[0]
 		eventName = splittedEvent[1]

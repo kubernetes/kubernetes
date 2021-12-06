@@ -46,9 +46,7 @@ type mustMatchPatterns struct {
 	forbiddenSysctls     []string
 }
 
-var (
-	_ SysctlsStrategy = &mustMatchPatterns{}
-)
+var _ SysctlsStrategy = &mustMatchPatterns{}
 
 // NewMustMatchPatterns creates a new mustMatchPatterns strategy that will provide validation.
 // Passing nil means the default pattern, passing an empty list means to disallow all sysctls.

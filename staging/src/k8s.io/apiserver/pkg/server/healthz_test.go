@@ -73,5 +73,4 @@ func TestDelayedHealthCheck(t *testing.T) {
 			t.Errorf("Got %v, expected no error", err)
 		}
 	})
-
 }

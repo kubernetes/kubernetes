@@ -408,7 +408,7 @@ func newClient(cfg *Config) (*Client, error) {
 	client.Auth = NewAuth(client)
 	client.Maintenance = NewMaintenance(client)
 
-	//get token with established connection
+	// get token with established connection
 	ctx, cancel = client.ctx, func() {}
 	if client.cfg.DialTimeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, client.cfg.DialTimeout)
@@ -417,7 +417,7 @@ func newClient(cfg *Config) (*Client, error) {
 	if err != nil {
 		client.Close()
 		cancel()
-		//TODO: Consider fmt.Errorf("communicating with [%s] failed: %v", strings.Join(cfg.Endpoints, ";"), err)
+		// TODO: Consider fmt.Errorf("communicating with [%s] failed: %v", strings.Join(cfg.Endpoints, ";"), err)
 		return nil, err
 	}
 	cancel()

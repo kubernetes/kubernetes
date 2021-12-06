@@ -107,7 +107,6 @@ func (bus *DBusCon) InhibitShutdown() (InhibitLock, error) {
 // ReleaseInhibitLock will release the underlying inhibit lock which will cause the shutdown to start.
 func (bus *DBusCon) ReleaseInhibitLock(lock InhibitLock) error {
 	err := syscall.Close(int(lock))
-
 	if err != nil {
 		return fmt.Errorf("unable to close systemd inhibitor lock: %w", err)
 	}
@@ -138,7 +137,6 @@ func (bus *DBusCon) ReloadLogindConf() error {
 // see https://www.freedesktop.org/wiki/Software/systemd/inhibit/ for more details.
 func (bus *DBusCon) MonitorShutdown() (<-chan bool, error) {
 	err := bus.SystemBus.AddMatchSignal(dbus.WithMatchInterface(logindInterface), dbus.WithMatchMember("PrepareForShutdown"), dbus.WithMatchObjectPath("/org/freedesktop/login1"))
-
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +176,7 @@ const (
 
 // OverrideInhibitDelay writes a config file to logind overriding InhibitDelayMaxSec to the value desired.
 func (bus *DBusCon) OverrideInhibitDelay(inhibitDelayMax time.Duration) error {
-	err := os.MkdirAll(logindConfigDirectory, 0755)
+	err := os.MkdirAll(logindConfigDirectory, 0o755)
 	if err != nil {
 		return fmt.Errorf("failed creating %v directory: %w", logindConfigDirectory, err)
 	}
@@ -193,7 +191,7 @@ InhibitDelayMaxSec=%.0f
 `, inhibitDelayMax.Seconds())
 
 	logindOverridePath := filepath.Join(logindConfigDirectory, kubeletLogindConf)
-	if err := ioutil.WriteFile(logindOverridePath, []byte(inhibitOverride), 0644); err != nil {
+	if err := ioutil.WriteFile(logindOverridePath, []byte(inhibitOverride), 0o644); err != nil {
 		return fmt.Errorf("failed writing logind shutdown inhibit override file %v: %w", logindOverridePath, err)
 	}
 

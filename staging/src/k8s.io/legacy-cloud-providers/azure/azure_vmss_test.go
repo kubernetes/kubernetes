@@ -256,11 +256,12 @@ func TestGetScaleSetVMInstanceID(t *testing.T) {
 		machineName        string
 		expectError        bool
 		expectedInstanceID string
-	}{{
-		msg:         "invalid vmss instance name",
-		machineName: "vmvm",
-		expectError: true,
-	},
+	}{
+		{
+			msg:         "invalid vmss instance name",
+			machineName: "vmvm",
+			expectError: true,
+		},
 		{
 			msg:                "valid vmss instance name",
 			machineName:        "vm00000Z",

@@ -212,9 +212,11 @@ type LocalPackageReader struct {
 
 var _ Reader = LocalPackageReader{}
 
-var DefaultMatch = []string{"*.yaml", "*.yml"}
-var JSONMatch = []string{"*.json"}
-var MatchAll = append(DefaultMatch, JSONMatch...)
+var (
+	DefaultMatch = []string{"*.yaml", "*.yml"}
+	JSONMatch    = []string{"*.json"}
+	MatchAll     = append(DefaultMatch, JSONMatch...)
+)
 
 // Read reads the Resources.
 func (r LocalPackageReader) Read() ([]*yaml.RNode, error) {

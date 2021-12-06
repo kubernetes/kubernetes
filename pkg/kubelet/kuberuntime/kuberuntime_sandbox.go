@@ -45,7 +45,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 	}
 
 	// Create pod logs directory
-	err = m.osInterface.MkdirAll(podSandboxConfig.LogDirectory, 0755)
+	err = m.osInterface.MkdirAll(podSandboxConfig.LogDirectory, 0o755)
 	if err != nil {
 		message := fmt.Sprintf("Failed to create log directory for pod %q: %v", format.Pod(pod), err)
 		klog.ErrorS(err, "Failed to create log directory for pod", "pod", klog.KObj(pod))

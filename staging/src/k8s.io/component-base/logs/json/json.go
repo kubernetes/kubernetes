@@ -29,10 +29,8 @@ import (
 	"k8s.io/component-base/logs/registry"
 )
 
-var (
-	// timeNow stubbed out for testing
-	timeNow = time.Now
-)
+// timeNow stubbed out for testing
+var timeNow = time.Now
 
 // NewJSONLogger creates a new json logr.Logger and its associated
 // flush function. The separate error stream is optional and may be nil.

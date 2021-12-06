@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // DedicatedHostGroupsClient is the compute Client
@@ -50,13 +51,22 @@ func (client DedicatedHostGroupsClient) CreateOrUpdate(ctx context.Context, reso
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.DedicatedHostGroupProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.DedicatedHostGroupProperties.PlatformFaultDomainCount", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "parameters.DedicatedHostGroupProperties.PlatformFaultDomainCount", Name: validation.InclusiveMaximum, Rule: int64(3), Chain: nil},
-						{Target: "parameters.DedicatedHostGroupProperties.PlatformFaultDomainCount", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.DedicatedHostGroupProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.DedicatedHostGroupProperties.PlatformFaultDomainCount", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{
+							{Target: "parameters.DedicatedHostGroupProperties.PlatformFaultDomainCount", Name: validation.InclusiveMaximum, Rule: int64(3), Chain: nil},
+							{Target: "parameters.DedicatedHostGroupProperties.PlatformFaultDomainCount", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.DedicatedHostGroupsClient", "CreateOrUpdate", err.Error())
 	}
 

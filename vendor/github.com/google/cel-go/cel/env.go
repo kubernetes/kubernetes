@@ -178,7 +178,8 @@ func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
 		expr:    res.GetExpr(),
 		info:    res.GetSourceInfo(),
 		refMap:  res.GetReferenceMap(),
-		typeMap: res.GetTypeMap()}, nil
+		typeMap: res.GetTypeMap(),
+	}, nil
 }
 
 // Compile combines the Parse and Check phases CEL program compilation to produce an Ast and
@@ -310,7 +311,8 @@ func (e *Env) ParseSource(src common.Source) (*Ast, *Issues) {
 	return &Ast{
 		source: Source(src),
 		expr:   res.GetExpr(),
-		info:   res.GetSourceInfo()}, nil
+		info:   res.GetSourceInfo(),
+	}, nil
 }
 
 // Program generates an evaluable instance of the Ast within the environment (Env).

@@ -461,7 +461,6 @@ func (p *paragraph) isolatingRunSequence(indexes []int) *isolatingRunSequence {
 		// the first character after the end of run sequence
 		limit := indexes[length-1] + 1
 		for ; limit < p.Len() && isRemovedByX9(p.initialTypes[limit]); limit++ {
-
 		}
 		succLevel = p.embeddingLevel
 		if limit < p.Len() {
@@ -484,7 +483,6 @@ func (p *paragraph) isolatingRunSequence(indexes []int) *isolatingRunSequence {
 // Note that some weak types (EN, AN) remain after this processing is
 // complete.
 func (s *isolatingRunSequence) resolveWeakTypes() {
-
 	// on entry, only these types remain
 	s.assertOnly(L, R, AL, EN, ES, ET, AN, CS, B, S, WS, ON, NSM, LRI, RLI, FSI, PDI)
 
@@ -604,7 +602,6 @@ func (s *isolatingRunSequence) resolveWeakTypes() {
 
 // 6) resolving neutral types Rules N1-N2.
 func (s *isolatingRunSequence) resolveNeutralTypes() {
-
 	// on entry, only these types can be in resultTypes
 	s.assertOnly(L, R, EN, AN, B, S, WS, ON, RLI, LRI, FSI, PDI)
 
@@ -670,7 +667,6 @@ func setTypes(types []Class, newType Class) {
 
 // 7) resolving implicit embedding levels Rules I1, I2.
 func (s *isolatingRunSequence) resolveImplicitLevels() {
-
 	// on entry, only these types can be in resultTypes
 	s.assertOnly(L, R, EN, AN)
 

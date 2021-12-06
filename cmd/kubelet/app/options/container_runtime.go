@@ -31,10 +31,8 @@ const (
 	defaultPodSandboxImageVersion = "3.6"
 )
 
-var (
-	defaultPodSandboxImage = defaultPodSandboxImageName +
-		":" + defaultPodSandboxImageVersion
-)
+var defaultPodSandboxImage = defaultPodSandboxImageName +
+	":" + defaultPodSandboxImageVersion
 
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
 // default values.

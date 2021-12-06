@@ -149,8 +149,7 @@ func TestCacheBasedSecretManager(t *testing.T) {
 	// We should have only: s1, s3 and s4 secrets in namespaces: ns1 and ns2.
 	for _, ns := range []string{"ns1", "ns2", "ns3"} {
 		for _, secret := range []string{"s1", "s2", "s3", "s4", "s5", "s6", "s20", "s40", "s50"} {
-			shouldExist :=
-				(secret == "s1" || secret == "s3" || secret == "s4" || secret == "s40") && (ns == "ns1" || ns == "ns2")
+			shouldExist := (secret == "s1" || secret == "s3" || secret == "s4" || secret == "s40") && (ns == "ns1" || ns == "ns2")
 			checkObject(t, store, ns, secret, shouldExist)
 		}
 	}

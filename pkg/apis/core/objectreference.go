@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//TODO: consider making these methods functions, because we don't want helper
-//functions in the k8s.io/api repo.
+// TODO: consider making these methods functions, because we don't want helper
+// functions in the k8s.io/api repo.
 
 package core
 

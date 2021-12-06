@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VpnSitesConfigurationClient is the network Client
@@ -49,8 +50,11 @@ func (client VpnSitesConfigurationClient) Download(ctx context.Context, resource
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: request,
-			Constraints: []validation.Constraint{{Target: "request.OutputBlobSasURL", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: request,
+			Constraints: []validation.Constraint{{Target: "request.OutputBlobSasURL", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.VpnSitesConfigurationClient", "Download", err.Error())
 	}
 

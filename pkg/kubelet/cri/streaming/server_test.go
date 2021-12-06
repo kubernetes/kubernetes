@@ -123,7 +123,8 @@ func TestValidateExecAttachRequest(t *testing.T) {
 			expectErr: true,
 			configs: []config{
 				{false, false, false, false},
-				{true, false, false, false}},
+				{true, false, false, false},
+			},
 		},
 		{
 			desc:      "tty and stderr cannot both be true",

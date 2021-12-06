@@ -37,11 +37,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	// None indicates that the List result set should not be filter (i.e.
-	// return all values).
-	None *F
-)
+// None indicates that the List result set should not be filter (i.e.
+// return all values).
+var None *F
 
 // Regexp returns a filter for fieldName eq regexp v.
 func Regexp(fieldName, v string) *F {

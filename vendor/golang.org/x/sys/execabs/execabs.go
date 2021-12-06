@@ -84,7 +84,6 @@ func CommandContext(ctx context.Context, name string, arg ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, name, arg...)
 	fixCmd(name, cmd)
 	return cmd
-
 }
 
 // Command returns the Cmd struct to execute the named program with the given arguments.

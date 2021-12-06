@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ExpressRouteCrossConnectionPeeringsClient is the network Client
@@ -52,13 +53,22 @@ func (client ExpressRouteCrossConnectionPeeringsClient) CreateOrUpdate(ctx conte
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: peeringParameters,
-			Constraints: []validation.Constraint{{Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties.PeerASN", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties.PeerASN", Name: validation.InclusiveMaximum, Rule: int64(4294967295), Chain: nil},
-						{Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties.PeerASN", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: peeringParameters,
+			Constraints: []validation.Constraint{{
+				Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties.PeerASN", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties.PeerASN", Name: validation.InclusiveMaximum, Rule: int64(4294967295), Chain: nil},
+							{Target: "peeringParameters.ExpressRouteCrossConnectionPeeringProperties.PeerASN", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.ExpressRouteCrossConnectionPeeringsClient", "CreateOrUpdate", err.Error())
 	}
 

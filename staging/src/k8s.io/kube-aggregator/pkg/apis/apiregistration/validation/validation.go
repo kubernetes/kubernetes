@@ -110,7 +110,8 @@ func ValidateAPIServiceStatus(status *apiregistration.APIServiceStatus, fldPath 
 			condition.Status != apiregistration.ConditionFalse &&
 			condition.Status != apiregistration.ConditionUnknown {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("conditions").Index(i).Child("status"), condition.Status, []string{
-				string(apiregistration.ConditionTrue), string(apiregistration.ConditionFalse), string(apiregistration.ConditionUnknown)}))
+				string(apiregistration.ConditionTrue), string(apiregistration.ConditionFalse), string(apiregistration.ConditionUnknown),
+			}))
 		}
 	}
 

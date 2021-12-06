@@ -170,13 +170,14 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 	}
 
 	// Store the new stats
-	s.latest.Store(PodVolumeStats{EphemeralVolumes: ephemeralStats,
-		PersistentVolumes: persistentStats})
+	s.latest.Store(PodVolumeStats{
+		EphemeralVolumes:  ephemeralStats,
+		PersistentVolumes: persistentStats,
+	})
 }
 
 // parsePodVolumeStats converts (internal) volume.Metrics to (external) stats.VolumeStats structures
 func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats.PVCReference, metric *volume.Metrics, volSpec v1.Volume) stats.VolumeStats {
-
 	var available, capacity, used, inodes, inodesFree, inodesUsed uint64
 	if metric.Available != nil {
 		available = uint64(metric.Available.Value())
@@ -200,7 +201,9 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats
 	return stats.VolumeStats{
 		Name:   podName,
 		PVCRef: pvcRef,
-		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
-			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
+		FsStats: stats.FsStats{
+			Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
+			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed,
+		},
 	}
 }

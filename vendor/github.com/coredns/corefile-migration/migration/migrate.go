@@ -425,7 +425,6 @@ func ValidVersions() []string {
 }
 
 func ValidUpMigration(fromCoreDNSVersion, toCoreDNSVersion string) error {
-
 	err := validateVersion(fromCoreDNSVersion)
 	if err != nil {
 		return err

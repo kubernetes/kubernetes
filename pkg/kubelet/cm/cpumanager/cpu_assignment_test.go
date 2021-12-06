@@ -119,7 +119,6 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			sort.Ints(result)
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
-
 			}
 		})
 	}

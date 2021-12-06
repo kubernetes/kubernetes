@@ -34,11 +34,13 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-var _ volume.VolumePlugin = &azureDataDiskPlugin{}
-var _ volume.PersistentVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.BlockVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.DeletableVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
+var (
+	_ volume.VolumePlugin              = &azureDataDiskPlugin{}
+	_ volume.PersistentVolumePlugin    = &azureDataDiskPlugin{}
+	_ volume.BlockVolumePlugin         = &azureDataDiskPlugin{}
+	_ volume.DeletableVolumePlugin     = &azureDataDiskPlugin{}
+	_ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
+)
 
 func (plugin *azureDataDiskPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(azureDataDiskPluginName)

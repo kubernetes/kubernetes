@@ -60,7 +60,7 @@ func (Export) UnmarshalJSONEnum(ed pref.EnumDescriptor, b []byte) (pref.EnumNumb
 // The current implementation does no compression.
 func (Export) CompressGZIP(in []byte) (out []byte) {
 	// RFC 1952, section 2.3.1.
-	var gzipHeader = [10]byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff}
+	gzipHeader := [10]byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff}
 
 	// RFC 1951, section 3.2.4.
 	var blockHeader [5]byte

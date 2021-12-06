@@ -87,7 +87,7 @@ type ErrorEvent struct {
 	EventID    uint16 `json:"EventId,omitempty"`
 	Flags      uint32 `json:"Flags,omitempty"`
 	Source     string `json:"Source,omitempty"`
-	//Data       []EventData `json:"Data,omitempty"`  // Omit this as HCS doesn't encode this well. It's more confusing to include. It is however logged in debug mode (see processHcsResult function)
+	// Data       []EventData `json:"Data,omitempty"`  // Omit this as HCS doesn't encode this well. It's more confusing to include. It is however logged in debug mode (see processHcsResult function)
 }
 
 type hcsResult struct {

@@ -42,8 +42,10 @@ const (
 	fMode = fElement | fAttr | fCharData | fInnerXml | fComment | fAny
 )
 
-var tinfoMap = make(map[reflect.Type]*typeInfo)
-var tinfoLock sync.RWMutex
+var (
+	tinfoMap  = make(map[reflect.Type]*typeInfo)
+	tinfoLock sync.RWMutex
+)
 
 var nameType = reflect.TypeOf(Name{})
 

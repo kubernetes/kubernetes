@@ -241,7 +241,7 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstable
 	// End of control plane table
 	endOfTable()
 
-	//fmt.Fprintln(w, "")
+	// fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "You can now apply the upgrade by executing the following command:")
 	fmt.Fprintln(w, "")
 	fmt.Fprintf(w, "\tkubeadm upgrade apply %s%s\n", up.After.KubeVersion, unstableVersionFlag)

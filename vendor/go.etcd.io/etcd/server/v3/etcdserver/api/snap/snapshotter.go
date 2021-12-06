@@ -88,7 +88,7 @@ func (s *Snapshotter) save(snapshot *raftpb.Snapshot) error {
 	spath := filepath.Join(s.dir, fname)
 
 	fsyncStart := time.Now()
-	err = pioutil.WriteAndSyncFile(spath, d, 0666)
+	err = pioutil.WriteAndSyncFile(spath, d, 0o666)
 	snapFsyncSec.Observe(time.Since(fsyncStart).Seconds())
 
 	if err != nil {

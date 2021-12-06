@@ -556,7 +556,6 @@ fake1,fake2
 			if test.expectErr {
 				if err == nil {
 					t.Errorf("test %s has unexpected error: %v", test.name, err)
-
 				}
 			} else {
 				if err != nil {

@@ -21,35 +21,29 @@ type Tree interface {
 
 type SyntaxTree interface {
 	Tree
-
 	GetSourceInterval() *Interval
 }
 
 type ParseTree interface {
 	SyntaxTree
-
 	Accept(Visitor ParseTreeVisitor) interface{}
 	GetText() string
-
 	ToStringTree([]string, Recognizer) string
 }
 
 type RuleNode interface {
 	ParseTree
-
 	GetRuleContext() RuleContext
 	GetBaseRuleContext() *BaseRuleContext
 }
 
 type TerminalNode interface {
 	ParseTree
-
 	GetSymbol() Token
 }
 
 type ErrorNode interface {
 	TerminalNode
-
 	errorNode()
 }
 
@@ -207,8 +201,7 @@ func (e *ErrorNodeImpl) Accept(v ParseTreeVisitor) interface{} {
 	return v.VisitErrorNode(e)
 }
 
-type ParseTreeWalker struct {
-}
+type ParseTreeWalker struct{}
 
 func NewParseTreeWalker() *ParseTreeWalker {
 	return new(ParseTreeWalker)

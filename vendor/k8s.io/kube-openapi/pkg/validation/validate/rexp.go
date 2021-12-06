@@ -23,7 +23,7 @@ import (
 // Cache for compiled regular expressions
 var (
 	cacheMutex = &sync.Mutex{}
-	reDict     = atomic.Value{} //map[string]*re.Regexp
+	reDict     = atomic.Value{} // map[string]*re.Regexp
 )
 
 func compileRegexp(pattern string) (*re.Regexp, error) {

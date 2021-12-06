@@ -53,7 +53,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(addr), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(addr), 0o750); err != nil {
 		return nil, fmt.Errorf("error creating socket directory %q: %v", filepath.Dir(addr), err)
 	}
 

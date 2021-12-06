@@ -108,7 +108,7 @@ type JOBOBJECT_BASIC_ACCOUNTING_INFORMATION struct {
 	TotalTerminateProcesses   uint32
 }
 
-//https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_and_io_accounting_information
+// https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_and_io_accounting_information
 type JOBOBJECT_BASIC_AND_IO_ACCOUNTING_INFORMATION struct {
 	BasicInfo JOBOBJECT_BASIC_ACCOUNTING_INFORMATION
 	IoInfo    windows.IO_COUNTERS

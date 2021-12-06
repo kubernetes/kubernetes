@@ -45,7 +45,6 @@ const (
 
 // Setup creates a pv and then verifies that a pod can consume it.  The pod writes data to the volume.
 func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
-
 	var err error
 	e2eskipper.SkipUnlessProviderIs("gce", "gke", "openstack", "aws", "vsphere", "azure")
 

@@ -110,15 +110,19 @@ func (ls *listReflect) Len() int {
 	}
 	return ls.v.Elem().Len()
 }
+
 func (ls *listReflect) Get(i int) pref.Value {
 	return ls.conv.PBValueOf(ls.v.Elem().Index(i))
 }
+
 func (ls *listReflect) Set(i int, v pref.Value) {
 	ls.v.Elem().Index(i).Set(ls.conv.GoValueOf(v))
 }
+
 func (ls *listReflect) Append(v pref.Value) {
 	ls.v.Elem().Set(reflect.Append(ls.v.Elem(), ls.conv.GoValueOf(v)))
 }
+
 func (ls *listReflect) AppendMutable() pref.Value {
 	if _, ok := ls.conv.(*messageConverter); !ok {
 		panic("invalid AppendMutable on list with non-message type")
@@ -127,15 +131,19 @@ func (ls *listReflect) AppendMutable() pref.Value {
 	ls.Append(v)
 	return v
 }
+
 func (ls *listReflect) Truncate(i int) {
 	ls.v.Elem().Set(ls.v.Elem().Slice(0, i))
 }
+
 func (ls *listReflect) NewElement() pref.Value {
 	return ls.conv.New()
 }
+
 func (ls *listReflect) IsValid() bool {
 	return !ls.v.IsNil()
 }
+
 func (ls *listReflect) protoUnwrap() interface{} {
 	return ls.v.Interface()
 }

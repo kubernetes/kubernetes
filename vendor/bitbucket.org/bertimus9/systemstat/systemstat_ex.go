@@ -2,6 +2,7 @@
 // Licensed under the MIT License
 // see file LICENSE
 
+//go:build !linux
 // +build !linux
 
 package systemstat

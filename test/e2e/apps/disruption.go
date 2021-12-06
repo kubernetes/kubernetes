@@ -19,9 +19,10 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"strings"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo"
@@ -222,26 +223,30 @@ var _ = SIGDescribe("DisruptionController", func() {
 			maxUnavailable: intstr.FromString(""),
 			podCount:       1,
 			shouldDeny:     false,
-		}, {
+		},
+		{
 			description:    "too few pods, absolute",
 			minAvailable:   intstr.FromInt(2),
 			maxUnavailable: intstr.FromString(""),
 			podCount:       2,
 			shouldDeny:     true,
-		}, {
+		},
+		{
 			description:    "enough pods, absolute",
 			minAvailable:   intstr.FromInt(2),
 			maxUnavailable: intstr.FromString(""),
 			podCount:       3,
 			shouldDeny:     false,
-		}, {
+		},
+		{
 			description:    "enough pods, replicaSet, percentage",
 			minAvailable:   intstr.FromString("90%"),
 			maxUnavailable: intstr.FromString(""),
 			replicaSetSize: 10,
 			exclusive:      false,
 			shouldDeny:     false,
-		}, {
+		},
+		{
 			description:    "too few pods, replicaSet, percentage",
 			minAvailable:   intstr.FromString("90%"),
 			maxUnavailable: intstr.FromString(""),
@@ -406,7 +411,6 @@ var _ = SIGDescribe("DisruptionController", func() {
 		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 	})
-
 })
 
 func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, name string, minAvailable intstr.IntOrString, labels map[string]string) {
@@ -442,9 +446,11 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, name strin
 	waitForPdbToBeProcessed(cs, ns, name)
 }
 
-type updateFunc func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget
-type updateRestAPI func(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudget, opts metav1.UpdateOptions) (*policyv1.PodDisruptionBudget, error)
-type patchFunc func(pdb *policyv1.PodDisruptionBudget) ([]byte, error)
+type (
+	updateFunc    func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget
+	updateRestAPI func(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudget, opts metav1.UpdateOptions) (*policyv1.PodDisruptionBudget, error)
+	patchFunc     func(pdb *policyv1.PodDisruptionBudget) ([]byte, error)
+)
 
 func updatePDBOrDie(cs kubernetes.Interface, ns string, name string, f updateFunc, api updateRestAPI) (updated *policyv1.PodDisruptionBudget) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {

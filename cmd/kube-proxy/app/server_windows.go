@@ -122,7 +122,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 				config.Winkernel,
 			)
 		} else {
-
 			proxier, err = winkernel.NewProxier(
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
@@ -135,7 +134,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 				healthzServer,
 				config.Winkernel,
 			)
-
 		}
 
 		if err != nil {

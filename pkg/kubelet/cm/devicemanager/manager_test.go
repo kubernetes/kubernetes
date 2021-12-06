@@ -59,7 +59,7 @@ func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) 
 	}
 	socketName = socketDir + "/server.sock"
 	pluginSocketName = socketDir + "/device-plugin.sock"
-	os.MkdirAll(socketDir, 0755)
+	os.MkdirAll(socketDir, 0o755)
 	return
 }
 
@@ -473,7 +473,6 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	devInstances2, ok := allocatableDevs[resourceName2]
 	as.True(ok)
 	checkAllocatableDevicesConsistsOf(as, devInstances2, []string{"R2Device1"})
-
 }
 
 func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
@@ -893,11 +892,14 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		makePod(v1.ResourceList{
 			v1.ResourceName(res1.resourceName): res1.resourceQuantity,
 			v1.ResourceName("cpu"):             res1.resourceQuantity,
-			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+			v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+		}),
 		makePod(v1.ResourceList{
-			v1.ResourceName(res1.resourceName): res2.resourceQuantity}),
+			v1.ResourceName(res1.resourceName): res2.resourceQuantity,
+		}),
 		makePod(v1.ResourceList{
-			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+			v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+		}),
 	}
 	testCases := []struct {
 		description               string
@@ -956,7 +958,6 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
 	}
-
 }
 
 func TestInitContainerDeviceAllocation(t *testing.T) {
@@ -1143,7 +1144,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 		opts: &pluginapi.DevicePluginOptions{PreStartRequired: true},
 	}
 	pod := makePod(v1.ResourceList{
-		v1.ResourceName(res1.resourceName): res1.resourceQuantity})
+		v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+	})
 	activePods := []*v1.Pod{}
 	activePods = append(activePods, pod)
 	podsStub.updateActivePods(activePods)
@@ -1172,7 +1174,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
 
 	pod2 := makePod(v1.ResourceList{
-		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
+		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI),
+	})
 	activePods = append(activePods, pod2)
 	podsStub.updateActivePods(activePods)
 	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
@@ -1299,7 +1302,7 @@ func TestReadPreNUMACheckpoint(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 
-	err = ioutil.WriteFile(filepath.Join(socketDir, deviceManagerCheckpointFilename), []byte(oldCheckpoint), 0644)
+	err = ioutil.WriteFile(filepath.Join(socketDir, deviceManagerCheckpointFilename), []byte(oldCheckpoint), 0o644)
 	require.NoError(t, err)
 
 	topologyStore := topologymanager.NewFakeManager()

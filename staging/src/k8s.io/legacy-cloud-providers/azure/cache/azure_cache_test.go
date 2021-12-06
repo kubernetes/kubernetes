@@ -28,9 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	fakeCacheTTL = 2 * time.Second
-)
+var fakeCacheTTL = 2 * time.Second
 
 type fakeDataObj struct{}
 

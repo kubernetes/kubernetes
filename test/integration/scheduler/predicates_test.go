@@ -161,16 +161,17 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "fakename2",
-					Labels: podLabel,
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "fakename2",
+						Labels: podLabel,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+						NodeName:   nodes[0].Name,
+					},
 				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-					NodeName:   nodes[0].Name,
-				},
-			},
 			},
 			fits: true,
 		},
@@ -203,12 +204,16 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{
-				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   nodes[0].Name},
+			pods: []*v1.Pod{{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+					NodeName:   nodes[0].Name,
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename2",
-					Labels: podLabel}}},
+					Labels: podLabel,
+				},
+			}},
 			fits: true,
 		},
 		{
@@ -241,12 +246,16 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{
-				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   nodes[0].Name},
+			pods: []*v1.Pod{{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+					NodeName:   nodes[0].Name,
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename2",
-					Labels: podLabel, Namespace: "ns2"}}},
+					Labels: podLabel, Namespace: "ns2",
+				},
+			}},
 			fits: false,
 		},
 		{
@@ -280,9 +289,11 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{{Spec: v1.PodSpec{
 				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   nodes[0].Name}, ObjectMeta: metav1.ObjectMeta{
+				NodeName:   nodes[0].Name,
+			}, ObjectMeta: metav1.ObjectMeta{
 				Name:   "fakename2",
-				Labels: podLabel}}},
+				Labels: podLabel,
+			}}},
 			fits: false,
 		},
 		{
@@ -333,9 +344,11 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{{Spec: v1.PodSpec{
 				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   nodes[0].Name}, ObjectMeta: metav1.ObjectMeta{
+				NodeName:   nodes[0].Name,
+			}, ObjectMeta: metav1.ObjectMeta{
 				Name:   "fakename2",
-				Labels: podLabel}}},
+				Labels: podLabel,
+			}}},
 			fits: true,
 		},
 		{
@@ -386,9 +399,11 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{{Spec: v1.PodSpec{
 				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   nodes[0].Name}, ObjectMeta: metav1.ObjectMeta{
+				NodeName:   nodes[0].Name,
+			}, ObjectMeta: metav1.ObjectMeta{
 				Name:   "fakename2",
-				Labels: podLabel}}},
+				Labels: podLabel,
+			}}},
 			fits: false,
 		},
 		{
@@ -438,9 +453,11 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{{Spec: v1.PodSpec{
 				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   nodes[0].Name}, ObjectMeta: metav1.ObjectMeta{
+				NodeName:   nodes[0].Name,
+			}, ObjectMeta: metav1.ObjectMeta{
 				Name:   "fakename2",
-				Labels: podLabel}}},
+				Labels: podLabel,
+			}}},
 			fits: true,
 		},
 		{
@@ -514,7 +531,8 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "fakename2",
-						Labels: podLabel},
+						Labels: podLabel,
+					},
 				},
 			},
 			fits: true,
@@ -566,9 +584,11 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{{Spec: v1.PodSpec{
 				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   nodes[0].Name}, ObjectMeta: metav1.ObjectMeta{
+				NodeName:   nodes[0].Name,
+			}, ObjectMeta: metav1.ObjectMeta{
 				Name:   "fakename2",
-				Labels: podLabel}}},
+				Labels: podLabel,
+			}}},
 			fits: false,
 		},
 		{
@@ -642,7 +662,8 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "fakename2",
-						Labels: podLabel},
+						Labels: podLabel,
+					},
 				},
 			},
 			fits: false,
@@ -678,9 +699,11 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{{Spec: v1.PodSpec{
 				Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				NodeName:   "machine2"}, ObjectMeta: metav1.ObjectMeta{
+				NodeName:   "machine2",
+			}, ObjectMeta: metav1.ObjectMeta{
 				Name:   "fakename2",
-				Labels: podLabel}}},
+				Labels: podLabel,
+			}}},
 			fits: false,
 		},
 		{
@@ -694,7 +717,8 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				{
-					Spec: v1.PodSpec{NodeName: nodes[0].Name,
+					Spec: v1.PodSpec{
+						NodeName:   nodes[0].Name,
 						Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
 						Affinity: &v1.Affinity{
 							PodAntiAffinity: &v1.PodAntiAffinity{
@@ -717,7 +741,8 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "fakename2",
-						Labels: podLabel},
+						Labels: podLabel,
+					},
 				},
 			},
 			fits: false,
@@ -733,7 +758,8 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				{
-					Spec: v1.PodSpec{NodeName: nodes[0].Name,
+					Spec: v1.PodSpec{
+						NodeName:   nodes[0].Name,
 						Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
 						Affinity: &v1.Affinity{
 							PodAntiAffinity: &v1.PodAntiAffinity{
@@ -756,7 +782,8 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "fake-name2",
-						Labels: podLabel},
+						Labels: podLabel,
+					},
 				},
 			},
 			fits: true,
@@ -791,7 +818,8 @@ func TestInterPodAffinity(t *testing.T) {
 			pods: []*v1.Pod{
 				{Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-					NodeName:   nodes[0].Name}, ObjectMeta: metav1.ObjectMeta{Name: "fakename", Labels: map[string]string{"foo": "abc"}}},
+					NodeName:   nodes[0].Name,
+				}, ObjectMeta: metav1.ObjectMeta{Name: "fakename", Labels: map[string]string{"foo": "abc"}}},
 			},
 			fits: false,
 		},

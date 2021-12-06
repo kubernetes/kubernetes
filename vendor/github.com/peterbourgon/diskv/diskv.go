@@ -18,8 +18,8 @@ import (
 
 const (
 	defaultBasePath             = "diskv"
-	defaultFilePerm os.FileMode = 0666
-	defaultPathPerm os.FileMode = 0777
+	defaultFilePerm os.FileMode = 0o666
+	defaultPathPerm os.FileMode = 0o777
 )
 
 var (
@@ -326,7 +326,7 @@ func (d *Diskv) readWithRLock(key string) (io.ReadCloser, error) {
 		r = &closingReader{f}
 	}
 
-	var rc = io.ReadCloser(ioutil.NopCloser(r))
+	rc := io.ReadCloser(ioutil.NopCloser(r))
 	if d.Compression != nil {
 		rc, err = d.Compression.Reader(r)
 		if err != nil {

@@ -110,14 +110,11 @@ func (la *LL1Analyzer) Look(s, stopState ATNState, ctx RuleContext) *IntervalSet
 // is {@code nil}.
 
 func (la *LL1Analyzer) look2(s, stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy *Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool, i int) {
-
 	returnState := la.atn.states[ctx.getReturnState(i)]
 	la.look1(returnState, stopState, ctx.GetParent(i), look, lookBusy, calledRuleStack, seeThruPreds, addEOF)
-
 }
 
 func (la *LL1Analyzer) look1(s, stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy *Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool) {
-
 	c := NewBaseATNConfig6(s, 0, ctx)
 
 	if lookBusy.contains(c) {
@@ -148,13 +145,13 @@ func (la *LL1Analyzer) look1(s, stopState ATNState, ctx PredictionContext, look 
 		}
 
 		if ctx != BasePredictionContextEMPTY {
-	        removed := calledRuleStack.contains(s.GetRuleIndex())
-            defer func() {
-                if removed {
-                    calledRuleStack.add(s.GetRuleIndex())
-                }
-            }()
-        	calledRuleStack.remove(s.GetRuleIndex())
+			removed := calledRuleStack.contains(s.GetRuleIndex())
+			defer func() {
+				if removed {
+					calledRuleStack.add(s.GetRuleIndex())
+				}
+			}()
+			calledRuleStack.remove(s.GetRuleIndex())
 			// run thru all possible stack tops in ctx
 			for i := 0; i < ctx.length(); i++ {
 				returnState := la.atn.states[ctx.getReturnState(i)]
@@ -199,7 +196,6 @@ func (la *LL1Analyzer) look1(s, stopState ATNState, ctx PredictionContext, look 
 }
 
 func (la *LL1Analyzer) look3(stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy *Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool, t1 *RuleTransition) {
-
 	newContext := SingletonBasePredictionContextCreate(ctx, t1.followState.GetStateNumber())
 
 	defer func() {
@@ -208,5 +204,4 @@ func (la *LL1Analyzer) look3(stopState ATNState, ctx PredictionContext, look *In
 
 	calledRuleStack.add(t1.getTarget().GetRuleIndex())
 	la.look1(t1.getTarget(), stopState, newContext, look, lookBusy, calledRuleStack, seeThruPreds, addEOF)
-
 }

@@ -300,7 +300,6 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				for i := 1; i <= L; i++ { // need one less iteration than the number of cases
 					testBothDirections(f, setConfigSourceFunc, &cases[i-1 : i][0], cases[i:L], 0)
 				}
-
 			})
 		})
 

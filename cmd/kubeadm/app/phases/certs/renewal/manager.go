@@ -118,7 +118,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 				LongName:   cert.LongName,
 				FileName:   cert.BaseName,
 				CAName:     ca.Name,
-				CABaseName: ca.BaseName, //Nb. this is a path for etcd certs (they are stored in a subfolder)
+				CABaseName: ca.BaseName, // Nb. this is a path for etcd certs (they are stored in a subfolder)
 				readwriter: pkiReadWriter,
 			}
 		}
@@ -149,7 +149,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 			longName: "certificate embedded in the kubeconfig file for the scheduler manager to use",
 			fileName: kubeadmconstants.SchedulerKubeConfigFileName,
 		},
-		//NB. we are excluding KubeletKubeConfig from renewal because management of this certificate is delegated to kubelet
+		// NB. we are excluding KubeletKubeConfig from renewal because management of this certificate is delegated to kubelet
 	}
 
 	// create a CertificateRenewHandler for each kubeConfig file

@@ -21,12 +21,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
+	"text/template"
 	"time"
 
 	"k8s.io/api/imagepolicy/v1alpha1"
@@ -35,12 +40,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"text/template"
 
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
@@ -92,7 +91,7 @@ func TestNewFromConfig(t *testing.T) {
 		{data.Key, clientKey},
 	}
 	for _, file := range files {
-		if err := ioutil.WriteFile(file.name, file.data, 0400); err != nil {
+		if err := ioutil.WriteFile(file.name, file.data, 0o400); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -973,7 +972,6 @@ func TestAnnotationFiltering(t *testing.T) {
 			if !reflect.DeepEqual(tt.outAnnotations, service.Annotations()) {
 				t.Errorf("expected annotations sent to webhook: %v to match expected: %v", service.Annotations(), tt.outAnnotations)
 			}
-
 		})
 	}
 }

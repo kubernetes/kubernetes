@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // RouteFilterRulesClient is the network Client
@@ -50,11 +51,17 @@ func (client RouteFilterRulesClient) CreateOrUpdate(ctx context.Context, resourc
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: routeFilterRuleParameters,
-			Constraints: []validation.Constraint{{Target: "routeFilterRuleParameters.RouteFilterRulePropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "routeFilterRuleParameters.RouteFilterRulePropertiesFormat.RouteFilterRuleType", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: routeFilterRuleParameters,
+			Constraints: []validation.Constraint{{
+				Target: "routeFilterRuleParameters.RouteFilterRulePropertiesFormat", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{Target: "routeFilterRuleParameters.RouteFilterRulePropertiesFormat.RouteFilterRuleType", Name: validation.Null, Rule: true, Chain: nil},
 					{Target: "routeFilterRuleParameters.RouteFilterRulePropertiesFormat.Communities", Name: validation.Null, Rule: true, Chain: nil},
-				}}}}}); err != nil {
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.RouteFilterRulesClient", "CreateOrUpdate", err.Error())
 	}
 

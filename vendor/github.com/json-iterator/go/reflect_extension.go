@@ -2,19 +2,22 @@ package jsoniter
 
 import (
 	"fmt"
-	"github.com/modern-go/reflect2"
 	"reflect"
 	"sort"
 	"strings"
 	"unicode"
 	"unsafe"
+
+	"github.com/modern-go/reflect2"
 )
 
-var typeDecoders = map[string]ValDecoder{}
-var fieldDecoders = map[string]ValDecoder{}
-var typeEncoders = map[string]ValEncoder{}
-var fieldEncoders = map[string]ValEncoder{}
-var extensions = []Extension{}
+var (
+	typeDecoders  = map[string]ValDecoder{}
+	fieldDecoders = map[string]ValDecoder{}
+	typeEncoders  = map[string]ValEncoder{}
+	fieldEncoders = map[string]ValEncoder{}
+	extensions    = []Extension{}
+)
 
 // StructDescriptor describe how should we encode/decode the struct
 type StructDescriptor struct {
@@ -56,8 +59,7 @@ type Extension interface {
 }
 
 // DummyExtension embed this type get dummy implementation for all methods of Extension
-type DummyExtension struct {
-}
+type DummyExtension struct{}
 
 // UpdateStructDescriptor No-op
 func (extension *DummyExtension) UpdateStructDescriptor(structDescriptor *StructDescriptor) {
@@ -253,6 +255,7 @@ func getTypeDecoderFromExtension(ctx *ctx, typ reflect2.Type) ValDecoder {
 	}
 	return decoder
 }
+
 func _getTypeDecoderFromExtension(ctx *ctx, typ reflect2.Type) ValDecoder {
 	for _, extension := range extensions {
 		decoder := extension.CreateDecoder(typ)
@@ -395,6 +398,7 @@ func describeStruct(ctx *ctx, typ reflect2.Type) *StructDescriptor {
 	}
 	return createStructDescriptor(ctx, typ, bindings, embeddedBindings)
 }
+
 func createStructDescriptor(ctx *ctx, typ reflect2.Type, bindings []*Binding, embeddedBindings []*Binding) *StructDescriptor {
 	structDescriptor := &StructDescriptor{
 		Type:   typ,

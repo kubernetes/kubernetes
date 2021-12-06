@@ -86,7 +86,7 @@ func NewHollowProxyOrDie(
 			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
-		//var err error
+		// var err error
 		proxier, err = iptables.NewProxier(
 			iptInterface,
 			sysctl,

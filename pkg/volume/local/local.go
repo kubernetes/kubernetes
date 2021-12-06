@@ -54,10 +54,12 @@ type localVolumePlugin struct {
 	recorder    record.EventRecorder
 }
 
-var _ volume.VolumePlugin = &localVolumePlugin{}
-var _ volume.PersistentVolumePlugin = &localVolumePlugin{}
-var _ volume.BlockVolumePlugin = &localVolumePlugin{}
-var _ volume.NodeExpandableVolumePlugin = &localVolumePlugin{}
+var (
+	_ volume.VolumePlugin               = &localVolumePlugin{}
+	_ volume.PersistentVolumePlugin     = &localVolumePlugin{}
+	_ volume.BlockVolumePlugin          = &localVolumePlugin{}
+	_ volume.NodeExpandableVolumePlugin = &localVolumePlugin{}
+)
 
 const (
 	localVolumePluginName = "kubernetes.io/local-volume"
@@ -141,7 +143,6 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 		mountOptions: util.MountOptionFromSpec(spec),
 		readOnly:     readOnly,
 	}, nil
-
 }
 
 func (plugin *localVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -320,7 +321,7 @@ func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath str
 	notMnt, err := dm.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+			if err := os.MkdirAll(deviceMountPath, 0o750); err != nil {
 				return err
 			}
 			notMnt = true
@@ -570,7 +571,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 
 	if runtime.GOOS != "windows" {
 		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_wiondows.go
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 			return err
 		}
@@ -656,8 +657,10 @@ type localVolumeMapper struct {
 	readOnly bool
 }
 
-var _ volume.BlockVolumeMapper = &localVolumeMapper{}
-var _ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
+var (
+	_ volume.BlockVolumeMapper       = &localVolumeMapper{}
+	_ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
+)
 
 // SetUpDevice prepares the volume to the node by the plugin specific way.
 func (m *localVolumeMapper) SetUpDevice() (string, error) {

@@ -27,16 +27,12 @@ package antlr
 
 type RuleContext interface {
 	RuleNode
-
 	GetInvokingState() int
 	SetInvokingState(int)
-
 	GetRuleIndex() int
 	IsEmpty() bool
-
 	GetAltNumber() int
 	SetAltNumber(altNumber int)
-
 	String([]string, RuleContext) string
 }
 
@@ -47,7 +43,6 @@ type BaseRuleContext struct {
 }
 
 func NewBaseRuleContext(parent RuleContext, invokingState int) *BaseRuleContext {
-
 	rn := new(BaseRuleContext)
 
 	// What context invoked b rule?

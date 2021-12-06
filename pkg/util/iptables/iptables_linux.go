@@ -67,7 +67,7 @@ func grabIptablesLocks(lockfilePath14x, lockfilePath16x string) (iptablesLocker,
 	// can't assume which lock method it'll use.
 
 	// Roughly duplicate iptables 1.6.x xtables_lock() function.
-	l.lock16, err = os.OpenFile(lockfilePath16x, os.O_CREATE, 0600)
+	l.lock16, err = os.OpenFile(lockfilePath16x, os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open iptables lock %s: %v", lockfilePath16x, err)
 	}

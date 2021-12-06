@@ -28,7 +28,6 @@ import (
 )
 
 func TestEmptyVersion(t *testing.T) {
-
 	ver, err := KubernetesReleaseVersion("")
 	if err == nil {
 		t.Error("KubernetesReleaseVersion returned successfully, but error expected")
@@ -128,7 +127,6 @@ func TestVersionFromNetwork(t *testing.T) {
 
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
-
 			fileFetcher := func(url string, timeout time.Duration) (string, error) {
 				key := strings.TrimSuffix(path.Base(url), ".txt")
 				res, found := cases[key]
@@ -268,7 +266,6 @@ func TestCIBuildVersion(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("input:%s/expected:%s", tc.input, tc.expected), func(t *testing.T) {
-
 			fileFetcher := func(url string, timeout time.Duration) (string, error) {
 				if tc.valid {
 					return tc.expected, nil

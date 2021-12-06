@@ -46,7 +46,7 @@ const (
 	diskEncryptionSetIDFormat = "/subscriptions/{subs-id}/resourceGroups/{rg-name}/providers/Microsoft.Compute/diskEncryptionSets/{diskEncryptionSet-name}"
 )
 
-//ManagedDiskController : managed disk controller struct
+// ManagedDiskController : managed disk controller struct
 type ManagedDiskController struct {
 	common *controllerCommon
 }
@@ -81,7 +81,7 @@ type ManagedDiskOptions struct {
 	MaxShares int32
 }
 
-//CreateManagedDisk : create managed disk
+// CreateManagedDisk : create managed disk
 func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (string, error) {
 	var err error
 	klog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
@@ -193,7 +193,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		diskID = id
 		// We are waiting for provisioningState==Succeeded
 		// We don't want to hand-off managed disks to k8s while they are
-		//still being provisioned, this is to avoid some race conditions
+		// still being provisioned, this is to avoid some race conditions
 		if err != nil {
 			return false, err
 		}
@@ -212,7 +212,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	return diskID, nil
 }
 
-//DeleteManagedDisk : delete managed disk
+// DeleteManagedDisk : delete managed disk
 func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 	diskName := path.Base(diskURI)
 	resourceGroup, err := getResourceGroupFromDiskURI(diskURI)

@@ -118,7 +118,6 @@ type Mutable interface {
 	// Set alters the matrix element at row i, column j to v.
 	// It will panic if i or j are out of bounds for the matrix.
 	Set(i, j int, v float64)
-
 	Matrix
 }
 
@@ -866,7 +865,6 @@ func normLapack(norm float64, aTrans bool) lapack.MatrixNorm {
 
 // Sum returns the sum of the elements of the matrix.
 func Sum(a Matrix) float64 {
-
 	var sum float64
 	aU, _ := untranspose(a)
 	switch rma := aU.(type) {

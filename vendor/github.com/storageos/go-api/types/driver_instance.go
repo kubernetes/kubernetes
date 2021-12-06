@@ -51,7 +51,6 @@ func init() {
 
 // Find an instance matching the parameters.
 func (i *DriverInstances) Find(pool string, driver string, controller string) *DriverInstance {
-
 	for _, inst := range *i {
 		if inst.PoolID == pool && inst.DriverName == driver && inst.ControllerName == controller {
 			return inst
@@ -62,7 +61,6 @@ func (i *DriverInstances) Find(pool string, driver string, controller string) *D
 
 // Add a new instance to the list of instances.
 func (i *DriverInstances) Add(new *DriverInstance) {
-
 	for _, inst := range *i {
 		// Skip if it already exists
 		if inst.PoolID == new.PoolID && inst.DriverName == new.DriverName && inst.ControllerName == new.ControllerName {
@@ -74,7 +72,6 @@ func (i *DriverInstances) Add(new *DriverInstance) {
 
 // Remove an instance to the list of instances.
 func (i *DriverInstances) Remove(id string) {
-
 	// TODO: not working
 	// for ndx, inst := range *i {
 	// 	if inst.ID == id {

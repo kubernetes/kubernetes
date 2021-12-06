@@ -190,7 +190,7 @@ func TestNewEndpointSlice(t *testing.T) {
 }
 
 func TestAddressToEndpoint(t *testing.T) {
-	//name: "simple + gate enabled",
+	// name: "simple + gate enabled",
 	epAddress := v1.EndpointAddress{
 		IP:       "10.1.2.3",
 		Hostname: "foo",

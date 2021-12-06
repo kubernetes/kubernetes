@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // LocalNetworkGatewaysClient is the network Client
@@ -49,10 +50,15 @@ func (client LocalNetworkGatewaysClient) CreateOrUpdate(ctx context.Context, res
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: localNetworkGatewayName,
-			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.LocalNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: localNetworkGatewayName,
+			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.LocalNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.LocalNetworkGatewaysClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -137,8 +143,11 @@ func (client LocalNetworkGatewaysClient) Delete(ctx context.Context, resourceGro
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: localNetworkGatewayName,
-			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: localNetworkGatewayName,
+			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.LocalNetworkGatewaysClient", "Delete", err.Error())
 	}
 
@@ -220,8 +229,11 @@ func (client LocalNetworkGatewaysClient) Get(ctx context.Context, resourceGroupN
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: localNetworkGatewayName,
-			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: localNetworkGatewayName,
+			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.LocalNetworkGatewaysClient", "Get", err.Error())
 	}
 
@@ -419,8 +431,11 @@ func (client LocalNetworkGatewaysClient) UpdateTags(ctx context.Context, resourc
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: localNetworkGatewayName,
-			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: localNetworkGatewayName,
+			Constraints: []validation.Constraint{{Target: "localNetworkGatewayName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.LocalNetworkGatewaysClient", "UpdateTags", err.Error())
 	}
 

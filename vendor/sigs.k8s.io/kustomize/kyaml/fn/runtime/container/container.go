@@ -135,6 +135,7 @@ func (c Filter) String() string {
 	}
 	return c.Image
 }
+
 func (c Filter) GetExit() error {
 	return c.Exec.GetExit()
 }
@@ -172,7 +173,8 @@ func (c *Filter) getCommand() (string, []string) {
 	// run the container using docker.  this is simpler than using the docker
 	// libraries, and ensures things like auth work the same as if the container
 	// was run from the cli.
-	args := []string{"run",
+	args := []string{
+		"run",
 		"--rm",                                              // delete the container afterward
 		"-i", "-a", "STDIN", "-a", "STDOUT", "-a", "STDERR", // attach stdin, stdout, stderr
 		"--network", string(network),

@@ -59,8 +59,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -125,12 +127,15 @@ func (t *testRESTStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 func (t *testRESTStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return nil
 }
+
 func (t *testRESTStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
+
 func (t *testRESTStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return nil
 }
+
 func (t *testRESTStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
@@ -735,7 +740,6 @@ func TestStoreUpdate(t *testing.T) {
 	//
 	// registry.UpdateStrategy.(*testRESTStrategy).allowUnconditionalUpdate = true
 	// updateAndVerify(t, testContext, registry, podAWithResourceVersion)
-
 }
 
 func TestNoOpUpdates(t *testing.T) {

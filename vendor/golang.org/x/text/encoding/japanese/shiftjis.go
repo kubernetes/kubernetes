@@ -107,7 +107,6 @@ loop:
 		// Decode a 1-byte rune.
 		if r < utf8.RuneSelf {
 			size = 1
-
 		} else {
 			// Decode a multi-byte rune.
 			r, size = utf8.DecodeRune(src[nSrc:])

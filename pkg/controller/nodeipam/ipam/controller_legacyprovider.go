@@ -69,8 +69,8 @@ func NewController(
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	clusterCIDR, serviceCIDR *net.IPNet,
-	nodeCIDRMaskSize int) (*Controller, error) {
-
+	nodeCIDRMaskSize int) (*Controller, error,
+) {
 	if !nodesync.IsValidMode(config.Mode) {
 		return nil, fmt.Errorf("invalid IPAM controller mode %q", config.Mode)
 	}
@@ -96,7 +96,7 @@ func NewController(
 		return nil, err
 	}
 
-	//check whether there is a remaining cidr after occupyServiceCIDR
+	// check whether there is a remaining cidr after occupyServiceCIDR
 	cidr, err := c.set.AllocateNext()
 	switch err {
 	case cidrset.ErrCIDRRangeNoCIDRsRemaining:

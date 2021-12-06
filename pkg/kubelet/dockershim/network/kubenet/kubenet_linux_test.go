@@ -68,7 +68,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 		expectError bool
 		expectIP    utilsets.String
 	}{
-		//in podCIDR map
+		// in podCIDR map
 		{
 			id:          "1",
 			expectError: false,
@@ -90,13 +90,13 @@ func TestGetPodNetworkStatus(t *testing.T) {
 			expectIP:    utilsets.NewString("2000::2"),
 		},
 
-		//not in podIP map
+		// not in podIP map
 		{
 			id:          "does-not-exist-map",
 			expectError: true,
 			expectIP:    nil,
 		},
-		//TODO: add test cases for retrieving ip inside container network namespace
+		// TODO: add test cases for retrieving ip inside container network namespace
 	}
 
 	fakeCmds := make([]fakeexec.FakeCommandAction, 0)
@@ -389,4 +389,4 @@ func TestGetRangesConfig(t *testing.T) {
 	}
 }
 
-//TODO: add unit test for each implementation of network plugin interface
+// TODO: add unit test for each implementation of network plugin interface

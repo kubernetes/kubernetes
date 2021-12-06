@@ -1,3 +1,4 @@
+//go:build !jsoniter
 // +build !jsoniter
 
 package restful

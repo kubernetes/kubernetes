@@ -178,6 +178,7 @@ func (mi *MessageInfo) makeExtensionFieldsFunc(t reflect.Type, si structInfo) {
 		}
 	}
 }
+
 func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 	md := mi.Desc
 	fds := md.Fields()
@@ -247,6 +248,7 @@ func (m *extensionMap) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
 		}
 	}
 }
+
 func (m *extensionMap) Has(xt pref.ExtensionType) (ok bool) {
 	if m == nil {
 		return false
@@ -266,9 +268,11 @@ func (m *extensionMap) Has(xt pref.ExtensionType) (ok bool) {
 	}
 	return true
 }
+
 func (m *extensionMap) Clear(xt pref.ExtensionType) {
 	delete(*m, int32(xt.TypeDescriptor().Number()))
 }
+
 func (m *extensionMap) Get(xt pref.ExtensionType) pref.Value {
 	xd := xt.TypeDescriptor()
 	if m != nil {
@@ -278,6 +282,7 @@ func (m *extensionMap) Get(xt pref.ExtensionType) pref.Value {
 	}
 	return xt.Zero()
 }
+
 func (m *extensionMap) Set(xt pref.ExtensionType, v pref.Value) {
 	xd := xt.TypeDescriptor()
 	isValid := true
@@ -302,6 +307,7 @@ func (m *extensionMap) Set(xt pref.ExtensionType, v pref.Value) {
 	x.Set(xt, v)
 	(*m)[int32(xd.Number())] = x
 }
+
 func (m *extensionMap) Mutable(xt pref.ExtensionType) pref.Value {
 	xd := xt.TypeDescriptor()
 	if xd.Kind() != pref.MessageKind && xd.Kind() != pref.GroupKind && !xd.IsList() && !xd.IsMap() {
@@ -421,9 +427,11 @@ func (m *messageIfaceWrapper) Reset() {
 		rv.Elem().Set(reflect.Zero(rv.Type().Elem()))
 	}
 }
+
 func (m *messageIfaceWrapper) ProtoReflect() pref.Message {
 	return (*messageReflectWrapper)(m)
 }
+
 func (m *messageIfaceWrapper) protoUnwrap() interface{} {
 	return m.p.AsIfaceOf(m.mi.GoReflectType.Elem())
 }

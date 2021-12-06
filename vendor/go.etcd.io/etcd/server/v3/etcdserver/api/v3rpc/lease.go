@@ -42,7 +42,6 @@ func NewLeaseServer(s *etcdserver.EtcdServer) pb.LeaseServer {
 
 func (ls *LeaseServer) LeaseGrant(ctx context.Context, cr *pb.LeaseGrantRequest) (*pb.LeaseGrantResponse, error) {
 	resp, err := ls.le.LeaseGrant(ctx, cr)
-
 	if err != nil {
 		return nil, togRPCError(err)
 	}

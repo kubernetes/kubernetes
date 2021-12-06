@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // InboundNatRulesClient is the network Client
@@ -49,21 +50,44 @@ func (client InboundNatRulesClient) CreateOrUpdate(ctx context.Context, resource
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: inboundNatRuleParameters,
-			Constraints: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration", Name: validation.Null, Rule: false,
-									Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
-										Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false, Chain: nil}}},
-									}},
-								}},
-							}},
-						}},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: inboundNatRuleParameters,
+			Constraints: []validation.Constraint{{
+				Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{
+										Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{
+												Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{
+														Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration", Name: validation.Null, Rule: false,
+														Chain: []validation.Constraint{
+															{
+																Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
+																Chain: []validation.Constraint{{Target: "inboundNatRuleParameters.InboundNatRulePropertiesFormat.BackendIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false, Chain: nil}},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.InboundNatRulesClient", "CreateOrUpdate", err.Error())
 	}
 

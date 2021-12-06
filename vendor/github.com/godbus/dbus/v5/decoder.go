@@ -199,9 +199,9 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		// Even for empty arrays, the correct padding must be included
 		align := alignment(typeFor(s[1:]))
 		if len(s) > 1 && s[1] == '(' {
-			//Special case for arrays of structs
-			//structs decode as a slice of interface{} values
-			//but the dbus alignment does not match this
+			// Special case for arrays of structs
+			// structs decode as a slice of interface{} values
+			// but the dbus alignment does not match this
 			align = 8
 		}
 		dec.align(align)

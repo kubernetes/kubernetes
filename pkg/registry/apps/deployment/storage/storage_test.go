@@ -58,8 +58,10 @@ func newStorage(t *testing.T) (*DeploymentStorage, *etcd3testing.EtcdTestServer)
 	return &deploymentStorage, server
 }
 
-var namespace = "foo-namespace"
-var name = "foo-deployment"
+var (
+	namespace = "foo-namespace"
+	name      = "foo-deployment"
+)
 
 func validNewDeployment() *apps.Deployment {
 	return &apps.Deployment{

@@ -26,7 +26,7 @@ type Version struct {
 	Minor uint64
 	Patch uint64
 	Pre   []PRVersion
-	Build []string //No Precendence
+	Build []string // No Precendence
 }
 
 // Version to string
@@ -158,7 +158,6 @@ func (v Version) Compare(o Version) int {
 	} else {
 		return 1
 	}
-
 }
 
 // Validate validates v and returns error in case
@@ -166,7 +165,7 @@ func (v Version) Validate() error {
 	// Major, Minor, Patch already validated using uint64
 
 	for _, pre := range v.Pre {
-		if !pre.IsNum { //Numeric prerelease versions already uint64
+		if !pre.IsNum { // Numeric prerelease versions already uint64
 			if len(pre.VersionStr) == 0 {
 				return fmt.Errorf("Prerelease can not be empty %q", pre.VersionStr)
 			}
@@ -339,7 +338,6 @@ func NewPRVersion(s string) (PRVersion, error) {
 			return PRVersion{}, fmt.Errorf("Numeric PreRelease version must not contain leading zeroes %q", s)
 		}
 		num, err := strconv.ParseUint(s, 10, 64)
-
 		// Might never be hit, but just in case
 		if err != nil {
 			return PRVersion{}, err

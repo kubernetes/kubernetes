@@ -51,7 +51,7 @@ const (
 // epToPollEvt converts epoll event field to poll equivalent.
 // In epoll, Events is a 32-bit field, while poll uses 16 bits.
 func epToPollEvt(events uint32) int16 {
-	var ep2p = map[uint32]int16{
+	ep2p := map[uint32]int16{
 		EPOLLIN:  POLLIN,
 		EPOLLOUT: POLLOUT,
 		EPOLLHUP: POLLHUP,
@@ -71,7 +71,7 @@ func epToPollEvt(events uint32) int16 {
 
 // pToEpollEvt converts 16 bit poll event bitfields to 32-bit epoll event fields.
 func pToEpollEvt(revents int16) uint32 {
-	var p2ep = map[int16]uint32{
+	p2ep := map[int16]uint32{
 		POLLIN:  EPOLLIN,
 		POLLOUT: EPOLLOUT,
 		POLLHUP: EPOLLHUP,
@@ -131,7 +131,6 @@ func (e *epollImpl) epollctl(epfd int, op int, fd int, event *EpollEvent) (err e
 
 	ep, ok := e.epfd2ep[epfd]
 	if !ok {
-
 		return EBADF
 	}
 

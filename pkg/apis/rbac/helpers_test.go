@@ -171,7 +171,6 @@ func TestResourceMatches(t *testing.T) {
 			if tc.expected != actual {
 				t.Errorf("expected %v, got %v", tc.expected, actual)
 			}
-
 		})
 	}
 }

@@ -68,6 +68,7 @@ func Test_WalkPkg(t *testing.T) {
 		}
 	}
 }
+
 func Test_findPackage(t *testing.T) {
 	testCases := []struct {
 		pkg  string

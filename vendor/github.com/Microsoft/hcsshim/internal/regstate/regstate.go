@@ -28,8 +28,10 @@ type Key struct {
 	Name string
 }
 
-var localMachine = &Key{registry.LOCAL_MACHINE, "HKEY_LOCAL_MACHINE"}
-var localUser = &Key{registry.CURRENT_USER, "HKEY_CURRENT_USER"}
+var (
+	localMachine = &Key{registry.LOCAL_MACHINE, "HKEY_LOCAL_MACHINE"}
+	localUser    = &Key{registry.CURRENT_USER, "HKEY_CURRENT_USER"}
+)
 
 var rootPath = `SOFTWARE\Microsoft\runhcs`
 

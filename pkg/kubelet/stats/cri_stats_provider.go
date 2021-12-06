@@ -41,10 +41,8 @@ import (
 	"k8s.io/utils/clock"
 )
 
-var (
-	// defaultCachePeriod is the default cache period for each cpuUsage.
-	defaultCachePeriod = 10 * time.Minute
-)
+// defaultCachePeriod is the default cache period for each cpuUsage.
+var defaultCachePeriod = 10 * time.Minute
 
 // cpuUsageRecord holds the cpu usage stats and the calculated usageNanoCores.
 type cpuUsageRecord struct {
@@ -777,7 +775,6 @@ func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi
 
 		return &usageNanoCores, nil
 	}()
-
 	if err != nil {
 		// This should not happen. Log now to raise visibility
 		klog.ErrorS(err, "Failed updating cpu usage nano core")

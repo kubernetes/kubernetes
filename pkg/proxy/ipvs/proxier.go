@@ -298,7 +298,6 @@ type realIPGetter struct {
 //  * Addresses on the created dummy device `kube-ipvs0`
 //
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
-
 	nodeAddress, err := r.nl.GetAllLocalAddresses()
 	if err != nil {
 		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
@@ -524,7 +523,6 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 	kernelHandler KernelHandler,
 ) (proxy.Provider, error) {
-
 	safeIpset := newSafeIpset(ipset)
 
 	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
@@ -1919,7 +1917,6 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 			klog.ErrorS(err, "Failed to ensure chain jumps", "table", jc.table, "srcChain", jc.from, "dstChain", jc.to)
 		}
 	}
-
 }
 
 // getExistingChains get iptables-save output so we can check for existing chains and rules.

@@ -155,7 +155,6 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 	recorder := &timeoutRecorder{invocations: []invocation{}, markers: sets.NewString()}
 	webhookServer := httptest.NewUnstartedServer(newTimeoutWebhookHandler(recorder))
 	webhookServer.TLS = &tls.Config{
-
 		RootCAs:      roots,
 		Certificates: []tls.Certificate{cert},
 	}

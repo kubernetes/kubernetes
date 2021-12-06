@@ -16,6 +16,7 @@ func layerPath(info *DriverInfo, id string) string {
 func ActivateLayer(info DriverInfo, id string) error {
 	return wclayer.ActivateLayer(context.Background(), layerPath(&info, id))
 }
+
 func CreateLayer(info DriverInfo, id, parent string) error {
 	return wclayer.CreateLayer(context.Background(), layerPath(&info, id), parent)
 }
@@ -24,12 +25,15 @@ func CreateLayer(info DriverInfo, id, parent string) error {
 func CreateSandboxLayer(info DriverInfo, layerId, parentId string, parentLayerPaths []string) error {
 	return wclayer.CreateScratchLayer(context.Background(), layerPath(&info, layerId), parentLayerPaths)
 }
+
 func CreateScratchLayer(info DriverInfo, layerId, parentId string, parentLayerPaths []string) error {
 	return wclayer.CreateScratchLayer(context.Background(), layerPath(&info, layerId), parentLayerPaths)
 }
+
 func DeactivateLayer(info DriverInfo, id string) error {
 	return wclayer.DeactivateLayer(context.Background(), layerPath(&info, id))
 }
+
 func DestroyLayer(info DriverInfo, id string) error {
 	return wclayer.DestroyLayer(context.Background(), layerPath(&info, id))
 }
@@ -38,33 +42,43 @@ func DestroyLayer(info DriverInfo, id string) error {
 func ExpandSandboxSize(info DriverInfo, layerId string, size uint64) error {
 	return wclayer.ExpandScratchSize(context.Background(), layerPath(&info, layerId), size)
 }
+
 func ExpandScratchSize(info DriverInfo, layerId string, size uint64) error {
 	return wclayer.ExpandScratchSize(context.Background(), layerPath(&info, layerId), size)
 }
+
 func ExportLayer(info DriverInfo, layerId string, exportFolderPath string, parentLayerPaths []string) error {
 	return wclayer.ExportLayer(context.Background(), layerPath(&info, layerId), exportFolderPath, parentLayerPaths)
 }
+
 func GetLayerMountPath(info DriverInfo, id string) (string, error) {
 	return wclayer.GetLayerMountPath(context.Background(), layerPath(&info, id))
 }
+
 func GetSharedBaseImages() (imageData string, err error) {
 	return wclayer.GetSharedBaseImages(context.Background())
 }
+
 func ImportLayer(info DriverInfo, layerID string, importFolderPath string, parentLayerPaths []string) error {
 	return wclayer.ImportLayer(context.Background(), layerPath(&info, layerID), importFolderPath, parentLayerPaths)
 }
+
 func LayerExists(info DriverInfo, id string) (bool, error) {
 	return wclayer.LayerExists(context.Background(), layerPath(&info, id))
 }
+
 func PrepareLayer(info DriverInfo, layerId string, parentLayerPaths []string) error {
 	return wclayer.PrepareLayer(context.Background(), layerPath(&info, layerId), parentLayerPaths)
 }
+
 func ProcessBaseLayer(path string) error {
 	return wclayer.ProcessBaseLayer(context.Background(), path)
 }
+
 func ProcessUtilityVMImage(path string) error {
 	return wclayer.ProcessUtilityVMImage(context.Background(), path)
 }
+
 func UnprepareLayer(info DriverInfo, layerId string) error {
 	return wclayer.UnprepareLayer(context.Background(), layerPath(&info, layerId))
 }

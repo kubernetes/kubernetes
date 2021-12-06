@@ -31,24 +31,24 @@ import (
 func TestMoveFiles(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
-	os.Chmod(tmpdir, 0766)
+	os.Chmod(tmpdir, 0o766)
 
 	certPath := filepath.Join(tmpdir, constants.APIServerCertName)
-	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	if err != nil {
 		t.Fatalf("Failed to create cert file %s: %v", certPath, err)
 	}
 	defer certFile.Close()
 
 	keyPath := filepath.Join(tmpdir, constants.APIServerKeyName)
-	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	if err != nil {
 		t.Fatalf("Failed to create key file %s: %v", keyPath, err)
 	}
 	defer keyFile.Close()
 
 	subDir := filepath.Join(tmpdir, "expired")
-	if err := os.Mkdir(subDir, 0766); err != nil {
+	if err := os.Mkdir(subDir, 0o766); err != nil {
 		t.Fatalf("Failed to create backup directory %s: %v", subDir, err)
 	}
 
@@ -65,22 +65,22 @@ func TestMoveFiles(t *testing.T) {
 func TestRollbackFiles(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
-	os.Chmod(tmpdir, 0766)
+	os.Chmod(tmpdir, 0o766)
 
 	subDir := filepath.Join(tmpdir, "expired")
-	if err := os.Mkdir(subDir, 0766); err != nil {
+	if err := os.Mkdir(subDir, 0o766); err != nil {
 		t.Fatalf("Failed to create backup directory %s: %v", subDir, err)
 	}
 
 	certPath := filepath.Join(subDir, constants.APIServerCertName)
-	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	if err != nil {
 		t.Fatalf("Failed to create cert file %s: %v", certPath, err)
 	}
 	defer certFile.Close()
 
 	keyPath := filepath.Join(subDir, constants.APIServerKeyName)
-	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	if err != nil {
 		t.Fatalf("Failed to create key file %s: %v", keyPath, err)
 	}

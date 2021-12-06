@@ -17,8 +17,9 @@ limitations under the License.
 package disruption
 
 import (
-	"k8s.io/kubernetes/test/integration/framework"
 	"testing"
+
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {

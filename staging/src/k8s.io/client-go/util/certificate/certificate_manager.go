@@ -380,8 +380,8 @@ func (m *manager) Start() {
 func getCurrentCertificateOrBootstrap(
 	store Store,
 	bootstrapCertificatePEM []byte,
-	bootstrapKeyPEM []byte) (cert *tls.Certificate, shouldRotate bool, errResult error) {
-
+	bootstrapKeyPEM []byte) (cert *tls.Certificate, shouldRotate bool, errResult error,
+) {
 	currentCert, err := store.Current()
 	if err == nil {
 		// if the current cert is expired, fall back to the bootstrap cert

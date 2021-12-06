@@ -30,9 +30,11 @@ type RESTClientGetter interface {
 	ToRESTMapper() (meta.RESTMapper, error)
 }
 
-type ClientConfigFunc func() (*rest.Config, error)
-type RESTMapperFunc func() (meta.RESTMapper, error)
-type CategoryExpanderFunc func() (restmapper.CategoryExpander, error)
+type (
+	ClientConfigFunc     func() (*rest.Config, error)
+	RESTMapperFunc       func() (meta.RESTMapper, error)
+	CategoryExpanderFunc func() (restmapper.CategoryExpander, error)
+)
 
 // RESTClient is a client helper for dealing with RESTful resources
 // in a generic way.
@@ -75,12 +77,15 @@ func (c *clientOptions) Get() *rest.Request {
 func (c *clientOptions) Post() *rest.Request {
 	return c.modify(c.c.Post())
 }
+
 func (c *clientOptions) Patch(t types.PatchType) *rest.Request {
 	return c.modify(c.c.Patch(t))
 }
+
 func (c *clientOptions) Delete() *rest.Request {
 	return c.modify(c.c.Delete())
 }
+
 func (c *clientOptions) Put() *rest.Request {
 	return c.modify(c.c.Put())
 }

@@ -63,11 +63,13 @@ type PodTopologySpread struct {
 	statefulSets       appslisters.StatefulSetLister
 }
 
-var _ framework.PreFilterPlugin = &PodTopologySpread{}
-var _ framework.FilterPlugin = &PodTopologySpread{}
-var _ framework.PreScorePlugin = &PodTopologySpread{}
-var _ framework.ScorePlugin = &PodTopologySpread{}
-var _ framework.EnqueueExtensions = &PodTopologySpread{}
+var (
+	_ framework.PreFilterPlugin   = &PodTopologySpread{}
+	_ framework.FilterPlugin      = &PodTopologySpread{}
+	_ framework.PreScorePlugin    = &PodTopologySpread{}
+	_ framework.ScorePlugin       = &PodTopologySpread{}
+	_ framework.EnqueueExtensions = &PodTopologySpread{}
+)
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

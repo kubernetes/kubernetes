@@ -146,7 +146,7 @@ func newControlPlanePrepareCertsSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "certs [api-server-endpoint]",
 		Short:        "Generate the certificates for the new control plane components",
-		Run:          runControlPlanePrepareCertsPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each cert or add the --csr option
+		Run:          runControlPlanePrepareCertsPhaseLocal, // NB. eventually in future we would like to break down this in sub phases for each cert or add the --csr option
 		InheritFlags: getControlPlanePreparePhaseFlags("certs"),
 	}
 }
@@ -155,7 +155,7 @@ func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "kubeconfig [api-server-endpoint]",
 		Short:        "Generate the kubeconfig for the new control plane components",
-		Run:          runControlPlanePrepareKubeconfigPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each kubeconfig
+		Run:          runControlPlanePrepareKubeconfigPhaseLocal, // NB. eventually in future we would like to break down this in sub phases for each kubeconfig
 		InheritFlags: getControlPlanePreparePhaseFlags("kubeconfig"),
 	}
 }
@@ -164,7 +164,7 @@ func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:          "control-plane",
 		Short:         "Generate the manifests for the new control plane components",
-		Run:           runControlPlanePrepareControlPlaneSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
+		Run:           runControlPlanePrepareControlPlaneSubphase, // NB. eventually in future we would like to break down this in sub phases for each component
 		InheritFlags:  getControlPlanePreparePhaseFlags("control-plane"),
 		ArgsValidator: cobra.NoArgs,
 	}

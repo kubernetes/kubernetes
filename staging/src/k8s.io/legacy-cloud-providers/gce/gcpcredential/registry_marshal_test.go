@@ -19,9 +19,10 @@ package gcpcredential
 import (
 	"encoding/base64"
 	"encoding/json"
-	"k8s.io/cloud-provider/credentialconfig"
 	"reflect"
 	"testing"
+
+	"k8s.io/cloud-provider/credentialconfig"
 )
 
 // Code copied (and edited to replace DockerConfig* with RegistryConfig*) from:
@@ -227,5 +228,4 @@ func TestRegistryConfigEntryJSONCompatibleEncode(t *testing.T) {
 			t.Errorf("case %d: expected %v, got %v", i, string(tt.expect), string(actual))
 		}
 	}
-
 }

@@ -40,9 +40,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient"
 )
 
-var (
-	errPreconditionFailedEtagMismatch = fmt.Errorf("PreconditionFailedEtagMismatch")
-)
+var errPreconditionFailedEtagMismatch = fmt.Errorf("PreconditionFailedEtagMismatch")
 
 // GetTestCloud returns a fake azure cloud for unit tests in Azure related CSI drivers
 func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {

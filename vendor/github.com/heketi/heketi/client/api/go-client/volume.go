@@ -22,8 +22,8 @@ import (
 )
 
 func (c *Client) VolumeCreate(request *api.VolumeCreateRequest) (
-	*api.VolumeInfoResponse, error) {
-
+	*api.VolumeInfoResponse, error,
+) {
 	// Marshal request to JSON
 	buffer, err := json.Marshal(request)
 	if err != nil {
@@ -72,12 +72,11 @@ func (c *Client) VolumeCreate(request *api.VolumeCreateRequest) (
 	}
 
 	return &volume, nil
-
 }
 
 func (c *Client) VolumeSetBlockRestriction(id string, request *api.VolumeBlockRestrictionRequest) (
-	*api.VolumeInfoResponse, error) {
-
+	*api.VolumeInfoResponse, error,
+) {
 	// Marshal request to JSON
 	buffer, err := json.Marshal(request)
 	if err != nil {
@@ -126,12 +125,11 @@ func (c *Client) VolumeSetBlockRestriction(id string, request *api.VolumeBlockRe
 	}
 
 	return &volume, nil
-
 }
 
 func (c *Client) VolumeExpand(id string, request *api.VolumeExpandRequest) (
-	*api.VolumeInfoResponse, error) {
-
+	*api.VolumeInfoResponse, error,
+) {
 	// Marshal request to JSON
 	buffer, err := json.Marshal(request)
 	if err != nil {
@@ -180,11 +178,9 @@ func (c *Client) VolumeExpand(id string, request *api.VolumeExpandRequest) (
 	}
 
 	return &volume, nil
-
 }
 
 func (c *Client) VolumeList() (*api.VolumeListResponse, error) {
-
 	// Create request
 	req, err := http.NewRequest("GET", c.host+"/volumes", nil)
 	if err != nil {
@@ -218,7 +214,6 @@ func (c *Client) VolumeList() (*api.VolumeListResponse, error) {
 }
 
 func (c *Client) VolumeInfo(id string) (*api.VolumeInfoResponse, error) {
-
 	// Create request
 	req, err := http.NewRequest("GET", c.host+"/volumes/"+id, nil)
 	if err != nil {
@@ -252,7 +247,6 @@ func (c *Client) VolumeInfo(id string) (*api.VolumeInfoResponse, error) {
 }
 
 func (c *Client) VolumeDelete(id string) error {
-
 	// Create a request
 	req, err := http.NewRequest("DELETE", c.host+"/volumes/"+id, nil)
 	if err != nil {

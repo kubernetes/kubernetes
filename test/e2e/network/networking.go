@@ -77,7 +77,7 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 }
 
 var _ = common.SIGDescribe("Networking", func() {
-	var svcname = "nettest"
+	svcname := "nettest"
 	f := framework.NewDefaultFramework(svcname)
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
@@ -141,7 +141,6 @@ var _ = common.SIGDescribe("Networking", func() {
 	})
 
 	ginkgo.Describe("Granular Checks: Services", func() {
-
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
@@ -535,9 +534,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			if err != nil {
 				framework.Failf("failed dialing endpoint, %v", err)
 			}
-
 		})
-
 	})
 
 	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {

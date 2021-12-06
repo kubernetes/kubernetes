@@ -40,31 +40,36 @@ func TestRestoreObjectMeta(t *testing.T) {
 		expected      map[string]interface{}
 		expectedError bool
 	}{
-		{"no converted metadata",
+		{
+			"no converted metadata",
 			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
 			map[string]interface{}{"spec": map[string]interface{}{}},
 			map[string]interface{}{"spec": map[string]interface{}{}},
 			true,
 		},
-		{"invalid converted metadata",
+		{
+			"invalid converted metadata",
 			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
 			map[string]interface{}{"metadata": []interface{}{"foo"}},
 			map[string]interface{}{"metadata": []interface{}{"foo"}},
 			true,
 		},
-		{"no original metadata",
+		{
+			"no original metadata",
 			map[string]interface{}{"spec": map[string]interface{}{}},
 			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
 			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
 			false,
 		},
-		{"invalid original metadata",
+		{
+			"invalid original metadata",
 			map[string]interface{}{"metadata": []interface{}{"foo"}},
 			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
 			map[string]interface{}{"metadata": []interface{}{"foo"}, "spec": map[string]interface{}{}},
 			true,
 		},
-		{"changed label, annotations and non-label",
+		{
+			"changed label, annotations and non-label",
 			map[string]interface{}{"metadata": map[string]interface{}{
 				"foo":         "bar",
 				"labels":      map[string]interface{}{"a": "A", "b": "B"},
@@ -82,7 +87,8 @@ func TestRestoreObjectMeta(t *testing.T) {
 			}, "spec": map[string]interface{}{}},
 			false,
 		},
-		{"added labels and annotations",
+		{
+			"added labels and annotations",
 			map[string]interface{}{"metadata": map[string]interface{}{
 				"foo": "bar",
 			}, "spec": map[string]interface{}{}},
@@ -98,7 +104,8 @@ func TestRestoreObjectMeta(t *testing.T) {
 			}, "spec": map[string]interface{}{}},
 			false,
 		},
-		{"added labels and annotations, with nil before",
+		{
+			"added labels and annotations, with nil before",
 			map[string]interface{}{"metadata": map[string]interface{}{
 				"foo":         "bar",
 				"labels":      nil,
@@ -116,7 +123,8 @@ func TestRestoreObjectMeta(t *testing.T) {
 			}, "spec": map[string]interface{}{}},
 			false,
 		},
-		{"removed labels and annotations",
+		{
+			"removed labels and annotations",
 			map[string]interface{}{"metadata": map[string]interface{}{
 				"foo":         "bar",
 				"labels":      map[string]interface{}{"a": "AA", "b": "B"},
@@ -130,7 +138,8 @@ func TestRestoreObjectMeta(t *testing.T) {
 			}, "spec": map[string]interface{}{}},
 			false,
 		},
-		{"nil'ed labels and annotations",
+		{
+			"nil'ed labels and annotations",
 			map[string]interface{}{"metadata": map[string]interface{}{
 				"foo":         "bar",
 				"labels":      map[string]interface{}{"a": "AA", "b": "B"},
@@ -146,7 +155,8 @@ func TestRestoreObjectMeta(t *testing.T) {
 			}, "spec": map[string]interface{}{}},
 			false,
 		},
-		{"added labels and annotations",
+		{
+			"added labels and annotations",
 			map[string]interface{}{"metadata": map[string]interface{}{
 				"foo": "bar",
 			}, "spec": map[string]interface{}{}},
@@ -160,31 +170,36 @@ func TestRestoreObjectMeta(t *testing.T) {
 			}, "spec": map[string]interface{}{}},
 			true,
 		},
-		{"invalid label key",
+		{
+			"invalid label key",
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			map[string]interface{}{"metadata": map[string]interface{}{"labels": map[string]interface{}{"some/non-qualified/label": "x"}}},
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			true,
 		},
-		{"invalid annotation key",
+		{
+			"invalid annotation key",
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			map[string]interface{}{"metadata": map[string]interface{}{"labels": map[string]interface{}{"some/non-qualified/label": "x"}}},
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			true,
 		},
-		{"invalid label value",
+		{
+			"invalid label value",
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			map[string]interface{}{"metadata": map[string]interface{}{"labels": map[string]interface{}{"foo": "üäö"}}},
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			true,
 		},
-		{"too big label value",
+		{
+			"too big label value",
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			map[string]interface{}{"metadata": map[string]interface{}{"labels": map[string]interface{}{"foo": strings.Repeat("x", validation.LabelValueMaxLength+1)}}},
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			true,
 		},
-		{"too big annotation value",
+		{
+			"too big annotation value",
 			map[string]interface{}{"metadata": map[string]interface{}{}},
 			map[string]interface{}{"metadata": map[string]interface{}{"annotations": map[string]interface{}{"foo": strings.Repeat("x", 256*(1<<10)+1)}}},
 			map[string]interface{}{"metadata": map[string]interface{}{}},
@@ -536,7 +551,6 @@ func TestGetConvertedObjectsFromResponse(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.Name, func(t *testing.T) {
-
 			objects, err := getConvertedObjectsFromResponse("uid", tc.Response)
 
 			if err == nil && len(tc.ExpectErr) > 0 {
@@ -550,7 +564,6 @@ func TestGetConvertedObjectsFromResponse(t *testing.T) {
 			if !reflect.DeepEqual(objects, tc.ExpectObjects) {
 				t.Errorf("unexpected diff: %s", cmp.Diff(tc.ExpectObjects, objects))
 			}
-
 		})
 	}
 }

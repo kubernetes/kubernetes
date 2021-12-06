@@ -49,7 +49,7 @@ func Fstatfs(fd int, stat *Statfs_t) (err error) {
 			default:
 				break
 			}
-			//proceed to return if: err is nil (found), err is nonnil but not ERANGE (another error occurred)
+			// proceed to return if: err is nil (found), err is nonnil but not ERANGE (another error occurred)
 			if err == nil || err != nil && err != ERANGE {
 				break
 			}
@@ -68,7 +68,7 @@ func tryGetmntent64(stat *Statfs_t) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ERANGE //return ERANGE if no match is found in this batch
+	err = ERANGE // return ERANGE if no match is found in this batch
 	for i := 0; i < fs_count; i++ {
 		if stat.Fsid == uint64(mnt_ent_buffer.filesys_info[i].Dev) {
 			stat.Type = uint32(mnt_ent_buffer.filesys_info[i].Fstname[0])
@@ -89,7 +89,7 @@ func tryGetmntent128(stat *Statfs_t) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ERANGE //return ERANGE if no match is found in this batch
+	err = ERANGE // return ERANGE if no match is found in this batch
 	for i := 0; i < fs_count; i++ {
 		if stat.Fsid == uint64(mnt_ent_buffer.filesys_info[i].Dev) {
 			stat.Type = uint32(mnt_ent_buffer.filesys_info[i].Fstname[0])
@@ -110,7 +110,7 @@ func tryGetmntent256(stat *Statfs_t) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ERANGE //return ERANGE if no match is found in this batch
+	err = ERANGE // return ERANGE if no match is found in this batch
 	for i := 0; i < fs_count; i++ {
 		if stat.Fsid == uint64(mnt_ent_buffer.filesys_info[i].Dev) {
 			stat.Type = uint32(mnt_ent_buffer.filesys_info[i].Fstname[0])
@@ -131,7 +131,7 @@ func tryGetmntent512(stat *Statfs_t) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ERANGE //return ERANGE if no match is found in this batch
+	err = ERANGE // return ERANGE if no match is found in this batch
 	for i := 0; i < fs_count; i++ {
 		if stat.Fsid == uint64(mnt_ent_buffer.filesys_info[i].Dev) {
 			stat.Type = uint32(mnt_ent_buffer.filesys_info[i].Fstname[0])
@@ -152,7 +152,7 @@ func tryGetmntent1024(stat *Statfs_t) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ERANGE //return ERANGE if no match is found in this batch
+	err = ERANGE // return ERANGE if no match is found in this batch
 	for i := 0; i < fs_count; i++ {
 		if stat.Fsid == uint64(mnt_ent_buffer.filesys_info[i].Dev) {
 			stat.Type = uint32(mnt_ent_buffer.filesys_info[i].Fstname[0])

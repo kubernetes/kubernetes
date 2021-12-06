@@ -797,7 +797,6 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	ds *apps.DaemonSet,
 	hash string,
 ) (nodesNeedingDaemonPods, podsToDelete []string) {
-
 	shouldRun, shouldContinueRunning := dsc.nodeShouldRunDaemonPod(node, ds)
 	daemonPods, exists := nodeToDaemonPods[node.Name]
 
@@ -998,7 +997,6 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 
 				err := dsc.podControl.CreatePods(ctx, ds.Namespace, podTemplate,
 					ds, metav1.NewControllerRef(ds, controllerKind))
-
 				if err != nil {
 					if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 						// If the namespace is being torn down, we can safely ignore

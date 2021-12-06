@@ -84,7 +84,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		t.Fatalf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
-	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0o666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 

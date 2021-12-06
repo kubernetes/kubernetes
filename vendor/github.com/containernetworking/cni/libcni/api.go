@@ -29,9 +29,7 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 )
 
-var (
-	CacheDir = "/var/lib/cni"
-)
+var CacheDir = "/var/lib/cni"
 
 const (
 	CNICacheV1 = "cniCacheV1"
@@ -76,13 +74,11 @@ type CNI interface {
 	DelNetworkList(ctx context.Context, net *NetworkConfigList, rt *RuntimeConf) error
 	GetNetworkListCachedResult(net *NetworkConfigList, rt *RuntimeConf) (types.Result, error)
 	GetNetworkListCachedConfig(net *NetworkConfigList, rt *RuntimeConf) ([]byte, *RuntimeConf, error)
-
 	AddNetwork(ctx context.Context, net *NetworkConfig, rt *RuntimeConf) (types.Result, error)
 	CheckNetwork(ctx context.Context, net *NetworkConfig, rt *RuntimeConf) error
 	DelNetwork(ctx context.Context, net *NetworkConfig, rt *RuntimeConf) error
 	GetNetworkCachedResult(net *NetworkConfig, rt *RuntimeConf) (types.Result, error)
 	GetNetworkCachedConfig(net *NetworkConfig, rt *RuntimeConf) ([]byte, *RuntimeConf, error)
-
 	ValidateNetworkList(ctx context.Context, net *NetworkConfigList) ([]string, error)
 	ValidateNetwork(ctx context.Context, net *NetworkConfig) ([]string, error)
 }
@@ -247,11 +243,11 @@ func (c *CNIConfig) cacheAdd(result types.Result, config []byte, netName string,
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(fname), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(fname), 0o700); err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(fname, newBytes, 0600)
+	return ioutil.WriteFile(fname, newBytes, 0o600)
 }
 
 func (c *CNIConfig) cacheDel(netName string, rt *RuntimeConf) error {

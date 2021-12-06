@@ -57,7 +57,8 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 			Code:    http.StatusNotFound,
 			Reason:  metav1.StatusReasonNotFound,
 			Message: fmt.Sprintf("the server could not find the requested resource, GroupVersion %q not found", groupVersion),
-		}}
+		},
+	}
 }
 
 // ServerResources returns the supported resources for all groups and versions.
@@ -138,7 +139,6 @@ func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	}
 
 	return list, nil
-
 }
 
 // ServerVersion retrieves and parses the server's version.

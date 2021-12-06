@@ -1311,7 +1311,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				ConditionFn: JSONPathWait{
 					jsonPathCondition: test.jsonPathCond,
 					jsonPathParser:    j,
-					errOut:            ioutil.Discard}.IsJSONPathConditionMet,
+					errOut:            ioutil.Discard,
+				}.IsJSONPathConditionMet,
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 
@@ -1663,7 +1664,8 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
 					jsonPathCondition: test.jsonPathCond,
-					jsonPathParser:    j, errOut: ioutil.Discard}.IsJSONPathConditionMet,
+					jsonPathParser:    j, errOut: ioutil.Discard,
+				}.IsJSONPathConditionMet,
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 

@@ -186,8 +186,8 @@ func TestMigrate(t *testing.T) {
 					t.Errorf("Expected version.txt to contain %s but got %s", end, v)
 				}
 				// Integration tests are run in a docker container with umask of 0022.
-				checkPermissions(t, server.cfg.dataDirectory, 0755|os.ModeDir)
-				checkPermissions(t, dataDir.versionFile.path, 0644)
+				checkPermissions(t, server.cfg.dataDirectory, 0o755|os.ModeDir)
+				checkPermissions(t, dataDir.versionFile.path, 0o644)
 			})
 		})
 	}
@@ -291,14 +291,14 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 		return err
 	}
 
-	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0777))
+	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0o777))
+	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0o777))
 	if err != nil {
 		return err
 	}
 
-	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0777))
+	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0o777))
+	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0o777))
 	if err != nil {
 		return err
 	}

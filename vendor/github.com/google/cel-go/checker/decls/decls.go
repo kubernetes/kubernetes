@@ -16,21 +16,25 @@
 package decls
 
 import (
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 var (
 	// Error type used to communicate issues during type-checking.
 	Error = &exprpb.Type{
 		TypeKind: &exprpb.Type_Error{
-			Error: &emptypb.Empty{}}}
+			Error: &emptypb.Empty{},
+		},
+	}
 
 	// Dyn is a top-type used to represent any value.
 	Dyn = &exprpb.Type{
 		TypeKind: &exprpb.Type_Dyn{
-			Dyn: &emptypb.Empty{}}}
+			Dyn: &emptypb.Empty{},
+		},
+	}
 )
 
 // Commonly used types.
@@ -41,7 +45,9 @@ var (
 	Int    = NewPrimitiveType(exprpb.Type_INT64)
 	Null   = &exprpb.Type{
 		TypeKind: &exprpb.Type_Null{
-			Null: structpb.NullValue_NULL_VALUE}}
+			Null: structpb.NullValue_NULL_VALUE,
+		},
+	}
 	String = NewPrimitiveType(exprpb.Type_STRING)
 	Uint   = NewPrimitiveType(exprpb.Type_UINT64)
 )
@@ -61,7 +67,10 @@ func NewAbstractType(name string, paramTypes ...*exprpb.Type) *exprpb.Type {
 		TypeKind: &exprpb.Type_AbstractType_{
 			AbstractType: &exprpb.Type_AbstractType{
 				Name:           name,
-				ParameterTypes: paramTypes}}}
+				ParameterTypes: paramTypes,
+			},
+		},
+	}
 }
 
 // NewFunctionType creates a function invocation contract, typically only used
@@ -72,7 +81,10 @@ func NewFunctionType(resultType *exprpb.Type,
 		TypeKind: &exprpb.Type_Function{
 			Function: &exprpb.Type_FunctionType{
 				ResultType: resultType,
-				ArgTypes:   argTypes}}}
+				ArgTypes:   argTypes,
+			},
+		},
+	}
 }
 
 // NewFunction creates a named function declaration with one or more overloads.
@@ -82,7 +94,10 @@ func NewFunction(name string,
 		Name: name,
 		DeclKind: &exprpb.Decl_Function{
 			Function: &exprpb.Decl_FunctionDecl{
-				Overloads: overloads}}}
+				Overloads: overloads,
+			},
+		},
+	}
 }
 
 // NewIdent creates a named identifier declaration with an optional literal
@@ -97,7 +112,10 @@ func NewIdent(name string, t *exprpb.Type, v *exprpb.Constant) *exprpb.Decl {
 		DeclKind: &exprpb.Decl_Ident{
 			Ident: &exprpb.Decl_IdentDecl{
 				Type:  t,
-				Value: v}}}
+				Value: v,
+			},
+		},
+	}
 }
 
 // NewConst creates a constant identifier with a CEL constant literal value.
@@ -118,7 +136,8 @@ func NewInstanceOverload(id string, argTypes []*exprpb.Type,
 		OverloadId:         id,
 		ResultType:         resultType,
 		Params:             argTypes,
-		IsInstanceFunction: true}
+		IsInstanceFunction: true,
+	}
 }
 
 // NewListType generates a new list with elements of a certain type.
@@ -126,7 +145,10 @@ func NewListType(elem *exprpb.Type) *exprpb.Type {
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_ListType_{
 			ListType: &exprpb.Type_ListType{
-				ElemType: elem}}}
+				ElemType: elem,
+			},
+		},
+	}
 }
 
 // NewMapType generates a new map with typed keys and values.
@@ -135,14 +157,19 @@ func NewMapType(key *exprpb.Type, value *exprpb.Type) *exprpb.Type {
 		TypeKind: &exprpb.Type_MapType_{
 			MapType: &exprpb.Type_MapType{
 				KeyType:   key,
-				ValueType: value}}}
+				ValueType: value,
+			},
+		},
+	}
 }
 
 // NewObjectType creates an object type for a qualified type name.
 func NewObjectType(typeName string) *exprpb.Type {
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_MessageType{
-			MessageType: typeName}}
+			MessageType: typeName,
+		},
+	}
 }
 
 // NewOverload creates a function overload declaration which contains a unique
@@ -154,7 +181,8 @@ func NewOverload(id string, argTypes []*exprpb.Type,
 		OverloadId:         id,
 		ResultType:         resultType,
 		Params:             argTypes,
-		IsInstanceFunction: false}
+		IsInstanceFunction: false,
+	}
 }
 
 // NewParameterizedInstanceOverload creates a parametric function instance overload type.
@@ -167,7 +195,8 @@ func NewParameterizedInstanceOverload(id string,
 		ResultType:         resultType,
 		Params:             argTypes,
 		TypeParams:         typeParams,
-		IsInstanceFunction: true}
+		IsInstanceFunction: true,
+	}
 }
 
 // NewParameterizedOverload creates a parametric function overload type.
@@ -180,7 +209,8 @@ func NewParameterizedOverload(id string,
 		ResultType:         resultType,
 		Params:             argTypes,
 		TypeParams:         typeParams,
-		IsInstanceFunction: false}
+		IsInstanceFunction: false,
+	}
 }
 
 // NewPrimitiveType creates a type for a primitive value. See the var declarations
@@ -188,7 +218,9 @@ func NewParameterizedOverload(id string,
 func NewPrimitiveType(primitive exprpb.Type_PrimitiveType) *exprpb.Type {
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_Primitive{
-			Primitive: primitive}}
+			Primitive: primitive,
+		},
+	}
 }
 
 // NewTypeType creates a new type designating a type.
@@ -199,14 +231,18 @@ func NewTypeType(nested *exprpb.Type) *exprpb.Type {
 	}
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_Type{
-			Type: nested}}
+			Type: nested,
+		},
+	}
 }
 
 // NewTypeParamType creates a type corresponding to a named, contextual parameter.
 func NewTypeParamType(name string) *exprpb.Type {
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_TypeParam{
-			TypeParam: name}}
+			TypeParam: name,
+		},
+	}
 }
 
 // NewWellKnownType creates a type corresponding to a protobuf well-known type
@@ -214,7 +250,9 @@ func NewTypeParamType(name string) *exprpb.Type {
 func NewWellKnownType(wellKnown exprpb.Type_WellKnownType) *exprpb.Type {
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_WellKnown{
-			WellKnown: wellKnown}}
+			WellKnown: wellKnown,
+		},
+	}
 }
 
 // NewWrapperType creates a wrapped primitive type instance. Wrapped types
@@ -227,5 +265,7 @@ func NewWrapperType(wrapped *exprpb.Type) *exprpb.Type {
 	}
 	return &exprpb.Type{
 		TypeKind: &exprpb.Type_Wrapper{
-			Wrapper: primitive}}
+			Wrapper: primitive,
+		},
+	}
 }

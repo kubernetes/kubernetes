@@ -86,25 +86,29 @@ func TestPluginEmptyRootContext(t *testing.T) {
 		readyDirExists:         true,
 		medium:                 v1.StorageMediumDefault,
 		expectedSetupMounts:    0,
-		expectedTeardownMounts: 0})
+		expectedTeardownMounts: 0,
+	})
 	doTestPlugin(t, pluginTestConfig{
 		volumeDirExists:        false,
 		readyDirExists:         false,
 		medium:                 v1.StorageMediumDefault,
 		expectedSetupMounts:    0,
-		expectedTeardownMounts: 0})
+		expectedTeardownMounts: 0,
+	})
 	doTestPlugin(t, pluginTestConfig{
 		volumeDirExists:        true,
 		readyDirExists:         false,
 		medium:                 v1.StorageMediumDefault,
 		expectedSetupMounts:    0,
-		expectedTeardownMounts: 0})
+		expectedTeardownMounts: 0,
+	})
 	doTestPlugin(t, pluginTestConfig{
 		volumeDirExists:        false,
 		readyDirExists:         true,
 		medium:                 v1.StorageMediumDefault,
 		expectedSetupMounts:    0,
-		expectedTeardownMounts: 0})
+		expectedTeardownMounts: 0,
+	})
 }
 
 func TestPluginHugetlbfs(t *testing.T) {
@@ -132,9 +136,9 @@ func TestPluginHugetlbfs(t *testing.T) {
 
 type pluginTestConfig struct {
 	medium v1.StorageMedium
-	//volumeDirExists indicates whether volumeDir already/still exists before volume setup/teardown
+	// volumeDirExists indicates whether volumeDir already/still exists before volume setup/teardown
 	volumeDirExists bool
-	//readyDirExists indicates whether readyDir already/still exists before volume setup/teardown
+	// readyDirExists indicates whether readyDir already/still exists before volume setup/teardown
 	readyDirExists                bool
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
@@ -350,7 +354,7 @@ func TestMetrics(t *testing.T) {
 	}
 
 	// Need to create the subdirectory
-	os.MkdirAll(mounter.GetPath(), 0755)
+	os.MkdirAll(mounter.GetPath(), 0o755)
 
 	expectedEmptyDirUsage, err := volumetest.FindEmptyDirectoryUsageOnTmpfs()
 	if err != nil {
@@ -1054,7 +1058,8 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 							SizeLimit: &testCase.emptyDirSizeLimit,
 						},
 					},
-				}}
+				},
+			}
 			result := calculateEmptyDirMemorySize(&testCase.nodeAllocatableMemory, spec, testCase.pod)
 			if result.Cmp(testCase.expectedResult) != 0 {
 				t.Errorf("%s: Unexpected result.  Expected %v, got %v", testCaseName, testCase.expectedResult.String(), result.String())

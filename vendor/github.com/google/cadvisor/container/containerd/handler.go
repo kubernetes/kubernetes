@@ -164,7 +164,7 @@ func (h *containerdContainerHandler) needNet() bool {
 	// on includedMetrics list. Here the assumption is the presence of cri-containerd
 	// label
 	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
-		//TODO change it to exported cri-containerd constants
+		// TODO change it to exported cri-containerd constants
 		return h.labels["io.cri-containerd.kind"] == "sandbox"
 	}
 	return false

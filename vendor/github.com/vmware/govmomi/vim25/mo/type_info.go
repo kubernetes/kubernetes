@@ -36,8 +36,10 @@ type typeInfo struct {
 	props map[string][]int
 }
 
-var typeInfoLock sync.RWMutex
-var typeInfoMap = make(map[string]*typeInfo)
+var (
+	typeInfoLock sync.RWMutex
+	typeInfoMap  = make(map[string]*typeInfo)
+)
 
 func typeInfoForType(tname string) *typeInfo {
 	typeInfoLock.RLock()

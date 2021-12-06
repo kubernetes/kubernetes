@@ -119,7 +119,7 @@ func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fil
 	}
 	fullFile := path.Join(dir, filename) + fileExtension
 	parent := path.Dir(fullFile)
-	cmdutil.CheckErr(os.MkdirAll(parent, 0755))
+	cmdutil.CheckErr(os.MkdirAll(parent, 0o755))
 
 	file, err := os.Create(fullFile)
 	cmdutil.CheckErr(err)

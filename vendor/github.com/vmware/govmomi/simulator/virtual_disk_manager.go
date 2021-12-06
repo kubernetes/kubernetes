@@ -104,7 +104,6 @@ func (m *VirtualDiskManager) DeleteVirtualDiskTask(req *types.DeleteVirtualDisk_
 				Name:       name,
 				Datacenter: req.Datacenter,
 			})
-
 			if err != nil {
 				return nil, err
 			}
@@ -134,7 +133,6 @@ func (m *VirtualDiskManager) MoveVirtualDiskTask(req *types.MoveVirtualDisk_Task
 				DestinationDatacenter: req.DestDatacenter,
 				Force:                 req.Force,
 			})
-
 			if err != nil {
 				return nil, err
 			}
@@ -170,7 +168,6 @@ func (m *VirtualDiskManager) CopyVirtualDiskTask(req *types.CopyVirtualDisk_Task
 				DestinationDatacenter: req.DestDatacenter,
 				Force:                 req.Force,
 			})
-
 			if err != nil {
 				return nil, err
 			}

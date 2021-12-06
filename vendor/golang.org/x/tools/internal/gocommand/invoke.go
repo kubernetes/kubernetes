@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	exec "golang.org/x/sys/execabs"
 	"io"
 	"os"
 	"regexp"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	exec "golang.org/x/sys/execabs"
 
 	"golang.org/x/tools/internal/event"
 )

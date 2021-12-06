@@ -438,7 +438,6 @@ func (sc *scanner) endToken(val *tokenValue) {
 // corresponding to the token).  For string and int tokens, the string
 // and int fields additionally contain the token's interpreted value.
 func (sc *scanner) nextToken(val *tokenValue) Token {
-
 	// The following distribution of tokens guides case ordering:
 	//
 	//      COMMA          27   %

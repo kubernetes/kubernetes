@@ -42,7 +42,6 @@ func NoOpNewStreamHandler(stream Stream, replySent <-chan struct{}) error { retu
 
 // Dialer knows how to open a streaming connection to a server.
 type Dialer interface {
-
 	// Dial opens a streaming connection to a server using one of the protocols
 	// specified (in order of most preferred to least preferred).
 	Dial(protocols ...string) (Connection, string, error)

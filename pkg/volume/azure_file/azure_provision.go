@@ -88,7 +88,6 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 	if accountName, _, err := util.GetAzureCredentials(plugin.host, secretNamespace, secretName); err != nil {
 		return nil, err
 	} else {
-
 		return &azureFileDeleter{
 			azureFile: &azureFile{
 				volName: spec.Name(),

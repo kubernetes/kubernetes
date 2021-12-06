@@ -53,7 +53,6 @@ func shredFile(filePath string) {
 	// Shred failed Try to remove the file for good meausure
 	err = os.Remove(filePath)
 	framework.ExpectNoError(err, "Failed to remove service account file %s", filePath)
-
 }
 
 // createGCESecrets downloads the GCP IAM Key for the default compute service account
@@ -62,7 +61,7 @@ func createGCESecrets(client clientset.Interface, ns string) {
 	saEnv := "E2E_GOOGLE_APPLICATION_CREDENTIALS"
 	saFile := fmt.Sprintf("/tmp/%s/cloud-sa.json", string(uuid.NewUUID()))
 
-	os.MkdirAll(path.Dir(saFile), 0750)
+	os.MkdirAll(path.Dir(saFile), 0o750)
 	defer os.Remove(path.Dir(saFile))
 
 	premadeSAFile, ok := os.LookupEnv(saEnv)

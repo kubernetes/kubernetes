@@ -244,10 +244,9 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	default:
 		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
 	}
-
 }
 
-//TODO: need to finish the method to get the rules when using webhook mode
+// TODO: need to finish the method to get the rules when using webhook mode
 func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo

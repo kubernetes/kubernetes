@@ -51,13 +51,9 @@ type Plugin struct {
 	*admission.Handler
 }
 
-var (
-	_ = admission.Interface(&Plugin{})
-)
+var _ = admission.Interface(&Plugin{})
 
-var (
-	nodeResource = api.Resource("nodes")
-)
+var nodeResource = api.Resource("nodes")
 
 // Admit is the main function that checks node identity and adds taints as needed.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {

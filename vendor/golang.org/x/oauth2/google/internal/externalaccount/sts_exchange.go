@@ -23,7 +23,6 @@ import (
 // headers beyond the bare minimum required by the token exchange.  options can
 // be used to pass additional JSON-structured options to the remote server.
 func exchangeToken(ctx context.Context, endpoint string, request *stsTokenExchangeRequest, authentication clientAuthentication, headers http.Header, options map[string]interface{}) (*stsTokenExchangeResponse, error) {
-
 	client := oauth2.NewClient(ctx, nil)
 
 	data := url.Values{}
@@ -47,7 +46,6 @@ func exchangeToken(ctx context.Context, endpoint string, request *stsTokenExchan
 	req, err := http.NewRequest("POST", endpoint, strings.NewReader(encodedData))
 	if err != nil {
 		return nil, fmt.Errorf("oauth2/google: failed to properly build http request: %v", err)
-
 	}
 	req = req.WithContext(ctx)
 	for key, list := range headers {
@@ -58,7 +56,6 @@ func exchangeToken(ctx context.Context, endpoint string, request *stsTokenExchan
 	req.Header.Add("Content-Length", strconv.Itoa(len(encodedData)))
 
 	resp, err := client.Do(req)
-
 	if err != nil {
 		return nil, fmt.Errorf("oauth2/google: invalid response from Secure Token Server: %v", err)
 	}
@@ -75,7 +72,6 @@ func exchangeToken(ctx context.Context, endpoint string, request *stsTokenExchan
 	err = json.Unmarshal(body, &stsResp)
 	if err != nil {
 		return nil, fmt.Errorf("oauth2/google: failed to unmarshal response body from Secure Token Server: %v", err)
-
 	}
 
 	return &stsResp, nil

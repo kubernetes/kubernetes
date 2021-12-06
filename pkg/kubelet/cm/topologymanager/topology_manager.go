@@ -67,7 +67,7 @@ type Manager interface {
 }
 
 type manager struct {
-	//Topology Manager Scope
+	// Topology Manager Scope
 	scope Scope
 }
 
@@ -92,7 +92,7 @@ type HintProvider interface {
 	Allocate(pod *v1.Pod, container *v1.Container) error
 }
 
-//Store interface is to allow Hint Providers to retrieve pod affinity
+// Store interface is to allow Hint Providers to retrieve pod affinity
 type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 }

@@ -139,7 +139,6 @@ func TestMergeResizeCondition(t *testing.T) {
 				testcase.finalConditions, updateConditions)
 		}
 	}
-
 }
 
 func TestCreatePVCPatch(t *testing.T) {

@@ -48,9 +48,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 	})
 
 	ginkgo.Context("for all supported CNIs", func() {
-
 		ginkgo.It("should have stable networking for Linux and Windows pods", func() {
-
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
 			linuxPod = f.PodClient().CreateSync(linuxPod)
@@ -76,9 +74,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 
 			ginkgo.By("checking connectivity from Windows to Linux")
 			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP))
-
 		})
-
 	})
 })
 

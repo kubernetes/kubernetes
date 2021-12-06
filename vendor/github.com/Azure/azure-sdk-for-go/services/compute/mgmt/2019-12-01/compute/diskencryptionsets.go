@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // DiskEncryptionSetsClient is the compute Client
@@ -52,13 +53,22 @@ func (client DiskEncryptionSetsClient) CreateOrUpdate(ctx context.Context, resou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: diskEncryptionSet,
-			Constraints: []validation.Constraint{{Target: "diskEncryptionSet.EncryptionSetProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "diskEncryptionSet.EncryptionSetProperties.ActiveKey", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "diskEncryptionSet.EncryptionSetProperties.ActiveKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
-						{Target: "diskEncryptionSet.EncryptionSetProperties.ActiveKey.KeyURL", Name: validation.Null, Rule: true, Chain: nil},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: diskEncryptionSet,
+			Constraints: []validation.Constraint{{
+				Target: "diskEncryptionSet.EncryptionSetProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "diskEncryptionSet.EncryptionSetProperties.ActiveKey", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "diskEncryptionSet.EncryptionSetProperties.ActiveKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
+							{Target: "diskEncryptionSet.EncryptionSetProperties.ActiveKey.KeyURL", Name: validation.Null, Rule: true, Chain: nil},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.DiskEncryptionSetsClient", "CreateOrUpdate", err.Error())
 	}
 

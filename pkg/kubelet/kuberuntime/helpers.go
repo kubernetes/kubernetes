@@ -183,8 +183,10 @@ func BuildContainerLogsDirectory(podNamespace, podName string, podUID types.UID,
 
 // BuildPodLogsDirectory builds absolute log directory path for a pod sandbox.
 func BuildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
-	return filepath.Join(podLogsRootDirectory, strings.Join([]string{podNamespace, podName,
-		string(podUID)}, logPathDelimiter))
+	return filepath.Join(podLogsRootDirectory, strings.Join([]string{
+		podNamespace, podName,
+		string(podUID),
+	}, logPathDelimiter))
 }
 
 // parsePodUIDFromLogsDirectory parses pod logs directory name and returns the pod UID.

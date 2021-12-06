@@ -118,7 +118,6 @@ func (t *TableBatch) MergeEntity(entity *Entity) {
 // the changesets.
 // As per document https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/performing-entity-group-transactions
 func (t *TableBatch) ExecuteBatch() error {
-
 	id, err := newUUID()
 	if err != nil {
 		return err
@@ -185,7 +184,6 @@ func (t *TableBatch) getFailedOperation(errorMessage string) string {
 
 // generateBody generates the complete body for the batch request.
 func generateBody(changeSetBody *bytes.Buffer, changesetBoundary string, boundary string) (*bytes.Buffer, error) {
-
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 	writer.SetBoundary(boundary)
@@ -203,7 +201,6 @@ func generateBody(changeSetBody *bytes.Buffer, changesetBoundary string, boundar
 // generateChangesetBody generates the individual changesets for the various operations within the batch request.
 // There is a changeset for Insert, Delete, Merge etc.
 func (t *TableBatch) generateChangesetBody(changesetBoundary string) (*bytes.Buffer, error) {
-
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 	writer.SetBoundary(changesetBoundary)
@@ -264,7 +261,6 @@ func generateGenericOperationHeaders(be *BatchEntity) map[string]string {
 
 // generateEntitySubset generates body payload for particular batch entity
 func (t *TableBatch) generateEntitySubset(batchEntity *BatchEntity, writer *multipart.Writer) error {
-
 	h := make(textproto.MIMEHeader)
 	h.Set(headerContentType, "application/http")
 	h.Set(headerContentTransferEncoding, "binary")
@@ -290,7 +286,7 @@ func (t *TableBatch) generateEntitySubset(batchEntity *BatchEntity, writer *mult
 
 	// delete operation doesn't need a body.
 	if batchEntity.Op != DeleteOp {
-		//var e Entity = batchEntity.Entity
+		// var e Entity = batchEntity.Entity
 		body, err := json.Marshal(batchEntity.Entity)
 		if err != nil {
 			return err

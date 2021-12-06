@@ -25,18 +25,16 @@ import (
 	"k8s.io/csi-translation-lib/plugins"
 )
 
-var (
-	inTreePlugins = map[string]plugins.InTreePlugin{
-		plugins.GCEPDDriverName:     plugins.NewGCEPersistentDiskCSITranslator(),
-		plugins.AWSEBSDriverName:    plugins.NewAWSElasticBlockStoreCSITranslator(),
-		plugins.CinderDriverName:    plugins.NewOpenStackCinderCSITranslator(),
-		plugins.AzureDiskDriverName: plugins.NewAzureDiskCSITranslator(),
-		plugins.AzureFileDriverName: plugins.NewAzureFileCSITranslator(),
-		plugins.VSphereDriverName:   plugins.NewvSphereCSITranslator(),
-		plugins.PortworxDriverName:  plugins.NewPortworxCSITranslator(),
-		plugins.RBDDriverName:       plugins.NewRBDCSITranslator(),
-	}
-)
+var inTreePlugins = map[string]plugins.InTreePlugin{
+	plugins.GCEPDDriverName:     plugins.NewGCEPersistentDiskCSITranslator(),
+	plugins.AWSEBSDriverName:    plugins.NewAWSElasticBlockStoreCSITranslator(),
+	plugins.CinderDriverName:    plugins.NewOpenStackCinderCSITranslator(),
+	plugins.AzureDiskDriverName: plugins.NewAzureDiskCSITranslator(),
+	plugins.AzureFileDriverName: plugins.NewAzureFileCSITranslator(),
+	plugins.VSphereDriverName:   plugins.NewvSphereCSITranslator(),
+	plugins.PortworxDriverName:  plugins.NewPortworxCSITranslator(),
+	plugins.RBDDriverName:       plugins.NewRBDCSITranslator(),
+}
 
 // CSITranslator translates in-tree storage API objects to their equivalent CSI
 // API objects. It also provides many helper functions to determine whether

@@ -1219,7 +1219,7 @@ type ManagedFieldsEntry struct {
 	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
 
 	// Fields is tombstoned to show why 5 is a reserved protobuf tag.
-	//Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
+	// Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
 
 	// FieldsType is the discriminator for the different fields format and version.
 	// There is currently only one possible value: "FieldsV1"

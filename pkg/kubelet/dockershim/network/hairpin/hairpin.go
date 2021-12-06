@@ -39,9 +39,7 @@ const (
 	hairpinEnable           = "1"
 )
 
-var (
-	ethtoolOutputRegex = regexp.MustCompile(`peer_ifindex: (\d+)`)
-)
+var ethtoolOutputRegex = regexp.MustCompile(`peer_ifindex: (\d+)`)
 
 func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceName, containerDesc string, nsenterArgs []string) (string, error) {
 	nsenterPath, err := e.LookPath("nsenter")
@@ -86,5 +84,5 @@ func setUpInterface(ifName string) error {
 		return nil
 	}
 	hairpinModeFile := path.Join(brportPath, hairpinModeRelativePath)
-	return ioutil.WriteFile(hairpinModeFile, []byte(hairpinEnable), 0644)
+	return ioutil.WriteFile(hairpinModeFile, []byte(hairpinEnable), 0o644)
 }

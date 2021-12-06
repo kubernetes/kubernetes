@@ -50,9 +50,7 @@ const (
 	referencedResourceNotProvisionedMessageCode = "ReferencedResourceNotProvisioned"
 )
 
-var (
-	pipErrorMessageRE = regexp.MustCompile(`(?:.*)/subscriptions/(?:.*)/resourceGroups/(.*)/providers/Microsoft.Network/publicIPAddresses/([^\s]+)(?:.*)`)
-)
+var pipErrorMessageRE = regexp.MustCompile(`(?:.*)/subscriptions/(?:.*)/resourceGroups/(.*)/providers/Microsoft.Network/publicIPAddresses/([^\s]+)(?:.*)`)
 
 // RequestBackoff if backoff is disabled in cloud provider it
 // returns a new Backoff object steps = 1

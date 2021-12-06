@@ -46,9 +46,7 @@ const (
 	priorityLevelLabelName            = "priority_level"
 )
 
-var (
-	errPriorityLevelNotFound = errors.New("cannot find a metric sample with a matching priority level name label")
-)
+var errPriorityLevelNotFound = errors.New("cannot find a metric sample with a matching priority level name label")
 
 var _ = SIGDescribe("API priority and fairness", func() {
 	f := framework.NewDefaultFramework("apf")

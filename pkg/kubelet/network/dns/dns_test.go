@@ -41,16 +41,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	fetchEvent = func(recorder *record.FakeRecorder) string {
-		select {
-		case event := <-recorder.Events:
-			return event
-		default:
-			return ""
-		}
+var fetchEvent = func(recorder *record.FakeRecorder) string {
+	select {
+	case event := <-recorder.Events:
+		return event
+	default:
+		return ""
 	}
-)
+}
 
 func TestParseResolvConf(t *testing.T) {
 	testCases := []struct {

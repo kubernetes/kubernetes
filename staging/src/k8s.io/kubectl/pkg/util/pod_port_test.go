@@ -39,10 +39,12 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
-									ContainerPort: int32(443)},
+									ContainerPort: int32(443),
+								},
 								{
 									Name:          "http",
-									ContainerPort: int32(80)},
+									ContainerPort: int32(80),
+								},
 							},
 						},
 					},
@@ -61,7 +63,8 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
-									ContainerPort: int32(443)},
+									ContainerPort: int32(443),
+								},
 							},
 						},
 					},

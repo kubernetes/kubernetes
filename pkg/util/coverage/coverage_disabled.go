@@ -26,5 +26,4 @@ func InitCoverage(name string) {
 
 // FlushCoverage is a no-op when not running with coverage.
 func FlushCoverage() {
-
 }

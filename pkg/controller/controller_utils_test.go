@@ -314,7 +314,7 @@ func TestCreatePods(t *testing.T) {
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
 	fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
-	var actualPod = &v1.Pod{}
+	actualPod := &v1.Pod{}
 	err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
 	assert.NoError(t, err, "unexpected error: %v", err)
 	assert.True(t, apiequality.Semantic.DeepDerivative(&expectedPod, actualPod),
@@ -355,7 +355,7 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 	}
 
 	fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
-	var actualPod = &v1.Pod{}
+	actualPod := &v1.Pod{}
 	err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
 	assert.NoError(t, err, "unexpected error: %v", err)
 	assert.True(t, apiequality.Semantic.DeepDerivative(&expectedPod, actualPod),

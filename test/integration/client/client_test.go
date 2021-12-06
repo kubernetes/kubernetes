@@ -728,7 +728,6 @@ func TestSingleWatch(t *testing.T) {
 			FieldSelector:   fields.OneTermEqualSelector("metadata.name", "event-9").String(),
 		}, metav1.ParameterCodec).
 		Watch(context.TODO())
-
 	if err != nil {
 		t.Fatalf("Failed watch: %v", err)
 	}
@@ -811,7 +810,6 @@ func TestMultiWatch(t *testing.T) {
 				}},
 			},
 		}, metav1.CreateOptions{})
-
 		if err != nil {
 			t.Fatalf("Couldn't make %v: %v", name, err)
 		}
@@ -917,7 +915,6 @@ func TestMultiWatch(t *testing.T) {
 							}},
 						},
 					}, metav1.CreateOptions{})
-
 					if err != nil {
 						panic(fmt.Sprintf("couldn't make unrelated pod: %v", err))
 					}

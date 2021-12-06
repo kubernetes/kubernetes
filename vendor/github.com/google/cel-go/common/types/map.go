@@ -92,14 +92,12 @@ func NewProtoMap(adapter ref.TypeAdapter, value *pb.Map) traits.Mapper {
 	}
 }
 
-var (
-	// MapType singleton.
-	MapType = NewTypeValue("map",
-		traits.ContainerType,
-		traits.IndexerType,
-		traits.IterableType,
-		traits.SizerType)
-)
+// MapType singleton.
+var MapType = NewTypeValue("map",
+	traits.ContainerType,
+	traits.IndexerType,
+	traits.IterableType,
+	traits.SizerType)
 
 // mapAccessor is a private interface for finding values within a map and iterating over the keys.
 // This interface implements portions of the API surface area required by the traits.Mapper
@@ -161,8 +159,7 @@ func (m *baseMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 		}
 		return anypb.New(json.(proto.Message))
 	case jsonValueType, jsonStructType:
-		jsonEntries, err :=
-			m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
+		jsonEntries, err := m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
 		if err != nil {
 			return nil, err
 		}
@@ -564,13 +561,13 @@ func (m *protoMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 		}
 		return anypb.New(json.(proto.Message))
 	case jsonValueType, jsonStructType:
-		jsonEntries, err :=
-			m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
+		jsonEntries, err := m.ConvertToNative(reflect.TypeOf(map[string]*structpb.Value{}))
 		if err != nil {
 			return nil, err
 		}
 		jsonMap := &structpb.Struct{
-			Fields: jsonEntries.(map[string]*structpb.Value)}
+			Fields: jsonEntries.(map[string]*structpb.Value),
+		}
 		if typeDesc == jsonStructType {
 			return jsonMap, nil
 		}

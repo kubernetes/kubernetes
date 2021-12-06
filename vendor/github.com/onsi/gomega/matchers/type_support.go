@@ -156,6 +156,7 @@ func lengthOf(a interface{}) (int, bool) {
 		return 0, false
 	}
 }
+
 func capOf(a interface{}) (int, bool) {
 	if a == nil {
 		return 0, false

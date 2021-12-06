@@ -45,8 +45,10 @@ type Exporter struct {
 	stopOnce  sync.Once
 }
 
-var _ tracesdk.SpanExporter = (*Exporter)(nil)
-var _ metricsdk.Exporter = (*Exporter)(nil)
+var (
+	_ tracesdk.SpanExporter = (*Exporter)(nil)
+	_ metricsdk.Exporter    = (*Exporter)(nil)
+)
 
 // NewExporter constructs a new Exporter and starts it.
 func NewExporter(ctx context.Context, driver ProtocolDriver, opts ...ExporterOption) (*Exporter, error) {
@@ -74,14 +76,12 @@ func NewUnstartedExporter(driver ProtocolDriver, opts ...ExporterOption) *Export
 	}
 }
 
-var (
-	errAlreadyStarted = errors.New("already started")
-)
+var errAlreadyStarted = errors.New("already started")
 
 // Start establishes connections to the OpenTelemetry collector. Starting an
 // already started exporter returns an error.
 func (e *Exporter) Start(ctx context.Context) error {
-	var err = errAlreadyStarted
+	err := errAlreadyStarted
 	e.startOnce.Do(func() {
 		e.mu.Lock()
 		e.started = true
@@ -138,8 +138,8 @@ func (e *Exporter) ExportSpans(ctx context.Context, ss []*tracesdk.SpanSnapshot)
 // NewExportPipeline sets up a complete export pipeline
 // with the recommended TracerProvider setup.
 func NewExportPipeline(ctx context.Context, driver ProtocolDriver, exporterOpts ...ExporterOption) (*Exporter,
-	*sdktrace.TracerProvider, *basic.Controller, error) {
-
+	*sdktrace.TracerProvider, *basic.Controller, error,
+) {
 	exp, err := NewExporter(ctx, driver, exporterOpts...)
 	if err != nil {
 		return nil, nil, nil, err
@@ -162,8 +162,8 @@ func NewExportPipeline(ctx context.Context, driver ProtocolDriver, exporterOpts 
 // InstallNewPipeline instantiates a NewExportPipeline with the
 // recommended configuration and registers it globally.
 func InstallNewPipeline(ctx context.Context, driver ProtocolDriver, exporterOpts ...ExporterOption) (*Exporter,
-	*sdktrace.TracerProvider, *basic.Controller, error) {
-
+	*sdktrace.TracerProvider, *basic.Controller, error,
+) {
 	exp, tp, cntr, err := NewExportPipeline(ctx, driver, exporterOpts...)
 	if err != nil {
 		return nil, nil, nil, err

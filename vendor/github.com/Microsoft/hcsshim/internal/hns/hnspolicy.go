@@ -70,9 +70,11 @@ type ProxyPolicy struct {
 	OutboundNat   bool       `json:",omitempty"`
 }
 
-type ActionType string
-type DirectionType string
-type RuleType string
+type (
+	ActionType    string
+	DirectionType string
+	RuleType      string
+)
 
 const (
 	Allow ActionType = "Allow"

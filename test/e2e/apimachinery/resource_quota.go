@@ -46,8 +46,10 @@ const (
 	podName              = "pfpod"
 )
 
-var classGold = "gold"
-var extendedResourceName = "example.com/dongle"
+var (
+	classGold            = "gold"
+	extendedResourceName = "example.com/dongle"
+)
 
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
@@ -1097,7 +1099,6 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	f := framework.NewDefaultFramework("resourcequota-priorityclass")
 
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func() {
-
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass1"}, Value: int32(1000)}, metav1.CreateOptions{})
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
@@ -1136,7 +1137,6 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	})
 
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with same priority class.", func() {
-
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass2"}, Value: int32(1000)}, metav1.CreateOptions{})
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
@@ -1181,7 +1181,6 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	})
 
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class.", func() {
-
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass3"}, Value: int32(1000)}, metav1.CreateOptions{})
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
@@ -1282,7 +1281,6 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	})
 
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).", func() {
-
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass7"}, Value: int32(1000)}, metav1.CreateOptions{})
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
@@ -1316,7 +1314,6 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	})
 
 	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpExists).", func() {
-
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass8"}, Value: int32(1000)}, metav1.CreateOptions{})
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
@@ -1355,7 +1352,6 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	})
 
 	ginkgo.It("should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.", func() {
-
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass9"}, Value: int32(1000)}, metav1.CreateOptions{})
 		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 
@@ -1415,7 +1411,6 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaPriorityClass.Name, usedResources)
 		framework.ExpectNoError(err)
 	})
-
 })
 
 var _ = SIGDescribe("ResourceQuota", func() {
@@ -1436,7 +1431,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			PodAntiAffinity: &v1.PodAntiAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
 					TopologyKey: "region",
-				}}}})
+				}},
+			},
+		})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -1446,7 +1443,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
 					TopologyKey: "region",
 					Namespaces:  []string{"ns1"},
-				}}}})
+				}},
+			},
+		})
 		podWithNamespaces, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), podWithNamespaces, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -1468,7 +1467,10 @@ var _ = SIGDescribe("ResourceQuota", func() {
 								Values:   []string{"ads"},
 							},
 						},
-					}}}}})
+					},
+				}},
+			},
+		})
 		podWithNamespaceSelector, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), podWithNamespaceSelector, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -1505,12 +1507,14 @@ func newTestResourceQuotaWithScopeSelector(name string, scope v1.ResourceQuotaSc
 	}
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: v1.ResourceQuotaSpec{Hard: hard,
+		Spec: v1.ResourceQuotaSpec{
+			Hard: hard,
 			ScopeSelector: &v1.ScopeSelector{
 				MatchExpressions: []v1.ScopedResourceSelectorRequirement{
 					{
 						ScopeName: scope,
-						Operator:  v1.ScopeSelectorOpExists},
+						Operator:  v1.ScopeSelectorOpExists,
+					},
 				},
 			},
 		},
@@ -1539,7 +1543,8 @@ func newTestResourceQuotaWithScope(name string, scope v1.ResourceQuotaScope) *v1
 func newTestResourceQuotaWithScopeForPriorityClass(name string, hard v1.ResourceList, op v1.ScopeSelectorOperator, values []string) *v1.ResourceQuota {
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: v1.ResourceQuotaSpec{Hard: hard,
+		Spec: v1.ResourceQuotaSpec{
+			Hard: hard,
 			ScopeSelector: &v1.ScopeSelector{
 				MatchExpressions: []v1.ScopedResourceSelectorRequirement{
 					{

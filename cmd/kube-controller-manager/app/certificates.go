@@ -94,6 +94,7 @@ func areKubeletServingSignerFilesSpecified(config csrsigningconfig.CSRSigningCon
 	// if only one is specified, it will error later during construction
 	return len(config.KubeletServingSignerConfiguration.CertFile) > 0 || len(config.KubeletServingSignerConfiguration.KeyFile) > 0
 }
+
 func areKubeletClientSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
 	// if only one is specified, it will error later during construction
 	return len(config.KubeletClientSignerConfiguration.CertFile) > 0 || len(config.KubeletClientSignerConfiguration.KeyFile) > 0

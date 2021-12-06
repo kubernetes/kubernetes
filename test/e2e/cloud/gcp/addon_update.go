@@ -213,7 +213,6 @@ type stringPair struct {
 }
 
 var _ = SIGDescribe("Addon update", func() {
-
 	var dir string
 	var sshClient *ssh.Client
 	f := framework.NewDefaultFramework("addon-update-test")
@@ -247,7 +246,7 @@ var _ = SIGDescribe("Addon update", func() {
 		// providers that provide those capabilities.
 		e2eskipper.SkipUnlessProviderIs("gce")
 
-		//these tests are long, so I squeezed several cases in one scenario
+		// these tests are long, so I squeezed several cases in one scenario
 		framework.ExpectNotEqual(sshClient, nil)
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
@@ -276,7 +275,7 @@ var _ = SIGDescribe("Addon update", func() {
 		}
 
 		for _, p := range remoteFiles {
-			err := writeRemoteFile(sshClient, p.data, temporaryRemotePath, p.fileName, 0644)
+			err := writeRemoteFile(sshClient, p.data, temporaryRemotePath, p.fileName, 0o644)
 			framework.ExpectNoError(err, "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
 		}
 

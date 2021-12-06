@@ -33,10 +33,12 @@ type TaintToleration struct {
 	handle framework.Handle
 }
 
-var _ framework.FilterPlugin = &TaintToleration{}
-var _ framework.PreScorePlugin = &TaintToleration{}
-var _ framework.ScorePlugin = &TaintToleration{}
-var _ framework.EnqueueExtensions = &TaintToleration{}
+var (
+	_ framework.FilterPlugin      = &TaintToleration{}
+	_ framework.PreScorePlugin    = &TaintToleration{}
+	_ framework.ScorePlugin       = &TaintToleration{}
+	_ framework.EnqueueExtensions = &TaintToleration{}
+)
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

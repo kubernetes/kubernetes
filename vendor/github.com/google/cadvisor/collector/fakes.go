@@ -20,8 +20,7 @@ import (
 	v1 "github.com/google/cadvisor/info/v1"
 )
 
-type FakeCollectorManager struct {
-}
+type FakeCollectorManager struct{}
 
 func (fkm *FakeCollectorManager) RegisterCollector(collector Collector) error {
 	return nil

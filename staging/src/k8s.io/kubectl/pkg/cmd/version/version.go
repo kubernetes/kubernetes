@@ -40,11 +40,9 @@ type Version struct {
 	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
 }
 
-var (
-	versionExample = templates.Examples(i18n.T(`
+var versionExample = templates.Examples(i18n.T(`
 		# Print the client and server versions for the current context
 		kubectl version`))
-)
 
 // Options is a struct to support version command
 type Options struct {
@@ -62,7 +60,6 @@ func NewOptions(ioStreams genericclioptions.IOStreams) *Options {
 	return &Options{
 		IOStreams: ioStreams,
 	}
-
 }
 
 // NewCmdVersion returns a cobra command for fetching versions

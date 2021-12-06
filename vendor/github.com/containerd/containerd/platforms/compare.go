@@ -22,7 +22,6 @@ import specs "github.com/opencontainers/image-spec/specs-go/v1"
 // filter and sort platforms.
 type MatchComparer interface {
 	Matcher
-
 	Less(specs.Platform, specs.Platform) bool
 }
 

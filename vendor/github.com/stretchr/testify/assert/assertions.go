@@ -103,7 +103,6 @@ the problem actually occurred in calling code.*/
 // of each stack frame leading from the current test to the assert call that
 // failed.
 func CallerInfo() []string {
-
 	var pc uintptr
 	var ok bool
 	var file string
@@ -349,7 +348,6 @@ func Equal(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}) 
 	}
 
 	return true
-
 }
 
 // validateEqualArgs checks whether provided arguments can be safely used in the
@@ -470,7 +468,6 @@ func EqualValues(t TestingT, expected, actual interface{}, msgAndArgs ...interfa
 	}
 
 	return true
-
 }
 
 // Exactly asserts that two objects are equal in value and type.
@@ -489,7 +486,6 @@ func Exactly(t TestingT, expected, actual interface{}, msgAndArgs ...interface{}
 	}
 
 	return Equal(t, expected, actual, msgAndArgs...)
-
 }
 
 // NotNil asserts that the specified object is not nil.
@@ -528,7 +524,8 @@ func isNil(object interface{}) bool {
 		[]reflect.Kind{
 			reflect.Chan, reflect.Func,
 			reflect.Interface, reflect.Map,
-			reflect.Ptr, reflect.Slice},
+			reflect.Ptr, reflect.Slice,
+		},
 		kind)
 
 	if isNilableKind && value.IsNil() {
@@ -553,7 +550,6 @@ func Nil(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 
 // isEmpty gets whether the specified object is considered empty or not.
 func isEmpty(object interface{}) bool {
-
 	// get nil case out of the way
 	if object == nil {
 		return true
@@ -593,7 +589,6 @@ func Empty(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 	}
 
 	return pass
-
 }
 
 // NotEmpty asserts that the specified object is NOT empty.  I.e. not nil, "", false, 0 or either
@@ -612,7 +607,6 @@ func NotEmpty(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 	}
 
 	return pass
-
 }
 
 // getLen try to get length of object.
@@ -658,7 +652,6 @@ func True(t TestingT, value bool, msgAndArgs ...interface{}) bool {
 	}
 
 	return true
-
 }
 
 // False asserts that the specified value is false.
@@ -673,7 +666,6 @@ func False(t TestingT, value bool, msgAndArgs ...interface{}) bool {
 	}
 
 	return true
-
 }
 
 // NotEqual asserts that the specified values are NOT equal.
@@ -696,7 +688,6 @@ func NotEqual(t TestingT, expected, actual interface{}, msgAndArgs ...interface{
 	}
 
 	return true
-
 }
 
 // NotEqualValues asserts that two objects are not equal even when converted to the same type
@@ -719,7 +710,6 @@ func NotEqualValues(t TestingT, expected, actual interface{}, msgAndArgs ...inte
 // return (true, false) if element was not found.
 // return (true, true) if element was found.
 func includeElement(list interface{}, element interface{}) (ok, found bool) {
-
 	listValue := reflect.ValueOf(list)
 	listKind := reflect.TypeOf(list).Kind()
 	defer func() {
@@ -750,7 +740,6 @@ func includeElement(list interface{}, element interface{}) (ok, found bool) {
 		}
 	}
 	return true, false
-
 }
 
 // Contains asserts that the specified string, list(array, slice...) or map contains the
@@ -773,7 +762,6 @@ func Contains(t TestingT, s, contains interface{}, msgAndArgs ...interface{}) bo
 	}
 
 	return true
-
 }
 
 // NotContains asserts that the specified string, list(array, slice...) or map does NOT contain the
@@ -796,7 +784,6 @@ func NotContains(t TestingT, s, contains interface{}, msgAndArgs ...interface{})
 	}
 
 	return true
-
 }
 
 // Subset asserts that the specified list(array, slice...) contains all
@@ -1001,12 +988,10 @@ type PanicTestFunc func()
 
 // didPanic returns true if the function passed to it panics. Otherwise, it returns false.
 func didPanic(f PanicTestFunc) (bool, interface{}, string) {
-
 	didPanic := false
 	var message interface{}
 	var stack string
 	func() {
-
 		defer func() {
 			if message = recover(); message != nil {
 				didPanic = true
@@ -1016,11 +1001,9 @@ func didPanic(f PanicTestFunc) (bool, interface{}, string) {
 
 		// call the target function
 		f()
-
 	}()
 
 	return didPanic, message, stack
-
 }
 
 // Panics asserts that the code inside the specified PanicTestFunc panics.
@@ -1377,7 +1360,6 @@ func EqualError(t TestingT, theError error, errString string, msgAndArgs ...inte
 
 // matchRegexp return true if a specified regexp matches a string.
 func matchRegexp(rx interface{}, str interface{}) bool {
-
 	var r *regexp.Regexp
 	if rr, ok := rx.(*regexp.Regexp); ok {
 		r = rr
@@ -1386,7 +1368,6 @@ func matchRegexp(rx interface{}, str interface{}) bool {
 	}
 
 	return (r.FindStringIndex(fmt.Sprint(str)) != nil)
-
 }
 
 // Regexp asserts that a specified regexp matches a string.
@@ -1422,7 +1403,6 @@ func NotRegexp(t TestingT, rx interface{}, str interface{}, msgAndArgs ...interf
 	}
 
 	return !match
-
 }
 
 // Zero asserts that i is the zero value for its type.

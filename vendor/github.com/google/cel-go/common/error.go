@@ -40,7 +40,7 @@ var (
 
 // ToDisplayString decorates the error message with the source location.
 func (e *Error) ToDisplayString(source Source) string {
-	var result = fmt.Sprintf("ERROR: %s:%d:%d: %s",
+	result := fmt.Sprintf("ERROR: %s:%d:%d: %s",
 		source.Description(),
 		e.Location.Line(),
 		e.Location.Column()+1, // add one to the 0-based column for display
@@ -48,8 +48,8 @@ func (e *Error) ToDisplayString(source Source) string {
 	if snippet, found := source.Snippet(e.Location.Line()); found {
 		snippet := strings.Replace(snippet, "\t", " ", -1)
 		srcLine := "\n | " + snippet
-		var bytes = []byte(snippet)
-		var indLine = "\n | "
+		bytes := []byte(snippet)
+		indLine := "\n | "
 		for i := 0; i < e.Location.Column() && len(bytes) > 0; i++ {
 			_, sz := utf8.DecodeRune(bytes)
 			bytes = bytes[sz:]

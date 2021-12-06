@@ -101,7 +101,6 @@ type diskServiceManager interface {
 		instanceZone string,
 		instanceName string,
 		devicePath string) error
-
 	ResizeDiskOnCloudProvider(disk *Disk, sizeGb int64, zone string) error
 	RegionalResizeDiskOnCloudProvider(disk *Disk, sizeGb int64) error
 
@@ -154,8 +153,8 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 	sizeGb int64,
 	tagsStr string,
 	diskType string,
-	replicaZones sets.String) (*Disk, error) {
-
+	replicaZones sets.String) (*Disk, error,
+) {
 	diskTypeURI, err := manager.getDiskTypeURI(
 		manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType)
 	if err != nil {
@@ -259,8 +258,8 @@ func (manager *gceServiceManager) GetDiskFromCloudProvider(
 }
 
 func (manager *gceServiceManager) GetRegionalDiskFromCloudProvider(
-	diskName string) (*Disk, error) {
-
+	diskName string) (*Disk, error,
+) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 	diskBeta, err := manager.gce.c.RegionDisks().Get(ctx, meta.RegionalKey(diskName, manager.gce.region))
@@ -293,7 +292,6 @@ func (manager *gceServiceManager) DeleteDiskOnCloudProvider(
 
 func (manager *gceServiceManager) DeleteRegionalDiskOnCloudProvider(
 	diskName string) error {
-
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 	return manager.gce.c.RegionDisks().Delete(ctx, meta.RegionalKey(diskName, manager.gce.region))
@@ -334,8 +332,8 @@ func (manager *gceServiceManager) getDiskSourceURI(disk *Disk) (string, error) {
 }
 
 func (manager *gceServiceManager) getDiskTypeURI(
-	diskRegion string, diskZoneInfo zoneType, diskType string) (string, error) {
-
+	diskRegion string, diskZoneInfo zoneType, diskType string) (string, error,
+) {
 	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
 
 	switch zoneInfo := diskZoneInfo.(type) {
@@ -417,7 +415,6 @@ func (manager *gceServiceManager) ResizeDiskOnCloudProvider(disk *Disk, sizeGb i
 }
 
 func (manager *gceServiceManager) RegionalResizeDiskOnCloudProvider(disk *Disk, sizeGb int64) error {
-
 	resizeServiceRequest := &compute.RegionDisksResizeRequest{
 		SizeGb: sizeGb,
 	}
@@ -741,8 +738,8 @@ func (g *Cloud) CreateDisk(
 // name & size, replicated to the specified zones. It stores specified tags
 // encoded in JSON in Description field.
 func (g *Cloud) CreateRegionalDisk(
-	name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*Disk, error) {
-
+	name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*Disk, error,
+) {
 	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
 	// are not currently usable. This functionality should be reverted to checking
 	// against managed zones if we want users to be able to create RegionalDisks
@@ -831,7 +828,6 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 	case singleZone:
 		mc = newDiskMetricContextZonal("resize", disk.Region, zoneInfo.zone)
 		err := g.manager.ResizeDiskOnCloudProvider(disk, requestGIB, zoneInfo.zone)
-
 		if err != nil {
 			return oldSize, mc.Observe(err)
 		}
@@ -839,7 +835,6 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 	case multiZone:
 		mc = newDiskMetricContextRegional("resize", disk.Region)
 		err := g.manager.RegionalResizeDiskOnCloudProvider(disk, requestGIB)
-
 		if err != nil {
 			return oldSize, mc.Observe(err)
 		}
@@ -869,8 +864,7 @@ func (g *Cloud) GetAutoLabelsForPD(disk *Disk) (map[string]string, error) {
 			// Unexpected, but sanity-check
 			return nil, fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", disk)
 		}
-		labels[v1.LabelTopologyZone] =
-			volumehelpers.ZonesSetToLabelValue(zoneInfo.replicaZones)
+		labels[v1.LabelTopologyZone] = volumehelpers.ZonesSetToLabelValue(zoneInfo.replicaZones)
 		labels[v1.LabelTopologyRegion] = disk.Region
 	case nil:
 		// Unexpected, but sanity-check

@@ -36,16 +36,16 @@ func TestTar(t *testing.T) {
 	}
 	defer os.RemoveAll(tmp)
 
-	if err := os.Mkdir(filepath.Join(tmp, "subdir"), os.FileMode(0755)); err != nil {
+	if err := os.Mkdir(filepath.Join(tmp, "subdir"), os.FileMode(0o755)); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmp, "file1"), []byte(`file1 data`), os.FileMode(0644)); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmp, "file1"), []byte(`file1 data`), os.FileMode(0o644)); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmp, "file2"), []byte(`file2 data`), os.FileMode(0644)); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmp, "file2"), []byte(`file2 data`), os.FileMode(0o644)); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmp, "subdir", "file4"), []byte(`file4 data`), os.FileMode(0644)); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmp, "subdir", "file4"), []byte(`file4 data`), os.FileMode(0o644)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,7 +134,6 @@ func readAllTar(tarPath string) (map[string]string, error) {
 			break // End of archive
 		}
 		if err != nil {
-
 			return nil, err
 		}
 

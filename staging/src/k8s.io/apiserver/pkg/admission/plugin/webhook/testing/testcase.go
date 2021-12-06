@@ -49,17 +49,21 @@ var matchEverythingRules = []registrationv1.RuleWithOperations{{
 	},
 }}
 
-var sideEffectsUnknown = registrationv1.SideEffectClassUnknown
-var sideEffectsNone = registrationv1.SideEffectClassNone
-var sideEffectsSome = registrationv1.SideEffectClassSome
-var sideEffectsNoneOnDryRun = registrationv1.SideEffectClassNoneOnDryRun
+var (
+	sideEffectsUnknown      = registrationv1.SideEffectClassUnknown
+	sideEffectsNone         = registrationv1.SideEffectClassNone
+	sideEffectsSome         = registrationv1.SideEffectClassSome
+	sideEffectsNoneOnDryRun = registrationv1.SideEffectClassNoneOnDryRun
+)
 
-var reinvokeNever = registrationv1.NeverReinvocationPolicy
-var reinvokeIfNeeded = registrationv1.IfNeededReinvocationPolicy
+var (
+	reinvokeNever    = registrationv1.NeverReinvocationPolicy
+	reinvokeIfNeeded = registrationv1.IfNeededReinvocationPolicy
+)
 
 // NewFakeValidatingDataSource returns a mock client and informer returning the given webhooks.
 func NewFakeValidatingDataSource(name string, webhooks []registrationv1.ValidatingWebhook, stopCh <-chan struct{}) (clientset kubernetes.Interface, factory informers.SharedInformerFactory) {
-	var objs = []runtime.Object{
+	objs := []runtime.Object{
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
@@ -84,7 +88,7 @@ func NewFakeValidatingDataSource(name string, webhooks []registrationv1.Validati
 
 // NewFakeMutatingDataSource returns a mock client and informer returning the given webhooks.
 func NewFakeMutatingDataSource(name string, webhooks []registrationv1.MutatingWebhook, stopCh <-chan struct{}) (clientset kubernetes.Interface, factory informers.SharedInformerFactory) {
-	var objs = []runtime.Object{
+	objs := []runtime.Object{
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
@@ -520,7 +524,8 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 			}},
 			ExpectStatusCode: http.StatusForbidden,
 			ErrorContains:    "without explanation",
-		}, {
+		},
+		{
 			Name: "absent response and fail open",
 			Webhooks: []registrationv1.ValidatingWebhook{{
 				Name:                    "nilResponse",

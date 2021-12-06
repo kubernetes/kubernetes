@@ -53,7 +53,6 @@ type ImageGCManager interface {
 
 	// Start async garbage collection of images.
 	Start()
-
 	GetImageList() ([]container.Image, error)
 
 	// Delete all unused images.
@@ -201,7 +200,6 @@ func (im *realImageGCManager) Start() {
 			im.imageCache.set(images)
 		}
 	}, 30*time.Second, wait.NeverStop)
-
 }
 
 // Get a list of images on this node

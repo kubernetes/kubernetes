@@ -12,7 +12,6 @@ type InputStream struct {
 }
 
 func NewInputStream(data string) *InputStream {
-
 	is := new(InputStream)
 
 	is.name = "<empty>"
@@ -36,7 +35,6 @@ func (is *InputStream) Consume() {
 }
 
 func (is *InputStream) LA(offset int) int {
-
 	if offset == 0 {
 		return 0 // nil
 	}

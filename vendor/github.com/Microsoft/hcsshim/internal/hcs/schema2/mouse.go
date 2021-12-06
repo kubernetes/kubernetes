@@ -9,5 +9,4 @@
 
 package hcsschema
 
-type Mouse struct {
-}
+type Mouse struct{}

@@ -247,7 +247,7 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 			klog.Warningf("Updating replica set revision OldRevision not int %s", err)
 			return false
 		}
-		//If the RS annotation is empty then initialise it to 0
+		// If the RS annotation is empty then initialise it to 0
 		oldRevisionInt = 0
 	}
 	newRevisionInt, err := strconv.ParseInt(newRevision, 10, 64)

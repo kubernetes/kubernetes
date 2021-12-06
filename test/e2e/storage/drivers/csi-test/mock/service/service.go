@@ -90,7 +90,7 @@ func (o OSDirIO) DirExists(path string) (bool, error) {
 }
 
 func (o OSDirIO) Mkdir(path string) error {
-	return os.Mkdir(path, os.FileMode(0755))
+	return os.Mkdir(path, os.FileMode(0o755))
 }
 
 func (o OSDirIO) RemoveAll(path string) error {
@@ -234,19 +234,18 @@ func (s *service) findVolNoLock(k, v string) (volIdx int, volInfo csi.Volume) {
 }
 
 func (s *service) findVolByName(
-	ctx context.Context, name string) (int, csi.Volume) {
-
+	ctx context.Context, name string) (int, csi.Volume,
+) {
 	return s.findVol("name", name)
 }
 
 func (s *service) findVolByID(
-	ctx context.Context, id string) (int, csi.Volume) {
-
+	ctx context.Context, id string) (int, csi.Volume,
+) {
 	return s.findVol("id", id)
 }
 
 func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string]string) cache.Snapshot {
-
 	ptime := timestamppb.Now()
 	return cache.Snapshot{
 		Name:       name,

@@ -18,14 +18,13 @@ package cpumanager
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"io/ioutil"
-	"os"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
@@ -323,9 +322,11 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 				[]struct{ request, limit string }{{"100m", "100m"}},
 				[]struct{ request, limit string }{{"4000m", "4000m"}}),
 			expInitCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet()},
+				cpuset.NewCPUSet(),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 		},
 		{
 			description:      "Equal Number of Guaranteed CPUs",
@@ -339,9 +340,11 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 				[]struct{ request, limit string }{{"4000m", "4000m"}},
 				[]struct{ request, limit string }{{"4000m", "4000m"}}),
 			expInitCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 		},
 		{
 			description:      "More Init Container Guaranteed CPUs",
@@ -355,9 +358,11 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 				[]struct{ request, limit string }{{"6000m", "6000m"}},
 				[]struct{ request, limit string }{{"4000m", "4000m"}}),
 			expInitCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5, 2, 6)},
+				cpuset.NewCPUSet(0, 4, 1, 5, 2, 6),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 		},
 		{
 			description:      "Less Init Container Guaranteed CPUs",
@@ -371,9 +376,11 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 				[]struct{ request, limit string }{{"2000m", "2000m"}},
 				[]struct{ request, limit string }{{"4000m", "4000m"}}),
 			expInitCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4)},
+				cpuset.NewCPUSet(0, 4),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 		},
 		{
 			description:      "Multi Init Container Equal CPUs",
@@ -386,14 +393,18 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			pod: makeMultiContainerPod(
 				[]struct{ request, limit string }{
 					{"2000m", "2000m"},
-					{"2000m", "2000m"}},
+					{"2000m", "2000m"},
+				},
 				[]struct{ request, limit string }{
-					{"2000m", "2000m"}}),
+					{"2000m", "2000m"},
+				}),
 			expInitCSets: []cpuset.CPUSet{
 				cpuset.NewCPUSet(0, 4),
-				cpuset.NewCPUSet(0, 4)},
+				cpuset.NewCPUSet(0, 4),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4)},
+				cpuset.NewCPUSet(0, 4),
+			},
 		},
 		{
 			description:      "Multi Init Container Less CPUs",
@@ -406,14 +417,18 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			pod: makeMultiContainerPod(
 				[]struct{ request, limit string }{
 					{"4000m", "4000m"},
-					{"4000m", "4000m"}},
+					{"4000m", "4000m"},
+				},
 				[]struct{ request, limit string }{
-					{"2000m", "2000m"}}),
+					{"2000m", "2000m"},
+				}),
 			expInitCSets: []cpuset.CPUSet{
 				cpuset.NewCPUSet(0, 4, 1, 5),
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4)},
+				cpuset.NewCPUSet(0, 4),
+			},
 		},
 		{
 			description:      "Multi Init Container More CPUs",
@@ -426,14 +441,18 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			pod: makeMultiContainerPod(
 				[]struct{ request, limit string }{
 					{"2000m", "2000m"},
-					{"2000m", "2000m"}},
+					{"2000m", "2000m"},
+				},
 				[]struct{ request, limit string }{
-					{"4000m", "4000m"}}),
+					{"4000m", "4000m"},
+				}),
 			expInitCSets: []cpuset.CPUSet{
 				cpuset.NewCPUSet(0, 4),
-				cpuset.NewCPUSet(0, 4)},
+				cpuset.NewCPUSet(0, 4),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 		},
 		{
 			description:      "Multi Init Container Increasing CPUs",
@@ -446,14 +465,18 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			pod: makeMultiContainerPod(
 				[]struct{ request, limit string }{
 					{"2000m", "2000m"},
-					{"4000m", "4000m"}},
+					{"4000m", "4000m"},
+				},
 				[]struct{ request, limit string }{
-					{"6000m", "6000m"}}),
+					{"6000m", "6000m"},
+				}),
 			expInitCSets: []cpuset.CPUSet{
 				cpuset.NewCPUSet(0, 4),
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 			expCSets: []cpuset.CPUSet{
-				cpuset.NewCPUSet(0, 4, 1, 5, 2, 6)},
+				cpuset.NewCPUSet(0, 4, 1, 5, 2, 6),
+			},
 		},
 		{
 			description:      "Multi Init, Multi App Container Split CPUs",
@@ -466,16 +489,20 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			pod: makeMultiContainerPod(
 				[]struct{ request, limit string }{
 					{"2000m", "2000m"},
-					{"4000m", "4000m"}},
+					{"4000m", "4000m"},
+				},
 				[]struct{ request, limit string }{
 					{"2000m", "2000m"},
-					{"2000m", "2000m"}}),
+					{"2000m", "2000m"},
+				}),
 			expInitCSets: []cpuset.CPUSet{
 				cpuset.NewCPUSet(0, 4),
-				cpuset.NewCPUSet(0, 4, 1, 5)},
+				cpuset.NewCPUSet(0, 4, 1, 5),
+			},
 			expCSets: []cpuset.CPUSet{
 				cpuset.NewCPUSet(0, 4),
-				cpuset.NewCPUSet(1, 5)},
+				cpuset.NewCPUSet(1, 5),
+			},
 		},
 	}
 
@@ -657,7 +684,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }
 
@@ -1363,6 +1389,5 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
 			}
 		})
-
 	}
 }

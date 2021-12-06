@@ -573,7 +573,6 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers() *corev1.Pod {

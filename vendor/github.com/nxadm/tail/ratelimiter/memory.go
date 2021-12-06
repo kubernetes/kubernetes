@@ -23,7 +23,6 @@ func NewMemory() *Memory {
 }
 
 func (m *Memory) GetBucketFor(key string) (*LeakyBucket, error) {
-
 	bucket, ok := m.store[key]
 	if !ok {
 		return nil, errors.New("miss")
@@ -33,7 +32,6 @@ func (m *Memory) GetBucketFor(key string) (*LeakyBucket, error) {
 }
 
 func (m *Memory) SetBucketFor(key string, bucket LeakyBucket) error {
-
 	if len(m.store) > GC_SIZE {
 		m.GarbageCollect()
 	}

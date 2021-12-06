@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -27,7 +28,7 @@ import (
 var DefaultSysSpec = SysSpec{
 	OS: "Microsoft Windows Server 2016",
 	KernelSpec: KernelSpec{
-		Versions:  []string{`10\.0\.1439[3-9]`, `10\.0\.14[4-9][0-9]{2}`, `10\.0\.1[5-9][0-9]{3}`, `10\.0\.[2-9][0-9]{4}`, `10\.[1-9]+\.[0-9]+`}, //requires >= '10.0.14393'
+		Versions:  []string{`10\.0\.1439[3-9]`, `10\.0\.14[4-9][0-9]{2}`, `10\.0\.1[5-9][0-9]{3}`, `10\.0\.[2-9][0-9]{4}`, `10\.[1-9]+\.[0-9]+`}, // requires >= '10.0.14393'
 		Required:  []KernelConfig{},
 		Optional:  []KernelConfig{},
 		Forbidden: []KernelConfig{},

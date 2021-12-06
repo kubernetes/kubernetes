@@ -1130,7 +1130,6 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 
 		lockObj = action.(fakeclient.UpdateAction).GetObject()
 		return true, lockObj, nil
-
 	})
 
 	c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {

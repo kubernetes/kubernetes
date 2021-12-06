@@ -32,9 +32,7 @@ const (
 	roundTripperDefaultCount = 3
 )
 
-var (
-	clientLock sync.Mutex
-)
+var clientLock sync.Mutex
 
 // Connect makes connection to vSphere
 // No actions are taken if a connection exists and alive. Otherwise, a new client will be created.

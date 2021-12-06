@@ -37,7 +37,7 @@ func newPathExpression(path string) (*pathExpression, error) {
 func templateToRegularExpression(template string) (expression string, literalCount int, varNames []string, varCount int, tokens []string) {
 	var buffer bytes.Buffer
 	buffer.WriteString("^")
-	//tokens = strings.Split(template, "/")
+	// tokens = strings.Split(template, "/")
 	tokens = tokenizePath(template)
 	for _, each := range tokens {
 		if each == "" {

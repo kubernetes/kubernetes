@@ -30,7 +30,6 @@ type ParserATNSimulator struct {
 }
 
 func NewParserATNSimulator(parser Parser, atn *ATN, decisionToDFA []*DFA, sharedContextCache *PredictionContextCache) *ParserATNSimulator {
-
 	p := new(ParserATNSimulator)
 
 	p.BaseATNSimulator = NewBaseATNSimulator(atn, sharedContextCache)
@@ -148,7 +147,6 @@ func (p *ParserATNSimulator) AdaptivePredict(input TokenStream, decision int, ou
 		fmt.Println("DFA after predictATN: " + dfa.String(p.parser.GetLiteralNames(), nil))
 	}
 	return alt
-
 }
 
 // Performs ATN simulation to compute a predicted alternative based
@@ -182,7 +180,6 @@ func (p *ParserATNSimulator) AdaptivePredict(input TokenStream, decision int, ou
 //    conflict + preds
 //
 func (p *ParserATNSimulator) execATN(dfa *DFA, s0 *DFAState, input TokenStream, startIndex int, outerContext ParserRuleContext) int {
-
 	if ParserATNSimulatorDebug || ParserATNSimulatorListATNDecisions {
 		fmt.Println("execATN decision " + strconv.Itoa(dfa.decision) +
 			" exec LA(1)==" + p.getLookaheadName(input) +
@@ -296,7 +293,7 @@ func (p *ParserATNSimulator) getExistingTargetState(previousD *DFAState, t int) 
 		return nil
 	}
 
-	return previousD.getIthEdge(t+1)
+	return previousD.getIthEdge(t + 1)
 }
 
 // Compute a target state for an edge in the DFA, and attempt to add the
@@ -377,7 +374,6 @@ func (p *ParserATNSimulator) predicateDFAState(dfaState *DFAState, decisionState
 
 // comes back with reach.uniqueAlt set to a valid alt
 func (p *ParserATNSimulator) execATNWithFullContext(dfa *DFA, D *DFAState, s0 ATNConfigSet, input TokenStream, startIndex int, outerContext ParserRuleContext) int {
-
 	if ParserATNSimulatorDebug || ParserATNSimulatorListATNDecisions {
 		fmt.Println("execATNWithFullContext " + s0.String())
 	}
@@ -728,7 +724,6 @@ func (p *ParserATNSimulator) computeStartState(a ATNState, ctx RuleContext, full
 // calling {@link Parser//getPrecedence}).
 //
 func (p *ParserATNSimulator) applyPrecedenceFilter(configs ATNConfigSet) ATNConfigSet {
-
 	statesFromAlt1 := make(map[int]PredictionContext)
 	configSet := NewBaseATNConfigSet(configs.FullContext())
 
@@ -779,7 +774,6 @@ func (p *ParserATNSimulator) getReachableTarget(trans Transition, ttype int) ATN
 }
 
 func (p *ParserATNSimulator) getPredsForAmbigAlts(ambigAlts *BitSet, configs ATNConfigSet, nalts int) []SemanticContext {
-
 	altToPred := make([]SemanticContext, nalts+1)
 	for _, c := range configs.GetItems() {
 		if ambigAlts.contains(c.GetAlt()) {
@@ -979,7 +973,6 @@ func (p *ParserATNSimulator) closure(config ATNConfig, configs ATNConfigSet, clo
 }
 
 func (p *ParserATNSimulator) closureCheckingStopState(config ATNConfig, configs ATNConfigSet, closureBusy *Set, collectPredicates, fullCtx bool, depth int, treatEOFAsEpsilon bool) {
-
 	if ParserATNSimulatorDebug {
 		fmt.Println("closure(" + config.String() + ")")
 		fmt.Println("configs(" + configs.String() + ")")
@@ -1098,7 +1091,6 @@ func (p *ParserATNSimulator) getRuleName(index int) string {
 }
 
 func (p *ParserATNSimulator) getEpsilonTarget(config ATNConfig, t Transition, collectPredicates, inContext, fullCtx, treatEOFAsEpsilon bool) ATNConfig {
-
 	switch t.getSerializationType() {
 	case TransitionRULE:
 		return p.ruleTransition(config, t.(*RuleTransition))
@@ -1151,7 +1143,6 @@ func (p *ParserATNSimulator) actionTransition(config ATNConfig, t *ActionTransit
 
 func (p *ParserATNSimulator) precedenceTransition(config ATNConfig,
 	pt *PrecedencePredicateTransition, collectPredicates, inContext, fullCtx bool) *BaseATNConfig {
-
 	if ParserATNSimulatorDebug {
 		fmt.Println("PRED (collectPredicates=" + fmt.Sprint(collectPredicates) + ") " +
 			strconv.Itoa(pt.precedence) + ">=_p, ctx dependent=true")
@@ -1187,7 +1178,6 @@ func (p *ParserATNSimulator) precedenceTransition(config ATNConfig,
 }
 
 func (p *ParserATNSimulator) predTransition(config ATNConfig, pt *PredicateTransition, collectPredicates, inContext, fullCtx bool) *BaseATNConfig {
-
 	if ParserATNSimulatorDebug {
 		fmt.Println("PRED (collectPredicates=" + fmt.Sprint(collectPredicates) + ") " + strconv.Itoa(pt.ruleIndex) +
 			":" + strconv.Itoa(pt.predIndex) + ", ctx dependent=" + fmt.Sprint(pt.isCtxDependent))
@@ -1309,7 +1299,6 @@ func (p *ParserATNSimulator) getLookaheadName(input TokenStream) string {
 //  "dead" code for a bit.
 //
 func (p *ParserATNSimulator) dumpDeadEndConfigs(nvae *NoViableAltException) {
-
 	panic("Not implemented")
 
 	//    fmt.Println("dead end configs: ")

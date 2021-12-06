@@ -64,7 +64,6 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 	}
 
 	return service, nil
-
 }
 
 // useV1API returns true if the v1 CRI API should be used instead of v1alpha2.
@@ -89,7 +88,6 @@ func (r *remoteImageService) determineAPIVersion(conn *grpc.ClientConn) error {
 
 	if _, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{}); err == nil {
 		klog.V(2).InfoS("Using CRI v1 image API")
-
 	} else if status.Code(err) == codes.Unimplemented {
 		klog.V(2).InfoS("Falling back to CRI v1alpha2 image API (deprecated)")
 		r.imageClientV1alpha2 = runtimeapiV1alpha2.NewImageServiceClient(conn)

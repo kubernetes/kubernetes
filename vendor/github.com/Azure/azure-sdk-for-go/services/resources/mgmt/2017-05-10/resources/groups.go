@@ -8,11 +8,12 @@ package resources
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // GroupsClient is the provides operations for working with resources and resource groups.
@@ -46,10 +47,15 @@ func (client GroupsClient) CheckExistence(ctx context.Context, resourceGroupName
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.GroupsClient", "CheckExistence", err.Error())
 	}
 
@@ -128,12 +134,19 @@ func (client GroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}},
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.Location", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.Location", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.GroupsClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -216,10 +229,15 @@ func (client GroupsClient) Delete(ctx context.Context, resourceGroupName string)
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.GroupsClient", "Delete", err.Error())
 	}
 
@@ -300,10 +318,15 @@ func (client GroupsClient) ExportTemplate(ctx context.Context, resourceGroupName
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.GroupsClient", "ExportTemplate", err.Error())
 	}
 
@@ -384,10 +407,15 @@ func (client GroupsClient) Get(ctx context.Context, resourceGroupName string) (r
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.GroupsClient", "Get", err.Error())
 	}
 
@@ -590,10 +618,15 @@ func (client GroupsClient) Update(ctx context.Context, resourceGroupName string,
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.GroupsClient", "Update", err.Error())
 	}
 

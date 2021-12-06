@@ -382,5 +382,4 @@ func TestWriteConfigMapDeleted(t *testing.T) {
 			t.Fatal(client.Actions())
 		}
 	})
-
 }

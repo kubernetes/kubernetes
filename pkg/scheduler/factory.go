@@ -118,7 +118,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	if len(ignoredExtendedResources) > 0 {
 		for i := range c.profiles {
 			prof := &c.profiles[i]
-			var found = false
+			found := false
 			for k := range prof.PluginConfig {
 				if prof.PluginConfig[k].Name == noderesources.FitName {
 					// Update the existing args

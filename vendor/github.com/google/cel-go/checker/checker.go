@@ -311,7 +311,6 @@ func (c *checker) resolveOverloadOrError(
 func (c *checker) resolveOverload(
 	loc common.Location,
 	fn *exprpb.Decl, target *exprpb.Expr, args []*exprpb.Expr) *overloadResolution {
-
 	var argTypes []*exprpb.Type
 	if target != nil {
 		argTypes = append(argTypes, c.getType(target))
@@ -617,7 +616,7 @@ func (c *checker) location(e *exprpb.Expr) common.Location {
 
 func (c *checker) locationByID(id int64) common.Location {
 	positions := c.sourceInfo.GetPositions()
-	var line = 1
+	line := 1
 	if offset, found := positions[id]; found {
 		col := int(offset)
 		for _, lineOffset := range c.sourceInfo.LineOffsets {

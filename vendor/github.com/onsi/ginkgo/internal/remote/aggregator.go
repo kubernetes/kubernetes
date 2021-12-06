@@ -79,7 +79,7 @@ func (aggregator *Aggregator) AfterSuiteDidRun(setupSummary *types.SetupSummary)
 }
 
 func (aggregator *Aggregator) SpecWillRun(specSummary *types.SpecSummary) {
-	//noop
+	// noop
 }
 
 func (aggregator *Aggregator) SpecDidComplete(specSummary *types.SpecSummary) {

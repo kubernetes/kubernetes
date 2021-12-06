@@ -650,7 +650,6 @@ func setWriteCommand(file string, container *v1.Container) {
 	if !framework.NodeOSDistroIs("windows") {
 		container.Args = append(container.Args, fmt.Sprintf("--file_mode=%v", file))
 	}
-
 }
 
 func addSubpathVolumeContainer(container *v1.Container, volumeMount v1.VolumeMount) {
@@ -957,7 +956,6 @@ func TestPodContainerRestartWithConfigmapModified(f *framework.Framework, origin
 			framework.ExpectNoError(err, "while fixing liveness probe")
 		},
 	})
-
 }
 
 func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, pod *v1.Pod, forceDelete bool) {

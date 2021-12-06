@@ -25,7 +25,7 @@ import (
 )
 
 func TestDefaultStabilityLevel(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		inputValue  StabilityLevel
 		expectValue StabilityLevel
@@ -54,7 +54,7 @@ func TestDefaultStabilityLevel(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			var stability = tc.inputValue
+			stability := tc.inputValue
 
 			stability.setDefaults()
 			assert.Equalf(t, tc.expectValue, stability, "Got %s, expected: %v ", stability, tc.expectValue)
@@ -69,7 +69,7 @@ func TestConstrainToAllowedList(t *testing.T) {
 		},
 	}
 	labelNameList := []string{"label_a", "label_b"}
-	var tests = []struct {
+	tests := []struct {
 		name                 string
 		inputLabelValueList  []string
 		outputLabelValueList []string
@@ -101,7 +101,7 @@ func TestConstrainLabelMap(t *testing.T) {
 			"label_a": sets.NewString("allow_value1", "allow_value2"),
 		},
 	}
-	var tests = []struct {
+	tests := []struct {
 		name           string
 		inputLabelMap  map[string]string
 		outputLabelMap map[string]string

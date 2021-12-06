@@ -31,7 +31,6 @@ const (
 
 type LookupPatchItem interface {
 	openapi.SchemaVisitor
-
 	Error() error
 	Path() *openapi.Path
 }

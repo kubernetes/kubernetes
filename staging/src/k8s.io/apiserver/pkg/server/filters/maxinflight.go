@@ -164,7 +164,6 @@ func WithMaxInFlightLimit(
 		if c == nil {
 			handler.ServeHTTP(w, r)
 		} else {
-
 			select {
 			case c <- true:
 				// We note the concurrency level both while the

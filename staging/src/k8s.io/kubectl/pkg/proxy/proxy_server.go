@@ -241,7 +241,7 @@ func (s *Server) ListenUnix(path string) (net.Listener, error) {
 		os.Remove(path)
 	}
 	// Default to only user accessible socket, caller can open up later if desired
-	oldmask, _ := util.Umask(0077)
+	oldmask, _ := util.Umask(0o077)
 	l, err := net.Listen("unix", path)
 	util.Umask(oldmask)
 	return l, err

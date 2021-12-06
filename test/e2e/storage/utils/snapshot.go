@@ -97,7 +97,6 @@ func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured
 	framework.ExpectNoError(err)
 
 	return vscontent
-
 }
 
 // DeleteSnapshotWithoutWaiting deletes a VolumeSnapshot and return directly without waiting

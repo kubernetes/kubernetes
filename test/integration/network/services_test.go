@@ -38,7 +38,6 @@ import (
 // mistakenly, repair the ClusterIP assigned to the Service that is being deleted.
 // https://issues.k8s.io/87603
 func TestServicesFinalizersRepairLoop(t *testing.T) {
-
 	serviceCIDR := "10.0.0.0/16"
 	clusterIP := "10.0.0.20"
 	interval := 5 * time.Second

@@ -73,7 +73,6 @@ type SchemaOperation func(schema *Schema, context string)
 
 // Applies a specified function to a Schema and all of the Schemas that it contains.
 func (schema *Schema) applyToSchemas(operation SchemaOperation, context string) {
-
 	if schema.AdditionalItems != nil {
 		s := schema.AdditionalItems.Schema
 		if s != nil {

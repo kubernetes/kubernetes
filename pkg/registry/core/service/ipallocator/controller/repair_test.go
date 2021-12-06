@@ -243,10 +243,12 @@ func makeRangeRegistry(t *testing.T, cidrRange string) *mockRangeRegistry {
 func makeFakeClientSet() *fake.Clientset {
 	return fake.NewSimpleClientset()
 }
+
 func makeIPNet(cidr string) *net.IPNet {
 	_, net, _ := netutils.ParseCIDRSloppy(cidr)
 	return net
 }
+
 func TestShouldWorkOnSecondary(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -281,7 +283,6 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			fakeClient := makeFakeClientSet()
 			primaryRegistry := makeRangeRegistry(t, tc.primaryNet.String())
 			var secondaryRegistry *mockRangeRegistry

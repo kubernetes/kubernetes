@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // WebApplicationFirewallPoliciesClient is the network Client
@@ -49,8 +50,11 @@ func (client WebApplicationFirewallPoliciesClient) CreateOrUpdate(ctx context.Co
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: policyName,
-			Constraints: []validation.Constraint{{Target: "policyName", Name: validation.MaxLength, Rule: 128, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: policyName,
+			Constraints: []validation.Constraint{{Target: "policyName", Name: validation.MaxLength, Rule: 128, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WebApplicationFirewallPoliciesClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -133,8 +137,11 @@ func (client WebApplicationFirewallPoliciesClient) Delete(ctx context.Context, r
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: policyName,
-			Constraints: []validation.Constraint{{Target: "policyName", Name: validation.MaxLength, Rule: 128, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: policyName,
+			Constraints: []validation.Constraint{{Target: "policyName", Name: validation.MaxLength, Rule: 128, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WebApplicationFirewallPoliciesClient", "Delete", err.Error())
 	}
 
@@ -216,8 +223,11 @@ func (client WebApplicationFirewallPoliciesClient) Get(ctx context.Context, reso
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: policyName,
-			Constraints: []validation.Constraint{{Target: "policyName", Name: validation.MaxLength, Rule: 128, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: policyName,
+			Constraints: []validation.Constraint{{Target: "policyName", Name: validation.MaxLength, Rule: 128, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.WebApplicationFirewallPoliciesClient", "Get", err.Error())
 	}
 

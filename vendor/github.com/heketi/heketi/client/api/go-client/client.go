@@ -221,8 +221,8 @@ func (c *Client) pollResponse(r *http.Response) (*http.Response, error) {
 
 // Wait for the job to finish, waiting waitTime on every loop
 func (c *Client) waitForResponseWithTimer(r *http.Response,
-	waitTime time.Duration) (*http.Response, error) {
-
+	waitTime time.Duration) (*http.Response, error,
+) {
 	// Get temp resource
 	location, err := r.Location()
 	if err != nil {
@@ -254,7 +254,7 @@ func (c *Client) waitForResponseWithTimer(r *http.Response,
 				return nil, utils.GetErrorFromResponse(r)
 			}
 			if r != nil {
-				//Read Response Body
+				// Read Response Body
 				ioutil.ReadAll(r.Body)
 				r.Body.Close()
 			}
@@ -263,12 +263,10 @@ func (c *Client) waitForResponseWithTimer(r *http.Response,
 			return r, nil
 		}
 	}
-
 }
 
 // Create JSON Web Token
 func (c *Client) setToken(r *http.Request) error {
-
 	// Create qsh hash
 	qshstring := r.Method + "&" + r.URL.Path
 	hash := sha256.New()
@@ -327,14 +325,14 @@ func (c *Client) retryOperationDo(req *http.Request) (*http.Response, error) {
 		switch r.StatusCode {
 		case http.StatusTooManyRequests:
 			if r != nil {
-				//Read Response Body
+				// Read Response Body
 				// I don't like discarding error here, but I cant
 				// think of something better atm
 				b, _ := ioutil.ReadAll(r.Body)
 				r.Body.Close()
 				r.Body = ioutil.NopCloser(bytes.NewReader(b))
 			}
-			//sleep before continue
+			// sleep before continue
 			time.Sleep(c.opts.retryDelay(r))
 			continue
 

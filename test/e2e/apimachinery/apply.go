@@ -362,7 +362,6 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		if len(deployment.Spec.Template.Spec.Containers[0].Ports) > 0 {
 			framework.Failf("Expected no container ports but got: %v, object: \n%#v", deployment.Spec.Template.Spec.Containers[0].Ports, deployment)
 		}
-
 	})
 
 	/*

@@ -292,8 +292,8 @@ func NewBasicClientOnSovereignCloud(accountName, accountKey string, env azure.En
 	return NewClient(accountName, accountKey, env.StorageEndpointSuffix, DefaultAPIVersion, defaultUseHTTPS)
 }
 
-//NewEmulatorClient contructs a Client intended to only work with Azure
-//Storage Emulator
+// NewEmulatorClient contructs a Client intended to only work with Azure
+// Storage Emulator
 func NewEmulatorClient() (Client, error) {
 	return NewClient(StorageEmulatorAccountName, StorageEmulatorAccountKey, DefaultBaseURL, DefaultAPIVersion, false)
 }

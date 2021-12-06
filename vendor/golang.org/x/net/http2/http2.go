@@ -71,9 +71,7 @@ const (
 	defaultMaxReadFrameSize = 1 << 20
 )
 
-var (
-	clientPreface = []byte(ClientPreface)
-)
+var clientPreface = []byte(ClientPreface)
 
 type streamState int
 

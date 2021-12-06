@@ -135,7 +135,6 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 		},
 		nil,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %v", err)
 	}

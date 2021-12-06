@@ -107,7 +107,6 @@ func (r *FakeRuntimeService) SetFakeContainers(containers []*FakeContainer) {
 		containerID := c.Id
 		r.Containers[containerID] = c
 	}
-
 }
 
 // AssertCalls validates whether specified calls were made to the FakeRuntimeService.

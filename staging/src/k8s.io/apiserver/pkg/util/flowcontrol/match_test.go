@@ -86,8 +86,10 @@ func TestPolicyRules(t *testing.T) {
 }
 
 func TestLiterals(t *testing.T) {
-	ui := &user.DefaultInfo{Name: "goodu", UID: "1",
-		Groups: []string{"goodg1", "goodg2"}}
+	ui := &user.DefaultInfo{
+		Name: "goodu", UID: "1",
+		Groups: []string{"goodg1", "goodg2"},
+	}
 	reqRN := RequestDigest{
 		RequestInfo: &request.RequestInfo{
 			IsResourceRequest: true,
@@ -126,195 +128,308 @@ func TestLiterals(t *testing.T) {
 		},
 		User: ui,
 	}
-	checkRules(t, true, reqRN, []flowcontrol.PolicyRulesWithSubjects{{
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindGroup,
-			Group: &flowcontrol.GroupSubject{"goodg1"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"*"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindGroup,
-			Group: &flowcontrol.GroupSubject{"*"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"*"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"*"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"*"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"*"}}}},
+	checkRules(t, true, reqRN, []flowcontrol.PolicyRulesWithSubjects{
+		{
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind:  flowcontrol.SubjectKindGroup,
+				Group: &flowcontrol.GroupSubject{"goodg1"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"*"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind:  flowcontrol.SubjectKindGroup,
+				Group: &flowcontrol.GroupSubject{"*"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"*"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"*"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"*"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"*"},
+			}},
+		},
 	})
-	checkRules(t, false, reqRN, []flowcontrol.PolicyRulesWithSubjects{{
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"badu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindGroup,
-			Group: &flowcontrol.GroupSubject{"badg"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"badverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"badapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"badrscs"},
-			Namespaces: []string{"goodns"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:      []string{"goodverb"},
-			APIGroups:  []string{"goodapig"},
-			Resources:  []string{"goodrscs"},
-			Namespaces: []string{"badns"}}}},
+	checkRules(t, false, reqRN, []flowcontrol.PolicyRulesWithSubjects{
+		{
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"badu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind:  flowcontrol.SubjectKindGroup,
+				Group: &flowcontrol.GroupSubject{"badg"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"badverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"badapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"badrscs"},
+				Namespaces: []string{"goodns"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:      []string{"goodverb"},
+				APIGroups:  []string{"goodapig"},
+				Resources:  []string{"goodrscs"},
+				Namespaces: []string{"badns"},
+			}},
+		},
 	})
 	checkRules(t, true, reqRU, []flowcontrol.PolicyRulesWithSubjects{{
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
+		Subjects: []flowcontrol.Subject{{
+			Kind: flowcontrol.SubjectKindUser,
+			User: &flowcontrol.UserSubject{"goodu"},
+		}},
 		ResourceRules: []flowcontrol.ResourcePolicyRule{{
 			Verbs:        []string{"goodverb"},
 			APIGroups:    []string{"goodapig"},
 			Resources:    []string{"goodrscs"},
-			ClusterScope: true}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
+			ClusterScope: true,
+		}},
+	}, {
+		Subjects: []flowcontrol.Subject{{
+			Kind: flowcontrol.SubjectKindUser,
+			User: &flowcontrol.UserSubject{"goodu"},
+		}},
 		ResourceRules: []flowcontrol.ResourcePolicyRule{{
 			Verbs:        []string{"*"},
 			APIGroups:    []string{"goodapig"},
 			Resources:    []string{"goodrscs"},
-			ClusterScope: true}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
+			ClusterScope: true,
+		}},
+	}, {
+		Subjects: []flowcontrol.Subject{{
+			Kind: flowcontrol.SubjectKindUser,
+			User: &flowcontrol.UserSubject{"goodu"},
+		}},
 		ResourceRules: []flowcontrol.ResourcePolicyRule{{
 			Verbs:        []string{"goodverb"},
 			APIGroups:    []string{"*"},
 			Resources:    []string{"goodrscs"},
-			ClusterScope: true}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
+			ClusterScope: true,
+		}},
+	}, {
+		Subjects: []flowcontrol.Subject{{
+			Kind: flowcontrol.SubjectKindUser,
+			User: &flowcontrol.UserSubject{"goodu"},
+		}},
 		ResourceRules: []flowcontrol.ResourcePolicyRule{{
 			Verbs:        []string{"goodverb"},
 			APIGroups:    []string{"goodapig"},
 			Resources:    []string{"*"},
-			ClusterScope: true}}}})
-	checkRules(t, false, reqRU, []flowcontrol.PolicyRulesWithSubjects{{
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:        []string{"badverb"},
-			APIGroups:    []string{"goodapig"},
-			Resources:    []string{"goodrscs"},
-			ClusterScope: true}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:        []string{"goodverb"},
-			APIGroups:    []string{"badapig"},
-			Resources:    []string{"goodrscs"},
-			ClusterScope: true}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:        []string{"goodverb"},
-			APIGroups:    []string{"goodapig"},
-			Resources:    []string{"badrscs"},
-			ClusterScope: true}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		ResourceRules: []flowcontrol.ResourcePolicyRule{{
-			Verbs:        []string{"goodverb"},
-			APIGroups:    []string{"goodapig"},
-			Resources:    []string{"goodrscs"},
-			ClusterScope: false}}},
+			ClusterScope: true,
+		}},
+	}})
+	checkRules(t, false, reqRU, []flowcontrol.PolicyRulesWithSubjects{
+		{
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:        []string{"badverb"},
+				APIGroups:    []string{"goodapig"},
+				Resources:    []string{"goodrscs"},
+				ClusterScope: true,
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:        []string{"goodverb"},
+				APIGroups:    []string{"badapig"},
+				Resources:    []string{"goodrscs"},
+				ClusterScope: true,
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:        []string{"goodverb"},
+				APIGroups:    []string{"goodapig"},
+				Resources:    []string{"badrscs"},
+				ClusterScope: true,
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			ResourceRules: []flowcontrol.ResourcePolicyRule{{
+				Verbs:        []string{"goodverb"},
+				APIGroups:    []string{"goodapig"},
+				Resources:    []string{"goodrscs"},
+				ClusterScope: false,
+			}},
+		},
 	})
-	checkRules(t, true, reqN, []flowcontrol.PolicyRulesWithSubjects{{
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
-			Verbs:           []string{"goodverb"},
-			NonResourceURLs: []string{"/openapi/v2"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
-			Verbs:           []string{"*"},
-			NonResourceURLs: []string{"/openapi/v2"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
-			Verbs:           []string{"goodverb"},
-			NonResourceURLs: []string{"*"}}}},
+	checkRules(t, true, reqN, []flowcontrol.PolicyRulesWithSubjects{
+		{
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
+				Verbs:           []string{"goodverb"},
+				NonResourceURLs: []string{"/openapi/v2"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
+				Verbs:           []string{"*"},
+				NonResourceURLs: []string{"/openapi/v2"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
+				Verbs:           []string{"goodverb"},
+				NonResourceURLs: []string{"*"},
+			}},
+		},
 	})
-	checkRules(t, false, reqN, []flowcontrol.PolicyRulesWithSubjects{{
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
-			Verbs:           []string{"badverb"},
-			NonResourceURLs: []string{"/openapi/v2"}}}}, {
-		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{"goodu"}}},
-		NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
-			Verbs:           []string{"goodverb"},
-			NonResourceURLs: []string{"/closedapi/v2"}}}},
+	checkRules(t, false, reqN, []flowcontrol.PolicyRulesWithSubjects{
+		{
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
+				Verbs:           []string{"badverb"},
+				NonResourceURLs: []string{"/openapi/v2"},
+			}},
+		}, {
+			Subjects: []flowcontrol.Subject{{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{"goodu"},
+			}},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{{
+				Verbs:           []string{"goodverb"},
+				NonResourceURLs: []string{"/closedapi/v2"},
+			}},
+		},
 	})
 }
 
@@ -323,7 +438,9 @@ func checkRules(t *testing.T, expectMatch bool, digest RequestDigest, rules []fl
 		fs := &flowcontrol.FlowSchema{
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("rule%d", idx)},
 			Spec: flowcontrol.FlowSchemaSpec{
-				Rules: []flowcontrol.PolicyRulesWithSubjects{rule}}}
+				Rules: []flowcontrol.PolicyRulesWithSubjects{rule},
+			},
+		}
 		actualMatch := matchesFlowSchema(digest, fs)
 		if expectMatch != actualMatch {
 			t.Errorf("expectMatch=%v, actualMatch=%v, digest=%#+v, fs=%s", expectMatch, actualMatch, digest, fcfmt.Fmt(fs))

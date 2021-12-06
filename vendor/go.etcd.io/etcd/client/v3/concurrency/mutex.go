@@ -154,6 +154,7 @@ func (lm *lockerMutex) Lock() {
 		panic(err)
 	}
 }
+
 func (lm *lockerMutex) Unlock() {
 	client := lm.s.Client()
 	if err := lm.Mutex.Unlock(client.Ctx()); err != nil {

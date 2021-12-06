@@ -158,10 +158,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// now we update the client-ca nd request-header-client-ca-file and the kas will consume it, update the configmap
 	// and then the wardle server will detect and update too.
-	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
+	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0644); err != nil {
+	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// wait for it to be picked up.  there's a test in certreload_test.go that ensure this works
@@ -205,7 +205,6 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if numMatches != 4 {
 		t.Fatal("names don't match")
 	}
-
 }
 
 func waitForWardleRunning(t *testing.T, wardleToKASKubeConfig *rest.Config, wardleCertDir string, wardlePort int) (*rest.Config, error) {

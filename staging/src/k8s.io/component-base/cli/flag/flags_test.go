@@ -37,6 +37,7 @@ func (logger *FakeLogger) Enabled(lvl int) bool       { return true }
 func (logger *FakeLogger) Info(lvl int, msg string, keysAndValues ...interface{}) {
 	logger.infoBuffer.WriteString(msg)
 }
+
 func (logger *FakeLogger) Error(err error, msg string, keysAndValues ...interface{}) {
 	logger.errorBuffer.WriteString(msg)
 }

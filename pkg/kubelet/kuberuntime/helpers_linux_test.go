@@ -78,7 +78,8 @@ func TestMilliCPUToQuota(t *testing.T) {
 			input:    int64(1500),
 			expected: int64(150000),
 			period:   uint64(100000),
-		}} {
+		},
+	} {
 		t.Run(testCase.msg, func(t *testing.T) {
 			quota := milliCPUToQuota(testCase.input, int64(testCase.period))
 			if quota != testCase.expected {
@@ -192,7 +193,8 @@ func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 			input:    int64(1500),
 			period:   uint64(5000),
 			expected: int64(7500),
-		}} {
+		},
+	} {
 		t.Run(testCase.msg, func(t *testing.T) {
 			quota := milliCPUToQuota(testCase.input, int64(testCase.period))
 			if quota != testCase.expected {

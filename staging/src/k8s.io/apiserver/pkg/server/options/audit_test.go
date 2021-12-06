@@ -48,95 +48,96 @@ func TestAuditValidOptions(t *testing.T) {
 		name     string
 		options  func() *AuditOptions
 		expected string
-	}{{
-		name:    "default",
-		options: NewAuditOptions,
-	}, {
-		name: "default log",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.Path = auditPath
-			o.PolicyFile = policy
-			return o
+	}{
+		{
+			name:    "default",
+			options: NewAuditOptions,
+		}, {
+			name: "default log",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.Path = auditPath
+				o.PolicyFile = policy
+				return o
+			},
+			expected: "ignoreErrors<log>",
+		}, {
+			name: "stdout log",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.Path = "-"
+				o.PolicyFile = policy
+				return o
+			},
+			expected: "ignoreErrors<log>",
+		}, {
+			name: "default log no policy",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.Path = auditPath
+				return o
+			},
+			expected: "",
+		}, {
+			name: "default webhook",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = webhookConfig
+				o.PolicyFile = policy
+				return o
+			},
+			expected: "buffered<webhook>",
+		}, {
+			name: "default webhook no policy",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = webhookConfig
+				return o
+			},
+			expected: "",
+		}, {
+			name: "strict webhook",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = webhookConfig
+				o.WebhookOptions.BatchOptions.Mode = ModeBlockingStrict
+				o.PolicyFile = policy
+				return o
+			},
+			expected: "webhook",
+		}, {
+			name: "default union",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.Path = auditPath
+				o.WebhookOptions.ConfigFile = webhookConfig
+				o.PolicyFile = policy
+				return o
+			},
+			expected: "union[ignoreErrors<log>,buffered<webhook>]",
+		}, {
+			name: "custom",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.BatchOptions.Mode = ModeBatch
+				o.LogOptions.Path = auditPath
+				o.WebhookOptions.BatchOptions.Mode = ModeBlocking
+				o.WebhookOptions.ConfigFile = webhookConfig
+				o.PolicyFile = policy
+				return o
+			},
+			expected: "union[buffered<log>,ignoreErrors<webhook>]",
+		}, {
+			name: "default webhook with truncating",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = webhookConfig
+				o.WebhookOptions.TruncateOptions.Enabled = true
+				o.PolicyFile = policy
+				return o
+			},
+			expected: "truncate<buffered<webhook>>",
 		},
-		expected: "ignoreErrors<log>",
-	}, {
-		name: "stdout log",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.Path = "-"
-			o.PolicyFile = policy
-			return o
-		},
-		expected: "ignoreErrors<log>",
-	}, {
-		name: "default log no policy",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.Path = auditPath
-			return o
-		},
-		expected: "",
-	}, {
-		name: "default webhook",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = webhookConfig
-			o.PolicyFile = policy
-			return o
-		},
-		expected: "buffered<webhook>",
-	}, {
-		name: "default webhook no policy",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = webhookConfig
-			return o
-		},
-		expected: "",
-	}, {
-		name: "strict webhook",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = webhookConfig
-			o.WebhookOptions.BatchOptions.Mode = ModeBlockingStrict
-			o.PolicyFile = policy
-			return o
-		},
-		expected: "webhook",
-	}, {
-		name: "default union",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.Path = auditPath
-			o.WebhookOptions.ConfigFile = webhookConfig
-			o.PolicyFile = policy
-			return o
-		},
-		expected: "union[ignoreErrors<log>,buffered<webhook>]",
-	}, {
-		name: "custom",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.BatchOptions.Mode = ModeBatch
-			o.LogOptions.Path = auditPath
-			o.WebhookOptions.BatchOptions.Mode = ModeBlocking
-			o.WebhookOptions.ConfigFile = webhookConfig
-			o.PolicyFile = policy
-			return o
-		},
-		expected: "union[buffered<log>,ignoreErrors<webhook>]",
-	}, {
-		name: "default webhook with truncating",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = webhookConfig
-			o.WebhookOptions.TruncateOptions.Enabled = true
-			o.PolicyFile = policy
-			return o
-		},
-		expected: "truncate<buffered<webhook>>",
-	},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -184,68 +185,69 @@ func TestAuditInvalidOptions(t *testing.T) {
 	testCases := []struct {
 		name    string
 		options func() *AuditOptions
-	}{{
-		name: "invalid log format",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.Path = auditPath
-			o.LogOptions.Format = "foo"
-			return o
+	}{
+		{
+			name: "invalid log format",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.Path = auditPath
+				o.LogOptions.Format = "foo"
+				return o
+			},
+		}, {
+			name: "invalid log mode",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.Path = auditPath
+				o.LogOptions.BatchOptions.Mode = "foo"
+				return o
+			},
+		}, {
+			name: "invalid log buffer size",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.LogOptions.Path = auditPath
+				o.LogOptions.BatchOptions.Mode = "batch"
+				o.LogOptions.BatchOptions.BatchConfig.BufferSize = -3
+				return o
+			},
+		}, {
+			name: "invalid webhook mode",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = auditPath
+				o.WebhookOptions.BatchOptions.Mode = "foo"
+				return o
+			},
+		}, {
+			name: "invalid webhook buffer throttle qps",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = auditPath
+				o.WebhookOptions.BatchOptions.Mode = "batch"
+				o.WebhookOptions.BatchOptions.BatchConfig.ThrottleQPS = -1
+				return o
+			},
+		}, {
+			name: "invalid webhook truncate max event size",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = auditPath
+				o.WebhookOptions.TruncateOptions.Enabled = true
+				o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = -1
+				return o
+			},
+		}, {
+			name: "invalid webhook truncate max batch size",
+			options: func() *AuditOptions {
+				o := NewAuditOptions()
+				o.WebhookOptions.ConfigFile = auditPath
+				o.WebhookOptions.TruncateOptions.Enabled = true
+				o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = 2
+				o.WebhookOptions.TruncateOptions.TruncateConfig.MaxBatchSize = 1
+				return o
+			},
 		},
-	}, {
-		name: "invalid log mode",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.Path = auditPath
-			o.LogOptions.BatchOptions.Mode = "foo"
-			return o
-		},
-	}, {
-		name: "invalid log buffer size",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.LogOptions.Path = auditPath
-			o.LogOptions.BatchOptions.Mode = "batch"
-			o.LogOptions.BatchOptions.BatchConfig.BufferSize = -3
-			return o
-		},
-	}, {
-		name: "invalid webhook mode",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = auditPath
-			o.WebhookOptions.BatchOptions.Mode = "foo"
-			return o
-		},
-	}, {
-		name: "invalid webhook buffer throttle qps",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = auditPath
-			o.WebhookOptions.BatchOptions.Mode = "batch"
-			o.WebhookOptions.BatchOptions.BatchConfig.ThrottleQPS = -1
-			return o
-		},
-	}, {
-		name: "invalid webhook truncate max event size",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = auditPath
-			o.WebhookOptions.TruncateOptions.Enabled = true
-			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = -1
-			return o
-		},
-	}, {
-		name: "invalid webhook truncate max batch size",
-		options: func() *AuditOptions {
-			o := NewAuditOptions()
-			o.WebhookOptions.ConfigFile = auditPath
-			o.WebhookOptions.TruncateOptions.Enabled = true
-			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = 2
-			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxBatchSize = 1
-			return o
-		},
-	},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

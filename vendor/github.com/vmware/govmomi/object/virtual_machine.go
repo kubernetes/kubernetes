@@ -243,7 +243,6 @@ func (v VirtualMachine) WaitForIP(ctx context.Context) (string, error) {
 
 		return false
 	})
-
 	if err != nil {
 		return "", err
 	}

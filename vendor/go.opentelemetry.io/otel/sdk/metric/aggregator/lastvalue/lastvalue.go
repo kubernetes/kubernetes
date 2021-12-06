@@ -51,8 +51,10 @@ type (
 	}
 )
 
-var _ export.Aggregator = &Aggregator{}
-var _ aggregation.LastValue = &Aggregator{}
+var (
+	_ export.Aggregator     = &Aggregator{}
+	_ aggregation.LastValue = &Aggregator{}
+)
 
 // An unset lastValue has zero timestamp and zero value.
 var unsetLastValue = &lastValueData{}

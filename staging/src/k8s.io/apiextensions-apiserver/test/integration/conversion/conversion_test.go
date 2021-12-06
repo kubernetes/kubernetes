@@ -59,6 +59,7 @@ func checks(checkers ...Checker) []Checker {
 func TestWebhookConverterWithWatchCache(t *testing.T) {
 	testWebhookConverter(t, true)
 }
+
 func TestWebhookConverterWithoutWatchCache(t *testing.T) {
 	testWebhookConverter(t, false)
 }
@@ -773,6 +774,7 @@ func emptyV1ResponseConverter(review *apiextensionsv1.ConversionReview) (*apiext
 	}
 	return review, nil
 }
+
 func emptyV1Beta1ResponseConverter(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
 	review.Response = &apiextensionsv1beta1.ConversionResponse{
 		UID:              review.Request.UID,
@@ -978,7 +980,6 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 		t.Fatal(err)
 	}
 	c.crd = crd
-
 }
 
 func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
@@ -1275,7 +1276,7 @@ func verifyMultiVersionObject(t *testing.T, v string, obj *unstructured.Unstruct
 
 	delete(j, "metadata")
 
-	var expected = map[string]map[string]interface{}{
+	expected := map[string]map[string]interface{}{
 		"v1alpha1": {
 			"apiVersion": "stable.example.com/v1alpha1",
 			"kind":       "MultiVersion",

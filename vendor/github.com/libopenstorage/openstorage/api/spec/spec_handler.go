@@ -85,8 +85,7 @@ var (
 		`=([A-Za-z0-9:;@=#]+),?`)
 )
 
-type specHandler struct {
-}
+type specHandler struct{}
 
 // NewSpecHandler returns a new SpecHandler interface
 func NewSpecHandler() SpecHandler {

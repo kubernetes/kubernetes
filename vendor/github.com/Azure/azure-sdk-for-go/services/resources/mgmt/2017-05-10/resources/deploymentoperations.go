@@ -8,11 +8,12 @@ package resources
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // DeploymentOperationsClient is the provides operations for working with resources and resource groups.
@@ -49,14 +50,23 @@ func (client DeploymentOperationsClient) Get(ctx context.Context, resourceGroupN
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}},
-		{TargetValue: deploymentName,
-			Constraints: []validation.Constraint{{Target: "deploymentName", Name: validation.MaxLength, Rule: 64, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: deploymentName,
+			Constraints: []validation.Constraint{
+				{Target: "deploymentName", Name: validation.MaxLength, Rule: 64, Chain: nil},
 				{Target: "deploymentName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "deploymentName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
+				{Target: "deploymentName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.DeploymentOperationsClient", "Get", err.Error())
 	}
 
@@ -139,14 +149,23 @@ func (client DeploymentOperationsClient) List(ctx context.Context, resourceGroup
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil}}},
-		{TargetValue: deploymentName,
-			Constraints: []validation.Constraint{{Target: "deploymentName", Name: validation.MaxLength, Rule: 64, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\p{L}\._\(\)\w]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: deploymentName,
+			Constraints: []validation.Constraint{
+				{Target: "deploymentName", Name: validation.MaxLength, Rule: 64, Chain: nil},
 				{Target: "deploymentName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "deploymentName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
+				{Target: "deploymentName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("resources.DeploymentOperationsClient", "List", err.Error())
 	}
 

@@ -41,7 +41,6 @@ import (
 )
 
 var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
-
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
 
 	ginkgo.BeforeEach(func() {
@@ -60,7 +59,6 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 			overrideAllocatableMemoryTest(f, framework.TestContext.CloudConfig.NumNodes)
 		})
 	})
-
 })
 
 type nodeMemory struct {
@@ -81,7 +79,6 @@ type nodeMemory struct {
 // runDensityBatchTest runs the density batch pod creation test
 // checks that a calculated value for NodeAllocatable is equal to the reported value
 func checkNodeAllocatableTest(f *framework.Framework) {
-
 	nodeMem := getNodeMemory(f)
 	framework.Logf("nodeMem says: %+v", nodeMem)
 

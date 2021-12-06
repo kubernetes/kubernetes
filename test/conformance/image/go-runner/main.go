@@ -123,7 +123,7 @@ func saveResults(resultsDir string) error {
 		return fmt.Errorf("failed to find absolute path for %v: %w", resultsTarball, err)
 	}
 
-	err = ioutil.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0777))
+	err = ioutil.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0o777))
 	if err != nil {
 		return fmt.Errorf("writing donefile: %w", err)
 	}

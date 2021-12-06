@@ -66,7 +66,6 @@ func SetNodeAffinityTopologyRequirement(nodeSelection *NodeSelection, topology m
 					{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}},
 				},
 			})
-
 	}
 }
 

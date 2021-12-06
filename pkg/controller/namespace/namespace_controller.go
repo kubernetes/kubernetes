@@ -70,7 +70,6 @@ func NewNamespaceController(
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
-
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
 		queue:                      workqueue.NewNamedRateLimitingQueue(nsControllerRateLimiter(), "namespace"),

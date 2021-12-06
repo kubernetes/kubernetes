@@ -42,7 +42,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpfile.Name())
 
-	if err = ioutil.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = ioutil.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0o666); err != nil {
 		t.Fatalf("write file %s failed: %v", tmpfile.Name(), err)
 	}
 
@@ -91,7 +91,6 @@ func TestDynamicClientBuilder(t *testing.T) {
 
 	saName := "dt"
 	dymClient, err := clientBuilder.Client(saName)
-
 	if err != nil {
 		t.Fatalf("build client via dynamic client builder failed: %v", err)
 	}

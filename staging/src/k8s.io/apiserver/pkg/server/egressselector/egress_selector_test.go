@@ -241,7 +241,6 @@ func TestMetrics(t *testing.T) {
 		},
 	}
 	for tn, tc := range testcases {
-
 		t.Run(tn, func(t *testing.T) {
 			metrics.Metrics.Reset()
 			metrics.Metrics.SetClock(testingclock.NewFakeClock(time.Now()))
@@ -262,5 +261,4 @@ func TestMetrics(t *testing.T) {
 			}
 		})
 	}
-
 }

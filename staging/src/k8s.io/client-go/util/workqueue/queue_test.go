@@ -198,7 +198,6 @@ func TestReinsert(t *testing.T) {
 }
 
 func TestQueueDrainageUsingShutDownWithDrain(t *testing.T) {
-
 	q := workqueue.New()
 
 	q.Add("foo")
@@ -230,7 +229,6 @@ func TestQueueDrainageUsingShutDownWithDrain(t *testing.T) {
 }
 
 func TestNoQueueDrainageUsingShutDown(t *testing.T) {
-
 	q := workqueue.New()
 
 	q.Add("foo")
@@ -253,7 +251,6 @@ func TestNoQueueDrainageUsingShutDown(t *testing.T) {
 }
 
 func TestForceQueueShutdownUsingShutDown(t *testing.T) {
-
 	q := workqueue.New()
 
 	q.Add("foo")

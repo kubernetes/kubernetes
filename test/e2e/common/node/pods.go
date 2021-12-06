@@ -148,7 +148,7 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 		}
 
 		// when the RestartCount is changed, the Containers will be in one of the following states:
-		//Running, Terminated, Waiting (it already is waiting for the backoff period to expire, and the last state details have been stored into status.LastTerminationState).
+		// Running, Terminated, Waiting (it already is waiting for the backoff period to expire, and the last state details have been stored into status.LastTerminationState).
 		if status.RestartCount > previousRestartCount {
 			var startedAt time.Time
 			if status.State.Running != nil {
@@ -599,7 +599,6 @@ var _ = SIGDescribe("Pods", func() {
 					} else {
 						framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
 					}
-
 				}
 				buf.Write(msg[1:])
 			}
@@ -833,7 +832,6 @@ var _ = SIGDescribe("Pods", func() {
 		_, err = podClient.Patch(context.TODO(), podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "False")), metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
 		validatePodReadiness(false)
-
 	})
 
 	/*
@@ -854,7 +852,8 @@ var _ = SIGDescribe("Pods", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podTestName,
 					Labels: map[string]string{
-						"type": "Testing"},
+						"type": "Testing",
+					},
 				},
 				Spec: v1.PodSpec{
 					TerminationGracePeriodSeconds: &one,
@@ -863,7 +862,8 @@ var _ = SIGDescribe("Pods", func() {
 						Name:  "token-test",
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
-				}}, metav1.CreateOptions{})
+				},
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 			framework.Logf("created %v", podTestName)
 			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podTestName, f.Namespace.Name))
@@ -877,7 +877,8 @@ var _ = SIGDescribe("Pods", func() {
 
 		// delete Collection of pods with a label in the current namespace
 		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{
-			LabelSelector: "type=Testing"})
+			LabelSelector: "type=Testing",
+		})
 		framework.ExpectNoError(err, "failed to delete collection of pods")
 
 		// wait for all pods to be deleted
@@ -1060,8 +1061,8 @@ func checkPodListQuantity(f *framework.Framework, label string, quantity int) fu
 		var err error
 
 		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: label})
-
+			LabelSelector: label,
+		})
 		if err != nil {
 			return false, err
 		}

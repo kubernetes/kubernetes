@@ -73,10 +73,8 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 )
 
-var (
-	// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
-	ErrVersionNotSupported = errors.New("runtime api version is not supported")
-)
+// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
+var ErrVersionNotSupported = errors.New("runtime api version is not supported")
 
 // podStateProvider can determine if none of the elements are necessary to retain (pod content)
 // or if none of the runtime elements are necessary to retain (containers)
@@ -154,7 +152,7 @@ type kubeGenericRuntimeManager struct {
 	// MemorySwapBehavior defines how swap is used
 	memorySwapBehavior string
 
-	//Function to get node allocatable resources
+	// Function to get node allocatable resources
 	getNodeAllocatable func() v1.ResourceList
 
 	// Memory throttling factor for MemoryQoS
@@ -254,7 +252,7 @@ func NewKubeGenericRuntimeManager(
 	// TODO: create podLogsRootDirectory at kubelet.go when kubelet is refactored to
 	// new runtime interface
 	if _, err := osInterface.Stat(podLogsRootDirectory); os.IsNotExist(err) {
-		if err := osInterface.MkdirAll(podLogsRootDirectory, 0755); err != nil {
+		if err := osInterface.MkdirAll(podLogsRootDirectory, 0o755); err != nil {
 			klog.ErrorS(err, "Failed to create pod log directory", "path", podLogsRootDirectory)
 		}
 	}

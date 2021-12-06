@@ -156,26 +156,32 @@ func (r *neverReturningRESTMapper) KindFor(resource schema.GroupVersionResource)
 	// this ok because if the test works, this method should never be called.
 	panic("test failed")
 }
+
 func (r *neverReturningRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
 	// this ok because if the test works, this method should never be called.
 	panic("test failed")
 }
+
 func (r *neverReturningRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	// this ok because if the test works, this method should never be called.
 	panic("test failed")
 }
+
 func (r *neverReturningRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	// this ok because if the test works, this method should never be called.
 	panic("test failed")
 }
+
 func (r *neverReturningRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	// this ok because if the test works, this method should never be called.
 	panic("test failed")
 }
+
 func (r *neverReturningRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
 	// this ok because if the test works, this method should never be called.
 	panic("test failed")
 }
+
 func (r *neverReturningRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	// this ok because if the test works, this method should never be called.
 	panic("test failed")

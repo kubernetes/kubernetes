@@ -245,8 +245,8 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 // returning the maximum  of the computed replica counts, a description of the associated metric, and the statuses of
 // all metrics computed.
 func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler, scale *autoscalingv1.Scale,
-	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
-
+	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error,
+) {
 	if scale.Status.Selector == "" {
 		errMsg := "selector is required"
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
@@ -272,7 +272,6 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 
 	for i, metricSpec := range metricSpecs {
 		replicaCountProposal, metricNameProposal, timestampProposal, condition, err := a.computeReplicasForMetric(ctx, hpa, metricSpec, specReplicas, statusReplicas, selector, &statuses[i])
-
 		if err != nil {
 			if invalidMetricsCount <= 0 {
 				invalidMetricCondition = condition
@@ -302,8 +301,8 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 // returning the metric status and a proposed condition to be set on the HPA object.
 func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler, spec autoscalingv2.MetricSpec,
 	specReplicas, statusReplicas int32, selector labels.Selector, status *autoscalingv2.MetricStatus) (replicaCountProposal int32, metricNameProposal string,
-	timestampProposal time.Time, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
-
+	timestampProposal time.Time, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error,
+) {
 	switch spec.Type {
 	case autoscalingv2.ObjectMetricSourceType:
 		metricSelector, err := metav1.LabelSelectorAsSelector(spec.Object.Metric.Selector)
@@ -769,7 +768,8 @@ func (a *HorizontalController) normalizeDesiredReplicasWithBehaviors(hpa *autosc
 		MinReplicas:       minReplicas,
 		MaxReplicas:       hpa.Spec.MaxReplicas,
 		CurrentReplicas:   currentReplicas,
-		DesiredReplicas:   prenormalizedDesiredReplicas}
+		DesiredReplicas:   prenormalizedDesiredReplicas,
+	}
 	stabilizedRecommendation, reason, message := a.stabilizeRecommendationWithBehaviors(normalizationArg)
 	normalizationArg.DesiredReplicas = stabilizedRecommendation
 	if stabilizedRecommendation != prenormalizedDesiredReplicas {
@@ -807,7 +807,6 @@ func getReplicasChangePerPeriod(periodSeconds int32, scaleEvents []timestampedSc
 		}
 	}
 	return replicas
-
 }
 
 func (a *HorizontalController) getUnableComputeReplicaCountCondition(hpa runtime.Object, reason string, err error) (condition autoscalingv2.HorizontalPodAutoscalerCondition) {
@@ -970,7 +969,6 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 
 // convertDesiredReplicas performs the actual normalization, without depending on `HorizontalController` or `HorizontalPodAutoscaler`
 func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinReplicas, hpaMaxReplicas int32) (int32, string, string) {
-
 	var minimumAllowedReplicas int32
 	var maximumAllowedReplicas int32
 

@@ -35,9 +35,11 @@ type (
 	}
 )
 
-var _ export.Aggregator = &Aggregator{}
-var _ aggregation.Points = &Aggregator{}
-var _ aggregation.Count = &Aggregator{}
+var (
+	_ export.Aggregator  = &Aggregator{}
+	_ aggregation.Points = &Aggregator{}
+	_ aggregation.Count  = &Aggregator{}
+)
 
 // New returns cnt many new exact aggregators, which aggregate recorded
 // measurements by storing them in an array.  This type uses a mutex

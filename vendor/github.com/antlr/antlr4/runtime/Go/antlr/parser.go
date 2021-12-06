@@ -11,16 +11,13 @@ import (
 
 type Parser interface {
 	Recognizer
-
 	GetInterpreter() *ParserATNSimulator
-
 	GetTokenStream() TokenStream
 	GetTokenFactory() TokenFactory
 	GetParserRuleContext() ParserRuleContext
 	SetParserRuleContext(ParserRuleContext)
 	Consume() Token
 	GetParseListeners() []ParseTreeListener
-
 	GetErrorHandler() ErrorStrategy
 	SetErrorHandler(ErrorStrategy)
 	GetInputStream() IntStream
@@ -51,7 +48,6 @@ type BaseParser struct {
 // p.is all the parsing support code essentially most of it is error
 // recovery stuff.//
 func NewBaseParser(input TokenStream) *BaseParser {
-
 	p := new(BaseParser)
 
 	p.BaseRecognizer = NewBaseRecognizer()
@@ -136,7 +132,6 @@ func (p *BaseParser) SetErrorHandler(e ErrorStrategy) {
 // mismatched symbol
 
 func (p *BaseParser) Match(ttype int) Token {
-
 	t := p.GetCurrentToken()
 
 	if t.GetTokenType() == ttype {
@@ -249,7 +244,6 @@ func (p *BaseParser) AddParseListener(listener ParseTreeListener) {
 // @param listener the listener to remove
 //
 func (p *BaseParser) RemoveParseListener(listener ParseTreeListener) {
-
 	if p.parseListeners != nil {
 
 		idx := -1
@@ -332,7 +326,6 @@ func (p *BaseParser) setTokenFactory(factory TokenFactory) {
 // implement the {@link //getSerializedATN()} method.
 //
 func (p *BaseParser) GetATNWithBypassAlts() {
-
 	// TODO
 	panic("Not implemented!")
 
@@ -362,7 +355,6 @@ func (p *BaseParser) GetATNWithBypassAlts() {
 // </pre>
 
 func (p *BaseParser) compileParseTreePattern(pattern, patternRuleIndex, lexer Lexer) {
-
 	panic("NewParseTreePatternMatcher not implemented!")
 	//
 	//	if (lexer == nil) {
@@ -637,7 +629,7 @@ func (p *BaseParser) GetExpectedTokensWithinCurrentRule() *IntervalSet {
 
 // Get a rule's index (i.e., {@code RULE_ruleName} field) or -1 if not found.//
 func (p *BaseParser) GetRuleIndex(ruleName string) int {
-	var ruleIndex, ok = p.GetRuleIndexMap()[ruleName]
+	ruleIndex, ok := p.GetRuleIndexMap()[ruleName]
 	if ok {
 		return ruleIndex
 	}

@@ -49,7 +49,8 @@ func NewObject(adapter ref.TypeAdapter,
 		TypeAdapter: adapter,
 		value:       value,
 		typeDesc:    typeDesc,
-		typeValue:   typeValue}
+		typeValue:   typeValue,
+	}
 }
 
 func (o *protoObj) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {

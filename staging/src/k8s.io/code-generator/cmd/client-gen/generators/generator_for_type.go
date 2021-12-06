@@ -453,6 +453,7 @@ func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privateP
 	}
 }
 `
+
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List(ctx context.Context, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {

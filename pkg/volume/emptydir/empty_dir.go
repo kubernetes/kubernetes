@@ -43,7 +43,7 @@ import (
 // from the group attribute.
 //
 // http://issue.k8s.io/2630
-const perm os.FileMode = 0777
+const perm os.FileMode = 0o777
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -427,7 +427,6 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	}
 
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil
-
 }
 
 // setupDir creates the directory with the default permissions specified by the perm constant.

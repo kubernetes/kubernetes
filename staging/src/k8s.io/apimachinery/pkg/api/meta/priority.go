@@ -29,9 +29,7 @@ const (
 	AnyKind     = "*"
 )
 
-var (
-	_ ResettableRESTMapper = PriorityRESTMapper{}
-)
+var _ ResettableRESTMapper = PriorityRESTMapper{}
 
 // PriorityRESTMapper is a wrapper for automatically choosing a particular Resource or Kind
 // when multiple matches are possible

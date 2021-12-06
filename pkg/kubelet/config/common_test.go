@@ -187,7 +187,7 @@ func TestDecodePodList(t *testing.T) {
 }
 
 func TestGetSelfLink(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		desc             string
 		name             string
 		namespace        string

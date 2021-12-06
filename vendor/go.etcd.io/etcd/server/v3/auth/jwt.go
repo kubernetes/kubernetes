@@ -58,7 +58,6 @@ func (t *tokenJWT) info(ctx context.Context, token string, rev uint64) (*AuthInf
 			return t.key, nil
 		}
 	})
-
 	if err != nil {
 		t.lg.Warn(
 			"failed to parse a JWT token",
@@ -126,7 +125,7 @@ func newTokenProviderJWT(lg *zap.Logger, optMap map[string]string) (*tokenJWT, e
 		return nil, ErrInvalidAuthOpts
 	}
 
-	var keys = make([]string, 0, len(optMap))
+	keys := make([]string, 0, len(optMap))
 	for k := range optMap {
 		if !knownOptions[k] {
 			keys = append(keys, k)

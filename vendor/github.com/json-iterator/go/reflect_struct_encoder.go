@@ -2,10 +2,11 @@ package jsoniter
 
 import (
 	"fmt"
-	"github.com/modern-go/reflect2"
 	"io"
 	"reflect"
 	"unsafe"
+
+	"github.com/modern-go/reflect2"
 )
 
 func encoderOfStruct(ctx *ctx, typ reflect2.Type) ValEncoder {
@@ -168,8 +169,7 @@ func (encoder *structEncoder) IsEmpty(ptr unsafe.Pointer) bool {
 	return false
 }
 
-type emptyStructEncoder struct {
-}
+type emptyStructEncoder struct{}
 
 func (encoder *emptyStructEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	stream.WriteEmptyObject()

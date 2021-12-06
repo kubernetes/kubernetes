@@ -50,8 +50,8 @@ type DFAState struct {
 
 	// edges elements point to the target of the symbol. Shift up by 1 so (-1)
 	// Token.EOF maps to the first element.
-	edges []*DFAState
-	edgesMu	sync.RWMutex
+	edges   []*DFAState
+	edgesMu sync.RWMutex
 
 	isAcceptState bool
 

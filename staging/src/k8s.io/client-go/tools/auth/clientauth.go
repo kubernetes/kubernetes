@@ -105,7 +105,7 @@ func LoadFromFile(path string) (*Info, error) {
 // The fields of client.Config with a corresponding field in the Info are set
 // with the value from the Info.
 func (info Info) MergeWithConfig(c restclient.Config) (restclient.Config, error) {
-	var config = c
+	config := c
 	config.Username = info.User
 	config.Password = info.Password
 	config.CAFile = info.CAFile

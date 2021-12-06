@@ -169,10 +169,11 @@ func validateGRPCTransport(transport *apiserver.Transport, fldPath *field.Path) 
 
 func validateDirectConnection(connection apiserver.Connection, fldPath *field.Path) field.ErrorList {
 	if connection.Transport != nil {
-		return field.ErrorList{field.Invalid(
-			fldPath.Child("transport"),
-			"direct",
-			"Transport config should be absent for direct connect"),
+		return field.ErrorList{
+			field.Invalid(
+				fldPath.Child("transport"),
+				"direct",
+				"Transport config should be absent for direct connect"),
 		}
 	}
 

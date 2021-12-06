@@ -195,8 +195,8 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 // NewDockerService creates a new `DockerService` struct.
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
-	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string) (DockerService, error) {
-
+	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string) (DockerService, error,
+) {
 	client := NewDockerClientFromConfig(config)
 
 	c := libdocker.NewInstrumentedInterface(client)

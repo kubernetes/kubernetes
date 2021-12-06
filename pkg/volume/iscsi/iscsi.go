@@ -50,9 +50,11 @@ type iscsiPlugin struct {
 	targetLocks keymutex.KeyMutex
 }
 
-var _ volume.VolumePlugin = &iscsiPlugin{}
-var _ volume.PersistentVolumePlugin = &iscsiPlugin{}
-var _ volume.BlockVolumePlugin = &iscsiPlugin{}
+var (
+	_ volume.VolumePlugin           = &iscsiPlugin{}
+	_ volume.PersistentVolumePlugin = &iscsiPlugin{}
+	_ volume.BlockVolumePlugin      = &iscsiPlugin{}
+)
 
 const (
 	iscsiPluginName = "kubernetes.io/iscsi"
@@ -122,8 +124,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 	}
 
 	if iscsiDisk != nil {
-
-		//Add volume metrics
+		// Add volume metrics
 		iscsiDisk.MetricsProvider = volume.NewMetricsStatFS(iscsiDisk.GetPath())
 	}
 	return &iscsiDiskMounter{
@@ -414,8 +415,10 @@ func (idm *iscsiDiskMapper) SupportsMetrics() bool {
 	return true
 }
 
-var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}
-var _ volume.CustomBlockVolumeUnmapper = &iscsiDiskUnmapper{}
+var (
+	_ volume.BlockVolumeUnmapper       = &iscsiDiskUnmapper{}
+	_ volume.CustomBlockVolumeUnmapper = &iscsiDiskUnmapper{}
+)
 
 // Even though iSCSI plugin has attacher/detacher implementation, iSCSI plugin
 // needs volume detach operation during TearDownDevice(). This method is only
@@ -593,7 +596,8 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 		secret:        secret,
 		InitiatorName: initiatorName,
 		manager:       manager,
-		plugin:        plugin}, nil
+		plugin:        plugin,
+	}, nil
 }
 
 func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (map[string]string, error) {

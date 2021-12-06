@@ -173,7 +173,6 @@ func TestDialURL(t *testing.T) {
 			}
 		}()
 	}
-
 }
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:

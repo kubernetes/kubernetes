@@ -26,7 +26,6 @@ import (
 	"math"
 	"strings"
 	"sync"
-
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -212,8 +211,7 @@ func (nim *nodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
 func buildNodeIDMapFromAnnotation(node *v1.Node) (map[string]string, error) {
 	var previousAnnotationValue string
 	if node.ObjectMeta.Annotations != nil {
-		previousAnnotationValue =
-			node.ObjectMeta.Annotations[annotationKeyNodeID]
+		previousAnnotationValue = node.ObjectMeta.Annotations[annotationKeyNodeID]
 	}
 
 	var existingDriverMap map[string]string
@@ -278,8 +276,7 @@ func removeNodeIDFromNode(csiDriverName string) nodeUpdateFunc {
 	return func(node *v1.Node) (*v1.Node, bool, error) {
 		var previousAnnotationValue string
 		if node.ObjectMeta.Annotations != nil {
-			previousAnnotationValue =
-				node.ObjectMeta.Annotations[annotationKeyNodeID]
+			previousAnnotationValue = node.ObjectMeta.Annotations[annotationKeyNodeID]
 		}
 
 		if previousAnnotationValue == "" {
@@ -351,7 +348,6 @@ func (nim *nodeInfoManager) updateCSINode(
 	driverNodeID string,
 	maxAttachLimit int64,
 	topology map[string]string) error {
-
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
 		return fmt.Errorf("error getting CSI client")
@@ -377,7 +373,6 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 	driverNodeID string,
 	maxAttachLimit int64,
 	topology map[string]string) error {
-
 	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if nodeInfo == nil || errors.IsNotFound(err) {
 		nodeInfo, err = nim.CreateCSINode()
@@ -427,11 +422,9 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 		return err
 	}
 	return nil
-
 }
 
 func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
-
 	kubeClient := nim.volumeHost.GetKubeClient()
 	if kubeClient == nil {
 		return nil, fmt.Errorf("error getting kube client")
@@ -516,7 +509,6 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	driverNodeID string,
 	maxAttachLimit int64,
 	topology map[string]string) error {
-
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
 		return fmt.Errorf("error getting CSI client")
@@ -575,7 +567,6 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 
 func (nim *nodeInfoManager) uninstallDriverFromCSINode(
 	csiDriverName string) error {
-
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
 		return fmt.Errorf("error getting CSI client")
@@ -598,7 +589,6 @@ func (nim *nodeInfoManager) uninstallDriverFromCSINode(
 func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 	csiKubeClient clientset.Interface,
 	csiDriverName string) error {
-
 	nodeInfoClient := csiKubeClient.StorageV1().CSINodes()
 	nodeInfo, err := nodeInfoClient.Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if err != nil && errors.IsNotFound(err) {
@@ -629,7 +619,6 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 	_, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 
 	return err // do not wrap error
-
 }
 
 func removeMaxAttachLimit(driverName string) nodeUpdateFunc {

@@ -113,7 +113,6 @@ func (r *remoteRuntimeService) determineAPIVersion(conn *grpc.ClientConn) error 
 
 	if _, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{}); err == nil {
 		klog.V(2).InfoS("Using CRI v1 runtime API")
-
 	} else if status.Code(err) == codes.Unimplemented {
 		klog.V(2).InfoS("Falling back to CRI v1alpha2 runtime API (deprecated)")
 		r.runtimeClientV1alpha2 = runtimeapiV1alpha2.NewRuntimeServiceClient(conn)
@@ -193,7 +192,6 @@ func (r *remoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 			Config:         config,
 			RuntimeHandler: runtimeHandler,
 		})
-
 		if err != nil {
 			klog.ErrorS(err, "RunPodSandbox from runtime service failed")
 			return "", err
@@ -204,7 +202,6 @@ func (r *remoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 			Config:         v1alpha2PodSandboxConfig(config),
 			RuntimeHandler: runtimeHandler,
 		})
-
 		if err != nil {
 			klog.ErrorS(err, "RunPodSandbox from runtime service failed")
 			return "", err

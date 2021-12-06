@@ -95,9 +95,11 @@ type Type struct {
 	clock                      clock.WithTicker
 }
 
-type empty struct{}
-type t interface{}
-type set map[t]empty
+type (
+	empty struct{}
+	t     interface{}
+	set   map[t]empty
+)
 
 func (s set) has(item t) bool {
 	_, exists := s[item]
@@ -277,7 +279,6 @@ func (q *Type) updateUnfinishedWorkLoop() {
 				return true
 			}
 			return false
-
 		}() {
 			return
 		}

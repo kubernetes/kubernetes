@@ -32,13 +32,11 @@ import (
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
-var (
-	kubeletConfigLongDesc = cmdutil.LongDesc(`
+var kubeletConfigLongDesc = cmdutil.LongDesc(`
 		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. kubeadm uses the KuberneteVersion field in the kubeadm-config
 		ConfigMap to determine what the _desired_ kubelet version is.
 		`)
-)
 
 // NewKubeletConfigPhase creates a kubeadm workflow phase that implements handling of kubelet-config upgrade.
 func NewKubeletConfigPhase() workflow.Phase {

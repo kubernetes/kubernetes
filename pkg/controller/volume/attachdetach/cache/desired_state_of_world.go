@@ -255,11 +255,10 @@ func (dsw *desiredStateOfWorld) AddPod(
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
 	if _, podExists := volumeObj.scheduledPods[podName]; !podExists {
-		dsw.nodesManaged[nodeName].volumesToAttach[volumeName].scheduledPods[podName] =
-			pod{
-				podName: podName,
-				podObj:  podToAdd,
-			}
+		dsw.nodesManaged[nodeName].volumesToAttach[volumeName].scheduledPods[podName] = pod{
+			podName: podName,
+			podObj:  podToAdd,
+		}
 	}
 
 	return volumeName, nil
@@ -386,7 +385,8 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 						VolumeSpec:               volumeObj.spec,
 						NodeName:                 nodeName,
 						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
-					}})
+					},
+				})
 		}
 	}
 

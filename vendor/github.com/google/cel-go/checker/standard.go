@@ -35,7 +35,8 @@ func StandardDeclarations() []*exprpb.Decl {
 	var idents []*exprpb.Decl
 	for _, t := range []*exprpb.Type{
 		decls.Int, decls.Uint, decls.Bool,
-		decls.Double, decls.Bytes, decls.String} {
+		decls.Double, decls.Bytes, decls.String,
+	} {
 		idents = append(idents,
 			decls.NewVar(FormatCheckedType(t), decls.NewTypeType(t)))
 	}
@@ -227,7 +228,7 @@ func StandardDeclarations() []*exprpb.Decl {
 			decls.NewParameterizedOverload(overloads.IndexMap,
 				[]*exprpb.Type{mapOfAB, paramA}, paramB,
 				typeParamABList)),
-		//decls.NewOverload(overloads.IndexMessage,
+		// decls.NewOverload(overloads.IndexMessage,
 		//	[]*expr.Type{decls.Dyn, decls.String}, decls.Dyn)),
 
 		// Collections.
@@ -267,7 +268,7 @@ func StandardDeclarations() []*exprpb.Decl {
 			decls.NewParameterizedOverload(overloads.InMap,
 				[]*exprpb.Type{paramA, mapOfAB}, decls.Bool,
 				typeParamABList)),
-		//decls.NewOverload(overloads.InMessage,
+		// decls.NewOverload(overloads.InMessage,
 		//	[]*expr.Type{Dyn, decls.String},decls.Bool)),
 
 		// Conversions to type.
@@ -436,5 +437,6 @@ func StandardDeclarations() []*exprpb.Decl {
 			decls.NewInstanceOverload(overloads.TimestampToMillisecondsWithTz,
 				[]*exprpb.Type{decls.Timestamp, decls.String}, decls.Int),
 			decls.NewInstanceOverload(overloads.DurationToMilliseconds,
-				[]*exprpb.Type{decls.Duration}, decls.Int))}...)
+				[]*exprpb.Type{decls.Duration}, decls.Int)),
+	}...)
 }

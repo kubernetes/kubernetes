@@ -72,7 +72,7 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 		for {
 			select {
 			case event := <-fsWatcher.Events:
-				//TODO: Handle errors by taking corrective measures
+				// TODO: Handle errors by taking corrective measures
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					err := w.handleCreateEvent(event)
 					if err != nil {
@@ -100,7 +100,7 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 func (w *Watcher) init() error {
 	klog.V(4).InfoS("Ensuring Plugin directory", "path", w.path)
 
-	if err := w.fs.MkdirAll(w.path, 0755); err != nil {
+	if err := w.fs.MkdirAll(w.path, 0o755); err != nil {
 		return fmt.Errorf("error (re-)creating root %s: %v", w.path, err)
 	}
 
@@ -141,7 +141,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				Name: path,
 				Op:   fsnotify.Create,
 			}
-			//TODO: Handle errors by taking corrective measures
+			// TODO: Handle errors by taking corrective measures
 			if err := w.handleCreateEvent(event); err != nil {
 				klog.ErrorS(err, "Error when handling create", "event", event)
 			}

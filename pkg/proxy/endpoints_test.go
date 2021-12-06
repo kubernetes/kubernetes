@@ -451,7 +451,6 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-
 			epTracker := NewEndpointChangeTracker("test-hostname", nil, tc.ipFamily, nil, nil)
 
 			// outputs
@@ -477,7 +476,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 }
 
 func TestUpdateEndpointsMap(t *testing.T) {
-	var nodeName = testHostname
+	nodeName := testHostname
 
 	emptyEndpoint := func(ept *v1.Endpoints) {
 		ept.Subsets = []v1.EndpointSubset{}
@@ -825,493 +824,494 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedStaleEndpoints    []ServiceEndpoint
 		expectedStaleServiceNames map[ServicePortName]bool
 		expectedHealthchecks      map[types.NamespacedName]int
-	}{{
-		name:                      "empty",
-		oldEndpoints:              map[ServicePortName][]*BaseEndpointInfo{},
-		expectedResult:            map[ServicePortName][]*BaseEndpointInfo{},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		name: "no change, unnamed port",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPort),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		name: "no change, named port, local",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortLocal),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
-			makeNSN("ns1", "ep1"): 1,
-		},
-	}, {
-		name: "no change, multiple subsets",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsets),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsets),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		name: "no change, multiple subsets, multiple ports, local",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
-			makeNSN("ns1", "ep1"): 1,
-		},
-	}, {
-		name: "no change, multiple endpoints, subsets, IPs, and ports",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
-			makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
-			makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints:    []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks: map[types.NamespacedName]int{
-			makeNSN("ns1", "ep1"): 2,
-			makeNSN("ns2", "ep2"): 1,
-		},
-	}, {
-		name: "add an Endpoints",
-		previousEndpoints: []*v1.Endpoints{
-			nil,
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
-		},
-		expectedHealthchecks: map[types.NamespacedName]int{
-			makeNSN("ns1", "ep1"): 1,
-		},
-	}, {
-		name: "remove an Endpoints",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			nil,
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{},
-		expectedStaleEndpoints: []ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP),
-		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		name: "add an IP and port",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
-		},
-		expectedHealthchecks: map[types.NamespacedName]int{
-			makeNSN("ns1", "ep1"): 1,
-		},
-	}, {
-		name: "remove an IP and port",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
-			Endpoint:        "1.1.1.2:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
+	}{
+		{
+			name:                      "empty",
+			oldEndpoints:              map[ServicePortName][]*BaseEndpointInfo{},
+			expectedResult:            map[ServicePortName][]*BaseEndpointInfo{},
+			expectedStaleEndpoints:    []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks:      map[types.NamespacedName]int{},
 		}, {
-			Endpoint:        "1.1.1.1:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
+			name: "no change, unnamed port",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", unnamedPort),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", unnamedPort),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints:    []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks:      map[types.NamespacedName]int{},
 		}, {
-			Endpoint:        "1.1.1.2:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
-		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		name: "add a subset",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsetsWithLocal),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			name: "no change, named port, local",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPortLocal),
 			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPortLocal),
 			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
 			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
-		},
-		expectedHealthchecks: map[types.NamespacedName]int{
-			makeNSN("ns1", "ep1"): 1,
-		},
-	}, {
-		name: "remove a subset",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", multipleSubsets),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
 			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			expectedStaleEndpoints:    []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks: map[types.NamespacedName]int{
+				makeNSN("ns1", "ep1"): 1,
 			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
-			Endpoint:        "1.1.1.2:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
-		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		name: "rename a port",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortRenamed),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
-		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
-		},
-		expectedHealthchecks: map[types.NamespacedName]int{},
-	}, {
-		name: "renumber a port",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPort),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", namedPortRenumbered),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
-		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{},
-		expectedHealthchecks:      map[types.NamespacedName]int{},
-	}, {
-		name: "complex add and remove",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", complexBefore1),
-			makeTestEndpoints("ns2", "ep2", complexBefore2),
-			nil,
-			makeTestEndpoints("ns4", "ep4", complexBefore4),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", complexAfter1),
-			nil,
-			makeTestEndpoints("ns3", "ep3", complexAfter3),
-			makeTestEndpoints("ns4", "ep4", complexAfter4),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "2.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.3:23", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "4.4.4.5:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP): {
-				{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-				{Endpoint: "1.1.1.11:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:122", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP): {
-				{Endpoint: "3.3.3.3:33", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-			},
-			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-			},
-		},
-		expectedStaleEndpoints: []ServiceEndpoint{{
-			Endpoint:        "2.2.2.2:22",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
 		}, {
-			Endpoint:        "2.2.2.22:22",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "2.2.2.3:23",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "4.4.4.5:44",
-			ServicePortName: makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP),
-		}, {
-			Endpoint:        "4.4.4.6:45",
-			ServicePortName: makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP),
-		}},
-		expectedStaleServiceNames: map[ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP):  true,
-			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): true,
-			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP):  true,
-		},
-		expectedHealthchecks: map[types.NamespacedName]int{
-			makeNSN("ns4", "ep4"): 1,
-		},
-	}, {
-		name: "change from 0 endpoint address to 1 unnamed port",
-		previousEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", emptyEndpoint),
-		},
-		currentEndpoints: []*v1.Endpoints{
-			makeTestEndpoints("ns1", "ep1", unnamedPort),
-		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
-		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			name: "no change, multiple subsets",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsets),
 			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsets),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints:    []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks:      map[types.NamespacedName]int{},
+		}, {
+			name: "no change, multiple subsets, multiple ports, local",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints:    []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks: map[types.NamespacedName]int{
+				makeNSN("ns1", "ep1"): 1,
+			},
+		}, {
+			name: "no change, multiple endpoints, subsets, IPs, and ports",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
+				makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
+				makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
+					{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
+					{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
+					{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
+					{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints:    []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks: map[types.NamespacedName]int{
+				makeNSN("ns1", "ep1"): 2,
+				makeNSN("ns2", "ep2"): 1,
+			},
+		}, {
+			name: "add an Endpoints",
+			previousEndpoints: []*v1.Endpoints{
+				nil,
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{
+				makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
+			},
+			expectedHealthchecks: map[types.NamespacedName]int{
+				makeNSN("ns1", "ep1"): 1,
+			},
+		}, {
+			name: "remove an Endpoints",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				nil,
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{},
+			expectedStaleEndpoints: []ServiceEndpoint{{
+				Endpoint:        "1.1.1.1:11",
+				ServicePortName: makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP),
+			}},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks:      map[types.NamespacedName]int{},
+		}, {
+			name: "add an IP and port",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPort),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
+			},
+			expectedHealthchecks: map[types.NamespacedName]int{
+				makeNSN("ns1", "ep1"): 1,
+			},
+		}, {
+			name: "remove an IP and port",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPort),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{{
+				Endpoint:        "1.1.1.2:11",
+				ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
+			}, {
+				Endpoint:        "1.1.1.1:12",
+				ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
+			}, {
+				Endpoint:        "1.1.1.2:12",
+				ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
+			}},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks:      map[types.NamespacedName]int{},
+		}, {
+			name: "add a subset",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPort),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsetsWithLocal),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
+			},
+			expectedHealthchecks: map[types.NamespacedName]int{
+				makeNSN("ns1", "ep1"): 1,
+			},
+		}, {
+			name: "remove a subset",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", multipleSubsets),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPort),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{{
+				Endpoint:        "1.1.1.2:12",
+				ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
+			}},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks:      map[types.NamespacedName]int{},
+		}, {
+			name: "rename a port",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPort),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPortRenamed),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{{
+				Endpoint:        "1.1.1.1:11",
+				ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
+			}},
+			expectedStaleServiceNames: map[ServicePortName]bool{
+				makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
+			},
+			expectedHealthchecks: map[types.NamespacedName]int{},
+		}, {
+			name: "renumber a port",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPort),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", namedPortRenumbered),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{{
+				Endpoint:        "1.1.1.1:11",
+				ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
+			}},
+			expectedStaleServiceNames: map[ServicePortName]bool{},
+			expectedHealthchecks:      map[types.NamespacedName]int{},
+		}, {
+			name: "complex add and remove",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", complexBefore1),
+				makeTestEndpoints("ns2", "ep2", complexBefore2),
+				nil,
+				makeTestEndpoints("ns4", "ep4", complexBefore4),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", complexAfter1),
+				nil,
+				makeTestEndpoints("ns3", "ep3", complexAfter3),
+				makeTestEndpoints("ns4", "ep4", complexAfter4),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
+					{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "2.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP): {
+					{Endpoint: "2.2.2.3:23", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
+					{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "4.4.4.5:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP): {
+					{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.11:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.2:122", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP): {
+					{Endpoint: "3.3.3.3:33", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+				makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
+					{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{{
+				Endpoint:        "2.2.2.2:22",
+				ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
+			}, {
+				Endpoint:        "2.2.2.22:22",
+				ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
+			}, {
+				Endpoint:        "2.2.2.3:23",
+				ServicePortName: makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP),
+			}, {
+				Endpoint:        "4.4.4.5:44",
+				ServicePortName: makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP),
+			}, {
+				Endpoint:        "4.4.4.6:45",
+				ServicePortName: makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP),
+			}},
+			expectedStaleServiceNames: map[ServicePortName]bool{
+				makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP):  true,
+				makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): true,
+				makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP):  true,
+			},
+			expectedHealthchecks: map[types.NamespacedName]int{
+				makeNSN("ns4", "ep4"): 1,
+			},
+		}, {
+			name: "change from 0 endpoint address to 1 unnamed port",
+			previousEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", emptyEndpoint),
+			},
+			currentEndpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "ep1", unnamedPort),
+			},
+			oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
+			expectedResult: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+			expectedStaleEndpoints: []ServiceEndpoint{},
+			expectedStaleServiceNames: map[ServicePortName]bool{
+				makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
+			},
+			expectedHealthchecks: map[types.NamespacedName]int{},
 		},
-		expectedStaleEndpoints: []ServiceEndpoint{},
-		expectedStaleServiceNames: map[ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
-		},
-		expectedHealthchecks: map[types.NamespacedName]int{},
-	},
 	}
 
 	for tci, tc := range testCases {
@@ -1386,7 +1386,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 }
 
 func TestLastChangeTriggerTime(t *testing.T) {
-	startTime := time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
+	startTime := time.Date(2018, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
 	t_1 := startTime.Add(-time.Second)
 	t0 := startTime.Add(time.Second)
 	t1 := t0.Add(time.Second)

@@ -47,7 +47,8 @@ var pluginConfigs = []v1beta3.PluginConfig{
 				},
 				MinCandidateNodesPercentage: pointer.Int32Ptr(10),
 				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
-			}},
+			},
+		},
 	},
 	{
 		Name: "InterPodAffinity",
@@ -58,7 +59,8 @@ var pluginConfigs = []v1beta3.PluginConfig{
 					APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 				},
 				HardPodAffinityWeight: pointer.Int32Ptr(1),
-			}},
+			},
+		},
 	},
 	{
 		Name: "NodeAffinity",
@@ -188,7 +190,8 @@ func TestSchedulerDefaults(t *testing.T) {
 					{
 						SchedulerName: pointer.StringPtr("default-scheduler"),
 						Plugins:       getDefaultPlugins(),
-						PluginConfig:  pluginConfigs},
+						PluginConfig:  pluginConfigs,
+					},
 				},
 			},
 		},
@@ -255,7 +258,8 @@ func TestSchedulerDefaults(t *testing.T) {
 										},
 										MinCandidateNodesPercentage: pointer.Int32Ptr(10),
 										MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
-									}},
+									},
+								},
 							},
 							{
 								Name: "InterPodAffinity",
@@ -266,7 +270,8 @@ func TestSchedulerDefaults(t *testing.T) {
 											APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 										},
 										HardPodAffinityWeight: pointer.Int32Ptr(1),
-									}},
+									},
+								},
 							},
 							{
 								Name: "NodeAffinity",

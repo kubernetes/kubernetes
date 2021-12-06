@@ -62,26 +62,19 @@ type applierV3Internal interface {
 // applierV3 is the interface for processing V3 raft messages
 type applierV3 interface {
 	Apply(r *pb.InternalRaftRequest, shouldApplyV3 membership.ShouldApplyV3) *applyResult
-
 	Put(ctx context.Context, txn mvcc.TxnWrite, p *pb.PutRequest) (*pb.PutResponse, *traceutil.Trace, error)
 	Range(ctx context.Context, txn mvcc.TxnRead, r *pb.RangeRequest) (*pb.RangeResponse, error)
 	DeleteRange(txn mvcc.TxnWrite, dr *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error)
 	Txn(ctx context.Context, rt *pb.TxnRequest) (*pb.TxnResponse, *traceutil.Trace, error)
 	Compaction(compaction *pb.CompactionRequest) (*pb.CompactionResponse, <-chan struct{}, *traceutil.Trace, error)
-
 	LeaseGrant(lc *pb.LeaseGrantRequest) (*pb.LeaseGrantResponse, error)
 	LeaseRevoke(lc *pb.LeaseRevokeRequest) (*pb.LeaseRevokeResponse, error)
-
 	LeaseCheckpoint(lc *pb.LeaseCheckpointRequest) (*pb.LeaseCheckpointResponse, error)
-
 	Alarm(*pb.AlarmRequest) (*pb.AlarmResponse, error)
-
 	Authenticate(r *pb.InternalAuthenticateRequest) (*pb.AuthenticateResponse, error)
-
 	AuthEnable() (*pb.AuthEnableResponse, error)
 	AuthDisable() (*pb.AuthDisableResponse, error)
 	AuthStatus() (*pb.AuthStatusResponse, error)
-
 	UserAdd(ua *pb.AuthUserAddRequest) (*pb.AuthUserAddResponse, error)
 	UserDelete(ua *pb.AuthUserDeleteRequest) (*pb.AuthUserDeleteResponse, error)
 	UserChangePassword(ua *pb.AuthUserChangePasswordRequest) (*pb.AuthUserChangePasswordResponse, error)

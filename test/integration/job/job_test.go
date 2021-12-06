@@ -789,7 +789,6 @@ func TestNodeSelectorUpdate(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
 				t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
 			}
-
 		})
 	}
 }

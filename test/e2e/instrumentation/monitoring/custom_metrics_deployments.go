@@ -186,16 +186,20 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 				Name:            "prometheus-exporter",
 				Image:           imageutils.GetE2EImage(imageutils.PrometheusDummyExporter),
 				ImagePullPolicy: v1.PullPolicy("Always"),
-				Command: []string{"/prometheus_dummy_exporter", "--metric-name=" + metricName,
-					fmt.Sprintf("--metric-value=%v", metricValue), fmt.Sprintf("=--port=%d", port)},
+				Command: []string{
+					"/prometheus_dummy_exporter", "--metric-name=" + metricName,
+					fmt.Sprintf("--metric-value=%v", metricValue), fmt.Sprintf("=--port=%d", port),
+				},
 				Ports: []v1.ContainerPort{{ContainerPort: port}},
 			},
 			{
 				Name:            "prometheus-to-sd",
 				Image:           imageutils.GetE2EImage(imageutils.PrometheusToSd),
 				ImagePullPolicy: v1.PullPolicy("Always"),
-				Command: []string{"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
-					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)"},
+				Command: []string{
+					"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
+					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)",
+				},
 				Env: []v1.EnvVar{
 					{
 						Name: "POD_ID",

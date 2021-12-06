@@ -37,15 +37,12 @@ const (
 	volumePath = "/test-volume"
 )
 
-var (
-	nonRootUID = int64(1001)
-)
+var nonRootUID = int64(1001)
 
 var _ = SIGDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
 	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
-
 		ginkgo.BeforeEach(func() {
 			// Windows does not support the FSGroup SecurityContext option.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")

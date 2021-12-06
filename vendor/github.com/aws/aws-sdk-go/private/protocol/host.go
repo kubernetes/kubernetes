@@ -1,10 +1,11 @@
 package protocol
 
 import (
-	"github.com/aws/aws-sdk-go/aws/request"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/aws/aws-sdk-go/aws/request"
 )
 
 // ValidateEndpointHostHandler is a request handler that will validate the

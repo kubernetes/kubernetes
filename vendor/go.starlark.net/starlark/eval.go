@@ -1219,7 +1219,6 @@ func asIndex(v Value, len int, result *int) error {
 // setArgs sets the values of the formal parameters of function fn in
 // based on the actual parameter values in args and kwargs.
 func setArgs(locals []Value, fn *Function, args Tuple, kwargs []Tuple) error {
-
 	// This is the general schema of a function:
 	//
 	//   def f(p1, p2=dp2, p3=dp3, *args, k1, k2=dk2, k3, **kwargs)

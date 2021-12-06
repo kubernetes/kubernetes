@@ -245,7 +245,6 @@ func Unmount(name, old string) (err error) {
 
 func Fchdir(fd int) (err error) {
 	path, err := Fd2path(fd)
-
 	if err != nil {
 		return
 	}

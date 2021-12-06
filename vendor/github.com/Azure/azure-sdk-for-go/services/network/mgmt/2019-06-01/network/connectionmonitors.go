@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ConnectionMonitorsClient is the network Client
@@ -50,12 +51,20 @@ func (client ConnectionMonitorsClient) CreateOrUpdate(ctx context.Context, resou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.ConnectionMonitorParameters", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.ConnectionMonitorParameters.Source", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "parameters.ConnectionMonitorParameters.Source.ResourceID", Name: validation.Null, Rule: true, Chain: nil}}},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.ConnectionMonitorParameters", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.ConnectionMonitorParameters.Source", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{{Target: "parameters.ConnectionMonitorParameters.Source.ResourceID", Name: validation.Null, Rule: true, Chain: nil}},
+					},
 					{Target: "parameters.ConnectionMonitorParameters.Destination", Name: validation.Null, Rule: true, Chain: nil},
-				}}}}}); err != nil {
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.ConnectionMonitorsClient", "CreateOrUpdate", err.Error())
 	}
 

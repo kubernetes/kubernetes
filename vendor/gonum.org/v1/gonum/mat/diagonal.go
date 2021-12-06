@@ -322,5 +322,4 @@ func (d *DiagDense) Trace() float64 {
 		tr += rb.Data[rb.KL+i*rb.Stride]
 	}
 	return tr
-
 }

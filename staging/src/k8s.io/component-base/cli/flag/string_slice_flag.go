@@ -35,8 +35,10 @@ func NewStringSlice(s *[]string) *StringSlice {
 	return &StringSlice{value: s}
 }
 
-var _ goflag.Value = &StringSlice{}
-var _ pflag.Value = &StringSlice{}
+var (
+	_ goflag.Value = &StringSlice{}
+	_ pflag.Value  = &StringSlice{}
+)
 
 func (s *StringSlice) String() string {
 	if s == nil || s.value == nil {

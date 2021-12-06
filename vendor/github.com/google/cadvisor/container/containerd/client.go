@@ -44,8 +44,10 @@ type ContainerdClient interface {
 	Version(ctx context.Context) (string, error)
 }
 
-var once sync.Once
-var ctrdClient ContainerdClient = nil
+var (
+	once       sync.Once
+	ctrdClient ContainerdClient = nil
+)
 
 const (
 	maxBackoffDelay   = 3 * time.Second

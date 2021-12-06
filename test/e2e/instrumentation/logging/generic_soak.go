@@ -40,7 +40,6 @@ var loggingSoak struct {
 var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
-
 	f := framework.NewDefaultFramework("logging-soak")
 
 	// Not a global constant (irrelevant outside this test), also not a parameter (if you want more logs, use --scale=).
@@ -77,7 +76,6 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 // RunLogPodsWithSleepOf creates a pod on every node, logs continuously (with "sleep" pauses), and verifies that the log string
 // was produced in each and every pod at least once.  The final arg is the timeout for the test to verify all the pods got logs.
 func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
-
 	nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 	framework.ExpectNoError(err)
 	totalPods := len(nodes.Items)

@@ -15,9 +15,8 @@
 package collector
 
 import (
-	"time"
-
 	"encoding/json"
+	"time"
 
 	v1 "github.com/google/cadvisor/info/v1"
 )

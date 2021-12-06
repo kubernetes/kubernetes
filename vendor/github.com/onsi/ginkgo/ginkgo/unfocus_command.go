@@ -113,7 +113,6 @@ func unfocusFile(path string) {
 
 func writeBackup(path string, data []byte) (string, error) {
 	t, err := ioutil.TempFile(filepath.Dir(path), filepath.Base(path))
-
 	if err != nil {
 		return "", fmt.Errorf("error creating temporary file: %w", err)
 	}

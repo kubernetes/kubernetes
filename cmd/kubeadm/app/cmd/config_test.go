@@ -118,7 +118,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 
 			configFilePath := filepath.Join(tmpDir, "test-config-file")
-			if err := ioutil.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
+			if err := ioutil.WriteFile(configFilePath, tc.configContents, 0o644); err != nil {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
@@ -207,7 +207,6 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 }
 
 func TestConfigImagesListOutput(t *testing.T) {
-
 	etcdVersion, _, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, dummyKubernetesVersionStr)
 	if err != nil {
 		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)
@@ -418,7 +417,7 @@ func tempConfig(t *testing.T, config []byte) (string, func()) {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}
 	configFilePath := filepath.Join(tmpDir, "test-config-file")
-	if err := ioutil.WriteFile(configFilePath, config, 0644); err != nil {
+	if err := ioutil.WriteFile(configFilePath, config, 0o644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed writing a config file: %v", err)
 	}

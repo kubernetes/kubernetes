@@ -24,10 +24,8 @@ import (
 // current value to become unknown.
 type Unknown []int64
 
-var (
-	// UnknownType singleton.
-	UnknownType = NewTypeValue("unknown")
-)
+// UnknownType singleton.
+var UnknownType = NewTypeValue("unknown")
 
 // ConvertToNative implements ref.Val.ConvertToNative.
 func (u Unknown) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {

@@ -33,20 +33,33 @@ func Test_processEnvFileLine(t *testing.T) {
 		expectedValue string
 		expectedErr   string
 	}{
-		{"the utf8bom is trimmed on the first line",
-			append(utf8bom, 'a', '=', 'c'), 0, "a", "c", ""},
+		{
+			"the utf8bom is trimmed on the first line",
+			append(utf8bom, 'a', '=', 'c'), 0, "a", "c", "",
+		},
 
-		{"the utf8bom is NOT trimmed on the second line",
-			append(utf8bom, 'a', '=', 'c'), 1, "", "", "not a valid key name"},
+		{
+			"the utf8bom is NOT trimmed on the second line",
+			append(utf8bom, 'a', '=', 'c'), 1, "", "", "not a valid key name",
+		},
 
-		{"no key is returned on a comment line",
-			[]byte{' ', '#', 'c'}, 0, "", "", ""},
+		{
+			"no key is returned on a comment line",
+			[]byte{' ', '#', 'c'},
+			0, "", "", "",
+		},
 
-		{"no key is returned on a blank line",
-			[]byte{' ', ' ', '\t'}, 0, "", "", ""},
+		{
+			"no key is returned on a blank line",
+			[]byte{' ', ' ', '\t'},
+			0, "", "", "",
+		},
 
-		{"key is returned even with no value",
-			[]byte{' ', 'x', '='}, 0, "x", "", ""},
+		{
+			"key is returned even with no value",
+			[]byte{' ', 'x', '='},
+			0, "x", "", "",
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {

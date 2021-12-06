@@ -170,7 +170,6 @@ func TestOpenCloseHostports(t *testing.T) {
 			portMappings: nil,
 		},
 		{
-
 			portMappings: []*PortMapping{
 				{HostPort: 80, Protocol: v1.ProtocolTCP},
 				{HostPort: 8080, Protocol: v1.ProtocolTCP},
@@ -178,7 +177,6 @@ func TestOpenCloseHostports(t *testing.T) {
 			},
 		},
 		{
-
 			portMappings: []*PortMapping{
 				{HostPort: 80, Protocol: v1.ProtocolTCP},
 			},

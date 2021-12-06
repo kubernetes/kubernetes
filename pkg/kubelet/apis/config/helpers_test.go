@@ -93,6 +93,7 @@ func allPrimitiveFieldPaths(t *testing.T, skipRecurseList sets.String, tp reflec
 type foo struct {
 	foo int
 }
+
 type bar struct {
 	str    string
 	strptr *string

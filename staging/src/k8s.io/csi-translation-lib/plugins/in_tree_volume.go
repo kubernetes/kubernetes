@@ -29,7 +29,6 @@ import (
 
 // InTreePlugin handles translations between CSI and in-tree sources in a PV
 type InTreePlugin interface {
-
 	// TranslateInTreeStorageClassToCSI takes in-tree volume options
 	// and translates them to a volume options consumable by CSI plugin
 	TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error)
@@ -182,7 +181,6 @@ func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) er
 // This function will remove the Beta version Kubernetes topology label in case the node upgrade to a
 // newer version where it does not have any Beta topology label anymore
 func translateTopologyFromInTreeToCSI(pv *v1.PersistentVolume, csiTopologyKey string) error {
-
 	zoneLabel, regionLabel := getTopologyLabel(pv)
 
 	// If Zone kubernetes topology exist, replace it to use csiTopologyKey
@@ -222,7 +220,6 @@ func translateTopologyFromInTreeToCSI(pv *v1.PersistentVolume, csiTopologyKey st
 //   2.1 Check if zoneGA exists, if yes return GA labels
 //   2.2 Check if zoneBeta exists, if yes return Beta labels
 func getTopologyLabel(pv *v1.PersistentVolume) (zoneLabel string, regionLabel string) {
-
 	if zoneGA := TopologyKeyExist(v1.LabelTopologyZone, pv.Spec.NodeAffinity); zoneGA {
 		return v1.LabelTopologyZone, v1.LabelTopologyRegion
 	}
@@ -272,7 +269,6 @@ type regionParserFn func([]string) (string, error)
 // 2. Process and generate region topology if a regionParser is passed
 // 3. Add Kubernetes Topology labels(zone) if they do not exist
 func translateTopologyFromCSIToInTree(pv *v1.PersistentVolume, csiTopologyKey string, regionParser regionParserFn) error {
-
 	zoneLabel, _ := getTopologyLabel(pv)
 
 	// 1. Replace all CSI topology to Kubernetes Zone label
@@ -339,7 +335,6 @@ func translateAllowedTopologies(terms []v1.TopologySelectorTerm, key string) ([]
 // It assumes the Zone NodeAffinity already exists
 // Each provider is responsible for providing their own regionParser
 func regionTopologyHandler(pv *v1.PersistentVolume, regionParser regionParserFn) error {
-
 	// Make sure the necessary fields exist
 	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
 		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
@@ -371,12 +366,11 @@ func regionTopologyHandler(pv *v1.PersistentVolume, regionParser regionParserFn)
 			return err
 		}
 		// Add the regionVal to this term
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions =
-			append(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions, v1.NodeSelectorRequirement{
-				Key:      regionLabel,
-				Operator: v1.NodeSelectorOpIn,
-				Values:   []string{regionVal},
-			})
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions = append(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions, v1.NodeSelectorRequirement{
+			Key:      regionLabel,
+			Operator: v1.NodeSelectorOpIn,
+			Values:   []string{regionVal},
+		})
 
 	}
 

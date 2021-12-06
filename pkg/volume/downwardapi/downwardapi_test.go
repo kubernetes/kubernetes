@@ -169,15 +169,15 @@ func TestDownwardAPI(t *testing.T) {
 			name:  "test_default_mode",
 			files: map[string]string{"name_file_name": "metadata.name"},
 			steps: []testStep{
-				verifyMode{stepName{"name_file_name"}, 0644},
+				verifyMode{stepName{"name_file_name"}, 0o644},
 			},
 		},
 		{
 			name:  "test_item_mode",
 			files: map[string]string{"name_file_name": "metadata.name"},
-			modes: map[string]int32{"name_file_name": 0400},
+			modes: map[string]int32{"name_file_name": 0o400},
 			steps: []testStep{
-				verifyMode{stepName{"name_file_name"}, 0400},
+				verifyMode{stepName{"name_file_name"}, 0o400},
 			},
 		},
 	}
@@ -202,7 +202,7 @@ type downwardAPITest struct {
 }
 
 func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAnnotations map[string]string, modes map[string]int32) *downwardAPITest {
-	defaultMode := int32(0644)
+	defaultMode := int32(0o644)
 	var files []v1.DownwardAPIVolumeFile
 	for path, fieldPath := range volumeFiles {
 		file := v1.DownwardAPIVolumeFile{

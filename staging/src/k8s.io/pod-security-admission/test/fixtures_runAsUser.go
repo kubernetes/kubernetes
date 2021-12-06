@@ -35,7 +35,6 @@ containerFields: []string{
 */
 
 func init() {
-
 	fixtureData_1_23 := fixtureGenerator{
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)

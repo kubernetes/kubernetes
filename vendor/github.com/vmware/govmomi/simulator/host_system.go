@@ -28,9 +28,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-var (
-	hostPortUnique = os.Getenv("VCSIM_HOST_PORT_UNIQUE") == "true"
-)
+var hostPortUnique = os.Getenv("VCSIM_HOST_PORT_UNIQUE") == "true"
 
 type HostSystem struct {
 	mo.HostSystem

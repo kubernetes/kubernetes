@@ -75,8 +75,10 @@ func newCall(t TestHelper, receiver interface{}, method string, methodType refle
 		}
 		return rets
 	}}
-	return &Call{t: t, receiver: receiver, method: method, methodType: methodType,
-		args: margs, origin: origin, minCalls: 1, maxCalls: 1, actions: actions}
+	return &Call{
+		t: t, receiver: receiver, method: method, methodType: methodType,
+		args: margs, origin: origin, minCalls: 1, maxCalls: 1, actions: actions,
+	}
 }
 
 // AnyTimes allows the expectation to be called 0 or more times

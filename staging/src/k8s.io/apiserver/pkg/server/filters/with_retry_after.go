@@ -21,16 +21,14 @@ import (
 	"strings"
 )
 
-var (
-	// health probes and metrics scraping are never rejected, we will continue
-	// serving these requests after shutdown delay duration elapses.
-	pathPrefixesExemptFromRetryAfter = []string{
-		"/readyz",
-		"/livez",
-		"/healthz",
-		"/metrics",
-	}
-)
+// health probes and metrics scraping are never rejected, we will continue
+// serving these requests after shutdown delay duration elapses.
+var pathPrefixesExemptFromRetryAfter = []string{
+	"/readyz",
+	"/livez",
+	"/healthz",
+	"/metrics",
+}
 
 // isRequestExemptFunc returns true if the request should not be rejected,
 // with a Retry-After response, otherwise it returns false.

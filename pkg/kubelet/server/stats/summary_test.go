@@ -225,6 +225,7 @@ func getContainerStats() *statsapi.ContainerStats {
 	f.Fuzz(v)
 	return v
 }
+
 func getVolumeCPUAndMemoryStats() *statsapi.ContainerStats {
 	f := fuzz.New().NilChance(0)
 	v := &statsapi.ContainerStats{}

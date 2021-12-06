@@ -42,9 +42,7 @@ const (
 	lbNodesHealthCheckPort = 10256
 )
 
-var (
-	minNodesHealthCheckVersion *utilversion.Version
-)
+var minNodesHealthCheckVersion *utilversion.Version
 
 func init() {
 	if v, err := utilversion.ParseGeneric("1.7.2"); err != nil {

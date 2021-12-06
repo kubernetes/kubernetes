@@ -2630,7 +2630,6 @@ func (g *Generator) generateMessageStruct(mc *msgCtx, topLevelFields []topLevelF
 func (g *Generator) generateGetters(mc *msgCtx, topLevelFields []topLevelField) {
 	for _, pf := range topLevelFields {
 		pf.getter(g, mc)
-
 	}
 }
 

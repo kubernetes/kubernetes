@@ -273,7 +273,6 @@ type nodeToUpdateStatusFor struct {
 
 func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
 	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error {
-
 	_, err := asw.AddVolumeNode(uniqueName, volumeSpec, nodeName, "", false /* isAttached */)
 	return err
 }
@@ -441,8 +440,8 @@ func (asw *actualStateOfWorld) SetDetachRequestTime(
 // This is correct, because if volumeObj is empty this function returns an error, and nodesAttachedTo
 // map is a reference type, and thus mutating the copy changes the original map.
 func (asw *actualStateOfWorld) getNodeAndVolume(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) (attachedVolume, nodeAttachedTo, error) {
-
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName) (attachedVolume, nodeAttachedTo, error,
+) {
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if volumeExists {
 		nodeObj, nodeExists := volumeObj.nodesAttachedTo[nodeName]
@@ -460,11 +459,9 @@ func (asw *actualStateOfWorld) getNodeAndVolume(
 // This is an internal function and caller should acquire and release the lock
 func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
-
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if nodeToUpdateExists {
-		_, nodeToUpdateVolumeExists :=
-			nodeToUpdate.volumesToReportAsAttached[volumeName]
+		_, nodeToUpdateVolumeExists := nodeToUpdate.volumesToReportAsAttached[volumeName]
 		if nodeToUpdateVolumeExists {
 			nodeToUpdate.statusUpdateNeeded = true
 			delete(nodeToUpdate.volumesToReportAsAttached, volumeName)
@@ -475,7 +472,6 @@ func (asw *actualStateOfWorld) removeVolumeFromReportAsAttached(
 	return fmt.Errorf("volume %q does not exist in volumesToReportAsAttached list or node %q does not exist in nodesToUpdateStatusFor list",
 		volumeName,
 		nodeName)
-
 }
 
 // Add the volumeName to the node's volumesToReportAsAttached list
@@ -498,8 +494,7 @@ func (asw *actualStateOfWorld) addVolumeToReportAsAttached(
 		asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
 		klog.V(4).Infof("Add new node %q to nodesToUpdateStatusFor", nodeName)
 	}
-	_, nodeToUpdateVolumeExists :=
-		nodeToUpdate.volumesToReportAsAttached[volumeName]
+	_, nodeToUpdateVolumeExists := nodeToUpdate.volumesToReportAsAttached[volumeName]
 	if !nodeToUpdateVolumeExists {
 		nodeToUpdate.statusUpdateNeeded = true
 		nodeToUpdate.volumesToReportAsAttached[volumeName] = volumeName
@@ -693,5 +688,6 @@ func getAttachedVolume(
 			PluginIsAttachable: true,
 		},
 		MountedByNode:       nodeAttachedTo.mountedByNode,
-		DetachRequestedTime: nodeAttachedTo.detachRequestedTime}
+		DetachRequestedTime: nodeAttachedTo.detachRequestedTime,
+	}
 }

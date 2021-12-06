@@ -38,7 +38,6 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // Decoder is intended to be used with a stream of tokens. As a result it navigates forward only.
 func (d *Decoder) SeekTo(path ...interface{}) (bool, error) {
-
 	if len(path) == 0 {
 		return len(d.path) == 0, nil
 	}
@@ -161,7 +160,6 @@ func (d *Decoder) Token() (json.Token, error) {
 //
 // Scan returns true if there are more contiguous values to scan (for example in an array).
 func (d *Decoder) Scan(ext *PathActions) (bool, error) {
-
 	rootPath := d.Path()
 
 	// If this is an array path, increment the root path in our local copy.

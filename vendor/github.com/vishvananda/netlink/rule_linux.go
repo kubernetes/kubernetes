@@ -173,7 +173,7 @@ func (h *Handle) RuleList(family int) ([]Rule, error) {
 	}
 
 	native := nl.NativeEndian()
-	var res = make([]Rule, 0)
+	res := make([]Rule, 0)
 	for i := range msgs {
 		msg := nl.DeserializeRtMsg(msgs[i])
 		attrs, err := nl.ParseRouteAttr(msgs[i][msg.Len():])

@@ -45,9 +45,7 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
-var (
-	emptyFunc = func() {}
-)
+var emptyFunc = func() {}
 
 const (
 	// storageWatchListPageSize is the cacher's request chunk size of

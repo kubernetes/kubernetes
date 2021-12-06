@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Paths describes the available paths and operations for the API, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#pathsObject

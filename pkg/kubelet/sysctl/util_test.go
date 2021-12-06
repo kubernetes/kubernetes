@@ -50,7 +50,6 @@ func TestConvertSysctlVariableToDotsSeparator(t *testing.T) {
 // TestConvertPodSysctlsVariableToDotsSeparator tests whether the sysctls variable
 // can be correctly converted to a dot as a separator.
 func TestConvertPodSysctlsVariableToDotsSeparator(t *testing.T) {
-
 	sysctls := []v1.Sysctl{
 		{
 			Name:  "kernel.msgmax",
@@ -93,5 +92,4 @@ func TestConvertPodSysctlsVariableToDotsSeparator(t *testing.T) {
 
 	ConvertPodSysctlsVariableToDotsSeparator(securityContext)
 	assert.Equalf(t, securityContext.Sysctls, exceptSysctls, "The sysctls name was not converted correctly. got: %s, want: %s", securityContext.Sysctls, exceptSysctls)
-
 }

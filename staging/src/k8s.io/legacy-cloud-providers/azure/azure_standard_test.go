@@ -655,7 +655,6 @@ func TestGetPrimaryIPConfig(t *testing.T) {
 		expectedIPConfig *network.InterfaceIPConfiguration
 		expectedErrMsg   error
 	}{
-
 		{
 			name: "GetPrimaryIPConfig should get the only IP configuration",
 			nic: network.Interface{

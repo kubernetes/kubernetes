@@ -171,7 +171,7 @@ func (g *DockerConfigURLKeyProvider) Provide(image string) credentialprovider.Do
 // runWithBackoff runs input function `f` with an exponential backoff.
 // Note that this method can block indefinitely.
 func runWithBackoff(f func() ([]byte, error)) []byte {
-	var backoff = 100 * time.Millisecond
+	backoff := 100 * time.Millisecond
 	const maxBackoff = time.Minute
 	for {
 		value, err := f()

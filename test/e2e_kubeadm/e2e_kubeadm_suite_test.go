@@ -50,7 +50,7 @@ func TestE2E(t *testing.T) {
 	reportDir := framework.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exists
-		if err := os.MkdirAll(reportDir, 0755); err != nil {
+		if err := os.MkdirAll(reportDir, 0o755); err != nil {
 			t.Fatalf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory

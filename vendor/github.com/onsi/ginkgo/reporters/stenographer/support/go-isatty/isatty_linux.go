@@ -1,5 +1,5 @@
-// +build linux
-// +build !appengine
+//go:build linux && !appengine
+// +build linux,!appengine
 
 package isatty
 

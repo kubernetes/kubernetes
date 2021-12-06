@@ -45,6 +45,7 @@ type valueNode struct {
 	// TransformerName is the name of the transformer.
 	TransformerName string // If non-empty, implies Value is populated
 }
+
 type reportRecord struct {
 	Key   reflect.Value // Invalid for slice element
 	Value *valueNode

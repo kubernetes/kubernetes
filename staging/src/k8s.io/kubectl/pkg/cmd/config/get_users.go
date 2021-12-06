@@ -29,11 +29,9 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	getUsersExample = templates.Examples(`
+var getUsersExample = templates.Examples(`
 		# List the users that kubectl knows about
 		kubectl config get-users`)
-)
 
 // GetUsersOptions holds the data needed to run the command
 type GetUsersOptions struct {

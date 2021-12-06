@@ -19,12 +19,13 @@ package rbd
 import (
 	"context"
 	"fmt"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"os"
 	"path/filepath"
 	"regexp"
 	dstrings "strings"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -43,9 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-var (
-	supportedFeatures = sets.NewString("layering")
-)
+var supportedFeatures = sets.NewString("layering")
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -57,14 +56,16 @@ type rbdPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &rbdPlugin{}
-var _ volume.PersistentVolumePlugin = &rbdPlugin{}
-var _ volume.DeletableVolumePlugin = &rbdPlugin{}
-var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
-var _ volume.AttachableVolumePlugin = &rbdPlugin{}
-var _ volume.ExpandableVolumePlugin = &rbdPlugin{}
-var _ volume.BlockVolumePlugin = &rbdPlugin{}
-var _ volume.DeviceMountableVolumePlugin = &rbdPlugin{}
+var (
+	_ volume.VolumePlugin                = &rbdPlugin{}
+	_ volume.PersistentVolumePlugin      = &rbdPlugin{}
+	_ volume.DeletableVolumePlugin       = &rbdPlugin{}
+	_ volume.ProvisionableVolumePlugin   = &rbdPlugin{}
+	_ volume.AttachableVolumePlugin      = &rbdPlugin{}
+	_ volume.ExpandableVolumePlugin      = &rbdPlugin{}
+	_ volume.BlockVolumePlugin           = &rbdPlugin{}
+	_ volume.DeviceMountableVolumePlugin = &rbdPlugin{}
+)
 
 const (
 	rbdPluginName                  = "kubernetes.io/rbd"
@@ -201,7 +202,6 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 		return oldSize, err
 	}
 	return expandedSize, nil
-
 }
 
 func (plugin *rbdPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
@@ -474,7 +474,6 @@ func getVolumeSpecFromGlobalMapPath(globalMapPath, volumeName string) (*volume.S
 }
 
 func (plugin *rbdPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
-
 	var uid types.UID
 	if pod != nil {
 		uid = pod.UID
@@ -597,7 +596,8 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret str
 			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
 			adminID:     admin,
 			adminSecret: secret,
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *rbdPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
@@ -722,7 +722,7 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		rbd.SecretRef.Name = secretName
 		rbd.SecretRef.Namespace = secretNamespace
 	} else {
-		var filePathRegex = regexp.MustCompile(`^(?:/[^/!;` + "`" + ` ]+)+$`)
+		filePathRegex := regexp.MustCompile(`^(?:/[^/!;` + "`" + ` ]+)+$`)
 		if keyring != "" && !filePathRegex.MatchString(keyring) {
 			return nil, fmt.Errorf("keyring field must contain a path to a file")
 		}
@@ -899,8 +899,10 @@ type rbdDiskMapper struct {
 	secret  string
 }
 
-var _ volume.BlockVolumeUnmapper = &rbdDiskUnmapper{}
-var _ volume.CustomBlockVolumeUnmapper = &rbdDiskUnmapper{}
+var (
+	_ volume.BlockVolumeUnmapper       = &rbdDiskUnmapper{}
+	_ volume.CustomBlockVolumeUnmapper = &rbdDiskUnmapper{}
+)
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/{rbd pool}-image-{rbd image-name}/{podUid}
@@ -956,7 +958,6 @@ type rbdDiskUnmapper struct {
 }
 
 func getPoolAndImageFromMapPath(mapPath string) (string, string, error) {
-
 	pathParts := dstrings.Split(mapPath, "/")
 	if len(pathParts) < 2 {
 		return "", "", fmt.Errorf("corrupted mapPath")
@@ -983,7 +984,6 @@ func getBlockVolumeDevice(mapPath string) (string, error) {
 }
 
 func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
-
 	device, err := getBlockVolumeDevice(mapPath)
 	if err != nil {
 		return fmt.Errorf("rbd: failed to get loopback for device: %v, err: %v", device, err)

@@ -194,7 +194,6 @@ func TestValidateContainerResourceName(t *testing.T) {
 }
 
 func TestValidatePodLogOptions(t *testing.T) {
-
 	var (
 		positiveLine             = int64(8)
 		negativeLine             = int64(-8)
@@ -282,7 +281,8 @@ func TestValidatePodLogOptions(t *testing.T) {
 				LimitBytes:   &limitBytesGreaterThan1,
 				SinceSeconds: &sinceSecondsLessThan1,
 			},
-		}, {
+		},
+		{
 			name: "Invalid podLogOptions with both SinceSeconds and SinceTime set",
 			podLogOptions: v1.PodLogOptions{
 				TailLines:    &negativeLine,

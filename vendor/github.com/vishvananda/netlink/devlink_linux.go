@@ -1,9 +1,9 @@
 package netlink
 
 import (
+	"fmt"
 	"syscall"
 
-	"fmt"
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
 )
@@ -54,7 +54,7 @@ func eswitchStringToMode(modeName string) (uint16, error) {
 }
 
 func parseEswitchMode(mode uint16) string {
-	var eswitchMode = map[uint16]string{
+	eswitchMode := map[uint16]string{
 		nl.DEVLINK_ESWITCH_MODE_LEGACY:    "legacy",
 		nl.DEVLINK_ESWITCH_MODE_SWITCHDEV: "switchdev",
 	}
@@ -66,7 +66,7 @@ func parseEswitchMode(mode uint16) string {
 }
 
 func parseEswitchInlineMode(inlinemode uint8) string {
-	var eswitchInlineMode = map[uint8]string{
+	eswitchInlineMode := map[uint8]string{
 		nl.DEVLINK_ESWITCH_INLINE_MODE_NONE:      "none",
 		nl.DEVLINK_ESWITCH_INLINE_MODE_LINK:      "link",
 		nl.DEVLINK_ESWITCH_INLINE_MODE_NETWORK:   "network",
@@ -80,7 +80,7 @@ func parseEswitchInlineMode(inlinemode uint8) string {
 }
 
 func parseEswitchEncapMode(encapmode uint8) string {
-	var eswitchEncapMode = map[uint8]string{
+	eswitchEncapMode := map[uint8]string{
 		nl.DEVLINK_ESWITCH_ENCAP_MODE_NONE:  "disable",
 		nl.DEVLINK_ESWITCH_ENCAP_MODE_BASIC: "enable",
 	}

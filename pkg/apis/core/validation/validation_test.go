@@ -480,7 +480,6 @@ func TestValidatePersistentVolumes(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestValidatePersistentVolumeSpec(t *testing.T) {
@@ -2322,7 +2321,7 @@ func TestValidateKeyToPath(t *testing.T) {
 			ok: true,
 		},
 		{
-			kp: core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(0644)},
+			kp: core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(0o644)},
 			ok: true,
 		},
 		{
@@ -2356,7 +2355,7 @@ func TestValidateKeyToPath(t *testing.T) {
 			errtype: field.ErrorTypeInvalid,
 		},
 		{
-			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(01000)},
+			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(0o1000)},
 			ok:      false,
 			errtype: field.ErrorTypeInvalid,
 		},
@@ -3187,7 +3186,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "my-secret",
-						DefaultMode: utilpointer.Int32Ptr(0644),
+						DefaultMode: utilpointer.Int32Ptr(0o644),
 					},
 				},
 			},
@@ -3202,7 +3201,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: utilpointer.Int32Ptr(0644),
+							Mode: utilpointer.Int32Ptr(0o644),
 						}},
 					},
 				},
@@ -3278,7 +3277,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: utilpointer.Int32Ptr(01000),
+						DefaultMode: utilpointer.Int32Ptr(0o1000),
 					},
 				},
 			},
@@ -3326,7 +3325,7 @@ func TestValidateVolumes(t *testing.T) {
 						LocalObjectReference: core.LocalObjectReference{
 							Name: "my-cfgmap",
 						},
-						DefaultMode: utilpointer.Int32Ptr(0644),
+						DefaultMode: utilpointer.Int32Ptr(0o644),
 					},
 				},
 			},
@@ -3338,11 +3337,12 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{
-							Name: "my-cfgmap"},
+							Name: "my-cfgmap",
+						},
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: utilpointer.Int32Ptr(0644),
+							Mode: utilpointer.Int32Ptr(0o644),
 						}},
 					},
 				},
@@ -3355,7 +3355,8 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{
-							Name: "my-cfgmap"},
+							Name: "my-cfgmap",
+						},
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "dir/filename",
@@ -3419,7 +3420,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          utilpointer.Int32Ptr(01000),
+						DefaultMode:          utilpointer.Int32Ptr(0o1000),
 					},
 				},
 			},
@@ -3855,7 +3856,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32Ptr(0644),
+						DefaultMode: utilpointer.Int32Ptr(0o644),
 					},
 				},
 			},
@@ -3867,7 +3868,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32Ptr(0644),
+							Mode: utilpointer.Int32Ptr(0o644),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -3885,7 +3886,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32Ptr(01000),
+							Mode: utilpointer.Int32Ptr(0o1000),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -4062,7 +4063,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32Ptr(01000),
+						DefaultMode: utilpointer.Int32Ptr(0o1000),
 					},
 				},
 			},
@@ -4587,7 +4588,6 @@ func TestValidateVolumes(t *testing.T) {
 	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working", nil, PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("Unexpected error when HugePages feature is enabled.")
 	}
-
 }
 
 func TestHugePagesIsolation(t *testing.T) {
@@ -4829,7 +4829,6 @@ func createTestVolModePVC(vmode *core.PersistentVolumeMode) *core.PersistentVolu
 }
 
 func createTestVolModePV(vmode *core.PersistentVolumeMode) *core.PersistentVolume {
-
 	// PersistentVolume with VolumeMode set (valid and invalid)
 	pv := core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -4855,7 +4854,6 @@ func createTestVolModePV(vmode *core.PersistentVolumeMode) *core.PersistentVolum
 }
 
 func createTestPV() *core.PersistentVolume {
-
 	// PersistentVolume with VolumeMode set (valid and invalid)
 	pv := core.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -4880,7 +4878,6 @@ func createTestPV() *core.PersistentVolume {
 }
 
 func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
-
 	testCases := []core.VolumeSource{
 		{EmptyDir: &core.EmptyDirVolumeSource{SizeLimit: resource.NewQuantity(int64(5), resource.BinarySI)}},
 	}
@@ -5554,7 +5551,8 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{
 					ConfigMapRef: &core.ConfigMapEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: ""}},
+						LocalObjectReference: core.LocalObjectReference{Name: ""},
+					},
 				},
 			},
 			expectedError: "field[0].configMapRef.name: Required value",
@@ -5564,7 +5562,8 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{
 					ConfigMapRef: &core.ConfigMapEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "$"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "$"},
+					},
 				},
 			},
 			expectedError: "field[0].configMapRef.name: Invalid value",
@@ -5575,7 +5574,8 @@ func TestValidateEnvFrom(t *testing.T) {
 				{
 					Prefix: "a!b",
 					ConfigMapRef: &core.ConfigMapEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
+					},
 				},
 			},
 			expectedError: `field[0].prefix: Invalid value: "a!b": ` + envVarNameErrMsg,
@@ -5585,7 +5585,8 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{
 					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: ""}},
+						LocalObjectReference: core.LocalObjectReference{Name: ""},
+					},
 				},
 			},
 			expectedError: "field[0].secretRef.name: Required value",
@@ -5595,7 +5596,8 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{
 					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "&"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "&"},
+					},
 				},
 			},
 			expectedError: "field[0].secretRef.name: Invalid value",
@@ -5606,7 +5608,8 @@ func TestValidateEnvFrom(t *testing.T) {
 				{
 					Prefix: "a!b",
 					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
+					},
 				},
 			},
 			expectedError: `field[0].prefix: Invalid value: "a!b": ` + envVarNameErrMsg,
@@ -5623,9 +5626,11 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{
 					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
+					},
 					ConfigMapRef: &core.ConfigMapEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
+					},
 				},
 			},
 			expectedError: "field: Invalid value: \"\": may not have more than one field specified at a time",
@@ -5635,7 +5640,8 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{
 					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "$%^&*#"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "$%^&*#"},
+					},
 				},
 			},
 			expectedError: "field[0].secretRef.name: Invalid value: \"$%^&*#\": " + dnsSubdomainLabelErrMsg,
@@ -5645,7 +5651,8 @@ func TestValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{
 					ConfigMapRef: &core.ConfigMapEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "$%^&*#"}},
+						LocalObjectReference: core.LocalObjectReference{Name: "$%^&*#"},
+					},
 				},
 			},
 			expectedError: "field[0].configMapRef.name: Invalid value: \"$%^&*#\": " + dnsSubdomainLabelErrMsg,
@@ -5820,7 +5827,6 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 }
 
 func TestValidateDisabledSubpathExpr(t *testing.T) {
-
 	volumes := []core.Volume{
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
@@ -6330,7 +6336,6 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		"All allowed fields": {
 			{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
-
 					Name:       "debug",
 					Image:      "image",
 					Command:    []string{"bash"},
@@ -6379,7 +6384,6 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		ephemeralContainers []core.EphemeralContainer
 		expectedError       field.Error
 	}{
-
 		{
 			"Name Collision with Container.Containers",
 			[]core.EphemeralContainer{
@@ -6873,17 +6877,23 @@ func TestValidateContainers(t *testing.T) {
 		},
 		"zero-length image": {{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		"host port not unique": {
-			{Name: "abc", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
-				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-			{Name: "def", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
-				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			{
+				Name: "abc", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+			},
+			{
+				Name: "def", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+			},
 		},
 		"invalid env var name": {
 			{Name: "abc", Image: "image", Env: []core.EnvVar{{Name: "ev!1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		"unknown volume name": {
-			{Name: "abc", Image: "image", VolumeMounts: []core.VolumeMount{{Name: "anything", MountPath: "/foo"}},
-				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			{
+				Name: "abc", Image: "image", VolumeMounts: []core.VolumeMount{{Name: "anything", MountPath: "/foo"}},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+			},
 		},
 		"invalid lifecycle, no exec command.": {
 			{
@@ -7672,9 +7682,11 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 		"populate HostNetwork": {
 			Containers: []core.Container{
-				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
 					Ports: []core.ContainerPort{
-						{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}},
+						{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"},
+					},
 				},
 			},
 			SecurityContext: &core.PodSecurityContext{
@@ -7844,8 +7856,10 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 		"with hostNetwork hostPort not equal to containerPort": {
 			Containers: []core.Container{
-				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []core.ContainerPort{
-					{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
+				{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []core.ContainerPort{
+						{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"},
+					},
 				},
 			},
 			SecurityContext: &core.PodSecurityContext{
@@ -8410,7 +8424,8 @@ func TestValidatePod(t *testing.T) {
 				Namespace: "ns",
 			},
 			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				Containers: []core.Container{{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
 					SecurityContext: &core.SecurityContext{
 						SeccompProfile: &core.SeccompProfile{
 							Type: core.SeccompProfileTypeRuntimeDefault,
@@ -8443,7 +8458,8 @@ func TestValidatePod(t *testing.T) {
 				Namespace: "ns",
 			},
 			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				Containers: []core.Container{{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
 					SecurityContext: &core.SecurityContext{
 						SeccompProfile: &core.SeccompProfile{
 							Type: core.SeccompProfileTypeUnconfined,
@@ -8477,7 +8493,8 @@ func TestValidatePod(t *testing.T) {
 				Namespace: "ns",
 			},
 			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				Containers: []core.Container{{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
 					SecurityContext: &core.SecurityContext{
 						SeccompProfile: &core.SeccompProfile{
 							Type:             core.SeccompProfileTypeLocalhost,
@@ -9309,12 +9326,14 @@ func TestValidatePod(t *testing.T) {
 					},
 				},
 				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					Containers: []core.Container{{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
 						SecurityContext: &core.SecurityContext{
 							SeccompProfile: &core.SeccompProfile{
 								Type: core.SeccompProfileTypeRuntimeDefault,
 							},
-						}}},
+						},
+					}},
 					RestartPolicy: core.RestartPolicyAlways,
 					DNSPolicy:     core.DNSClusterFirst,
 				},
@@ -10313,7 +10332,8 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: core.PodSpec{
 					NodeName:    "node1",
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
-				}},
+				},
+			},
 			err:  "",
 			test: "modified tolerationSeconds in existing toleration value in pod spec updates",
 		},
@@ -10371,7 +10391,8 @@ func TestValidatePodUpdate(t *testing.T) {
 						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
 						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]},
 					},
-				}},
+				},
+			},
 			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -10392,14 +10413,16 @@ func TestValidatePodUpdate(t *testing.T) {
 						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
 						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
 					},
-				}},
+				},
+			},
 			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: core.PodSpec{
 					NodeName: "node1", Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
-				}},
+				},
+			},
 			err:  "spec.tolerations[1].effect",
 			test: "added invalid new toleration to existing tolerations in pod spec updates",
 		},
@@ -12539,7 +12562,6 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "10.0.0.10"}
 				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
-
 			},
 			numErrs: 2,
 		},
@@ -12634,7 +12656,6 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &singleStack
 				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
-
 			},
 			numErrs: 0,
 		},
@@ -12645,7 +12666,6 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.ClusterIP = "2001::1"
 				s.Spec.ClusterIPs = []string{"2001::1"}
 				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
-
 			},
 			numErrs: 0,
 		},
@@ -12656,7 +12676,6 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.ClusterIP = "2001::1"
 				s.Spec.ClusterIPs = []string{"2001::1"}
 				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
-
 			},
 			numErrs: 0,
 		},
@@ -13122,7 +13141,6 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
-
 }
 
 func TestValidateReplicationControllerUpdate(t *testing.T) {
@@ -13890,13 +13908,19 @@ func TestValidateNodeUpdate(t *testing.T) {
 		valid   bool
 	}{
 		{core.Node{}, core.Node{}, true},
-		{core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+		{
 			core.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar"},
-			}, false},
+					Name: "foo",
+				},
+			},
+			core.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+			},
+			false,
+		},
 		{core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
@@ -14874,7 +14898,6 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.ClusterIPs = []string{"10.0.0.10"}
 				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 				newSvc.Spec.IPFamilyPolicy = &singleStack
-
 			},
 			numErrs: 3,
 		},
@@ -15876,7 +15899,6 @@ func TestValidateLimitRange(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
@@ -16383,44 +16405,60 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 		valid        bool
 	}{
 		{core.Namespace{}, core.Namespace{}, true},
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+		{
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo"},
+					Name: "foo",
+				},
+			},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
 				Spec: core.NamespaceSpec{
 					Finalizers: []core.FinalizerName{"Foo"},
 				},
-			}, false},
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"},
-			Spec: core.NamespaceSpec{
-				Finalizers: []core.FinalizerName{"foo.com/bar"},
 			},
+			false,
 		},
+		{
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo"},
+					Name: "foo",
+				},
+				Spec: core.NamespaceSpec{
+					Finalizers: []core.FinalizerName{"foo.com/bar"},
+				},
+			},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
 				Spec: core.NamespaceSpec{
 					Finalizers: []core.FinalizerName{"foo.com/bar", "what.com/bar"},
 				},
-			}, true},
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "fooemptyfinalizer"},
-			Spec: core.NamespaceSpec{
-				Finalizers: []core.FinalizerName{"foo.com/bar"},
 			},
+			true,
 		},
+		{
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "fooemptyfinalizer"},
+					Name: "fooemptyfinalizer",
+				},
+				Spec: core.NamespaceSpec{
+					Finalizers: []core.FinalizerName{"foo.com/bar"},
+				},
+			},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fooemptyfinalizer",
+				},
 				Spec: core.NamespaceSpec{
 					Finalizers: []core.FinalizerName{"", "foo.com/bar", "what.com/bar"},
 				},
-			}, false},
+			},
+			false,
+		},
 	}
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
@@ -16450,50 +16488,74 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 			},
 		}, true},
 		// Cannot set deletionTimestamp via status update
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+		{
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+			},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
-					DeletionTimestamp: &now},
+					DeletionTimestamp: &now,
+				},
 				Status: core.NamespaceStatus{
 					Phase: core.NamespaceTerminating,
 				},
-			}, false},
+			},
+			false,
+		},
 		// Can update phase via status update
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "foo",
-				DeletionTimestamp: &now}},
+		{
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
-					DeletionTimestamp: &now},
-				Status: core.NamespaceStatus{
-					Phase: core.NamespaceTerminating,
+					DeletionTimestamp: &now,
 				},
-			}, true},
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+			},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo"},
+					Name:              "foo",
+					DeletionTimestamp: &now,
+				},
 				Status: core.NamespaceStatus{
 					Phase: core.NamespaceTerminating,
 				},
-			}, false},
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+			},
+			true,
+		},
+		{
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar"},
+					Name: "foo",
+				},
+			},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
 				Status: core.NamespaceStatus{
 					Phase: core.NamespaceTerminating,
 				},
-			}, false},
+			},
+			false,
+		},
+		{
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Status: core.NamespaceStatus{
+					Phase: core.NamespaceTerminating,
+				},
+			},
+			false,
+		},
 	}
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
@@ -16516,13 +16578,19 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		valid        bool
 	}{
 		{core.Namespace{}, core.Namespace{}, true},
-		{core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo1"}},
+		{
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar1"},
-			}, false},
+					Name: "foo1",
+				},
+			},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar1",
+				},
+			},
+			false,
+		},
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo2",
@@ -16861,9 +16929,7 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 		}
 	}
 
-	var (
-		missingBasicAuthUsernamePasswordKeys = validBasicAuthSecret()
-	)
+	missingBasicAuthUsernamePasswordKeys := validBasicAuthSecret()
 
 	delete(missingBasicAuthUsernamePasswordKeys.Data, core.BasicAuthUsernameKey)
 	delete(missingBasicAuthUsernamePasswordKeys.Data, core.BasicAuthPasswordKey)
@@ -16985,7 +17051,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
 			}
-
 		})
 	}
 
@@ -17218,7 +17283,6 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 			if len(errs) != tc.numExpectedErrors {
 				t.Errorf("Expected %d validation errors, got %d: %v", tc.numExpectedErrors, len(errs), errs)
 			}
-
 		})
 	}
 }
@@ -17632,7 +17696,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		}
 	}
 
-	//setup data
+	// setup data
 	allSettings := fullValidSC()
 	noCaps := fullValidSC()
 	noCaps.Capabilities = nil
@@ -18129,7 +18193,12 @@ func newNodeNameEndpoint(nodeName string) *core.Endpoints {
 					{
 						IP:       "8.8.8.8",
 						Hostname: "zookeeper1",
-						NodeName: &nodeName}}}}}
+						NodeName: &nodeName,
+					},
+				},
+			},
+		},
+	}
 	return ep
 }
 
@@ -18569,7 +18638,6 @@ func TestAlphaVolumePVCDataSource(t *testing.T) {
 			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
 				t.Errorf("expected failure: %v", errs)
 			}
-
 		} else {
 			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
@@ -18791,6 +18859,7 @@ func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod 
 		},
 	}
 }
+
 func TestPodIPsValidation(t *testing.T) {
 	testCases := []struct {
 		pod         core.Pod
@@ -18895,6 +18964,7 @@ func makeNode(nodeName string, podCIDRs []string) core.Node {
 		},
 	}
 }
+
 func TestValidateNodeCIDRs(t *testing.T) {
 	testCases := []struct {
 		expectError bool

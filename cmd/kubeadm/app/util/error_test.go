@@ -32,7 +32,7 @@ func TestCheckErr(t *testing.T) {
 		codeReturned = code
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		e        error
 		expected int

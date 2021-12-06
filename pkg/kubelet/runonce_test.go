@@ -97,8 +97,7 @@ func TestRunOnce(t *testing.T) {
 	kb.containerManager = cm.NewStubContainerManager()
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
-	kb.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, nil, []volume.VolumePlugin{plug}, nil /* prober */)
+	kb.volumePluginMgr, err = NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, nil, []volume.VolumePlugin{plug}, nil /* prober */)
 	if err != nil {
 		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
 	}

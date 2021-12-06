@@ -63,8 +63,10 @@ func (e errorConst) Error() string {
 // nolint:golint
 type TraceID [16]byte
 
-var nilTraceID TraceID
-var _ json.Marshaler = nilTraceID
+var (
+	nilTraceID TraceID
+	_          json.Marshaler = nilTraceID
+)
 
 // IsValid checks whether the trace TraceID is valid. A valid trace ID does
 // not consist of zeros only.
@@ -86,8 +88,10 @@ func (t TraceID) String() string {
 // SpanID is a unique identity of a span in a trace.
 type SpanID [8]byte
 
-var nilSpanID SpanID
-var _ json.Marshaler = nilSpanID
+var (
+	nilSpanID SpanID
+	_         json.Marshaler = nilSpanID
+)
 
 // IsValid checks whether the SpanID is valid. A valid SpanID does not consist
 // of zeros only.
@@ -182,8 +186,10 @@ type TraceState struct { //nolint:golint
 	kvs []attribute.KeyValue
 }
 
-var _ json.Marshaler = TraceState{}
-var _ json.Marshaler = SpanContext{}
+var (
+	_ json.Marshaler = TraceState{}
+	_ json.Marshaler = SpanContext{}
+)
 
 var keyFormatRegExp = regexp.MustCompile(
 	`^((` + traceStateKeyFormat + `)|(` + traceStateKeyFormatWithMultiTenantVendor + `))$`,

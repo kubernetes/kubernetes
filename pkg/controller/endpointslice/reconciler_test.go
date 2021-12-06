@@ -86,8 +86,10 @@ func TestReconcile1Pod(t *testing.T) {
 	svcv4Labels, _ := newServiceAndEndpointMeta("foo", namespace)
 	svcv4Labels.Labels = map[string]string{"foo": "bar"}
 	svcv4BadLabels, _ := newServiceAndEndpointMeta("foo", namespace)
-	svcv4BadLabels.Labels = map[string]string{discovery.LabelServiceName: "bad",
-		discovery.LabelManagedBy: "actor", corev1.IsHeadlessService: "invalid"}
+	svcv4BadLabels.Labels = map[string]string{
+		discovery.LabelServiceName: "bad",
+		discovery.LabelManagedBy:   "actor", corev1.IsHeadlessService: "invalid",
+	}
 	svcv6, _ := newServiceAndEndpointMeta("foo", namespace)
 	svcv6.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol}
 	svcv6ClusterIP, _ := newServiceAndEndpointMeta("foo", namespace)

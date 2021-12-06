@@ -93,7 +93,8 @@ func NewInterpreter(dispatcher Dispatcher,
 		container:   container,
 		provider:    provider,
 		adapter:     adapter,
-		attrFactory: attrFactory}
+		attrFactory: attrFactory,
+	}
 }
 
 // NewStandardInterpreter builds a Dispatcher and TypeProvider with support for all of the CEL

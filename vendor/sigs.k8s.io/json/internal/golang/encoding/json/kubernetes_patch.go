@@ -23,19 +23,22 @@ import (
 
 // Type-alias error and data types returned from decoding
 
-type UnmarshalTypeError = gojson.UnmarshalTypeError
-type UnmarshalFieldError = gojson.UnmarshalFieldError
-type InvalidUnmarshalError = gojson.InvalidUnmarshalError
-type Number = gojson.Number
-type RawMessage = gojson.RawMessage
-type Token = gojson.Token
-type Delim = gojson.Delim
+type (
+	UnmarshalTypeError    = gojson.UnmarshalTypeError
+	UnmarshalFieldError   = gojson.UnmarshalFieldError
+	InvalidUnmarshalError = gojson.InvalidUnmarshalError
+	Number                = gojson.Number
+	RawMessage            = gojson.RawMessage
+	Token                 = gojson.Token
+	Delim                 = gojson.Delim
+)
 
 type UnmarshalOpt func(*decodeState)
 
 func UseNumber(d *decodeState) {
 	d.useNumber = true
 }
+
 func DisallowUnknownFields(d *decodeState) {
 	d.disallowUnknownFields = true
 }
@@ -45,6 +48,7 @@ func DisallowUnknownFields(d *decodeState) {
 func CaseSensitive(d *decodeState) {
 	d.caseSensitive = true
 }
+
 func (d *Decoder) CaseSensitive() {
 	d.d.caseSensitive = true
 }
@@ -57,6 +61,7 @@ func (d *Decoder) CaseSensitive() {
 func PreserveInts(d *decodeState) {
 	d.preserveInts = true
 }
+
 func (d *Decoder) PreserveInts() {
 	d.d.preserveInts = true
 }
@@ -65,6 +70,7 @@ func (d *Decoder) PreserveInts() {
 func DisallowDuplicateFields(d *decodeState) {
 	d.disallowDuplicateFields = true
 }
+
 func (d *Decoder) DisallowDuplicateFields() {
 	d.d.disallowDuplicateFields = true
 }

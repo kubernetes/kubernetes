@@ -70,6 +70,4 @@ func (d *DefaultPackage) Header(filename string) []byte {
 	return d.HeaderText
 }
 
-var (
-	_ = Package(&DefaultPackage{})
-)
+var _ = Package(&DefaultPackage{})

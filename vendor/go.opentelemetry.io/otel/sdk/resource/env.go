@@ -26,10 +26,8 @@ import (
 // envVar is the environment variable name OpenTelemetry Resource information can be assigned to.
 const envVar = "OTEL_RESOURCE_ATTRIBUTES"
 
-var (
-	// errMissingValue is returned when a resource value is missing.
-	errMissingValue = fmt.Errorf("%w: missing value", ErrPartialResource)
-)
+// errMissingValue is returned when a resource value is missing.
+var errMissingValue = fmt.Errorf("%w: missing value", ErrPartialResource)
 
 // FromEnv is a Detector that implements the Detector and collects
 // resources from environment.  This Detector is included as a

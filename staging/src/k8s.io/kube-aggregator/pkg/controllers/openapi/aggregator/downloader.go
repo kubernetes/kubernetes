@@ -29,8 +29,7 @@ import (
 )
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.
-type Downloader struct {
-}
+type Downloader struct{}
 
 // NewDownloader creates a new OpenAPI Downloader.
 func NewDownloader() Downloader {

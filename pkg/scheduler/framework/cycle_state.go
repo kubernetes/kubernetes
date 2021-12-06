@@ -21,10 +21,8 @@ import (
 	"sync"
 )
 
-var (
-	// ErrNotFound is the not found error message.
-	ErrNotFound = errors.New("not found")
-)
+// ErrNotFound is the not found error message.
+var ErrNotFound = errors.New("not found")
 
 // StateData is a generic type for arbitrary data stored in CycleState.
 type StateData interface {

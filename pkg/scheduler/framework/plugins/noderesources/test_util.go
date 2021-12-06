@@ -24,9 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-var (
-	ignoreBadValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
-)
+var ignoreBadValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 
 func makeNode(node string, milliCPU, memory int64) *v1.Node {
 	return &v1.Node{

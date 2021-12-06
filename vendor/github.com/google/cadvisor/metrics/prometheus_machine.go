@@ -70,7 +70,6 @@ type PrometheusMachineCollector struct {
 // NewPrometheusMachineCollector returns a new PrometheusCollector.
 func NewPrometheusMachineCollector(i infoProvider, includedMetrics container.MetricSet) *PrometheusMachineCollector {
 	c := &PrometheusMachineCollector{
-
 		infoProvider: i,
 		errors: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "machine",

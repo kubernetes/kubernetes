@@ -710,8 +710,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 
 		// ensure that static pods start in the order they are received by UpdatePod
 		if kubetypes.IsStaticPod(pod) {
-			p.waitingToStartStaticPodsByFullname[status.fullname] =
-				append(p.waitingToStartStaticPodsByFullname[status.fullname], uid)
+			p.waitingToStartStaticPodsByFullname[status.fullname] = append(p.waitingToStartStaticPodsByFullname[status.fullname], uid)
 		}
 
 		// Creating a new pod worker either means this is a new pod, or that the

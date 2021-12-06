@@ -568,7 +568,7 @@ func setupSecretBinaryFile(data []byte) func(*testing.T, *CreateSecretOptions) f
 		files := secretOptions.FileSources
 		for i, file := range files {
 			f := tmp + "/" + file
-			ioutil.WriteFile(f, data, 0644)
+			ioutil.WriteFile(f, data, 0o644)
 			secretOptions.FileSources[i] = f
 		}
 		return func() {

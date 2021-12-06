@@ -1,6 +1,6 @@
-//This package is copied from Go library text/template.
-//The original private functions indirect and printableValue
-//are exported as public functions.
+// This package is copied from Go library text/template.
+// The original private functions indirect and printableValue
+// are exported as public functions.
 package template
 
 import (
@@ -8,8 +8,10 @@ import (
 	"reflect"
 )
 
-var Indirect = indirect
-var PrintableValue = printableValue
+var (
+	Indirect       = indirect
+	PrintableValue = printableValue
+)
 
 var (
 	errorType       = reflect.TypeOf((*error)(nil)).Elem()

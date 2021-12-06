@@ -235,83 +235,156 @@ func TestPodSecrets(t *testing.T) {
 				EnvFrom: []api.EnvFromSource{{
 					SecretRef: &api.SecretEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
-							Name: "Spec.Containers[*].EnvFrom[*].SecretRef"}}}},
+							Name: "Spec.Containers[*].EnvFrom[*].SecretRef",
+						},
+					},
+				}},
 				Env: []api.EnvVar{{
 					ValueFrom: &api.EnvVarSource{
 						SecretKeyRef: &api.SecretKeySelector{
 							LocalObjectReference: api.LocalObjectReference{
-								Name: "Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
+								Name: "Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			ImagePullSecrets: []api.LocalObjectReference{{
-				Name: "Spec.ImagePullSecrets"}},
+				Name: "Spec.ImagePullSecrets",
+			}},
 			InitContainers: []api.Container{{
 				EnvFrom: []api.EnvFromSource{{
 					SecretRef: &api.SecretEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
-							Name: "Spec.InitContainers[*].EnvFrom[*].SecretRef"}}}},
+							Name: "Spec.InitContainers[*].EnvFrom[*].SecretRef",
+						},
+					},
+				}},
 				Env: []api.EnvVar{{
 					ValueFrom: &api.EnvVarSource{
 						SecretKeyRef: &api.SecretKeySelector{
 							LocalObjectReference: api.LocalObjectReference{
-								Name: "Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
+								Name: "Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			Volumes: []api.Volume{{
 				VolumeSource: api.VolumeSource{
 					AzureFile: &api.AzureFileVolumeSource{
-						SecretName: "Spec.Volumes[*].VolumeSource.AzureFile.SecretName"}}}, {
+						SecretName: "Spec.Volumes[*].VolumeSource.AzureFile.SecretName",
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					CephFS: &api.CephFSVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.CephFS.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.CephFS.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					Cinder: &api.CinderVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.Cinder.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.Cinder.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					FlexVolume: &api.FlexVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					Projected: &api.ProjectedVolumeSource{
 						Sources: []api.VolumeProjection{{
 							Secret: &api.SecretProjection{
 								LocalObjectReference: api.LocalObjectReference{
-									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret"}}}}}}}, {
+									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret",
+								},
+							},
+						}},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					RBD: &api.RBDVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.RBD.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.RBD.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					Secret: &api.SecretVolumeSource{
-						SecretName: "Spec.Volumes[*].VolumeSource.Secret.SecretName"}}}, {
+						SecretName: "Spec.Volumes[*].VolumeSource.Secret.SecretName",
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					Secret: &api.SecretVolumeSource{
-						SecretName: "Spec.Volumes[*].VolumeSource.Secret"}}}, {
+						SecretName: "Spec.Volumes[*].VolumeSource.Secret",
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					ScaleIO: &api.ScaleIOVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					ISCSI: &api.ISCSIVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					StorageOS: &api.StorageOSVolumeSource{
 						SecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					CSI: &api.CSIVolumeSource{
 						NodePublishSecretRef: &api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef",
+						},
+					},
+				},
+			}},
 			EphemeralContainers: []api.EphemeralContainer{{
 				EphemeralContainerCommon: api.EphemeralContainerCommon{
 					EnvFrom: []api.EnvFromSource{{
 						SecretRef: &api.SecretEnvSource{
 							LocalObjectReference: api.LocalObjectReference{
-								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef"}}}},
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef",
+							},
+						},
+					}},
 					Env: []api.EnvVar{{
 						ValueFrom: &api.EnvVarSource{
 							SecretKeyRef: &api.SecretKeySelector{
 								LocalObjectReference: api.LocalObjectReference{
-									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef"}}}}}}}},
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef",
+								},
+							},
+						},
+					}},
+				},
+			}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -374,7 +447,11 @@ func TestPodSecrets(t *testing.T) {
 				EnvFrom: []api.EnvFromSource{{
 					SecretRef: &api.SecretEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
-							Name: ""}}}}}},
+							Name: "",
+						},
+					},
+				}},
+			}},
 		},
 	}
 	VisitPodSecretNames(emptyPod, func(name string) bool {
@@ -434,44 +511,79 @@ func TestPodConfigmaps(t *testing.T) {
 				EnvFrom: []api.EnvFromSource{{
 					ConfigMapRef: &api.ConfigMapEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
-							Name: "Spec.Containers[*].EnvFrom[*].ConfigMapRef"}}}},
+							Name: "Spec.Containers[*].EnvFrom[*].ConfigMapRef",
+						},
+					},
+				}},
 				Env: []api.EnvVar{{
 					ValueFrom: &api.EnvVarSource{
 						ConfigMapKeyRef: &api.ConfigMapKeySelector{
 							LocalObjectReference: api.LocalObjectReference{
-								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			EphemeralContainers: []api.EphemeralContainer{{
 				EphemeralContainerCommon: api.EphemeralContainerCommon{
 					EnvFrom: []api.EnvFromSource{{
 						ConfigMapRef: &api.ConfigMapEnvSource{
 							LocalObjectReference: api.LocalObjectReference{
-								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef"}}}},
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef",
+							},
+						},
+					}},
 					Env: []api.EnvVar{{
 						ValueFrom: &api.EnvVarSource{
 							ConfigMapKeyRef: &api.ConfigMapKeySelector{
 								LocalObjectReference: api.LocalObjectReference{
-									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}}},
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef",
+								},
+							},
+						},
+					}},
+				},
+			}},
 			InitContainers: []api.Container{{
 				EnvFrom: []api.EnvFromSource{{
 					ConfigMapRef: &api.ConfigMapEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
-							Name: "Spec.InitContainers[*].EnvFrom[*].ConfigMapRef"}}}},
+							Name: "Spec.InitContainers[*].EnvFrom[*].ConfigMapRef",
+						},
+					},
+				}},
 				Env: []api.EnvVar{{
 					ValueFrom: &api.EnvVarSource{
 						ConfigMapKeyRef: &api.ConfigMapKeySelector{
 							LocalObjectReference: api.LocalObjectReference{
-								Name: "Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+								Name: "Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			Volumes: []api.Volume{{
 				VolumeSource: api.VolumeSource{
 					Projected: &api.ProjectedVolumeSource{
 						Sources: []api.VolumeProjection{{
 							ConfigMap: &api.ConfigMapProjection{
 								LocalObjectReference: api.LocalObjectReference{
-									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap"}}}}}}}, {
+									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap",
+								},
+							},
+						}},
+					},
+				},
+			}, {
 				VolumeSource: api.VolumeSource{
 					ConfigMap: &api.ConfigMapVolumeSource{
 						LocalObjectReference: api.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ConfigMap"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.ConfigMap",
+						},
+					},
+				},
+			}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -518,7 +630,11 @@ func TestPodConfigmaps(t *testing.T) {
 				EnvFrom: []api.EnvFromSource{{
 					ConfigMapRef: &api.ConfigMapEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
-							Name: ""}}}}}},
+							Name: "",
+						},
+					},
+				}},
+			}},
 		},
 	}
 	VisitPodConfigmapNames(emptyPod, func(name string) bool {
@@ -618,7 +734,6 @@ func TestDropFSGroupFields(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestDropProcMount(t *testing.T) {

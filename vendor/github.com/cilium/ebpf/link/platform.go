@@ -6,7 +6,6 @@ import (
 )
 
 func platformPrefix(symbol string) string {
-
 	prefix := runtime.GOARCH
 
 	// per https://github.com/golang/go/blob/master/src/go/build/syslist.go

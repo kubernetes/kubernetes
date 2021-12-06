@@ -127,7 +127,6 @@ func TestNamespaceLabels(t *testing.T) {
 			GenerateName: nsName,
 		},
 	}, metav1.CreateOptions{})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +136,6 @@ func TestNamespaceLabels(t *testing.T) {
 	}
 
 	nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
-
 	if err != nil {
 		t.Fatal(err)
 	}

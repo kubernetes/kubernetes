@@ -1022,6 +1022,7 @@ func typeMarshaler(t reflect.Type, tags []string, nozero, oneof bool) (sizer, ma
 func sizeFixed32Value(_ pointer, tagsize int) int {
 	return 4 + tagsize
 }
+
 func sizeFixed32ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toUint32()
 	if v == 0 {
@@ -1029,6 +1030,7 @@ func sizeFixed32ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return 4 + tagsize
 }
+
 func sizeFixed32Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toUint32Ptr()
 	if p == nil {
@@ -1036,10 +1038,12 @@ func sizeFixed32Ptr(ptr pointer, tagsize int) int {
 	}
 	return 4 + tagsize
 }
+
 func sizeFixed32Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint32Slice()
 	return (4 + tagsize) * len(s)
 }
+
 func sizeFixed32PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint32Slice()
 	if len(s) == 0 {
@@ -1047,9 +1051,11 @@ func sizeFixed32PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return 4*len(s) + SizeVarint(uint64(4*len(s))) + tagsize
 }
+
 func sizeFixedS32Value(_ pointer, tagsize int) int {
 	return 4 + tagsize
 }
+
 func sizeFixedS32ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toInt32()
 	if v == 0 {
@@ -1057,6 +1063,7 @@ func sizeFixedS32ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return 4 + tagsize
 }
+
 func sizeFixedS32Ptr(ptr pointer, tagsize int) int {
 	p := ptr.getInt32Ptr()
 	if p == nil {
@@ -1064,10 +1071,12 @@ func sizeFixedS32Ptr(ptr pointer, tagsize int) int {
 	}
 	return 4 + tagsize
 }
+
 func sizeFixedS32Slice(ptr pointer, tagsize int) int {
 	s := ptr.getInt32Slice()
 	return (4 + tagsize) * len(s)
 }
+
 func sizeFixedS32PackedSlice(ptr pointer, tagsize int) int {
 	s := ptr.getInt32Slice()
 	if len(s) == 0 {
@@ -1075,9 +1084,11 @@ func sizeFixedS32PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return 4*len(s) + SizeVarint(uint64(4*len(s))) + tagsize
 }
+
 func sizeFloat32Value(_ pointer, tagsize int) int {
 	return 4 + tagsize
 }
+
 func sizeFloat32ValueNoZero(ptr pointer, tagsize int) int {
 	v := math.Float32bits(*ptr.toFloat32())
 	if v == 0 {
@@ -1085,6 +1096,7 @@ func sizeFloat32ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return 4 + tagsize
 }
+
 func sizeFloat32Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toFloat32Ptr()
 	if p == nil {
@@ -1092,10 +1104,12 @@ func sizeFloat32Ptr(ptr pointer, tagsize int) int {
 	}
 	return 4 + tagsize
 }
+
 func sizeFloat32Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toFloat32Slice()
 	return (4 + tagsize) * len(s)
 }
+
 func sizeFloat32PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toFloat32Slice()
 	if len(s) == 0 {
@@ -1103,9 +1117,11 @@ func sizeFloat32PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return 4*len(s) + SizeVarint(uint64(4*len(s))) + tagsize
 }
+
 func sizeFixed64Value(_ pointer, tagsize int) int {
 	return 8 + tagsize
 }
+
 func sizeFixed64ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toUint64()
 	if v == 0 {
@@ -1113,6 +1129,7 @@ func sizeFixed64ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return 8 + tagsize
 }
+
 func sizeFixed64Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toUint64Ptr()
 	if p == nil {
@@ -1120,10 +1137,12 @@ func sizeFixed64Ptr(ptr pointer, tagsize int) int {
 	}
 	return 8 + tagsize
 }
+
 func sizeFixed64Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint64Slice()
 	return (8 + tagsize) * len(s)
 }
+
 func sizeFixed64PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint64Slice()
 	if len(s) == 0 {
@@ -1131,9 +1150,11 @@ func sizeFixed64PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return 8*len(s) + SizeVarint(uint64(8*len(s))) + tagsize
 }
+
 func sizeFixedS64Value(_ pointer, tagsize int) int {
 	return 8 + tagsize
 }
+
 func sizeFixedS64ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toInt64()
 	if v == 0 {
@@ -1141,6 +1162,7 @@ func sizeFixedS64ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return 8 + tagsize
 }
+
 func sizeFixedS64Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toInt64Ptr()
 	if p == nil {
@@ -1148,10 +1170,12 @@ func sizeFixedS64Ptr(ptr pointer, tagsize int) int {
 	}
 	return 8 + tagsize
 }
+
 func sizeFixedS64Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toInt64Slice()
 	return (8 + tagsize) * len(s)
 }
+
 func sizeFixedS64PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toInt64Slice()
 	if len(s) == 0 {
@@ -1159,9 +1183,11 @@ func sizeFixedS64PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return 8*len(s) + SizeVarint(uint64(8*len(s))) + tagsize
 }
+
 func sizeFloat64Value(_ pointer, tagsize int) int {
 	return 8 + tagsize
 }
+
 func sizeFloat64ValueNoZero(ptr pointer, tagsize int) int {
 	v := math.Float64bits(*ptr.toFloat64())
 	if v == 0 {
@@ -1169,6 +1195,7 @@ func sizeFloat64ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return 8 + tagsize
 }
+
 func sizeFloat64Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toFloat64Ptr()
 	if p == nil {
@@ -1176,10 +1203,12 @@ func sizeFloat64Ptr(ptr pointer, tagsize int) int {
 	}
 	return 8 + tagsize
 }
+
 func sizeFloat64Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toFloat64Slice()
 	return (8 + tagsize) * len(s)
 }
+
 func sizeFloat64PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toFloat64Slice()
 	if len(s) == 0 {
@@ -1187,10 +1216,12 @@ func sizeFloat64PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return 8*len(s) + SizeVarint(uint64(8*len(s))) + tagsize
 }
+
 func sizeVarint32Value(ptr pointer, tagsize int) int {
 	v := *ptr.toUint32()
 	return SizeVarint(uint64(v)) + tagsize
 }
+
 func sizeVarint32ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toUint32()
 	if v == 0 {
@@ -1198,6 +1229,7 @@ func sizeVarint32ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64(v)) + tagsize
 }
+
 func sizeVarint32Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toUint32Ptr()
 	if p == nil {
@@ -1205,6 +1237,7 @@ func sizeVarint32Ptr(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64(*p)) + tagsize
 }
+
 func sizeVarint32Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint32Slice()
 	n := 0
@@ -1213,6 +1246,7 @@ func sizeVarint32Slice(ptr pointer, tagsize int) int {
 	}
 	return n
 }
+
 func sizeVarint32PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint32Slice()
 	if len(s) == 0 {
@@ -1224,10 +1258,12 @@ func sizeVarint32PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return n + SizeVarint(uint64(n)) + tagsize
 }
+
 func sizeVarintS32Value(ptr pointer, tagsize int) int {
 	v := *ptr.toInt32()
 	return SizeVarint(uint64(v)) + tagsize
 }
+
 func sizeVarintS32ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toInt32()
 	if v == 0 {
@@ -1235,6 +1271,7 @@ func sizeVarintS32ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64(v)) + tagsize
 }
+
 func sizeVarintS32Ptr(ptr pointer, tagsize int) int {
 	p := ptr.getInt32Ptr()
 	if p == nil {
@@ -1242,6 +1279,7 @@ func sizeVarintS32Ptr(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64(*p)) + tagsize
 }
+
 func sizeVarintS32Slice(ptr pointer, tagsize int) int {
 	s := ptr.getInt32Slice()
 	n := 0
@@ -1250,6 +1288,7 @@ func sizeVarintS32Slice(ptr pointer, tagsize int) int {
 	}
 	return n
 }
+
 func sizeVarintS32PackedSlice(ptr pointer, tagsize int) int {
 	s := ptr.getInt32Slice()
 	if len(s) == 0 {
@@ -1261,10 +1300,12 @@ func sizeVarintS32PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return n + SizeVarint(uint64(n)) + tagsize
 }
+
 func sizeVarint64Value(ptr pointer, tagsize int) int {
 	v := *ptr.toUint64()
 	return SizeVarint(v) + tagsize
 }
+
 func sizeVarint64ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toUint64()
 	if v == 0 {
@@ -1272,6 +1313,7 @@ func sizeVarint64ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(v) + tagsize
 }
+
 func sizeVarint64Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toUint64Ptr()
 	if p == nil {
@@ -1279,6 +1321,7 @@ func sizeVarint64Ptr(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(*p) + tagsize
 }
+
 func sizeVarint64Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint64Slice()
 	n := 0
@@ -1287,6 +1330,7 @@ func sizeVarint64Slice(ptr pointer, tagsize int) int {
 	}
 	return n
 }
+
 func sizeVarint64PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toUint64Slice()
 	if len(s) == 0 {
@@ -1298,10 +1342,12 @@ func sizeVarint64PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return n + SizeVarint(uint64(n)) + tagsize
 }
+
 func sizeVarintS64Value(ptr pointer, tagsize int) int {
 	v := *ptr.toInt64()
 	return SizeVarint(uint64(v)) + tagsize
 }
+
 func sizeVarintS64ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toInt64()
 	if v == 0 {
@@ -1309,6 +1355,7 @@ func sizeVarintS64ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64(v)) + tagsize
 }
+
 func sizeVarintS64Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toInt64Ptr()
 	if p == nil {
@@ -1316,6 +1363,7 @@ func sizeVarintS64Ptr(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64(*p)) + tagsize
 }
+
 func sizeVarintS64Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toInt64Slice()
 	n := 0
@@ -1324,6 +1372,7 @@ func sizeVarintS64Slice(ptr pointer, tagsize int) int {
 	}
 	return n
 }
+
 func sizeVarintS64PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toInt64Slice()
 	if len(s) == 0 {
@@ -1335,10 +1384,12 @@ func sizeVarintS64PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return n + SizeVarint(uint64(n)) + tagsize
 }
+
 func sizeZigzag32Value(ptr pointer, tagsize int) int {
 	v := *ptr.toInt32()
 	return SizeVarint(uint64((uint32(v)<<1)^uint32((int32(v)>>31)))) + tagsize
 }
+
 func sizeZigzag32ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toInt32()
 	if v == 0 {
@@ -1346,6 +1397,7 @@ func sizeZigzag32ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64((uint32(v)<<1)^uint32((int32(v)>>31)))) + tagsize
 }
+
 func sizeZigzag32Ptr(ptr pointer, tagsize int) int {
 	p := ptr.getInt32Ptr()
 	if p == nil {
@@ -1354,6 +1406,7 @@ func sizeZigzag32Ptr(ptr pointer, tagsize int) int {
 	v := *p
 	return SizeVarint(uint64((uint32(v)<<1)^uint32((int32(v)>>31)))) + tagsize
 }
+
 func sizeZigzag32Slice(ptr pointer, tagsize int) int {
 	s := ptr.getInt32Slice()
 	n := 0
@@ -1362,6 +1415,7 @@ func sizeZigzag32Slice(ptr pointer, tagsize int) int {
 	}
 	return n
 }
+
 func sizeZigzag32PackedSlice(ptr pointer, tagsize int) int {
 	s := ptr.getInt32Slice()
 	if len(s) == 0 {
@@ -1373,10 +1427,12 @@ func sizeZigzag32PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return n + SizeVarint(uint64(n)) + tagsize
 }
+
 func sizeZigzag64Value(ptr pointer, tagsize int) int {
 	v := *ptr.toInt64()
 	return SizeVarint(uint64(v<<1)^uint64((int64(v)>>63))) + tagsize
 }
+
 func sizeZigzag64ValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toInt64()
 	if v == 0 {
@@ -1384,6 +1440,7 @@ func sizeZigzag64ValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return SizeVarint(uint64(v<<1)^uint64((int64(v)>>63))) + tagsize
 }
+
 func sizeZigzag64Ptr(ptr pointer, tagsize int) int {
 	p := *ptr.toInt64Ptr()
 	if p == nil {
@@ -1392,6 +1449,7 @@ func sizeZigzag64Ptr(ptr pointer, tagsize int) int {
 	v := *p
 	return SizeVarint(uint64(v<<1)^uint64((int64(v)>>63))) + tagsize
 }
+
 func sizeZigzag64Slice(ptr pointer, tagsize int) int {
 	s := *ptr.toInt64Slice()
 	n := 0
@@ -1400,6 +1458,7 @@ func sizeZigzag64Slice(ptr pointer, tagsize int) int {
 	}
 	return n
 }
+
 func sizeZigzag64PackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toInt64Slice()
 	if len(s) == 0 {
@@ -1411,9 +1470,11 @@ func sizeZigzag64PackedSlice(ptr pointer, tagsize int) int {
 	}
 	return n + SizeVarint(uint64(n)) + tagsize
 }
+
 func sizeBoolValue(_ pointer, tagsize int) int {
 	return 1 + tagsize
 }
+
 func sizeBoolValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toBool()
 	if !v {
@@ -1421,6 +1482,7 @@ func sizeBoolValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return 1 + tagsize
 }
+
 func sizeBoolPtr(ptr pointer, tagsize int) int {
 	p := *ptr.toBoolPtr()
 	if p == nil {
@@ -1428,10 +1490,12 @@ func sizeBoolPtr(ptr pointer, tagsize int) int {
 	}
 	return 1 + tagsize
 }
+
 func sizeBoolSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toBoolSlice()
 	return (1 + tagsize) * len(s)
 }
+
 func sizeBoolPackedSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toBoolSlice()
 	if len(s) == 0 {
@@ -1439,10 +1503,12 @@ func sizeBoolPackedSlice(ptr pointer, tagsize int) int {
 	}
 	return len(s) + SizeVarint(uint64(len(s))) + tagsize
 }
+
 func sizeStringValue(ptr pointer, tagsize int) int {
 	v := *ptr.toString()
 	return len(v) + SizeVarint(uint64(len(v))) + tagsize
 }
+
 func sizeStringValueNoZero(ptr pointer, tagsize int) int {
 	v := *ptr.toString()
 	if v == "" {
@@ -1450,6 +1516,7 @@ func sizeStringValueNoZero(ptr pointer, tagsize int) int {
 	}
 	return len(v) + SizeVarint(uint64(len(v))) + tagsize
 }
+
 func sizeStringPtr(ptr pointer, tagsize int) int {
 	p := *ptr.toStringPtr()
 	if p == nil {
@@ -1458,6 +1525,7 @@ func sizeStringPtr(ptr pointer, tagsize int) int {
 	v := *p
 	return len(v) + SizeVarint(uint64(len(v))) + tagsize
 }
+
 func sizeStringSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toStringSlice()
 	n := 0
@@ -1466,6 +1534,7 @@ func sizeStringSlice(ptr pointer, tagsize int) int {
 	}
 	return n
 }
+
 func sizeBytes(ptr pointer, tagsize int) int {
 	v := *ptr.toBytes()
 	if v == nil {
@@ -1473,6 +1542,7 @@ func sizeBytes(ptr pointer, tagsize int) int {
 	}
 	return len(v) + SizeVarint(uint64(len(v))) + tagsize
 }
+
 func sizeBytes3(ptr pointer, tagsize int) int {
 	v := *ptr.toBytes()
 	if len(v) == 0 {
@@ -1480,10 +1550,12 @@ func sizeBytes3(ptr pointer, tagsize int) int {
 	}
 	return len(v) + SizeVarint(uint64(len(v))) + tagsize
 }
+
 func sizeBytesOneof(ptr pointer, tagsize int) int {
 	v := *ptr.toBytes()
 	return len(v) + SizeVarint(uint64(len(v))) + tagsize
 }
+
 func sizeBytesSlice(ptr pointer, tagsize int) int {
 	s := *ptr.toBytesSlice()
 	n := 0
@@ -1606,6 +1678,7 @@ func appendFixed32Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, 
 	b = appendFixed32(b, v)
 	return b, nil
 }
+
 func appendFixed32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toUint32()
 	if v == 0 {
@@ -1615,6 +1688,7 @@ func appendFixed32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	b = appendFixed32(b, v)
 	return b, nil
 }
+
 func appendFixed32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toUint32Ptr()
 	if p == nil {
@@ -1624,6 +1698,7 @@ func appendFixed32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, er
 	b = appendFixed32(b, *p)
 	return b, nil
 }
+
 func appendFixed32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint32Slice()
 	for _, v := range s {
@@ -1632,6 +1707,7 @@ func appendFixed32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, 
 	}
 	return b, nil
 }
+
 func appendFixed32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint32Slice()
 	if len(s) == 0 {
@@ -1644,12 +1720,14 @@ func appendFixed32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	}
 	return b, nil
 }
+
 func appendFixedS32Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt32()
 	b = appendVarint(b, wiretag)
 	b = appendFixed32(b, uint32(v))
 	return b, nil
 }
+
 func appendFixedS32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt32()
 	if v == 0 {
@@ -1659,6 +1737,7 @@ func appendFixedS32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	b = appendFixed32(b, uint32(v))
 	return b, nil
 }
+
 func appendFixedS32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := ptr.getInt32Ptr()
 	if p == nil {
@@ -1668,6 +1747,7 @@ func appendFixedS32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	b = appendFixed32(b, uint32(*p))
 	return b, nil
 }
+
 func appendFixedS32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := ptr.getInt32Slice()
 	for _, v := range s {
@@ -1676,6 +1756,7 @@ func appendFixedS32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte,
 	}
 	return b, nil
 }
+
 func appendFixedS32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := ptr.getInt32Slice()
 	if len(s) == 0 {
@@ -1688,12 +1769,14 @@ func appendFixedS32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	}
 	return b, nil
 }
+
 func appendFloat32Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := math.Float32bits(*ptr.toFloat32())
 	b = appendVarint(b, wiretag)
 	b = appendFixed32(b, v)
 	return b, nil
 }
+
 func appendFloat32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := math.Float32bits(*ptr.toFloat32())
 	if v == 0 {
@@ -1703,6 +1786,7 @@ func appendFloat32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	b = appendFixed32(b, v)
 	return b, nil
 }
+
 func appendFloat32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toFloat32Ptr()
 	if p == nil {
@@ -1712,6 +1796,7 @@ func appendFloat32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, er
 	b = appendFixed32(b, math.Float32bits(*p))
 	return b, nil
 }
+
 func appendFloat32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toFloat32Slice()
 	for _, v := range s {
@@ -1720,6 +1805,7 @@ func appendFloat32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, 
 	}
 	return b, nil
 }
+
 func appendFloat32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toFloat32Slice()
 	if len(s) == 0 {
@@ -1732,12 +1818,14 @@ func appendFloat32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	}
 	return b, nil
 }
+
 func appendFixed64Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toUint64()
 	b = appendVarint(b, wiretag)
 	b = appendFixed64(b, v)
 	return b, nil
 }
+
 func appendFixed64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toUint64()
 	if v == 0 {
@@ -1747,6 +1835,7 @@ func appendFixed64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	b = appendFixed64(b, v)
 	return b, nil
 }
+
 func appendFixed64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toUint64Ptr()
 	if p == nil {
@@ -1756,6 +1845,7 @@ func appendFixed64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, er
 	b = appendFixed64(b, *p)
 	return b, nil
 }
+
 func appendFixed64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint64Slice()
 	for _, v := range s {
@@ -1764,6 +1854,7 @@ func appendFixed64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, 
 	}
 	return b, nil
 }
+
 func appendFixed64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint64Slice()
 	if len(s) == 0 {
@@ -1776,12 +1867,14 @@ func appendFixed64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	}
 	return b, nil
 }
+
 func appendFixedS64Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt64()
 	b = appendVarint(b, wiretag)
 	b = appendFixed64(b, uint64(v))
 	return b, nil
 }
+
 func appendFixedS64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt64()
 	if v == 0 {
@@ -1791,6 +1884,7 @@ func appendFixedS64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	b = appendFixed64(b, uint64(v))
 	return b, nil
 }
+
 func appendFixedS64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toInt64Ptr()
 	if p == nil {
@@ -1800,6 +1894,7 @@ func appendFixedS64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	b = appendFixed64(b, uint64(*p))
 	return b, nil
 }
+
 func appendFixedS64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toInt64Slice()
 	for _, v := range s {
@@ -1808,6 +1903,7 @@ func appendFixedS64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte,
 	}
 	return b, nil
 }
+
 func appendFixedS64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toInt64Slice()
 	if len(s) == 0 {
@@ -1820,12 +1916,14 @@ func appendFixedS64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	}
 	return b, nil
 }
+
 func appendFloat64Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := math.Float64bits(*ptr.toFloat64())
 	b = appendVarint(b, wiretag)
 	b = appendFixed64(b, v)
 	return b, nil
 }
+
 func appendFloat64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := math.Float64bits(*ptr.toFloat64())
 	if v == 0 {
@@ -1835,6 +1933,7 @@ func appendFloat64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	b = appendFixed64(b, v)
 	return b, nil
 }
+
 func appendFloat64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toFloat64Ptr()
 	if p == nil {
@@ -1844,6 +1943,7 @@ func appendFloat64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, er
 	b = appendFixed64(b, math.Float64bits(*p))
 	return b, nil
 }
+
 func appendFloat64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toFloat64Slice()
 	for _, v := range s {
@@ -1852,6 +1952,7 @@ func appendFloat64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, 
 	}
 	return b, nil
 }
+
 func appendFloat64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toFloat64Slice()
 	if len(s) == 0 {
@@ -1864,12 +1965,14 @@ func appendFloat64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]
 	}
 	return b, nil
 }
+
 func appendVarint32Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toUint32()
 	b = appendVarint(b, wiretag)
 	b = appendVarint(b, uint64(v))
 	return b, nil
 }
+
 func appendVarint32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toUint32()
 	if v == 0 {
@@ -1879,6 +1982,7 @@ func appendVarint32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	b = appendVarint(b, uint64(v))
 	return b, nil
 }
+
 func appendVarint32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toUint32Ptr()
 	if p == nil {
@@ -1888,6 +1992,7 @@ func appendVarint32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	b = appendVarint(b, uint64(*p))
 	return b, nil
 }
+
 func appendVarint32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint32Slice()
 	for _, v := range s {
@@ -1896,6 +2001,7 @@ func appendVarint32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte,
 	}
 	return b, nil
 }
+
 func appendVarint32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint32Slice()
 	if len(s) == 0 {
@@ -1913,12 +2019,14 @@ func appendVarint32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	}
 	return b, nil
 }
+
 func appendVarintS32Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt32()
 	b = appendVarint(b, wiretag)
 	b = appendVarint(b, uint64(v))
 	return b, nil
 }
+
 func appendVarintS32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt32()
 	if v == 0 {
@@ -1928,6 +2036,7 @@ func appendVarintS32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) (
 	b = appendVarint(b, uint64(v))
 	return b, nil
 }
+
 func appendVarintS32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := ptr.getInt32Ptr()
 	if p == nil {
@@ -1937,6 +2046,7 @@ func appendVarintS32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, 
 	b = appendVarint(b, uint64(*p))
 	return b, nil
 }
+
 func appendVarintS32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := ptr.getInt32Slice()
 	for _, v := range s {
@@ -1945,6 +2055,7 @@ func appendVarintS32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte
 	}
 	return b, nil
 }
+
 func appendVarintS32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := ptr.getInt32Slice()
 	if len(s) == 0 {
@@ -1962,12 +2073,14 @@ func appendVarintS32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) (
 	}
 	return b, nil
 }
+
 func appendVarint64Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toUint64()
 	b = appendVarint(b, wiretag)
 	b = appendVarint(b, v)
 	return b, nil
 }
+
 func appendVarint64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toUint64()
 	if v == 0 {
@@ -1977,6 +2090,7 @@ func appendVarint64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	b = appendVarint(b, v)
 	return b, nil
 }
+
 func appendVarint64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toUint64Ptr()
 	if p == nil {
@@ -1986,6 +2100,7 @@ func appendVarint64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	b = appendVarint(b, *p)
 	return b, nil
 }
+
 func appendVarint64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint64Slice()
 	for _, v := range s {
@@ -1994,6 +2109,7 @@ func appendVarint64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte,
 	}
 	return b, nil
 }
+
 func appendVarint64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toUint64Slice()
 	if len(s) == 0 {
@@ -2011,12 +2127,14 @@ func appendVarint64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	}
 	return b, nil
 }
+
 func appendVarintS64Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt64()
 	b = appendVarint(b, wiretag)
 	b = appendVarint(b, uint64(v))
 	return b, nil
 }
+
 func appendVarintS64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt64()
 	if v == 0 {
@@ -2026,6 +2144,7 @@ func appendVarintS64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) (
 	b = appendVarint(b, uint64(v))
 	return b, nil
 }
+
 func appendVarintS64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toInt64Ptr()
 	if p == nil {
@@ -2035,6 +2154,7 @@ func appendVarintS64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, 
 	b = appendVarint(b, uint64(*p))
 	return b, nil
 }
+
 func appendVarintS64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toInt64Slice()
 	for _, v := range s {
@@ -2043,6 +2163,7 @@ func appendVarintS64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte
 	}
 	return b, nil
 }
+
 func appendVarintS64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toInt64Slice()
 	if len(s) == 0 {
@@ -2060,12 +2181,14 @@ func appendVarintS64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) (
 	}
 	return b, nil
 }
+
 func appendZigzag32Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt32()
 	b = appendVarint(b, wiretag)
 	b = appendVarint(b, uint64((uint32(v)<<1)^uint32((int32(v)>>31))))
 	return b, nil
 }
+
 func appendZigzag32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt32()
 	if v == 0 {
@@ -2075,6 +2198,7 @@ func appendZigzag32ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	b = appendVarint(b, uint64((uint32(v)<<1)^uint32((int32(v)>>31))))
 	return b, nil
 }
+
 func appendZigzag32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := ptr.getInt32Ptr()
 	if p == nil {
@@ -2085,6 +2209,7 @@ func appendZigzag32Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	b = appendVarint(b, uint64((uint32(v)<<1)^uint32((int32(v)>>31))))
 	return b, nil
 }
+
 func appendZigzag32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := ptr.getInt32Slice()
 	for _, v := range s {
@@ -2093,6 +2218,7 @@ func appendZigzag32Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte,
 	}
 	return b, nil
 }
+
 func appendZigzag32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := ptr.getInt32Slice()
 	if len(s) == 0 {
@@ -2110,12 +2236,14 @@ func appendZigzag32PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	}
 	return b, nil
 }
+
 func appendZigzag64Value(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt64()
 	b = appendVarint(b, wiretag)
 	b = appendVarint(b, uint64(v<<1)^uint64((int64(v)>>63)))
 	return b, nil
 }
+
 func appendZigzag64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toInt64()
 	if v == 0 {
@@ -2125,6 +2253,7 @@ func appendZigzag64ValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	b = appendVarint(b, uint64(v<<1)^uint64((int64(v)>>63)))
 	return b, nil
 }
+
 func appendZigzag64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toInt64Ptr()
 	if p == nil {
@@ -2135,6 +2264,7 @@ func appendZigzag64Ptr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	b = appendVarint(b, uint64(v<<1)^uint64((int64(v)>>63)))
 	return b, nil
 }
+
 func appendZigzag64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toInt64Slice()
 	for _, v := range s {
@@ -2143,6 +2273,7 @@ func appendZigzag64Slice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte,
 	}
 	return b, nil
 }
+
 func appendZigzag64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toInt64Slice()
 	if len(s) == 0 {
@@ -2160,6 +2291,7 @@ func appendZigzag64PackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([
 	}
 	return b, nil
 }
+
 func appendBoolValue(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toBool()
 	b = appendVarint(b, wiretag)
@@ -2170,6 +2302,7 @@ func appendBoolValue(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, err
 	}
 	return b, nil
 }
+
 func appendBoolValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toBool()
 	if !v {
@@ -2193,6 +2326,7 @@ func appendBoolPtr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error
 	}
 	return b, nil
 }
+
 func appendBoolSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toBoolSlice()
 	for _, v := range s {
@@ -2205,6 +2339,7 @@ func appendBoolSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, err
 	}
 	return b, nil
 }
+
 func appendBoolPackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toBoolSlice()
 	if len(s) == 0 {
@@ -2221,6 +2356,7 @@ func appendBoolPackedSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byt
 	}
 	return b, nil
 }
+
 func appendStringValue(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toString()
 	b = appendVarint(b, wiretag)
@@ -2228,6 +2364,7 @@ func appendStringValue(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	b = append(b, v...)
 	return b, nil
 }
+
 func appendStringValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toString()
 	if v == "" {
@@ -2238,6 +2375,7 @@ func appendStringValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]b
 	b = append(b, v...)
 	return b, nil
 }
+
 func appendStringPtr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	p := *ptr.toStringPtr()
 	if p == nil {
@@ -2249,6 +2387,7 @@ func appendStringPtr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, err
 	b = append(b, v...)
 	return b, nil
 }
+
 func appendStringSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toStringSlice()
 	for _, v := range s {
@@ -2258,6 +2397,7 @@ func appendStringSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, e
 	}
 	return b, nil
 }
+
 func appendUTF8StringValue(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	var invalidUTF8 bool
 	v := *ptr.toString()
@@ -2272,6 +2412,7 @@ func appendUTF8StringValue(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byt
 	}
 	return b, nil
 }
+
 func appendUTF8StringValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	var invalidUTF8 bool
 	v := *ptr.toString()
@@ -2289,6 +2430,7 @@ func appendUTF8StringValueNoZero(b []byte, ptr pointer, wiretag uint64, _ bool) 
 	}
 	return b, nil
 }
+
 func appendUTF8StringPtr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	var invalidUTF8 bool
 	p := *ptr.toStringPtr()
@@ -2307,6 +2449,7 @@ func appendUTF8StringPtr(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte,
 	}
 	return b, nil
 }
+
 func appendUTF8StringSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	var invalidUTF8 bool
 	s := *ptr.toStringSlice()
@@ -2323,6 +2466,7 @@ func appendUTF8StringSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byt
 	}
 	return b, nil
 }
+
 func appendBytes(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toBytes()
 	if v == nil {
@@ -2333,6 +2477,7 @@ func appendBytes(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) 
 	b = append(b, v...)
 	return b, nil
 }
+
 func appendBytes3(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toBytes()
 	if len(v) == 0 {
@@ -2343,6 +2488,7 @@ func appendBytes3(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error)
 	b = append(b, v...)
 	return b, nil
 }
+
 func appendBytesOneof(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	v := *ptr.toBytes()
 	b = appendVarint(b, wiretag)
@@ -2350,6 +2496,7 @@ func appendBytesOneof(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, er
 	b = append(b, v...)
 	return b, nil
 }
+
 func appendBytesSlice(b []byte, ptr pointer, wiretag uint64, _ bool) ([]byte, error) {
 	s := *ptr.toBytesSlice()
 	for _, v := range s {

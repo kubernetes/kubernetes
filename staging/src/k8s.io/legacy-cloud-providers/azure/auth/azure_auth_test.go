@@ -24,31 +24,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	CrossTenantNetworkResourceNegativeConfig = []*AzureAuthConfig{
-		{
-			TenantID:        "TenantID",
-			AADClientID:     "AADClientID",
-			AADClientSecret: "AADClientSecret",
-		},
-		{
-			TenantID:                      "TenantID",
-			AADClientID:                   "AADClientID",
-			AADClientSecret:               "AADClientSecret",
-			NetworkResourceTenantID:       "NetworkResourceTenantID",
-			NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
-			IdentitySystem:                ADFSIdentitySystem,
-		},
-		{
-			TenantID:                      "TenantID",
-			AADClientID:                   "AADClientID",
-			AADClientSecret:               "AADClientSecret",
-			NetworkResourceTenantID:       "NetworkResourceTenantID",
-			NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
-			UseManagedIdentityExtension:   true,
-		},
-	}
-)
+var CrossTenantNetworkResourceNegativeConfig = []*AzureAuthConfig{
+	{
+		TenantID:        "TenantID",
+		AADClientID:     "AADClientID",
+		AADClientSecret: "AADClientSecret",
+	},
+	{
+		TenantID:                      "TenantID",
+		AADClientID:                   "AADClientID",
+		AADClientSecret:               "AADClientSecret",
+		NetworkResourceTenantID:       "NetworkResourceTenantID",
+		NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
+		IdentitySystem:                ADFSIdentitySystem,
+	},
+	{
+		TenantID:                      "TenantID",
+		AADClientID:                   "AADClientID",
+		AADClientSecret:               "AADClientSecret",
+		NetworkResourceTenantID:       "NetworkResourceTenantID",
+		NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
+		UseManagedIdentityExtension:   true,
+	},
+}
 
 func TestGetServicePrincipalToken(t *testing.T) {
 	config := &AzureAuthConfig{

@@ -82,7 +82,7 @@ func TestKMSPluginLateStart(t *testing.T) {
 // TestTimeout tests behaviour of the kube-apiserver based on the supplied timeout and delayed start of kms-plugin.
 func TestTimeouts(t *testing.T) {
 	t.Parallel()
-	var testCases = []struct {
+	testCases := []struct {
 		desc               string
 		callTimeout        time.Duration
 		pluginDelay        time.Duration

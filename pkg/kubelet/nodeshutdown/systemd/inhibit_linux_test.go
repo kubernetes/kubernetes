@@ -145,7 +145,7 @@ func TestReloadLogindConf(t *testing.T) {
 }
 
 func TestMonitorShutdown(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc           string
 		shutdownActive bool
 	}{

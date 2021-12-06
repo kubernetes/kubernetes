@@ -32,8 +32,10 @@ import (
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 func init() {
 	install.Install(scheme)

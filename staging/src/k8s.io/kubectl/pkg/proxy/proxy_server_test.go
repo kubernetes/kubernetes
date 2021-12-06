@@ -43,7 +43,6 @@ func TestAccept(t *testing.T) {
 		method        string
 		expectAccept  bool
 	}{
-
 		{
 			name:          "test1",
 			acceptPaths:   DefaultPathAcceptRE,
@@ -366,7 +365,7 @@ func TestFileServing(t *testing.T) {
 		t.Fatalf("error creating tmp dir: %v", err)
 	}
 	defer os.RemoveAll(dir)
-	if err := ioutil.WriteFile(filepath.Join(dir, fname), []byte(data), 0755); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(dir, fname), []byte(data), 0o755); err != nil {
 		t.Fatalf("error writing tmp file: %v", err)
 	}
 

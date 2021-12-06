@@ -109,7 +109,6 @@ func TestDryRunCreateExistingObjectFails(t *testing.T) {
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyExists {
 		t.Errorf("Expected KeyExists error: %v", err)
 	}
-
 }
 
 func TestDryRunUpdateMissingObjectFails(t *testing.T) {

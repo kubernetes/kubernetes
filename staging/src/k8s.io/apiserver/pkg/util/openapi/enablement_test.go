@@ -37,7 +37,8 @@ func schema_k8sio_api_apps_v1_DeploymentCondition(ref common.ReferenceCallback) 
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"Available", "Progressing", "ReplicaFailure"}},
+							Enum:        []interface{}{"Available", "Progressing", "ReplicaFailure"},
+						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
@@ -45,7 +46,8 @@ func schema_k8sio_api_apps_v1_DeploymentCondition(ref common.ReferenceCallback) 
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"False", "True", "Unknown"}},
+							Enum:        []interface{}{"False", "True", "Unknown"},
+						},
 					},
 					"lastUpdateTime": {
 						SchemaProps: spec.SchemaProps{
@@ -80,7 +82,8 @@ func schema_k8sio_api_apps_v1_DeploymentCondition(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time",
+		},
 	}
 }
 

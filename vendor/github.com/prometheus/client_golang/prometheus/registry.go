@@ -575,7 +575,7 @@ func WriteToTextfile(filename string, g Gatherer) error {
 		return err
 	}
 
-	if err := os.Chmod(tmp.Name(), 0644); err != nil {
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
 		return err
 	}
 	return os.Rename(tmp.Name(), filename)

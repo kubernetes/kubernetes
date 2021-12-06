@@ -701,7 +701,7 @@ func (d *decoder) mappingSlice(n *node, out reflect.Value) (good bool) {
 	d.mapType = outt
 
 	var slice []MapItem
-	var l = len(n.children)
+	l := len(n.children)
 	for i := 0; i < l; i += 2 {
 		if isMerge(n.children[i]) {
 			d.merge(n.children[i+1], out)

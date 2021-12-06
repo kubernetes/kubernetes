@@ -4,8 +4,10 @@ import (
 	"sync"
 )
 
-var signingMethods = map[string]func() SigningMethod{}
-var signingMethodLock = new(sync.RWMutex)
+var (
+	signingMethods    = map[string]func() SigningMethod{}
+	signingMethodLock = new(sync.RWMutex)
+)
 
 // Implement SigningMethod to add new methods for signing or verifying tokens.
 type SigningMethod interface {

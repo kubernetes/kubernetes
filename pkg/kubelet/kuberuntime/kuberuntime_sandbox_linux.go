@@ -47,7 +47,6 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runt
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
-
 	if config.Linux == nil {
 		return nil
 	}

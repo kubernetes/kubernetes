@@ -319,7 +319,6 @@ func handleConfigMapFromFileSources(configMap *corev1.ConfigMap, fileSources []s
 			default:
 				return fmt.Errorf("error reading %s: %v", filePath, err)
 			}
-
 		}
 		if info.IsDir() {
 			if strings.Contains(fileSource, "=") {
@@ -343,7 +342,6 @@ func handleConfigMapFromFileSources(configMap *corev1.ConfigMap, fileSources []s
 			if err := addKeyFromFileToConfigMap(configMap, keyName, filePath); err != nil {
 				return err
 			}
-
 		}
 	}
 	return nil

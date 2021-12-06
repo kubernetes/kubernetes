@@ -43,17 +43,15 @@ const (
 	DefaultRetryDuration = 30 * time.Second
 )
 
-var (
-	// StatusCodesForRetry are a defined group of status code for which the client will retry
-	StatusCodesForRetry = []int{
-		http.StatusRequestTimeout,      // 408
-		http.StatusTooManyRequests,     // 429
-		http.StatusInternalServerError, // 500
-		http.StatusBadGateway,          // 502
-		http.StatusServiceUnavailable,  // 503
-		http.StatusGatewayTimeout,      // 504
-	}
-)
+// StatusCodesForRetry are a defined group of status code for which the client will retry
+var StatusCodesForRetry = []int{
+	http.StatusRequestTimeout,      // 408
+	http.StatusTooManyRequests,     // 429
+	http.StatusInternalServerError, // 500
+	http.StatusBadGateway,          // 502
+	http.StatusServiceUnavailable,  // 503
+	http.StatusGatewayTimeout,      // 504
+}
 
 const (
 	requestFormat = `HTTP Request Begin ===================================================

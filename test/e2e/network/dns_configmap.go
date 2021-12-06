@@ -316,7 +316,6 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 }
 
 var _ = common.SIGDescribe("DNS configMap nameserver", func() {
-
 	ginkgo.Context("Change stubDomain", func() {
 		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}
 

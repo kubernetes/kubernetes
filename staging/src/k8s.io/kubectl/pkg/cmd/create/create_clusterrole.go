@@ -151,7 +151,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 		}
 	}
 
-	//validate non-resource-url
+	// validate non-resource-url
 	if len(c.NonResourceURLs) > 0 {
 		for _, v := range c.Verbs {
 			if !arrayContains(validNonResourceVerbs, v) {
@@ -175,7 +175,6 @@ func (c *CreateClusterRoleOptions) Validate() error {
 	}
 
 	return nil
-
 }
 
 // RunCreateRole creates a new clusterRole

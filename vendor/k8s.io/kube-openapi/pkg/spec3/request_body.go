@@ -19,8 +19,8 @@ package spec3
 import (
 	"encoding/json"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // RequestBody describes a single request body, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#requestBodyObject

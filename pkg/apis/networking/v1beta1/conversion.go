@@ -50,6 +50,7 @@ func Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.
 	}
 	return nil
 }
+
 func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in, out, s); err != nil {
 		return err

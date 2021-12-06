@@ -84,7 +84,6 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 }
 
 func TestApplyToFallback(t *testing.T) {
-
 	f, err := ioutil.TempFile("", "authkubeconfig")
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +102,7 @@ contexts:
     cluster: cluster
   name: cluster
 current-context: cluster
-`), os.FileMode(0755)); err != nil {
+`), os.FileMode(0o755)); err != nil {
 		t.Fatal(err)
 	}
 	remoteKubeconfig := f.Name()

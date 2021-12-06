@@ -88,7 +88,6 @@ func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
 	if !newDswPlugins[0].Timestamp.After(oldTimestamp) {
 		t.Fatal("New timestamp is not newer than the old timestamp", newDswPlugins[0].Timestamp, oldTimestamp)
 	}
-
 }
 
 // Calls AddOrUpdatePlugin() to add an empty string for socket path

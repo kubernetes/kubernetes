@@ -31,6 +31,7 @@ type byMessages []Message
 func (d byMessages) Len() int {
 	return len(d)
 }
+
 func (d byMessages) Less(i, j int) bool {
 	if d[i].Comment.less(&d[j].Comment) {
 		return true
@@ -46,6 +47,7 @@ func (d byMessages) Less(i, j int) bool {
 	}
 	return false
 }
+
 func (d byMessages) Swap(i, j int) {
 	d[i], d[j] = d[j], d[i]
 }

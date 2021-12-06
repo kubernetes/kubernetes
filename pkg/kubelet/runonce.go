@@ -51,7 +51,7 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 
 	// If the container logs directory does not exist, create it.
 	if _, err := os.Stat(ContainerLogsDir); err != nil {
-		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
+		if err := kl.os.MkdirAll(ContainerLogsDir, 0o755); err != nil {
 			klog.ErrorS(err, "Failed to create directory", "path", ContainerLogsDir)
 		}
 	}

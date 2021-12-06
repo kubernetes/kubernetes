@@ -303,7 +303,6 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			require.Equal(t, test.wantRequiresRepublish, csiDriver.Spec.RequiresRepublish)
 		})
 	}
-
 }
 
 func TestCSIDriverValidation(t *testing.T) {
@@ -459,7 +458,6 @@ func TestCSIDriverValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 					APIGroup:   "storage.k8s.io",

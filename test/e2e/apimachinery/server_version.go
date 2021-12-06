@@ -35,7 +35,6 @@ var _ = SIGDescribe("server version", func() {
 	   Both the major and minor versions MUST only be an integer.
 	*/
 	framework.ConformanceIt("should find the server version", func() {
-
 		ginkgo.By("Request ServerVersion")
 
 		var version *version.Info

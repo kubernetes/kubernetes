@@ -209,6 +209,7 @@ func TestMicroTimeBefore(t *testing.T) {
 		})
 	}
 }
+
 func TestMicroTimeBeforeTime(t *testing.T) {
 	t1 := NewMicroTime(time.Now())
 	t2 := NewTime(t1.Time)

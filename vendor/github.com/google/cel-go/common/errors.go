@@ -29,7 +29,8 @@ type Errors struct {
 func NewErrors(source Source) *Errors {
 	return &Errors{
 		errors: []Error{},
-		source: source}
+		source: source,
+	}
 }
 
 // ReportError records an error at a source location.
@@ -57,7 +58,7 @@ func (e *Errors) Append(errs []Error) *Errors {
 
 // ToDisplayString returns the error set to a newline delimited string.
 func (e *Errors) ToDisplayString() string {
-	var result = ""
+	result := ""
 	sort.SliceStable(e.errors, func(i, j int) bool {
 		ei := e.errors[i].Location
 		ej := e.errors[j].Location

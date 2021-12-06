@@ -75,7 +75,6 @@ func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInform
 }
 
 func (c *DiscoveryController) sync(version schema.GroupVersion) error {
-
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
 	versionsForDiscoveryMap := map[metav1.GroupVersion]bool{}

@@ -1077,7 +1077,7 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	// Grab the /run lock and ensure the RestoreAll fails
-	runLock, err := os.OpenFile(lockPath16x, os.O_CREATE, 0600)
+	runLock, err := os.OpenFile(lockPath16x, os.O_CREATE, 0o600)
 	if err != nil {
 		t.Fatalf("expected to open %s, got %v", lockPath16x, err)
 	}

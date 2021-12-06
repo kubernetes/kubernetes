@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // UsageClient is the compute Client
@@ -47,8 +48,11 @@ func (client UsageClient) List(ctx context.Context, location string) (result Lis
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: location,
-			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.UsageClient", "List", err.Error())
 	}
 

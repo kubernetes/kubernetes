@@ -69,7 +69,6 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	ginkgo.It("should have cluster metrics [Feature:StackdriverMonitoring]", func() {
 		testStackdriverMonitoring(f, 1, 100, 200)
 	})
-
 })
 
 func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, perPodCPU int64) {

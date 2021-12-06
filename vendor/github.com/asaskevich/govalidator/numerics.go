@@ -70,7 +70,6 @@ func InRangeFloat64(value, left, right float64) bool {
 
 // InRange returns true if value lies between left and right border, generic type to handle int, float32 or float64, all types must the same type
 func InRange(value interface{}, left interface{}, right interface{}) bool {
-
 	reflectValue := reflect.TypeOf(value).Kind()
 	reflectLeft := reflect.TypeOf(left).Kind()
 	reflectRight := reflect.TypeOf(right).Kind()

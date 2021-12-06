@@ -21,7 +21,6 @@ var (
 
 type ILexerATNSimulator interface {
 	IATNSimulator
-
 	reset()
 	Match(input CharStream, mode int) int
 	GetCharPositionInLine() int
@@ -131,7 +130,6 @@ func (l *LexerATNSimulator) MatchATN(input CharStream) int {
 }
 
 func (l *LexerATNSimulator) execATN(input CharStream, ds0 *DFAState) int {
-
 	if LexerATNSimulatorDebug {
 		fmt.Println("start state closure=" + ds0.configs.String())
 	}
@@ -206,7 +204,7 @@ func (l *LexerATNSimulator) getExistingTargetState(s *DFAState, t int) *DFAState
 		return nil
 	}
 
-	target := s.getIthEdge(t-LexerATNSimulatorMinDFAEdge)
+	target := s.getIthEdge(t - LexerATNSimulatorMinDFAEdge)
 	if LexerATNSimulatorDebug && target != nil {
 		fmt.Println("reuse state " + strconv.Itoa(s.stateNumber) + " edge to " + strconv.Itoa(target.stateNumber))
 	}
@@ -273,7 +271,6 @@ func (l *LexerATNSimulator) getReachableConfigSet(input CharStream, closure ATNC
 		}
 
 		if LexerATNSimulatorDebug {
-
 			fmt.Printf("testing %s at %s\n", l.GetTokenName(t), cfg.String()) // l.recog, true))
 		}
 
@@ -339,7 +336,6 @@ func (l *LexerATNSimulator) computeStartState(input CharStream, p ATNState) *Ord
 // {@code false}.
 func (l *LexerATNSimulator) closure(input CharStream, config *LexerATNConfig, configs ATNConfigSet,
 	currentAltReachedAcceptState, speculative, treatEOFAsEpsilon bool) bool {
-
 	if LexerATNSimulatorDebug {
 		fmt.Println("closure(" + config.String() + ")") // config.String(l.recog, true) + ")")
 	}
@@ -396,7 +392,6 @@ func (l *LexerATNSimulator) closure(input CharStream, config *LexerATNConfig, co
 // side-effect: can alter configs.hasSemanticContext
 func (l *LexerATNSimulator) getEpsilonTarget(input CharStream, config *LexerATNConfig, trans Transition,
 	configs ATNConfigSet, speculative, treatEOFAsEpsilon bool) *LexerATNConfig {
-
 	var cfg *LexerATNConfig
 
 	if trans.getSerializationType() == TransitionRULE {
@@ -564,7 +559,6 @@ func (l *LexerATNSimulator) addDFAEdge(from *DFAState, tk int, to *DFAState, cfg
 // configuration containing an ATN rule stop state. Later, when
 // traversing the DFA, we will know which rule to accept.
 func (l *LexerATNSimulator) addDFAState(configs ATNConfigSet) *DFAState {
-
 	proposed := NewDFAState(-1, configs)
 	var firstConfigWithRuleStopState ATNConfig
 

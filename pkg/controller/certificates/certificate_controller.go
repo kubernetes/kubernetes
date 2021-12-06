@@ -155,7 +155,6 @@ func (cc *CertificateController) processNextWorkItem() bool {
 
 	cc.queue.Forget(cKey)
 	return true
-
 }
 
 func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {

@@ -35,8 +35,10 @@ import (
 
 const policyTypeStatic policyType = "Static"
 
-type systemReservedMemory map[int]map[v1.ResourceName]uint64
-type reusableMemory map[string]map[string]map[v1.ResourceName]uint64
+type (
+	systemReservedMemory map[int]map[v1.ResourceName]uint64
+	reusableMemory       map[string]map[string]map[v1.ResourceName]uint64
+)
 
 // staticPolicy is implementation of the policy interface for the static policy
 type staticPolicy struct {
@@ -320,7 +322,6 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 	for _, ctr := range pod.Spec.InitContainers {
 		reqRsrcs, err := getRequestedResources(&ctr)
-
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +338,6 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 	for _, ctr := range pod.Spec.Containers {
 		reqRsrcs, err := getRequestedResources(&ctr)
-
 		if err != nil {
 			return nil, err
 		}

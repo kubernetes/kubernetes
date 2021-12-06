@@ -359,7 +359,6 @@ func (c *Controller) syncService(key string) error {
 		discovery.LabelManagedBy:   controllerName,
 	}).AsSelectorPreValidated()
 	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
-
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is basically
 		// impossible to get this error.

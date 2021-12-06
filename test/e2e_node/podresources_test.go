@@ -236,11 +236,10 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 						continue
 					}
 					if cd.Topology != nil {
-						//we expect nil topology
+						// we expect nil topology
 						return fmt.Errorf("Nil topology is expected")
 					}
 				}
-
 			}
 		}
 	}
@@ -347,7 +346,6 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 				cpuRequest: 1000,
 			},
 		}
-
 	}
 	tpd.createPodsForTest(f, expected)
 	expectPodResources(1, cli, expected)
@@ -410,7 +408,6 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 			cntName:    "cnt-00",
 			cpuRequest: 1000,
 		}
-
 	}
 
 	tpd.createPodsForTest(f, []podDesc{
@@ -506,12 +503,10 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 				cpuRequest: 1500,
 			},
 		}
-
 	}
 	tpd.createPodsForTest(f, expected)
 	expectPodResources(1, cli, expected)
 	tpd.deletePodsForTest(f)
-
 }
 
 func podresourcesGetAllocatableResourcesTests(cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {

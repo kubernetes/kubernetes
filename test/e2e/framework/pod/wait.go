@@ -181,7 +181,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 					e2elog.Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
-				//ignore failed pods that are controlled by some controller
+				// ignore failed pods that are controlled by some controller
 			}
 		}
 

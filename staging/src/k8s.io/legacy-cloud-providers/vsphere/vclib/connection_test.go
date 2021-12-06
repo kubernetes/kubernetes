@@ -138,8 +138,7 @@ func TestWithVerificationWithoutCaCertOrThumbprint(t *testing.T) {
 func TestWithValidThumbprint(t *testing.T) {
 	handler, verifyConnectionWasMade := getRequestVerifier(t)
 
-	server, thumbprint :=
-		createTestServer(t, "./testdata/ca.pem", "./testdata/server.pem", "./testdata/server.key", handler)
+	server, thumbprint := createTestServer(t, "./testdata/ca.pem", "./testdata/server.pem", "./testdata/server.key", handler)
 	server.StartTLS()
 	u := mustParseURL(t, server.URL)
 

@@ -21,13 +21,11 @@ import (
 
 const number = "v14.2.1"
 
-var (
-	userAgent = fmt.Sprintf("Go/%s (%s-%s) go-autorest/%s",
-		runtime.Version(),
-		runtime.GOARCH,
-		runtime.GOOS,
-		number,
-	)
+var userAgent = fmt.Sprintf("Go/%s (%s-%s) go-autorest/%s",
+	runtime.Version(),
+	runtime.GOARCH,
+	runtime.GOOS,
+	number,
 )
 
 // UserAgent returns a string containing the Go version, system architecture and OS, and the go-autorest version.

@@ -267,7 +267,7 @@ func (f *freelist) read(p *page) {
 	}
 	// If the page.count is at the max uint16 value (64k) then it's considered
 	// an overflow and the size of the freelist is stored as the first element.
-	var idx, count = 0, int(p.count)
+	idx, count := 0, int(p.count)
 	if count == 0xFFFF {
 		idx = 1
 		c := *(*pgid)(unsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p)))

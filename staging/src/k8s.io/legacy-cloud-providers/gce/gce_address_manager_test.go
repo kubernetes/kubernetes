@@ -28,9 +28,11 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
-const testSvcName = "my-service"
-const testSubnet = "/projects/x/testRegions/us-central1/testSubnetworks/customsub"
-const testLBName = "a111111111111111"
+const (
+	testSvcName = "my-service"
+	testSubnet  = "/projects/x/testRegions/us-central1/testSubnetworks/customsub"
+	testLBName  = "a111111111111111"
+)
 
 var vals = DefaultTestClusterValues()
 

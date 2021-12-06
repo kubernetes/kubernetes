@@ -261,7 +261,6 @@ func TestGetInterestedWatchCount(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestGetInterestedWatchCountWithIndex(t *testing.T) {
@@ -331,5 +330,4 @@ func TestGetInterestedWatchCountWithIndex(t *testing.T) {
 			}
 		})
 	}
-
 }

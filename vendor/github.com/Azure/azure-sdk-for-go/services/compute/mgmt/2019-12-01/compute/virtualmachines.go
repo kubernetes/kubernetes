@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VirtualMachinesClient is the compute Client
@@ -49,10 +50,15 @@ func (client VirtualMachinesClient) Capture(ctx context.Context, resourceGroupNa
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.VhdPrefix", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{
+				{Target: "parameters.VhdPrefix", Name: validation.Null, Rule: true, Chain: nil},
 				{Target: "parameters.DestinationContainerName", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "parameters.OverwriteVhds", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+				{Target: "parameters.OverwriteVhds", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachinesClient", "Capture", err.Error())
 	}
 
@@ -221,23 +227,44 @@ func (client VirtualMachinesClient) CreateOrUpdate(ctx context.Context, resource
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.VirtualMachineProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.VirtualMachineProperties.StorageProfile", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SecretURL", Name: validation.Null, Rule: true, Chain: nil},
-									{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
-								}},
-								{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey", Name: validation.Null, Rule: false,
-									Chain: []validation.Constraint{{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.KeyURL", Name: validation.Null, Rule: true, Chain: nil},
-										{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
-									}},
-							}},
-						}},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.VirtualMachineProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.VirtualMachineProperties.StorageProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{
+										Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{
+												Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SecretURL", Name: validation.Null, Rule: true, Chain: nil},
+													{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
+												},
+											},
+											{
+												Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.KeyURL", Name: validation.Null, Rule: true, Chain: nil},
+													{Target: "parameters.VirtualMachineProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachinesClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -1024,8 +1051,11 @@ func (client VirtualMachinesClient) ListByLocation(ctx context.Context, location
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: location,
-			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachinesClient", "ListByLocation", err.Error())
 	}
 
@@ -1626,8 +1656,11 @@ func (client VirtualMachinesClient) RunCommand(ctx context.Context, resourceGrou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.CommandID", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.CommandID", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachinesClient", "RunCommand", err.Error())
 	}
 

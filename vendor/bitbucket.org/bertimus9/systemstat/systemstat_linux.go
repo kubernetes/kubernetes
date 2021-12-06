@@ -2,6 +2,7 @@
 // Licensed under the MIT License
 // see file LICENSE
 
+//go:build linux
 // +build linux
 
 package systemstat
@@ -76,7 +77,8 @@ func getMemSample(procfile string) (samp MemSample) {
 		"MemUsed:":   true,
 		"SwapTotal:": true,
 		"SwapFree:":  true,
-		"SwapUsed:":  true}
+		"SwapUsed:":  true,
+	}
 
 	// read in whole meminfo file with cpu usage information ;"/proc/meminfo"
 	contents, err := ioutil.ReadFile(procfile)

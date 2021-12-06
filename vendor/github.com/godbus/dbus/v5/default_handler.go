@@ -148,7 +148,7 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 		out[i] = val.Interface()
 	}
 	if nilErr || err == nil {
-		//concrete type to interface nil is a special case
+		// concrete type to interface nil is a special case
 		return out, nil
 	}
 	return out, err

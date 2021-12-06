@@ -49,28 +49,30 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-var mode = flag.String("mode", "gce", "Mode to operate in. One of gce|ssh. Defaults to gce")
-var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
-var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
-var zone = flag.String("zone", "", "gce zone the hosts live in")
-var project = flag.String("project", "", "gce project the hosts live in")
-var imageConfigFile = flag.String("image-config-file", "", "yaml file describing images to run")
-var imageConfigDir = flag.String("image-config-dir", "", "(optional)path to image config files")
-var imageProject = flag.String("image-project", "", "gce project the hosts live in")
-var images = flag.String("images", "", "images to test")
-var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible")
-var hosts = flag.String("hosts", "", "hosts to test")
-var cleanup = flag.Bool("cleanup", true, "If true remove files from remote hosts and delete temporary instances")
-var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any instances created")
-var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
-var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
-var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
-var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
-var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
-var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
+var (
+	mode                 = flag.String("mode", "gce", "Mode to operate in. One of gce|ssh. Defaults to gce")
+	testArgs             = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
+	testSuite            = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
+	instanceNamePrefix   = flag.String("instance-name-prefix", "", "prefix for instance names")
+	zone                 = flag.String("zone", "", "gce zone the hosts live in")
+	project              = flag.String("project", "", "gce project the hosts live in")
+	imageConfigFile      = flag.String("image-config-file", "", "yaml file describing images to run")
+	imageConfigDir       = flag.String("image-config-dir", "", "(optional)path to image config files")
+	imageProject         = flag.String("image-project", "", "gce project the hosts live in")
+	images               = flag.String("images", "", "images to test")
+	preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible")
+	hosts                = flag.String("hosts", "", "hosts to test")
+	cleanup              = flag.Bool("cleanup", true, "If true remove files from remote hosts and delete temporary instances")
+	deleteInstances      = flag.Bool("delete-instances", true, "If true, delete any instances created")
+	buildOnly            = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
+	instanceMetadata     = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
+	gubernator           = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
+	ginkgoFlags          = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
+	systemSpecName       = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
+	extraEnvs            = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+	runtimeConfig        = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+	kubeletConfigFile    = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
+)
 
 // envs is the type used to collect all node envs. The key is the env name,
 // and the value is the env value
@@ -407,7 +409,6 @@ func callGubernator(gubernator bool) {
 	if gubernator {
 		fmt.Println("Running gubernator.sh")
 		output, err := exec.Command("./test/e2e_node/gubernator.sh", "y").Output()
-
 		if err != nil {
 			fmt.Println("gubernator.sh Failed")
 			fmt.Println(err)
@@ -605,7 +606,8 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 						Type: "ONE_TO_ONE_NAT",
 						Name: "External NAT",
 					},
-				}},
+				},
+			},
 		},
 		Disks: []*compute.AttachedDisk{
 			{

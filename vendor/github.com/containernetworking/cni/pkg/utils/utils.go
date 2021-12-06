@@ -36,7 +36,6 @@ var cniReg = regexp.MustCompile(`^` + cniValidNameChars + `*$`)
 
 // ValidateContainerID will validate that the supplied containerID is not empty does not contain invalid characters
 func ValidateContainerID(containerID string) *types.Error {
-
 	if containerID == "" {
 		return types.NewError(types.ErrUnknownContainer, "missing containerID", "")
 	}
@@ -48,7 +47,6 @@ func ValidateContainerID(containerID string) *types.Error {
 
 // ValidateNetworkName will validate that the supplied networkName does not contain invalid characters
 func ValidateNetworkName(networkName string) *types.Error {
-
 	if networkName == "" {
 		return types.NewError(types.ErrInvalidNetworkConfig, "missing network name:", "")
 	}

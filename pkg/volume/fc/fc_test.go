@@ -118,7 +118,7 @@ func (fake *fakeDiskManager) MakeGlobalVDPDName(disk fcDisk) string {
 
 func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) (string, error) {
 	globalPath := b.manager.MakeGlobalPDName(*b.fcDisk)
-	err := os.MkdirAll(globalPath, 0750)
+	err := os.MkdirAll(globalPath, 0o750)
 	if err != nil {
 		return "", err
 	}

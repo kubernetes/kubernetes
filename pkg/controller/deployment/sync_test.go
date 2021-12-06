@@ -44,7 +44,7 @@ func TestScale(t *testing.T) {
 	oldTimestamp := metav1.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
 	olderTimestamp := metav1.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
 
-	var updatedTemplate = func(replicas int) *apps.Deployment {
+	updatedTemplate := func(replicas int) *apps.Deployment {
 		d := newDeployment("foo", replicas, nil, nil, nil, map[string]string{"foo": "bar"})
 		d.Spec.Template.Labels["another"] = "label"
 		return d

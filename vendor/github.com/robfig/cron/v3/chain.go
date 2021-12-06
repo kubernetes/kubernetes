@@ -77,7 +77,7 @@ func DelayIfStillRunning(logger Logger) JobWrapper {
 // still running. It logs skips to the given logger at Info level.
 func SkipIfStillRunning(logger Logger) JobWrapper {
 	return func(j Job) Job {
-		var ch = make(chan struct{}, 1)
+		ch := make(chan struct{}, 1)
 		ch <- struct{}{}
 		return FuncJob(func() {
 			select {

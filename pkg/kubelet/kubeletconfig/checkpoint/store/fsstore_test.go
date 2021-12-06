@@ -134,7 +134,8 @@ func TestFsStoreExists(t *testing.T) {
 					UID:              c.uid,
 					ResourceVersion:  c.resourceVersion,
 					KubeletConfigKey: "kubelet",
-				}})
+				},
+			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -272,7 +273,8 @@ func TestFsStoreLoad(t *testing.T) {
 					UID:              c.uid,
 					ResourceVersion:  c.resourceVersion,
 					KubeletConfigKey: kubeletKey,
-				}})
+				},
+			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -328,7 +330,8 @@ func TestFsStoreAssigned(t *testing.T) {
 			Namespace:        "namespace",
 			UID:              "uid",
 			KubeletConfigKey: "kubelet",
-		}})
+		},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -372,7 +375,8 @@ func TestFsStoreLastKnownGood(t *testing.T) {
 			Namespace:        "namespace",
 			UID:              "uid",
 			KubeletConfigKey: "kubelet",
-		}})
+		},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

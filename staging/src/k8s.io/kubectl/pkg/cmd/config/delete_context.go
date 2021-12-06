@@ -28,11 +28,9 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	deleteContextExample = templates.Examples(`
+var deleteContextExample = templates.Examples(`
 		# Delete the context for the minikube cluster
 		kubectl config delete-context minikube`)
-)
 
 // NewCmdConfigDeleteContext returns a Command instance for 'config delete-context' sub command
 func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

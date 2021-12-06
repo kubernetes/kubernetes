@@ -283,7 +283,6 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 	listenerAddress := listener.Addr().String()
 	host, localPort, _ := net.SplitHostPort(listenerAddress)
 	localPortUInt, err := strconv.ParseUint(localPort, 10, 16)
-
 	if err != nil {
 		fmt.Fprintf(pf.out, "Failed to forward from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
 		return nil, fmt.Errorf("error parsing local port: %s from %s (%s)", err, listenerAddress, host)

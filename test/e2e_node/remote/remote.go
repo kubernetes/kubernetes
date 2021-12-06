@@ -32,8 +32,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
-var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
+var (
+	testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
+	resultsDir  = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
+)
 
 const archiveName = "e2e_node_test.tar.gz"
 
@@ -196,7 +198,7 @@ func GetTimestampFromWorkspaceDir(dir string) string {
 
 func getTestArtifacts(host, testDir string) error {
 	logPath := filepath.Join(*resultsDir, host)
-	if err := os.MkdirAll(logPath, 0755); err != nil {
+	if err := os.MkdirAll(logPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
 	}
 	// Copy logs to artifacts/hostname
@@ -250,7 +252,7 @@ func collectSystemLog(host string) {
 // TODO(random-liu): Use the log-dump script in cluster e2e.
 func WriteLog(host, filename, content string) error {
 	logPath := filepath.Join(*resultsDir, host)
-	if err := os.MkdirAll(logPath, 0755); err != nil {
+	if err := os.MkdirAll(logPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
 	}
 	f, err := os.Create(filepath.Join(logPath, filename))

@@ -341,7 +341,6 @@ func (rh *realHistory) ReleaseControllerRevision(parent metav1.Object, revision 
 	// Use strategic merge patch to add an owner reference indicating a controller ref
 	released, err := rh.client.AppsV1().ControllerRevisions(revision.GetNamespace()).Patch(context.TODO(), revision.GetName(),
 		types.StrategicMergePatchType, dataBytes, metav1.PatchOptions{})
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// We ignore deleted revisions

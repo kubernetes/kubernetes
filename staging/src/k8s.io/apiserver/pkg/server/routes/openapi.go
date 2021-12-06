@@ -78,7 +78,6 @@ func (oa OpenAPI) InstallV3(c *restful.Container, mux *mux.PathRecorderMux) *han
 		spec, err := builder3.BuildOpenAPISpec(ws, oa.Config)
 		if err != nil {
 			klog.Errorf("Failed to build OpenAPI v3 for group %s, %q", gv, err)
-
 		}
 		openAPIVersionedService.UpdateGroupVersion(gv, spec)
 	}

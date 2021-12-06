@@ -58,8 +58,10 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
 const defaultTestPrefix = "test!"
 
@@ -89,6 +91,7 @@ func (p *prefixTransformer) TransformFromStorage(b []byte, ctx value.Context) ([
 	}
 	return bytes.TrimPrefix(b, p.prefix), p.stale, p.err
 }
+
 func (p *prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
 	if ctx == nil {
 		panic("no context provided")

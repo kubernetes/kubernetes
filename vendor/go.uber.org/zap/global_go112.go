@@ -19,6 +19,7 @@
 // THE SOFTWARE.
 
 // See #682 for more information.
+//go:build go1.12
 // +build go1.12
 
 package zap

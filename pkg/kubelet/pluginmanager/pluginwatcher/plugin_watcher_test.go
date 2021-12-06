@@ -56,7 +56,7 @@ func init() {
 
 func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(socketDir))
-	os.MkdirAll(socketDir, 0755)
+	os.MkdirAll(socketDir, 0o755)
 }
 
 func waitForRegistration(
@@ -90,7 +90,6 @@ func waitForUnregistration(
 			return false, nil
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Timed out waiting for plugin to be unregistered:\n%s.", socketPath)
 	}

@@ -51,7 +51,8 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
-									ContainerPort: int32(8080)},
+									ContainerPort: int32(8080),
+								},
 							},
 						},
 					},
@@ -81,7 +82,8 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
-									ContainerPort: int32(8080)},
+									ContainerPort: int32(8080),
+								},
 							},
 						},
 					},
@@ -110,7 +112,8 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
-									ContainerPort: int32(8080)},
+									ContainerPort: int32(8080),
+								},
 							},
 						},
 					},
@@ -138,7 +141,8 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
-									ContainerPort: int32(80)},
+									ContainerPort: int32(80),
+								},
 							},
 						},
 					},
@@ -167,7 +171,8 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
-									ContainerPort: int32(443)},
+									ContainerPort: int32(443),
+								},
 							},
 						},
 					},
@@ -196,7 +201,8 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "https",
-									ContainerPort: int32(443)},
+									ContainerPort: int32(443),
+								},
 							},
 						},
 					},
@@ -226,7 +232,8 @@ func TestLookupContainerPortNumberByServicePort(t *testing.T) {
 							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
-									ContainerPort: int32(80)},
+									ContainerPort: int32(80),
+								},
 							},
 						},
 					},

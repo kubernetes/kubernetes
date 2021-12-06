@@ -327,14 +327,12 @@ func contextErrToGrpcErr(err error) error {
 	}
 }
 
-var (
-	defaultOptions = &options{
-		retryPolicy: nonRepeatable,
-		max:         0, // disable
-		backoffFunc: backoffLinearWithJitter(50*time.Millisecond /*jitter*/, 0.10),
-		retryAuth:   true,
-	}
-)
+var defaultOptions = &options{
+	retryPolicy: nonRepeatable,
+	max:         0, // disable
+	backoffFunc: backoffLinearWithJitter(50*time.Millisecond /*jitter*/, 0.10),
+	retryAuth:   true,
+}
 
 // backoffFunc denotes a family of functions that control the backoff duration between call retries.
 //

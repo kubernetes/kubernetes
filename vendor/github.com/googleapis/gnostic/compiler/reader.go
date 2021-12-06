@@ -29,11 +29,15 @@ import (
 
 var verboseReader = false
 
-var fileCache map[string][]byte
-var infoCache map[string]*yaml.Node
+var (
+	fileCache map[string][]byte
+	infoCache map[string]*yaml.Node
+)
 
-var fileCacheEnable = true
-var infoCacheEnable = true
+var (
+	fileCacheEnable = true
+	infoCacheEnable = true
+)
 
 // These locks are used to synchronize accesses to the fileCache and infoCache
 // maps (above). They are global state and can throw thread-related errors

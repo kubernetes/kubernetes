@@ -182,7 +182,7 @@ func (o *SetLastAppliedOptions) Validate() error {
 			return fmt.Errorf("no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
 		}
 
-		//only add to PatchBufferList when changed
+		// only add to PatchBufferList when changed
 		if !bytes.Equal(cmdutil.StripComments(originalBuf), cmdutil.StripComments(diffBuf)) {
 			p := PatchBuffer{Patch: patchBuf, PatchType: patchType}
 			o.patchBufferList = append(o.patchBufferList, p)

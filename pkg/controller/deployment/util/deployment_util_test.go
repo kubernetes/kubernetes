@@ -1029,22 +1029,21 @@ func TestMaxUnavailable(t *testing.T) {
 	}
 }
 
-//Set of simple tests for annotation related util functions
+// Set of simple tests for annotation related util functions
 func TestAnnotationUtils(t *testing.T) {
-
-	//Setup
+	// Setup
 	tDeployment := generateDeployment("nginx")
 	tRS := generateRS(tDeployment)
 	tDeployment.Annotations[RevisionAnnotation] = "1"
 
-	//Test Case 1: Check if anotations are copied properly from deployment to RS
+	// Test Case 1: Check if anotations are copied properly from deployment to RS
 	t.Run("SetNewReplicaSetAnnotations", func(t *testing.T) {
-		//Try to set the increment revision from 11 through 20
+		// Try to set the increment revision from 11 through 20
 		for i := 10; i < 20; i++ {
 
 			nextRevision := fmt.Sprintf("%d", i+1)
 			SetNewReplicaSetAnnotations(&tDeployment, &tRS, nextRevision, true, 5)
-			//Now the ReplicaSets Revision Annotation should be i+1
+			// Now the ReplicaSets Revision Annotation should be i+1
 
 			if i >= 12 {
 				expectedHistoryAnnotation := fmt.Sprintf("%d,%d", i-1, i)
@@ -1058,7 +1057,7 @@ func TestAnnotationUtils(t *testing.T) {
 		}
 	})
 
-	//Test Case 2:  Check if annotations are set properly
+	// Test Case 2:  Check if annotations are set properly
 	t.Run("SetReplicasAnnotations", func(t *testing.T) {
 		updated := SetReplicasAnnotations(&tRS, 10, 11)
 		if !updated {
@@ -1079,7 +1078,7 @@ func TestAnnotationUtils(t *testing.T) {
 		}
 	})
 
-	//Test Case 3:  Check if annotations reflect deployments state
+	// Test Case 3:  Check if annotations reflect deployments state
 	tRS.Annotations[DesiredReplicasAnnotation] = "1"
 	tRS.Status.AvailableReplicas = 1
 	tRS.Spec.Replicas = new(int32)
@@ -1091,11 +1090,10 @@ func TestAnnotationUtils(t *testing.T) {
 			t.Errorf("SetReplicasAnnotations Expected=true Obtained=false")
 		}
 	})
-	//Tear Down
+	// Tear Down
 }
 
 func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
-
 	desiredReplicas := fmt.Sprintf("%d", int32(10))
 	maxReplicas := fmt.Sprintf("%d", int32(20))
 
@@ -1246,5 +1244,4 @@ func TestGetDeploymentsForReplicaSet(t *testing.T) {
 			}
 		})
 	}
-
 }

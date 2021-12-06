@@ -86,8 +86,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
-type fakePDManager struct {
-}
+type fakePDManager struct{}
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.

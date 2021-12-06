@@ -25,8 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type unsupportedShaper struct {
-}
+type unsupportedShaper struct{}
 
 // NewTCShaper makes a new unsupportedShaper for the given interface
 func NewTCShaper(iface string) Shaper {

@@ -145,11 +145,12 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
-				{VolumeSource: api.VolumeSource{
-					Projected: &api.ProjectedVolumeSource{
-						Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}},
+				{
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}},
+						},
 					},
-				},
 				},
 			},
 		},
@@ -202,7 +203,7 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 					{ConfigMap: &api.ConfigMapProjection{LocalObjectReference: api.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []api.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
 					{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
 				},
-				DefaultMode: utilpointer.Int32(0644),
+				DefaultMode: utilpointer.Int32(0o644),
 			},
 		},
 	}}
@@ -290,7 +291,6 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
-
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	admit.SetExternalKubeInformerFactory(informerFactory)

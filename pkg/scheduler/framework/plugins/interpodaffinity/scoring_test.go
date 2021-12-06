@@ -33,14 +33,16 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
-var nsLabelT1 = map[string]string{"team": "team1"}
-var nsLabelT2 = map[string]string{"team": "team2"}
-var namespaces = []runtime.Object{
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team1", Labels: nsLabelT1}},
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team1", Labels: nsLabelT1}},
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team2", Labels: nsLabelT2}},
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team2", Labels: nsLabelT2}},
-}
+var (
+	nsLabelT1  = map[string]string{"team": "team1"}
+	nsLabelT2  = map[string]string{"team": "team2"}
+	namespaces = []runtime.Object{
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team1", Labels: nsLabelT1}},
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team1", Labels: nsLabelT1}},
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team2", Labels: nsLabelT2}},
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team2", Labels: nsLabelT2}},
+	}
+)
 
 func TestPreferredAffinity(t *testing.T) {
 	labelRgChina := map[string]string{
@@ -771,7 +773,6 @@ func TestPreferredAffinity(t *testing.T) {
 					t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
 				}
 			}
-
 		})
 	}
 }

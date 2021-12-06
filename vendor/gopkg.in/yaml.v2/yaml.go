@@ -304,8 +304,10 @@ type fieldInfo struct {
 	Inline []int
 }
 
-var structMap = make(map[reflect.Type]*structInfo)
-var fieldMapMutex sync.RWMutex
+var (
+	structMap     = make(map[reflect.Type]*structInfo)
+	fieldMapMutex sync.RWMutex
+)
 
 func getStructInfo(st reflect.Type) (*structInfo, error) {
 	fieldMapMutex.RLock()
@@ -383,7 +385,7 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 					fieldsList = append(fieldsList, finfo)
 				}
 			default:
-				//return nil, errors.New("Option ,inline needs a struct value or map field")
+				// return nil, errors.New("Option ,inline needs a struct value or map field")
 				return nil, errors.New("Option ,inline needs a struct value field")
 			}
 			continue

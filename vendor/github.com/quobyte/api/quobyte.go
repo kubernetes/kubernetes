@@ -158,15 +158,15 @@ func (client *QuobyteClient) GetClientList(tenant string) (GetClientListResponse
 func (client *QuobyteClient) SetVolumeQuota(volumeUUID string, quotaSize uint64) error {
 	request := &setQuotaRequest{
 		Quotas: []*quota{
-			&quota{
+			{
 				Consumer: []*consumingEntity{
-					&consumingEntity{
+					{
 						Type:       "VOLUME",
 						Identifier: volumeUUID,
 					},
 				},
 				Limits: []*resource{
-					&resource{
+					{
 						Type:  "LOGICAL_DISK_SPACE",
 						Value: quotaSize,
 					},
@@ -195,7 +195,6 @@ func (client *QuobyteClient) GetTenant(tenantIDs []string) (GetTenantResponse, e
 func (client *QuobyteClient) GetTenantMap() (map[string]string, error) {
 	result := map[string]string{}
 	response, err := client.GetTenant([]string{})
-
 	if err != nil {
 		return result, err
 	}

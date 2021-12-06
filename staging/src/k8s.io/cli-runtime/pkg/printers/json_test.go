@@ -116,7 +116,8 @@ func TestPrintersSuccess(t *testing.T) {
 			Subsets: []v1.EndpointSubset{{
 				Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
 				Ports:     []v1.EndpointPort{{Port: 8080}},
-			}}},
+			}},
+		},
 	}
 
 	// Test PrintObj() success.

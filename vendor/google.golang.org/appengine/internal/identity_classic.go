@@ -2,6 +2,7 @@
 // Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
 
+//go:build appengine
 // +build appengine
 
 package internal
@@ -44,6 +45,7 @@ func ModuleName(ctx netcontext.Context) string {
 	}
 	return appengine.ModuleName(c)
 }
+
 func VersionID(ctx netcontext.Context) string {
 	c := fromContext(ctx)
 	if c == nil {

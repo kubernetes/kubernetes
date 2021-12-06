@@ -30,9 +30,7 @@ import (
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 )
 
-var (
-	errObjectNotFlowSchema = errors.New("object is not a FlowSchema type")
-)
+var errObjectNotFlowSchema = errors.New("object is not a FlowSchema type")
 
 // FlowSchemaEnsurer ensures the specified bootstrap configuration objects
 type FlowSchemaEnsurer interface {

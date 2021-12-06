@@ -69,5 +69,4 @@ func initOptions() {
 		{Name: "aes", Feature: &ARM.HasAES},
 		{Name: "crc32", Feature: &ARM.HasCRC32},
 	}
-
 }

@@ -89,7 +89,6 @@ type Grabber struct {
 // support it. If disabled for a component, the corresponding Grab function
 // will immediately return an error derived from MetricsGrabbingDisabledError.
 func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
-
 	kubeScheduler := ""
 	kubeControllerManager := ""
 	snapshotControllerManager := ""

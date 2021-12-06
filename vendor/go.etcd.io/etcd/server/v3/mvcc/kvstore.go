@@ -50,8 +50,10 @@ const (
 	markTombstone     byte = 't'
 )
 
-var restoreChunkKeys = 10000 // non-const for testing
-var defaultCompactBatchLimit = 1000
+var (
+	restoreChunkKeys         = 10000 // non-const for testing
+	defaultCompactBatchLimit = 1000
+)
 
 type StoreConfig struct {
 	CompactionBatchLimit int
@@ -251,7 +253,7 @@ func (s *store) updateCompactRev(rev int64) (<-chan struct{}, error) {
 
 func (s *store) compact(trace *traceutil.Trace, rev int64) (<-chan struct{}, error) {
 	ch := make(chan struct{})
-	var j = func(ctx context.Context) {
+	j := func(ctx context.Context) {
 		if ctx.Err() != nil {
 			s.compactBarrier(ctx, ch)
 			return

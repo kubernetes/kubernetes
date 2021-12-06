@@ -117,7 +117,6 @@ func TestFixtures(t *testing.T) {
 			t.Logf("If the files are expected to be removed, re-run with %s=true to drop extra fixture files", updateEnvVar)
 		}
 	}
-
 }
 
 func testFixtureFile(t *testing.T, dir, name string, pod *corev1.Pod) string {
@@ -145,10 +144,10 @@ func testFixtureFile(t *testing.T, dir, name string, pod *corev1.Pod) string {
 		t.Errorf("fixture data does not match the test fixture in %s", filename)
 
 		if os.Getenv(updateEnvVar) == "true" {
-			if err := os.MkdirAll(dir, os.FileMode(0755)); err != nil {
+			if err := os.MkdirAll(dir, os.FileMode(0o755)); err != nil {
 				t.Fatal(err)
 			}
-			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
+			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0o755)); err == nil {
 				t.Logf("Updated data in %s", filename)
 				t.Logf("Verify the diff, commit changes, and rerun the tests")
 			} else {

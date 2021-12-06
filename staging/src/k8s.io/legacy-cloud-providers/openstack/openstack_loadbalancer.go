@@ -302,7 +302,7 @@ func popMember(members []v2pools.Member, addr string, port int) []v2pools.Member
 
 func getSecurityGroupName(service *v1.Service) string {
 	securityGroupName := fmt.Sprintf("lb-sg-%s-%s-%s", service.UID, service.Namespace, service.Name)
-	//OpenStack requires that the name of a security group is shorter than 255 bytes.
+	// OpenStack requires that the name of a security group is shorter than 255 bytes.
 	if len(securityGroupName) > 255 {
 		securityGroupName = securityGroupName[:255]
 	}
@@ -311,7 +311,6 @@ func getSecurityGroupName(service *v1.Service) string {
 }
 
 func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpts) ([]rules.SecGroupRule, error) {
-
 	pager := rules.List(client, opts)
 
 	var securityRules []rules.SecGroupRule
@@ -324,7 +323,6 @@ func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpt
 		securityRules = append(securityRules, ruleList...)
 		return true, nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +351,6 @@ func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient,
 		} else {
 			return false, nil
 		}
-
 	})
 
 	if err == wait.ErrWaitTimeout {
@@ -428,7 +425,6 @@ func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGrou
 	}
 
 	_, err := rules.Create(client, v4NodeSecGroupRuleCreateOpts).Extract()
-
 	if err != nil {
 		return err
 	}
@@ -522,17 +518,17 @@ func nodeAddressForLB(node *v1.Node) (string, error) {
 	return "", ErrNoAddressFound
 }
 
-//getStringFromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
+// getStringFromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
 func getStringFromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting string) string {
 	klog.V(4).Infof("getStringFromServiceAnnotation(%v, %v, %v)", service, annotationKey, defaultSetting)
 	if annotationValue, ok := service.Annotations[annotationKey]; ok {
-		//if there is an annotation for this setting, set the "setting" var to it
+		// if there is an annotation for this setting, set the "setting" var to it
 		// annotationValue can be empty, it is working as designed
 		// it makes possible for instance provisioning loadbalancer without floatingip
 		klog.V(4).Infof("Found a Service Annotation: %v = %v", annotationKey, annotationValue)
 		return annotationValue
 	}
-	//if there is no annotation, set "settings" var to the value from cloud config
+	// if there is no annotation, set "settings" var to the value from cloud config
 	klog.V(4).Infof("Could not find a Service Annotation; falling back on cloud-config setting: %v = %v", annotationKey, defaultSetting)
 	return defaultSetting
 }
@@ -1056,12 +1052,11 @@ func (lbaas *LbaasV2) ensureSecurityGroup(clusterName string, apiService *v1.Ser
 		}
 		lbSecGroupID = lbSecGroup.ID
 
-		//add rule in security group
+		// add rule in security group
 		for _, port := range ports {
 			for _, sourceRange := range sourceRanges.StringSlice() {
 				ethertype := rules.EtherType4
 				network, _, err := netutils.ParseCIDRSloppy(sourceRange)
-
 				if err != nil {
 					return fmt.Errorf("error parsing source range %s as a CIDR: %v", sourceRange, err)
 				}

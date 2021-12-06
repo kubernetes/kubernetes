@@ -22,8 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const GroupName = "apiserver.k8s.io"
-const ConfigGroupName = "apiserver.config.k8s.io"
+const (
+	GroupName       = "apiserver.k8s.io"
+	ConfigGroupName = "apiserver.config.k8s.io"
+)
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}

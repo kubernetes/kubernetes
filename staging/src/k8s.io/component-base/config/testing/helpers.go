@@ -94,10 +94,10 @@ func matchOutputFile(t *testing.T, actual []byte, expectedFilePath string) {
 	}
 	if needsUpdate {
 		if os.Getenv(updateEnvVar) == "true" {
-			if err := os.MkdirAll(filepath.Dir(expectedFilePath), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(expectedFilePath), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			if err := ioutil.WriteFile(expectedFilePath, actual, 0644); err != nil {
+			if err := ioutil.WriteFile(expectedFilePath, actual, 0o644); err != nil {
 				t.Fatal(err)
 			}
 			t.Error("wrote expected test data... verify, commit, and rerun tests")

@@ -408,7 +408,7 @@ func TestFieldValidation(t *testing.T) {
 // testFieldValidationPost tests POST requests containing unknown fields with
 // strict and non-strict field validation.
 func testFieldValidationPost(t *testing.T, client clientset.Interface) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		bodyBase               string
 		opts                   metav1.CreateOptions
@@ -553,7 +553,6 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -575,7 +574,7 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 		t.Fatalf("failed to create initial deployment: %v", err)
 	}
 
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.UpdateOptions
 		putBodyBase            string
@@ -721,7 +720,6 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -797,7 +795,7 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 	}
 }
 			`
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		patchType              types.PatchType
@@ -995,7 +993,6 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -1066,7 +1063,7 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 	}
 	`
 
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		body                   string
@@ -1205,7 +1202,6 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -1214,7 +1210,7 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 // testFieldValidationApplyCreate tests apply patch requests containing unknown fields
 // on newly created objects, with strict and non-strict field validation.
 func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		strictDecodingErrors   []string
@@ -1289,7 +1285,6 @@ func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -1298,7 +1293,7 @@ func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
 // testFieldValidationApplyUpdate tests apply patch requests containing unknown fields
 // on apply requests to existing objects, with strict and non-strict field validation.
 func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		strictDecodingErrors   []string
@@ -1384,7 +1379,6 @@ func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -1393,7 +1387,7 @@ func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
 // testFieldValidationPostCRD tests that server-side schema validation
 // works for CRD create requests for CRDs with schemas
 func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		body                   string
@@ -1539,7 +1533,6 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -1549,7 +1542,7 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 // works for CRD create requests for CRDs that have schemas
 // with x-kubernetes-preserve-unknown-field set
 func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		body                   string
@@ -1650,7 +1643,6 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			kind := gvk.Kind
 			apiVersion := gvk.Group + "/" + gvk.Version
 
@@ -1692,7 +1684,6 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -1701,7 +1692,7 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 // testFieldValidationPutCRD tests that server-side schema validation
 // works for CRD update requests for CRDs with schemas.
 func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		putBody                string
@@ -1859,7 +1850,6 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -1869,7 +1859,7 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 // works for CRD update requests for CRDs that have schemas
 // with x-kubernetes-preserve-unknown-field set
 func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		putBody                string
@@ -2023,7 +2013,6 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -2082,7 +2071,7 @@ spec:
 				{"op": "add", "path": "/spec/ports/0/unknownNested", "value": "val"}
 			]
 			`
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		patchType              types.PatchType
 		opts                   metav1.PatchOptions
@@ -2256,7 +2245,6 @@ spec:
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -2302,7 +2290,7 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 				{"op": "add", "path": "/spec/ports/0/unknownNested", "value": "val"}
 			]
 			`
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		patchType              types.PatchType
 		opts                   metav1.PatchOptions
@@ -2461,7 +2449,6 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -2472,7 +2459,7 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
 func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		strictDecodingErrors   []string
@@ -2552,7 +2539,6 @@ func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk sc
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -2564,7 +2550,7 @@ func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk sc
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
 func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		strictDecodingErrors   []string
@@ -2644,7 +2630,6 @@ func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interfa
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -2655,7 +2640,7 @@ func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interfa
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
 func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		strictDecodingErrors   []string
@@ -2745,7 +2730,6 @@ func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk sc
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -2757,7 +2741,7 @@ func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk sc
 // Note that even prior to server-side validation, unknown fields were treated as
 // errors in apply-patch and are not tested here.
 func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
-	var testcases = []struct {
+	testcases := []struct {
 		name                   string
 		opts                   metav1.PatchOptions
 		strictDecodingErrors   []string
@@ -2847,7 +2831,6 @@ func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interfa
 				if strictWarn != result.Warnings()[i].Text {
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
-
 			}
 		})
 	}
@@ -2881,7 +2864,7 @@ func setupCRD(t *testing.T, config *rest.Config, apiGroup string, schemaless boo
 	if err != nil {
 		t.Fatal(err)
 	}
-	//crd.Spec.PreserveUnknownFields = false
+	// crd.Spec.PreserveUnknownFields = false
 	for i := range crd.Spec.Versions {
 		crd.Spec.Versions[i].Schema = &c
 	}

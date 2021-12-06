@@ -86,13 +86,15 @@ const (
 	gceComputeAPIEndpointBeta = "https://www.googleapis.com/compute/beta/"
 )
 
-var _ cloudprovider.Interface = (*Cloud)(nil)
-var _ cloudprovider.Instances = (*Cloud)(nil)
-var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
-var _ cloudprovider.Routes = (*Cloud)(nil)
-var _ cloudprovider.Zones = (*Cloud)(nil)
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
-var _ cloudprovider.Clusters = (*Cloud)(nil)
+var (
+	_ cloudprovider.Interface    = (*Cloud)(nil)
+	_ cloudprovider.Instances    = (*Cloud)(nil)
+	_ cloudprovider.LoadBalancer = (*Cloud)(nil)
+	_ cloudprovider.Routes       = (*Cloud)(nil)
+	_ cloudprovider.Zones        = (*Cloud)(nil)
+	_ cloudprovider.PVLabeler    = (*Cloud)(nil)
+	_ cloudprovider.Clusters     = (*Cloud)(nil)
+)
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type Cloud struct {
@@ -893,7 +895,7 @@ func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string
 	// listCall = listCall.Filter("region eq " + region)
 
 	var zones []string
-	var accumulator = func(response *compute.ZoneList) error {
+	accumulator := func(response *compute.ZoneList) error {
 		for _, zone := range response.Items {
 			regionName := lastComponent(zone.Region)
 			if regionName == region {

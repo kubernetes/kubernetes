@@ -23,7 +23,7 @@ import (
 )
 
 func TestGetControlPlaneEndpoint(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		cfg              *kubeadmapi.InitConfiguration
 		expectedEndpoint string
@@ -76,7 +76,6 @@ func TestGetControlPlaneEndpoint(t *testing.T) {
 					AdvertiseAddress: "4.5.6.7",
 				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-
 					ControlPlaneEndpoint: "cp.k8s.io",
 				},
 			},
@@ -103,7 +102,6 @@ func TestGetControlPlaneEndpoint(t *testing.T) {
 					AdvertiseAddress: "4.5.6.7",
 				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-
 					ControlPlaneEndpoint: "2001:db8::1",
 				},
 			},
@@ -216,8 +214,7 @@ func TestGetControlPlaneEndpoint(t *testing.T) {
 }
 
 func TestParseHostPort(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		hostport      string
 		expectedHost  string
@@ -342,8 +339,7 @@ func TestParseHostPort(t *testing.T) {
 }
 
 func TestParsePort(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		port          string
 		expectedPort  int

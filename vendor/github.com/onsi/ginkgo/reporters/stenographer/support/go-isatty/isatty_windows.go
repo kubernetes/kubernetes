@@ -1,5 +1,5 @@
-// +build windows
-// +build !appengine
+//go:build windows && !appengine
+// +build windows,!appengine
 
 package isatty
 
@@ -8,8 +8,10 @@ import (
 	"unsafe"
 )
 
-var kernel32 = syscall.NewLazyDLL("kernel32.dll")
-var procGetConsoleMode = kernel32.NewProc("GetConsoleMode")
+var (
+	kernel32           = syscall.NewLazyDLL("kernel32.dll")
+	procGetConsoleMode = kernel32.NewProc("GetConsoleMode")
+)
 
 // IsTerminal return true if the file descriptor is terminal.
 func IsTerminal(fd uintptr) bool {

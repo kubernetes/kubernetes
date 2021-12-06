@@ -202,7 +202,6 @@ func isData(frameType int) bool {
 
 var validReceivedCloseCodes = map[int]bool{
 	// see http://www.iana.org/assignments/websocket/websocket.xhtml#close-code-number
-
 	CloseNormalClosure:           true,
 	CloseGoingAway:               true,
 	CloseProtocolError:           true,
@@ -282,7 +281,6 @@ type Conn struct {
 }
 
 func newConn(conn net.Conn, isServer bool, readBufferSize, writeBufferSize int, writeBufferPool BufferPool, br *bufio.Reader, writeBuf []byte) *Conn {
-
 	if br == nil {
 		if readBufferSize == 0 {
 			readBufferSize = defaultReadBufferSize
@@ -749,7 +747,6 @@ func (c *Conn) WritePreparedMessage(pm *PreparedMessage) error {
 // WriteMessage is a helper method for getting a writer using NextWriter,
 // writing the message and closing the writer.
 func (c *Conn) WriteMessage(messageType int, data []byte) error {
-
 	if c.isServer && (c.newCompressionWriter == nil || !c.enableWriteCompression) {
 		// Fast path with no allocations and single frame.
 

@@ -91,7 +91,7 @@ func init() {
 
 func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(socketDir))
-	os.MkdirAll(socketDir, 0755)
+	os.MkdirAll(socketDir, 0o755)
 }
 
 func waitForRegistration(t *testing.T, fakePluginHandler *fakePluginHandler, pluginName string) {

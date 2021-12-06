@@ -259,7 +259,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 			if newCfgPath == "" {
 				fmt.Fprint(out, string(outputBytes))
 			} else {
-				if err := ioutil.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
+				if err := ioutil.WriteFile(newCfgPath, outputBytes, 0o644); err != nil {
 					return errors.Wrapf(err, "failed to write the new configuration to the file %q", newCfgPath)
 				}
 			}

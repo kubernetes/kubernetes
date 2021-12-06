@@ -15,14 +15,16 @@ import (
 	"github.com/onsi/ginkgo/types"
 )
 
-const defaultStyle = "\x1b[0m"
-const boldStyle = "\x1b[1m"
-const redColor = "\x1b[91m"
-const greenColor = "\x1b[32m"
-const yellowColor = "\x1b[33m"
-const cyanColor = "\x1b[36m"
-const grayColor = "\x1b[90m"
-const lightGrayColor = "\x1b[37m"
+const (
+	defaultStyle   = "\x1b[0m"
+	boldStyle      = "\x1b[1m"
+	redColor       = "\x1b[91m"
+	greenColor     = "\x1b[32m"
+	yellowColor    = "\x1b[33m"
+	cyanColor      = "\x1b[36m"
+	grayColor      = "\x1b[90m"
+	lightGrayColor = "\x1b[37m"
+)
 
 type cursorStateType int
 
@@ -40,24 +42,18 @@ type Stenographer interface {
 	AnnounceTotalNumberOfSpecs(total int, succinct bool)
 	AnnounceNumberOfSpecs(specsToRun int, total int, succinct bool)
 	AnnounceSpecRunCompletion(summary *types.SuiteSummary, succinct bool)
-
 	AnnounceSpecWillRun(spec *types.SpecSummary)
 	AnnounceBeforeSuiteFailure(summary *types.SetupSummary, succinct bool, fullTrace bool)
 	AnnounceAfterSuiteFailure(summary *types.SetupSummary, succinct bool, fullTrace bool)
-
 	AnnounceCapturedOutput(output string)
-
 	AnnounceSuccessfulSpec(spec *types.SpecSummary)
 	AnnounceSuccessfulSlowSpec(spec *types.SpecSummary, succinct bool)
 	AnnounceSuccessfulMeasurement(spec *types.SpecSummary, succinct bool)
-
 	AnnouncePendingSpec(spec *types.SpecSummary, noisy bool)
 	AnnounceSkippedSpec(spec *types.SpecSummary, succinct bool, fullTrace bool)
-
 	AnnounceSpecTimedOut(spec *types.SpecSummary, succinct bool, fullTrace bool)
 	AnnounceSpecPanicked(spec *types.SpecSummary, succinct bool, fullTrace bool)
 	AnnounceSpecFailed(spec *types.SpecSummary, succinct bool, fullTrace bool)
-
 	SummarizeFailures(summaries []*types.SpecSummary)
 }
 

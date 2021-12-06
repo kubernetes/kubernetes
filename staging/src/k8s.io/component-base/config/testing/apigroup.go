@@ -160,7 +160,6 @@ func verifyCorrectGroupNameFunc(_ *runtime.Scheme, pkginfo *ComponentConfigPacka
 	desiredGroupName := fmt.Sprintf("%s.config.k8s.io", lowercaseWithoutDashes(pkginfo.ComponentName))
 	if pkginfo.SchemeGroupVersion.Group != desiredGroupName {
 		return fmt.Errorf("got GroupName %q, want %q", pkginfo.SchemeGroupVersion.Group, desiredGroupName)
-
 	}
 	return nil
 }

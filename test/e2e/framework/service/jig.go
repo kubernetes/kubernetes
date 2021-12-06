@@ -355,7 +355,7 @@ func (j *TestJig) WaitForEndpointOnNode(nodeName string) error {
 
 // waitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
 func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
-	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
+	// Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
 	endpointSelector := fields.OneTermEqualSelector("metadata.name", j.Name)
 	stopCh := make(chan struct{})
 	endpointAvailable := false

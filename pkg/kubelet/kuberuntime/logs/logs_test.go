@@ -20,11 +20,12 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
-	apitesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/utils/pointer"
 	"os"
 	"testing"
 	"time"
+
+	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 
@@ -136,7 +137,7 @@ func TestReadLogs(t *testing.T) {
 		{
 			name: "using SinceTime should output lines with a time on or after the specified time",
 			podLogOptions: v1.PodLogOptions{
-				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
+				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 0o2, 0, time.UTC)},
 			},
 			expected: "line2\nline3\n",
 		},
@@ -166,7 +167,7 @@ func TestReadLogs(t *testing.T) {
 			name: "using follow combined with SinceTime should output lines with a time on or after the specified time",
 			podLogOptions: v1.PodLogOptions{
 				Follow:    true,
-				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
+				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 0o2, 0, time.UTC)},
 			},
 			expected: "line2\nline3\n",
 		},

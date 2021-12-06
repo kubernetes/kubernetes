@@ -296,8 +296,7 @@ outer:
 			}
 
 			// While submatrix unfinished take a good dqds step.
-			i0, n0, pp, dmin, sigma, desig, qmax, nFail, iter, nDiv, ttype, dmin1, dmin2, dn, dn1, dn2, g, tau =
-				impl.Dlasq3(i0, n0, z, pp, dmin, sigma, desig, qmax, nFail, iter, nDiv, ttype, dmin1, dmin2, dn, dn1, dn2, g, tau)
+			i0, n0, pp, dmin, sigma, desig, qmax, nFail, iter, nDiv, ttype, dmin1, dmin2, dn, dn1, dn2, g, tau = impl.Dlasq3(i0, n0, z, pp, dmin, sigma, desig, qmax, nFail, iter, nDiv, ttype, dmin1, dmin2, dn, dn1, dn2, g, tau)
 
 			pp = 1 - pp
 			// When emin is very small check for splits.

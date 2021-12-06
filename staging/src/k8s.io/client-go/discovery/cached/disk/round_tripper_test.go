@@ -137,9 +137,9 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 			return err
 		}
 		if info.IsDir() {
-			assert.Equal(os.FileMode(0750), info.Mode().Perm())
+			assert.Equal(os.FileMode(0o750), info.Mode().Perm())
 		} else {
-			assert.Equal(os.FileMode(0660), info.Mode().Perm())
+			assert.Equal(os.FileMode(0o660), info.Mode().Perm())
 		}
 		return nil
 	})

@@ -123,7 +123,6 @@ func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *LeaderElec
 		r.RenewTime = metav1.Time{spec.RenewTime.Time}
 	}
 	return &r
-
 }
 
 func LeaderElectionRecordToLeaseSpec(ler *LeaderElectionRecord) coordinationv1.LeaseSpec {

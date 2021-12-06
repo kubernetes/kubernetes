@@ -29,9 +29,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
 
-var (
-	procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
-)
+var procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
 
 // Client is an interface that is used to get stats information.
 type Client interface {

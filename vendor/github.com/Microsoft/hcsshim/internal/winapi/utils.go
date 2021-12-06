@@ -26,7 +26,7 @@ type UnicodeString struct {
 	Buffer        *uint16
 }
 
-//String converts a UnicodeString to a golang string
+// String converts a UnicodeString to a golang string
 func (uni UnicodeString) String() string {
 	// UnicodeString is not guaranteed to be null terminated, therefore
 	// use the UnicodeString's Length field

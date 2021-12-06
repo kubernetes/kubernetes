@@ -88,8 +88,10 @@ func DateTimeProperty() *Schema {
 
 // MapProperty creates a map property
 func MapProperty(property *Schema) *Schema {
-	return &Schema{SchemaProps: SchemaProps{Type: []string{"object"},
-		AdditionalProperties: &SchemaOrBool{Allows: true, Schema: property}}}
+	return &Schema{SchemaProps: SchemaProps{
+		Type:                 []string{"object"},
+		AdditionalProperties: &SchemaOrBool{Allows: true, Schema: property},
+	}}
 }
 
 // RefProperty creates a ref property

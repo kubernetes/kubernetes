@@ -205,7 +205,6 @@ type Client interface {
 
 	// GetVersion retrieves the current etcd server and cluster version
 	GetVersion(ctx context.Context) (*version.Versions, error)
-
 	httpClient
 }
 

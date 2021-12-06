@@ -248,8 +248,8 @@ func newTestableController(config TestableConfig) *configController {
 			name, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			klog.V(7).Infof("Triggered API priority and fairness config reloading in %s due to deletion of PLC %s", cfgCtlr.name, name)
 			cfgCtlr.configQueue.Add(0)
-
-		}})
+		},
+	})
 	fsi.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			fs := obj.(*flowcontrol.FlowSchema)
@@ -286,8 +286,8 @@ func newTestableController(config TestableConfig) *configController {
 			name, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			klog.V(7).Infof("Triggered API priority and fairness config reloading in %s due to deletion of FS %s", cfgCtlr.name, name)
 			cfgCtlr.configQueue.Add(0)
-
-		}})
+		},
+	})
 	return cfgCtlr
 }
 
@@ -710,7 +710,8 @@ func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flow
 	qcAPI := pl.Spec.Limited.LimitResponse.Queuing
 	qcQS := fq.QueuingConfig{Name: pl.Name}
 	if qcAPI != nil {
-		qcQS = fq.QueuingConfig{Name: pl.Name,
+		qcQS = fq.QueuingConfig{
+			Name:             pl.Name,
 			DesiredNumQueues: int(qcAPI.Queues),
 			QueueLengthLimit: int(qcAPI.QueueLengthLimit),
 			HandSize:         int(qcAPI.HandSize),
@@ -760,7 +761,8 @@ func (meal *cfgMeal) presyncFlowSchemaStatus(fs *flowcontrol.FlowSchema, isDangl
 			Reason:             desiredReason,
 			Message:            desiredMessage,
 		},
-		oldValue: *danglingCondition})
+		oldValue: *danglingCondition,
+	})
 }
 
 // imaginePL adds a priority level based on one of the mandatory ones
@@ -906,7 +908,7 @@ func computeFlowDistinguisher(rd RequestDigest, method *flowcontrol.FlowDistingu
 
 func hashFlowID(fsName, fDistinguisher string) uint64 {
 	hash := sha256.New()
-	var sep = [1]byte{0}
+	sep := [1]byte{0}
 	hash.Write([]byte(fsName))
 	hash.Write(sep[:])
 	hash.Write([]byte(fDistinguisher))

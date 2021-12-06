@@ -109,7 +109,7 @@ func (h *valueHelper) asInt64(val interface{}) int64 {
 	case reflect.Float32, reflect.Float64:
 		return int64(v.Float())
 	default:
-		//panic("Non numeric value in asInt64()")
+		// panic("Non numeric value in asInt64()")
 		return 0
 	}
 }
@@ -126,7 +126,7 @@ func (h *valueHelper) asUint64(val interface{}) uint64 {
 	case reflect.Float32, reflect.Float64:
 		return uint64(v.Float())
 	default:
-		//panic("Non numeric value in asUint64()")
+		// panic("Non numeric value in asUint64()")
 		return 0
 	}
 }
@@ -144,7 +144,7 @@ func (h *valueHelper) asFloat64(val interface{}) float64 {
 	case reflect.Float32, reflect.Float64:
 		return v.Float()
 	default:
-		//panic("Non numeric value in asFloat64()")
+		// panic("Non numeric value in asFloat64()")
 		return 0
 	}
 }

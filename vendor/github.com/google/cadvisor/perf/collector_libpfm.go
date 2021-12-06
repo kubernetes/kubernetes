@@ -239,7 +239,6 @@ func (c *collector) createLeaderFileDescriptors(events []Event, cgroupFd int, gr
 			config, err := c.createConfigFromEvent(event)
 			if err != nil {
 				return nil, fmt.Errorf("cannot create config from perf event: %v", err)
-
 			}
 			leaderFileDescriptors, err = c.registerEvent(eventInfo{string(event), config, cgroupFd, groupIndex, isGroupLeader}, leaderFileDescriptors)
 			if err != nil {

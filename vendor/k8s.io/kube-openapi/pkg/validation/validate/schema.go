@@ -25,10 +25,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
-var (
-	specSchemaType = reflect.TypeOf(&spec.Schema{})
-	//specItemsType     = reflect.TypeOf(&spec.Items{})
-)
+var specSchemaType = reflect.TypeOf(&spec.Schema{}) // specItemsType     = reflect.TypeOf(&spec.Items{})
 
 // SchemaValidator validates data against a JSON schema
 type SchemaValidator struct {
@@ -74,7 +71,8 @@ func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string
 		Schema:       schema,
 		Root:         rootSchema,
 		KnownFormats: formats,
-		Options:      SchemaValidatorOptions{}}
+		Options:      SchemaValidatorOptions{},
+	}
 	for _, o := range options {
 		o(&s.Options)
 	}

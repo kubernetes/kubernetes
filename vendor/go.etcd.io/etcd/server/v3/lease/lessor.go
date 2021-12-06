@@ -83,7 +83,6 @@ type Lessor interface {
 	// Lessor deletes the items in the revoked or expired lease by creating
 	// new TxnDeletes.
 	SetRangeDeleter(rd RangeDeleter)
-
 	SetCheckpointer(cp Checkpointer)
 
 	// Grant grants a lease that expires at least after TTL seconds.

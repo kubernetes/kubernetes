@@ -1000,7 +1000,7 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 		p.P(`}`)
 		p.P()
 
-		//Generate MarshalTo methods for oneof fields
+		// Generate MarshalTo methods for oneof fields
 		m := proto.Clone(message.DescriptorProto).(*descriptor.DescriptorProto)
 		for _, field := range m.Field {
 			oneof := field.OneofIndex != nil
@@ -1047,7 +1047,6 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 		p.Out()
 		p.P(`}`)
 	}
-
 }
 
 func (p *marshalto) reverseListRange(expression ...string) string {

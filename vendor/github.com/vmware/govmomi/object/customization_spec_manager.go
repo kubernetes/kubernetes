@@ -43,7 +43,6 @@ func (cs CustomizationSpecManager) DoesCustomizationSpecExist(ctx context.Contex
 	}
 
 	res, err := methods.DoesCustomizationSpecExist(ctx, cs.c, &req)
-
 	if err != nil {
 		return false, err
 	}
@@ -58,7 +57,6 @@ func (cs CustomizationSpecManager) GetCustomizationSpec(ctx context.Context, nam
 	}
 
 	res, err := methods.GetCustomizationSpec(ctx, cs.c, &req)
-
 	if err != nil {
 		return nil, err
 	}

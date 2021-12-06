@@ -1532,8 +1532,7 @@ var htmlEntity = map[string]string{
 			,x v/^\&lt;!ENTITY/d
 			,s/\&lt;!ENTITY ([^ ]+) .*U\+([0-9A-F][0-9A-F][0-9A-F][0-9A-F]) .+/	"\1": "\\u\2",/g
 		'
-	*/
-	"nbsp":     "\u00A0",
+	*/ "nbsp":  "\u00A0",
 	"iexcl":    "\u00A1",
 	"cent":     "\u00A2",
 	"pound":    "\u00A3",
@@ -1795,8 +1794,7 @@ var htmlAutoClose = []string{
 	/*
 		hget http://www.w3.org/TR/html4/loose.dtd |
 		9 sed -n 's/<!ELEMENT ([^ ]*) +- O EMPTY.+/	"\1",/p' | tr A-Z a-z
-	*/
-	"basefont",
+	*/ "basefont",
 	"br",
 	"area",
 	"link",

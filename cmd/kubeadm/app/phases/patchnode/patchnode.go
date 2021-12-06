@@ -27,7 +27,6 @@ import (
 
 // AnnotateCRISocket annotates the node with the given crisocket
 func AnnotateCRISocket(client clientset.Interface, nodeName string, criSocket string) error {
-
 	klog.V(1).Infof("[patchnode] Uploading the CRI Socket information %q to the Node API object %q as an annotation\n", criSocket, nodeName)
 
 	return apiclient.PatchNode(client, nodeName, func(n *v1.Node) {

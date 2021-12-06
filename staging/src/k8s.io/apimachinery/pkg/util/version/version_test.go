@@ -276,8 +276,7 @@ func TestBadGenericVersions(t *testing.T) {
 }
 
 func TestComponents(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		version               string
 		semver                bool
 		expectedComponents    []uint

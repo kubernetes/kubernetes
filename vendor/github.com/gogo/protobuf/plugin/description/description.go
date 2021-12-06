@@ -79,6 +79,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/proto"
 	descriptor "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
@@ -133,7 +134,7 @@ func (p *plugin) Generate(file *generator.FileDescriptor) {
 
 		p.P(`func `, localName, `Description() (desc *`, descriptorPkg.Use(), `.FileDescriptorSet) {`)
 		p.In()
-		//Don't generate SourceCodeInfo, since it will create too much code.
+		// Don't generate SourceCodeInfo, since it will create too much code.
 
 		ss := make([]*descriptor.SourceCodeInfo, 0)
 		for _, f := range p.Generator.AllFiles().GetFile() {

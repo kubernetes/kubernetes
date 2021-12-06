@@ -202,7 +202,6 @@ func (f *TextFormatter) Format(entry *Entry) ([]byte, error) {
 	if f.isColored() {
 		f.printColored(b, entry, keys, data, timestampFormat)
 	} else {
-
 		for _, key := range fixedKeys {
 			var value interface{}
 			switch {

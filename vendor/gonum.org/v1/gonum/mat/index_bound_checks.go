@@ -4,6 +4,7 @@
 
 // This file must be kept in sync with index_no_bound_checks.go.
 
+//go:build bounds
 // +build bounds
 
 package mat

@@ -18,6 +18,7 @@ package schema
 
 import (
 	"fmt"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
 

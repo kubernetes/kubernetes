@@ -85,7 +85,7 @@ func (util *DiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) er
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+			if err := os.MkdirAll(globalPDPath, 0o750); err != nil {
 				return err
 			}
 			notmnt = true
@@ -272,7 +272,7 @@ func scsiHostRescan() {
 		for _, f := range dirs {
 			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
-			ioutil.WriteFile(name, data, 0666)
+			ioutil.WriteFile(name, data, 0o666)
 		}
 	}
 }

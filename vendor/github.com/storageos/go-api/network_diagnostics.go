@@ -8,11 +8,9 @@ import (
 	"github.com/storageos/go-api/types"
 )
 
-var (
-	// NetworkDiagnosticsAPIPrefix is a partial path to the HTTP endpoint for
-	// the node connectivity diagnostics report.
-	NetworkDiagnosticsAPIPrefix = "diagnostics/network"
-)
+// NetworkDiagnosticsAPIPrefix is a partial path to the HTTP endpoint for
+// the node connectivity diagnostics report.
+var NetworkDiagnosticsAPIPrefix = "diagnostics/network"
 
 // NetworkDiagnostics returns a collection of network connectivity reports.  If
 // a reference to a node is given, it will only check connectivity from that

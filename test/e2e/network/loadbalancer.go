@@ -67,7 +67,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			framework.Logf("cleaning load balancer resource for %s", lb)
 			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
-		//reset serviceLBNames
+		// reset serviceLBNames
 		serviceLBNames = []string{}
 	})
 
@@ -871,7 +871,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 			framework.Logf("cleaning load balancer resource for %s", lb)
 			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
-		//reset serviceLBNames
+		// reset serviceLBNames
 		serviceLBNames = []string{}
 	})
 
@@ -971,7 +971,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 					svc.Spec.Ports[0].TargetPort = intstr.FromInt(int(svc.Spec.Ports[0].Port))
 					svc.Spec.Ports[0].Port = 8081
 				}
-
 			})
 		framework.ExpectNoError(err)
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))

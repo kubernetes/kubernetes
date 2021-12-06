@@ -256,7 +256,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	}
 
 	socketPath := filepath.Join(m.socketdir, m.socketname)
-	if err = os.MkdirAll(m.socketdir, 0750); err != nil {
+	if err = os.MkdirAll(m.socketdir, 0o750); err != nil {
 		return err
 	}
 	if selinux.SELinuxEnabled() {
@@ -529,8 +529,8 @@ func (m *ManagerImpl) markResourceUnhealthy(resourceName string) {
 // requiring device plugin resources will not be scheduled till device plugin re-registers.
 func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string) {
 	needsUpdateCheckpoint := false
-	var capacity = v1.ResourceList{}
-	var allocatable = v1.ResourceList{}
+	capacity := v1.ResourceList{}
+	allocatable := v1.ResourceList{}
 	deletedResources := sets.NewString()
 	m.mutex.Lock()
 	for resourceName, devices := range m.healthyDevices {

@@ -211,6 +211,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 		}
 	}
 }
+
 func TestHandles(t *testing.T) {
 	handler := NewInterPodAntiAffinity()
 	tests := map[admission.Operation]bool{

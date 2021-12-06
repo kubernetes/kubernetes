@@ -57,8 +57,10 @@ func fieldFold(v reflect.Value, name string) (reflect.Value, tag) {
 
 type setter func(destp interface{}, blank bool, val string, t tag) error
 
-var errUnsupportedType = fmt.Errorf("unsupported type")
-var errBlankUnsupported = fmt.Errorf("blank value not supported for type")
+var (
+	errUnsupportedType  = fmt.Errorf("unsupported type")
+	errBlankUnsupported = fmt.Errorf("blank value not supported for type")
+)
 
 var setters = []setter{
 	typeSetter, textUnmarshalerSetter, kindSetter, scanSetter,

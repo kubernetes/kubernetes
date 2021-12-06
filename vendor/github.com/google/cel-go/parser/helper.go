@@ -44,7 +44,8 @@ func (p *parserHelper) getSourceInfo() *exprpb.SourceInfo {
 		Location:    p.source.Description(),
 		Positions:   p.positions,
 		LineOffsets: p.source.LineOffsets(),
-		MacroCalls:  p.macroCalls}
+		MacroCalls:  p.macroCalls,
+	}
 }
 
 func (p *parserHelper) newLiteral(ctx interface{}, value *exprpb.Constant) *exprpb.Expr {
@@ -91,42 +92,48 @@ func (p *parserHelper) newIdent(ctx interface{}, name string) *exprpb.Expr {
 func (p *parserHelper) newSelect(ctx interface{}, operand *exprpb.Expr, field string) *exprpb.Expr {
 	exprNode := p.newExpr(ctx)
 	exprNode.ExprKind = &exprpb.Expr_SelectExpr{
-		SelectExpr: &exprpb.Expr_Select{Operand: operand, Field: field}}
+		SelectExpr: &exprpb.Expr_Select{Operand: operand, Field: field},
+	}
 	return exprNode
 }
 
 func (p *parserHelper) newPresenceTest(ctx interface{}, operand *exprpb.Expr, field string) *exprpb.Expr {
 	exprNode := p.newExpr(ctx)
 	exprNode.ExprKind = &exprpb.Expr_SelectExpr{
-		SelectExpr: &exprpb.Expr_Select{Operand: operand, Field: field, TestOnly: true}}
+		SelectExpr: &exprpb.Expr_Select{Operand: operand, Field: field, TestOnly: true},
+	}
 	return exprNode
 }
 
 func (p *parserHelper) newGlobalCall(ctx interface{}, function string, args ...*exprpb.Expr) *exprpb.Expr {
 	exprNode := p.newExpr(ctx)
 	exprNode.ExprKind = &exprpb.Expr_CallExpr{
-		CallExpr: &exprpb.Expr_Call{Function: function, Args: args}}
+		CallExpr: &exprpb.Expr_Call{Function: function, Args: args},
+	}
 	return exprNode
 }
 
 func (p *parserHelper) newReceiverCall(ctx interface{}, function string, target *exprpb.Expr, args ...*exprpb.Expr) *exprpb.Expr {
 	exprNode := p.newExpr(ctx)
 	exprNode.ExprKind = &exprpb.Expr_CallExpr{
-		CallExpr: &exprpb.Expr_Call{Function: function, Target: target, Args: args}}
+		CallExpr: &exprpb.Expr_Call{Function: function, Target: target, Args: args},
+	}
 	return exprNode
 }
 
 func (p *parserHelper) newList(ctx interface{}, elements ...*exprpb.Expr) *exprpb.Expr {
 	exprNode := p.newExpr(ctx)
 	exprNode.ExprKind = &exprpb.Expr_ListExpr{
-		ListExpr: &exprpb.Expr_CreateList{Elements: elements}}
+		ListExpr: &exprpb.Expr_CreateList{Elements: elements},
+	}
 	return exprNode
 }
 
 func (p *parserHelper) newMap(ctx interface{}, entries ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr {
 	exprNode := p.newExpr(ctx)
 	exprNode.ExprKind = &exprpb.Expr_StructExpr{
-		StructExpr: &exprpb.Expr_CreateStruct{Entries: entries}}
+		StructExpr: &exprpb.Expr_CreateStruct{Entries: entries},
+	}
 	return exprNode
 }
 
@@ -134,7 +141,8 @@ func (p *parserHelper) newMapEntry(entryID int64, key *exprpb.Expr, value *exprp
 	return &exprpb.Expr_CreateStruct_Entry{
 		Id:      entryID,
 		KeyKind: &exprpb.Expr_CreateStruct_Entry_MapKey{MapKey: key},
-		Value:   value}
+		Value:   value,
+	}
 }
 
 func (p *parserHelper) newObject(ctx interface{},
@@ -144,7 +152,9 @@ func (p *parserHelper) newObject(ctx interface{},
 	exprNode.ExprKind = &exprpb.Expr_StructExpr{
 		StructExpr: &exprpb.Expr_CreateStruct{
 			MessageName: typeName,
-			Entries:     entries}}
+			Entries:     entries,
+		},
+	}
 	return exprNode
 }
 
@@ -152,7 +162,8 @@ func (p *parserHelper) newObjectField(fieldID int64, field string, value *exprpb
 	return &exprpb.Expr_CreateStruct_Entry{
 		Id:      fieldID,
 		KeyKind: &exprpb.Expr_CreateStruct_Entry_FieldKey{FieldKey: field},
-		Value:   value}
+		Value:   value,
+	}
 }
 
 func (p *parserHelper) newComprehension(ctx interface{}, iterVar string,
@@ -171,7 +182,9 @@ func (p *parserHelper) newComprehension(ctx interface{}, iterVar string,
 			IterRange:     iterRange,
 			LoopCondition: condition,
 			LoopStep:      step,
-			Result:        result}}
+			Result:        result,
+		},
+	}
 	return exprNode
 }
 
@@ -447,11 +460,9 @@ func (e *exprHelper) OffsetLocation(exprID int64) common.Location {
 	return location
 }
 
-var (
-	// Thread-safe pool of ExprHelper values to minimize alloc overhead of ExprHelper creations.
-	exprHelperPool = &sync.Pool{
-		New: func() interface{} {
-			return &exprHelper{}
-		},
-	}
-)
+// Thread-safe pool of ExprHelper values to minimize alloc overhead of ExprHelper creations.
+var exprHelperPool = &sync.Pool{
+	New: func() interface{} {
+		return &exprHelper{}
+	},
+}

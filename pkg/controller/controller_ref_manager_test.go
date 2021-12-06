@@ -68,7 +68,7 @@ func TestClaimPods(t *testing.T) {
 		claimed []*v1.Pod
 		patches int
 	}
-	var tests = []test{
+	tests := []test{
 		func() test {
 			controller := v1.ReplicationController{}
 			controller.Namespace = metav1.NamespaceDefault

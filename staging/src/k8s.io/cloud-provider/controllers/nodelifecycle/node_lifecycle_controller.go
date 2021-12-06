@@ -68,8 +68,8 @@ func NewCloudNodeLifecycleController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
-	nodeMonitorPeriod time.Duration) (*CloudNodeLifecycleController, error) {
-
+	nodeMonitorPeriod time.Duration) (*CloudNodeLifecycleController, error,
+) {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
 	eventBroadcaster.StartStructuredLogging(0)

@@ -25,9 +25,7 @@ import (
 	"github.com/blang/semver"
 )
 
-var (
-	latestVersion = semver.MustParse("3.1.12")
-)
+var latestVersion = semver.MustParse("3.1.12")
 
 func TestExistingDataDirWithVersionFile(t *testing.T) {
 	d, err := OpenOrCreateDataDirectory("testdata/datadir_with_version")
@@ -160,7 +158,7 @@ func newTestPath(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Failed to create tmp dir for test: %v", err)
 	}
-	err = os.Chmod(path, 0777)
+	err = os.Chmod(path, 0o777)
 	if err != nil {
 		t.Fatalf("Failed to granting permission to tmp dir for test: %v", err)
 	}

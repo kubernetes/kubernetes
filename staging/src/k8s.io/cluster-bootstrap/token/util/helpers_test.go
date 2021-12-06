@@ -32,7 +32,7 @@ func TestGenerateBootstrapToken(t *testing.T) {
 }
 
 func TestRandBytes(t *testing.T) {
-	var randTest = []int{
+	randTest := []int{
 		0,
 		1,
 		2,
@@ -52,7 +52,7 @@ func TestRandBytes(t *testing.T) {
 }
 
 func TestTokenFromIDAndSecret(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		id       string
 		secret   string
 		expected string
@@ -74,7 +74,7 @@ func TestTokenFromIDAndSecret(t *testing.T) {
 }
 
 func TestIsValidBootstrapToken(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		token    string
 		expected bool
 	}{
@@ -110,7 +110,7 @@ func TestIsValidBootstrapToken(t *testing.T) {
 }
 
 func TestIsValidBootstrapTokenID(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		tokenID  string
 		expected bool
 	}{
@@ -137,7 +137,7 @@ func TestIsValidBootstrapTokenID(t *testing.T) {
 }
 
 func TestBootstrapTokenSecretName(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		tokenID  string
 		expected string
 	}{

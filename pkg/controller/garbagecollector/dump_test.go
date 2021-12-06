@@ -254,7 +254,6 @@ func TestToGonumGraph(t *testing.T) {
 			compareGraphs(test.expect, actual, t)
 		})
 	}
-
 }
 
 func TestToGonumGraphObj(t *testing.T) {

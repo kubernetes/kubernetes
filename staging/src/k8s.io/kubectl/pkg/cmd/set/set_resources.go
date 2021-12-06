@@ -126,8 +126,8 @@ func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
-	//usage := "Filename, directory, or URL to a file identifying the resource to get from the server"
-	//kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	// usage := "Filename, directory, or URL to a file identifying the resource to get from the server"
+	// kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, in the namespace of the specified resource types")
@@ -279,7 +279,7 @@ func (o *SetResourcesOptions) Run() error {
 			continue
 		}
 
-		//no changes
+		// no changes
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
 			continue
 		}

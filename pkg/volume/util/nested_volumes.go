@@ -91,7 +91,7 @@ func MakeNestedMountpoints(name, baseDir string, pod v1.Pod) error {
 		return err
 	}
 	for _, dir := range dirs {
-		err := os.MkdirAll(filepath.Join(baseDir, dir), 0755)
+		err := os.MkdirAll(filepath.Join(baseDir, dir), 0o755)
 		if err != nil {
 			return fmt.Errorf("unable to create nested volume mountpoints: %v", err)
 		}

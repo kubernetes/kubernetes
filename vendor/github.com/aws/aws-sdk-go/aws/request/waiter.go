@@ -167,7 +167,6 @@ func (m WaiterMatchMode) String() string {
 // retryer ShouldRetry returns false. This normally will happen when the max
 // wait attempts expires.
 func (w Waiter) WaitWithContext(ctx aws.Context) error {
-
 	for attempt := 1; ; attempt++ {
 		req, err := w.NewRequest(w.RequestOptions)
 		if err != nil {

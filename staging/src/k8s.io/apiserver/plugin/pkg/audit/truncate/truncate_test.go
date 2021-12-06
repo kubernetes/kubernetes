@@ -30,12 +30,10 @@ import (
 	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 )
 
-var (
-	defaultConfig = Config{
-		MaxBatchSize: 4 * 1024 * 1024,
-		MaxEventSize: 100 * 1024,
-	}
-)
+var defaultConfig = Config{
+	MaxBatchSize: 4 * 1024 * 1024,
+	MaxEventSize: 100 * 1024,
+}
 
 func TestTruncatingEvents(t *testing.T) {
 	testCases := []struct {

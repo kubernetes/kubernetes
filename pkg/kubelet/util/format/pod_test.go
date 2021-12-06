@@ -84,7 +84,7 @@ func TestPodAndPodDesc(t *testing.T) {
 }
 
 func TestPodWithDeletionTimestamp(t *testing.T) {
-	normalDeletionTime := metav1.Date(2017, time.September, 26, 14, 37, 50, 00, time.UTC)
+	normalDeletionTime := metav1.Date(2017, time.September, 26, 14, 37, 50, 0o0, time.UTC)
 
 	testCases := []struct {
 		caseName               string

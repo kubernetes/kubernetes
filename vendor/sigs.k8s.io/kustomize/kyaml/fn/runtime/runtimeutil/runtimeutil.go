@@ -164,7 +164,8 @@ func (c *FunctionFilter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 		WrappingKind:          kio.ResourceListKind,
 		Writer:                in,
 		KeepReaderAnnotations: true,
-		FunctionConfig:        c.FunctionConfig}.Write(input)
+		FunctionConfig:        c.FunctionConfig,
+	}.Write(input)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +269,7 @@ func (c *FunctionFilter) doResults(r *kio.ByteReader) error {
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(c.ResultsFile, []byte(results), 0600)
+		err = ioutil.WriteFile(c.ResultsFile, []byte(results), 0o600)
 		if err != nil {
 			return err
 		}

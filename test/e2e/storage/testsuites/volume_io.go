@@ -125,7 +125,6 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		if l.resource.VolSource == nil {
 			e2eskipper.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
-
 	}
 
 	cleanup := func() {

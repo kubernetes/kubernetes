@@ -66,7 +66,6 @@ type preflightError interface {
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an exit code.
 func checkErr(err error, handleErr func(string, int)) {
-
 	var msg string
 	if err != nil {
 		msg = fmt.Sprintf("%s\nTo see the stack trace of this error execute with --v=5 or higher", err.Error())

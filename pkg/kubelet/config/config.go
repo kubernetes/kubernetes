@@ -417,7 +417,6 @@ func podsDifferSemantically(existing, ref *v1.Pod) bool {
 //   * else return all false
 //   Now, needUpdate, needGracefulDelete and needReconcile should never be both true
 func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGracefulDelete bool) {
-
 	// 1. this is a reconcile
 	// TODO: it would be better to update the whole object and only preserve certain things
 	//       like the source annotation or the UID (to ensure safety)

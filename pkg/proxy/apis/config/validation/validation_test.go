@@ -413,8 +413,10 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 				SyncPeriod:    metav1.Duration{Duration: -5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPTablesConfiguration.SyncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than 0"),
-				field.Invalid(newPath.Child("KubeIPTablesConfiguration.SyncPeriod"), metav1.Duration{Duration: 2 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.KubeIPTablesConfiguration.MinSyncPeriod")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(newPath.Child("KubeIPTablesConfiguration.SyncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than 0"),
+				field.Invalid(newPath.Child("KubeIPTablesConfiguration.SyncPeriod"), metav1.Duration{Duration: 2 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.KubeIPTablesConfiguration.MinSyncPeriod"),
+			},
 		},
 		"MinSyncPeriod must be > 0": {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
@@ -469,16 +471,20 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 				SyncPeriod:    metav1.Duration{Duration: -5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than 0"),
-				field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 2 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.KubeIPVSConfiguration.MinSyncPeriod")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than 0"),
+				field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 2 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.KubeIPVSConfiguration.MinSyncPeriod"),
+			},
 		},
 		"SyncPeriod cannot be 0": {
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				SyncPeriod:    metav1.Duration{Duration: 0 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 0}, "must be greater than 0"),
-				field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 10 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.KubeIPVSConfiguration.MinSyncPeriod")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 0}, "must be greater than 0"),
+				field.Invalid(newPath.Child("KubeIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 10 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.KubeIPVSConfiguration.MinSyncPeriod"),
+			},
 		},
 		"MinSyncPeriod cannot be less than 0": {
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
@@ -540,9 +546,11 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 				UDPTimeout:    metav1.Duration{Duration: -1 * time.Second},
 				TCPFinTimeout: metav1.Duration{Duration: -1 * time.Second},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
+			expectedErrs: field.ErrorList{
+				field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
 				field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPFinTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
-				field.Invalid(newPath.Child("KubeIPVSConfiguration.UDPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0")},
+				field.Invalid(newPath.Child("KubeIPVSConfiguration.UDPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
+			},
 		},
 	}
 	for _, testCase := range testCases {
@@ -862,8 +870,10 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		},
 		"missing ipv6 subnet ranges": {
 			addresses: []string{"::0", "::1", "2001:db8::/32"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "::0", "must be a valid CIDR"),
-				field.Invalid(newPath.Child("NodePortAddresses[1]"), "::1", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(newPath.Child("NodePortAddresses[0]"), "::0", "must be a valid CIDR"),
+				field.Invalid(newPath.Child("NodePortAddresses[1]"), "::1", "must be a valid CIDR"),
+			},
 		},
 		"invalid ipv6 ip format": {
 			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
@@ -933,8 +943,10 @@ func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 		},
 		"missing ipv6 subnet ranges": {
 			addresses: []string{"::0", "::1", "2001:db8::/32"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[0]"), "::0", "must be a valid CIDR"),
-				field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "::1", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(newPath.Child("ExcludeCIDRS[0]"), "::0", "must be a valid CIDR"),
+				field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "::1", "must be a valid CIDR"),
+			},
 		},
 		"invalid ipv6 ip format": {
 			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},

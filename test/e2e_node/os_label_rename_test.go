@@ -61,7 +61,6 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			framework.ExpectNoError(err)
 		})
 		ginkgo.It("should reconcile the OS and Arch labels when running", func() {
-
 			node := getLocalNode(f)
 			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
 			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)

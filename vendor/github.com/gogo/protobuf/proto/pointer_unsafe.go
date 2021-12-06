@@ -29,6 +29,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+//go:build !purego && !appengine && !js
 // +build !purego,!appengine,!js
 
 // This file contains the implementation of the proto field accesses using package unsafe.
@@ -122,12 +123,15 @@ func (p pointer) isNil() bool {
 func (p pointer) toInt64() *int64 {
 	return (*int64)(p.p)
 }
+
 func (p pointer) toInt64Ptr() **int64 {
 	return (**int64)(p.p)
 }
+
 func (p pointer) toInt64Slice() *[]int64 {
 	return (*[]int64)(p.p)
 }
+
 func (p pointer) toInt32() *int32 {
 	return (*int32)(p.p)
 }
@@ -144,6 +148,7 @@ func (p pointer) toInt32() *int32 {
 func (p pointer) getInt32Ptr() *int32 {
 	return *(**int32)(p.p)
 }
+
 func (p pointer) setInt32Ptr(v int32) {
 	*(**int32)(p.p) = &v
 }
@@ -171,66 +176,87 @@ func (p pointer) appendInt32Slice(v int32) {
 func (p pointer) toUint64() *uint64 {
 	return (*uint64)(p.p)
 }
+
 func (p pointer) toUint64Ptr() **uint64 {
 	return (**uint64)(p.p)
 }
+
 func (p pointer) toUint64Slice() *[]uint64 {
 	return (*[]uint64)(p.p)
 }
+
 func (p pointer) toUint32() *uint32 {
 	return (*uint32)(p.p)
 }
+
 func (p pointer) toUint32Ptr() **uint32 {
 	return (**uint32)(p.p)
 }
+
 func (p pointer) toUint32Slice() *[]uint32 {
 	return (*[]uint32)(p.p)
 }
+
 func (p pointer) toBool() *bool {
 	return (*bool)(p.p)
 }
+
 func (p pointer) toBoolPtr() **bool {
 	return (**bool)(p.p)
 }
+
 func (p pointer) toBoolSlice() *[]bool {
 	return (*[]bool)(p.p)
 }
+
 func (p pointer) toFloat64() *float64 {
 	return (*float64)(p.p)
 }
+
 func (p pointer) toFloat64Ptr() **float64 {
 	return (**float64)(p.p)
 }
+
 func (p pointer) toFloat64Slice() *[]float64 {
 	return (*[]float64)(p.p)
 }
+
 func (p pointer) toFloat32() *float32 {
 	return (*float32)(p.p)
 }
+
 func (p pointer) toFloat32Ptr() **float32 {
 	return (**float32)(p.p)
 }
+
 func (p pointer) toFloat32Slice() *[]float32 {
 	return (*[]float32)(p.p)
 }
+
 func (p pointer) toString() *string {
 	return (*string)(p.p)
 }
+
 func (p pointer) toStringPtr() **string {
 	return (**string)(p.p)
 }
+
 func (p pointer) toStringSlice() *[]string {
 	return (*[]string)(p.p)
 }
+
 func (p pointer) toBytes() *[]byte {
 	return (*[]byte)(p.p)
 }
+
 func (p pointer) toBytesSlice() *[][]byte {
 	return (*[][]byte)(p.p)
 }
+
 func (p pointer) toExtensions() *XXX_InternalExtensions {
 	return (*XXX_InternalExtensions)(p.p)
 }
+
 func (p pointer) toOldExtensions() *map[int32]Extension {
 	return (*map[int32]Extension)(p.p)
 }
@@ -285,24 +311,31 @@ func (p pointer) asPointerTo(t reflect.Type) reflect.Value {
 func atomicLoadUnmarshalInfo(p **unmarshalInfo) *unmarshalInfo {
 	return (*unmarshalInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
 }
+
 func atomicStoreUnmarshalInfo(p **unmarshalInfo, v *unmarshalInfo) {
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
 }
+
 func atomicLoadMarshalInfo(p **marshalInfo) *marshalInfo {
 	return (*marshalInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
 }
+
 func atomicStoreMarshalInfo(p **marshalInfo, v *marshalInfo) {
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
 }
+
 func atomicLoadMergeInfo(p **mergeInfo) *mergeInfo {
 	return (*mergeInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
 }
+
 func atomicStoreMergeInfo(p **mergeInfo, v *mergeInfo) {
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
 }
+
 func atomicLoadDiscardInfo(p **discardInfo) *discardInfo {
 	return (*discardInfo)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(p))))
 }
+
 func atomicStoreDiscardInfo(p **discardInfo, v *discardInfo) {
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(p)), unsafe.Pointer(v))
 }

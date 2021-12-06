@@ -50,8 +50,10 @@ type TokenREST struct {
 	extendExpiration     bool
 }
 
-var _ = rest.NamedCreater(&TokenREST{})
-var _ = rest.GroupVersionKindProvider(&TokenREST{})
+var (
+	_ = rest.NamedCreater(&TokenREST{})
+	_ = rest.GroupVersionKindProvider(&TokenREST{})
+)
 
 var gvk = schema.GroupVersionKind{
 	Group:   authenticationapiv1.SchemeGroupVersion.Group,
@@ -119,7 +121,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	if r.maxExpirationSeconds > 0 && out.Spec.ExpirationSeconds > r.maxExpirationSeconds {
-		//only positive value is valid
+		// only positive value is valid
 		out.Spec.ExpirationSeconds = r.maxExpirationSeconds
 	}
 

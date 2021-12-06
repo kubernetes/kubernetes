@@ -189,7 +189,7 @@ func dropTopologyOnV1(ctx context.Context, oldEPS, newEPS *discovery.EndpointSli
 		for i := range newEPS.Endpoints {
 			ep := &newEPS.Endpoints[i]
 
-			//Silently clear out DeprecatedTopology
+			// Silently clear out DeprecatedTopology
 			ep.DeprecatedTopology = nil
 		}
 	}

@@ -383,8 +383,10 @@ func (v *Element) Pow22523(x *Element) *Element {
 }
 
 // sqrtM1 is 2^((p-1)/4), which squared is equal to -1 by Euler's Criterion.
-var sqrtM1 = &Element{1718705420411056, 234908883556509,
-	2233514472574048, 2117202627021982, 765476049583133}
+var sqrtM1 = &Element{
+	1718705420411056, 234908883556509,
+	2233514472574048, 2117202627021982, 765476049583133,
+}
 
 // SqrtRatio sets r to the non-negative square root of the ratio of u and v.
 //

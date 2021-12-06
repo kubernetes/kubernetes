@@ -148,7 +148,7 @@ func yaml_parser_set_parser_error_context(parser *yaml_parser_t, context string,
 
 // State dispatcher.
 func yaml_parser_state_machine(parser *yaml_parser_t, event *yaml_event_t) bool {
-	//trace("yaml_parser_state_machine", "state:", parser.state.String())
+	// trace("yaml_parser_state_machine", "state:", parser.state.String())
 
 	switch parser.state {
 	case yaml_PARSE_STREAM_START_STATE:
@@ -253,7 +253,6 @@ func yaml_parser_parse_stream_start(parser *yaml_parser_t, event *yaml_event_t) 
 // explicit_document    ::= DIRECTIVE* DOCUMENT-START block_node? DOCUMENT-END*
 //                          *************************
 func yaml_parser_parse_document_start(parser *yaml_parser_t, event *yaml_event_t, implicit bool) bool {
-
 	token := peek_token(parser)
 	if token == nil {
 		return false
@@ -453,7 +452,7 @@ func yaml_parser_set_event_comments(parser *yaml_parser_t, event *yaml_event_t) 
 // flow_content         ::= flow_collection | SCALAR
 //                                            ******
 func yaml_parser_parse_node(parser *yaml_parser_t, event *yaml_event_t, block, indentless_sequence bool) bool {
-	//defer trace("yaml_parser_parse_node", "block:", block, "indentless_sequence:", indentless_sequence)()
+	// defer trace("yaml_parser_parse_node", "block:", block, "indentless_sequence:", indentless_sequence)()
 
 	token := peek_token(parser)
 	if token == nil {
@@ -1167,7 +1166,6 @@ var default_tag_directives = []yaml_tag_directive_t{
 func yaml_parser_process_directives(parser *yaml_parser_t,
 	version_directive_ref **yaml_version_directive_t,
 	tag_directives_ref *[]yaml_tag_directive_t) bool {
-
 	var version_directive *yaml_version_directive_t
 	var tag_directives []yaml_tag_directive_t
 

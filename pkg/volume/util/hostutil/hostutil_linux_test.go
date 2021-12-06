@@ -32,8 +32,7 @@ import (
 )
 
 func TestIsSharedSuccess(t *testing.T) {
-	successMountInfo :=
-		`62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+	successMountInfo := `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
 76 62 8:1 / /boot rw,relatime shared:29 - ext4 /dev/sda1 rw,seclabel,data=ordered
 78 62 0:41 / /tmp rw,nosuid,nodev shared:30 - tmpfs tmpfs rw,seclabel
 80 62 0:42 / /var/lib/nfs/rpc_pipefs rw,relatime shared:31 - rpc_pipefs sunrpc rw
@@ -141,8 +140,7 @@ func TestIsSharedFailure(t *testing.T) {
 }
 
 func TestGetSELinuxSupport(t *testing.T) {
-	info :=
-		`62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+	info := `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
 78 62 0:41 / /tmp rw,nosuid,nodev shared:30 - tmpfs tmpfs rw,seclabel
 83 63 0:44 / /var/lib/bar rw,relatime - tmpfs tmpfs rw
 227 62 253:0 /var/lib/docker/devicemapper /var/lib/docker/devicemapper rw,relatime - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
@@ -324,7 +322,7 @@ func writeFile(content string) (string, string, error) {
 		return "", "", err
 	}
 	filename := filepath.Join(tempDir, "mountinfo")
-	err = ioutil.WriteFile(filename, []byte(content), 0600)
+	err = ioutil.WriteFile(filename, []byte(content), 0o600)
 	if err != nil {
 		os.RemoveAll(tempDir)
 		return "", "", err

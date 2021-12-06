@@ -72,7 +72,6 @@ func (v Version) Unspecified() bool {
 // Kernel implements the kernel's KERNEL_VERSION macro from linux/version.h.
 // It represents the kernel version and patch level as a single value.
 func (v Version) Kernel() uint32 {
-
 	// Kernels 4.4 and 4.9 have their SUBLEVEL clamped to 255 to avoid
 	// overflowing into PATCHLEVEL.
 	// See kernel commit 9b82f13e7ef3 ("kbuild: clamp SUBLEVEL to 255").
@@ -104,7 +103,6 @@ func KernelVersion() (Version, error) {
 // for parsing. The first location that yields a usable version number is
 // returned.
 func detectKernelVersion() (Version, error) {
-
 	// Try reading /proc/version_signature for Ubuntu compatibility.
 	// Example format: Ubuntu 4.15.0-91.92-generic 4.15.18
 	// This method exists in the kernel itself, see d18acd15c

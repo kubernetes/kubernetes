@@ -39,11 +39,11 @@ const (
 	modeFile
 	modeUnsupported
 
-	//ErrDeviceNotFound defines "device not found"
+	// ErrDeviceNotFound defines "device not found"
 	ErrDeviceNotFound = "device not found"
-	//ErrDeviceNotSupported defines "device not supported"
+	// ErrDeviceNotSupported defines "device not supported"
 	ErrDeviceNotSupported = "device not supported"
-	//ErrNotAvailable defines "not available"
+	// ErrNotAvailable defines "not available"
 	ErrNotAvailable = "not available"
 )
 
@@ -115,7 +115,6 @@ func (u *storageosUtil) NewAPI(apiCfg *storageosAPIConfig) error {
 // Creates a new StorageOS volume and makes it available as a device within
 // /var/lib/storageos/volumes.
 func (u *storageosUtil) CreateVolume(p *storageosProvisioner) (*storageosVolume, error) {
-
 	klog.V(4).Infof("creating StorageOS volume %q with namespace %q", p.volName, p.volNamespace)
 
 	if err := u.NewAPI(p.apiCfg); err != nil {
@@ -161,7 +160,6 @@ func (u *storageosUtil) CreateVolume(p *storageosProvisioner) (*storageosVolume,
 // or a file device.  Block devices can be used directly, but file devices must
 // be made accessible as a block device before using.
 func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
-
 	klog.V(4).Infof("attaching StorageOS volume %q with namespace %q", b.volName, b.volNamespace)
 
 	if err := u.NewAPI(b.apiCfg); err != nil {
@@ -200,7 +198,6 @@ func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
 // Detach detaches a volume from the host.  This is only needed when NBD is not
 // enabled and loop devices are used to simulate a block device.
 func (u *storageosUtil) DetachVolume(b *storageosUnmounter, devicePath string) error {
-
 	klog.V(4).Infof("detaching StorageOS volume %q with namespace %q", b.volName, b.volNamespace)
 
 	if !isLoopDevice(devicePath) {
@@ -214,7 +211,6 @@ func (u *storageosUtil) DetachVolume(b *storageosUnmounter, devicePath string) e
 
 // AttachDevice attaches the volume device to the host at a given mount path.
 func (u *storageosUtil) AttachDevice(b *storageosMounter, deviceMountPath string) error {
-
 	klog.V(4).Infof("attaching StorageOS device for volume %q with namespace %q", b.volName, b.volNamespace)
 
 	if err := u.NewAPI(b.apiCfg); err != nil {
@@ -236,13 +232,12 @@ func (u *storageosUtil) AttachDevice(b *storageosMounter, deviceMountPath string
 
 // Mount mounts the volume on the host.
 func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountPath string) error {
-
 	klog.V(4).Infof("mounting StorageOS volume %q with namespace %q", b.volName, b.volNamespace)
 
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+			if err = os.MkdirAll(deviceMountPath, 0o750); err != nil {
 				return err
 			}
 			notMnt = true
@@ -250,7 +245,7 @@ func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountP
 			return err
 		}
 	}
-	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+	if err = os.MkdirAll(deviceMountPath, 0o750); err != nil {
 		klog.Errorf("mkdir failed on disk %s (%v)", deviceMountPath, err)
 		return err
 	}
@@ -271,7 +266,6 @@ func (u *storageosUtil) MountVolume(b *storageosMounter, mntDevice, deviceMountP
 // Unmount removes the mount reference from the volume allowing it to be
 // re-mounted elsewhere.
 func (u *storageosUtil) UnmountVolume(b *storageosUnmounter) error {
-
 	klog.V(4).Infof("clearing StorageOS mount reference for volume %q with namespace %q", b.volName, b.volNamespace)
 
 	if err := u.NewAPI(b.apiCfg); err != nil {
@@ -315,7 +309,6 @@ func (u *storageosUtil) DeleteVolume(d *storageosDeleter) error {
 // Get the node's device path from the API, falling back to the default if not
 // specified.
 func (u *storageosUtil) DeviceDir(b *storageosMounter) string {
-
 	ctrl, err := u.api.Node(b.plugin.host.GetHostName())
 	if err != nil {
 		klog.Warningf("node device path lookup failed: %v", err)

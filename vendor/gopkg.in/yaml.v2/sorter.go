@@ -52,7 +52,7 @@ func (l keyList) Less(i, j int) bool {
 		var ai, bi int
 		var an, bn int64
 		if ar[i] == '0' || br[i] == '0' {
-			for j := i-1; j >= 0 && unicode.IsDigit(ar[j]); j-- {
+			for j := i - 1; j >= 0 && unicode.IsDigit(ar[j]); j-- {
 				if ar[j] != '0' {
 					an = 1
 					bn = 1

@@ -53,5 +53,4 @@ func (cs fileCredentialSource) subjectToken() (string, error) {
 	default:
 		return "", errors.New("oauth2/google: invalid credential_source file format type")
 	}
-
 }

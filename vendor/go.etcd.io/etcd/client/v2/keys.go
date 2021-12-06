@@ -77,9 +77,7 @@ const (
 	PrevNoExist = PrevExistType("false")
 )
 
-var (
-	defaultV2KeysPrefix = "/v2/keys"
-)
+var defaultV2KeysPrefix = "/v2/keys"
 
 // NewKeysAPI builds a KeysAPI that interacts with etcd's key-value
 // API over HTTP.

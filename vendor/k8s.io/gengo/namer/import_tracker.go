@@ -55,6 +55,7 @@ func (tracker *DefaultImportTracker) AddTypes(types ...*types.Type) {
 		tracker.AddType(t)
 	}
 }
+
 func (tracker *DefaultImportTracker) AddType(t *types.Type) {
 	if tracker.local.Package == t.Name.Package {
 		return

@@ -29,7 +29,7 @@ import (
 )
 
 func TestMarshalJSON(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		bts      BootstrapTokenString
 		expected string
 	}{
@@ -55,7 +55,7 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 func TestUnmarshalJSON(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		input         string
 		bts           *BootstrapTokenString
 		expectedError bool
@@ -87,7 +87,7 @@ func TestUnmarshalJSON(t *testing.T) {
 }
 
 func TestJSONRoundtrip(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		input string
 		bts   *BootstrapTokenString
 	}{
@@ -141,7 +141,7 @@ func roundtrip(input string, bts *BootstrapTokenString) error {
 }
 
 func TestTokenFromIDAndSecret(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		bts      BootstrapTokenString
 		expected string
 	}{
@@ -164,7 +164,7 @@ func TestTokenFromIDAndSecret(t *testing.T) {
 }
 
 func TestNewBootstrapTokenString(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		token         string
 		expectedError bool
 		bts           *BootstrapTokenString
@@ -209,7 +209,7 @@ func TestNewBootstrapTokenString(t *testing.T) {
 }
 
 func TestNewBootstrapTokenStringFromIDAndSecret(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		id, secret    string
 		expectedError bool
 		bts           *BootstrapTokenString
@@ -256,7 +256,7 @@ func TestNewBootstrapTokenStringFromIDAndSecret(t *testing.T) {
 var refTime = time.Date(1970, time.January, 1, 1, 1, 1, 0, time.UTC)
 
 func TestBootstrapTokenToSecret(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		bt     *BootstrapToken
 		secret *v1.Secret
 	}{
@@ -303,7 +303,7 @@ func TestBootstrapTokenToSecret(t *testing.T) {
 }
 
 func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		bt *BootstrapToken
 	}{
 		{
@@ -336,7 +336,7 @@ func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
 }
 
 func TestEncodeTokenSecretData(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name string
 		bt   *BootstrapToken
 		data map[string][]byte
@@ -481,7 +481,7 @@ func mustParseDuration(durationStr string, t *testing.T) time.Duration {
 }
 
 func TestBootstrapTokenFromSecret(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		desc          string
 		name          string
 		data          map[string][]byte

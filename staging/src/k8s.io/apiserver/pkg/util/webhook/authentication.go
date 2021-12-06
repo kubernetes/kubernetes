@@ -48,7 +48,6 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 	egressSelector *egressselector.EgressSelector,
 	kubeapiserverClientConfig *rest.Config,
 	tp *trace.TracerProvider) AuthenticationInfoResolverWrapper {
-
 	webhookAuthResolverWrapper := func(delegate AuthenticationInfoResolver) AuthenticationInfoResolver {
 		return &AuthenticationInfoResolverDelegator{
 			ClientConfigForFunc: func(hostPort string) (*rest.Config, error) {

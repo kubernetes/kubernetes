@@ -35,114 +35,118 @@ import (
 var class1Parameters = map[string]string{
 	"param1": "value1",
 }
+
 var class2Parameters = map[string]string{
 	"param2": "value2",
 }
-var deleteReclaimPolicy = v1.PersistentVolumeReclaimDelete
-var modeImmediate = storage.VolumeBindingImmediate
-var storageClasses = []*storage.StorageClass{
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
 
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "gold",
-		},
+var (
+	deleteReclaimPolicy = v1.PersistentVolumeReclaimDelete
+	modeImmediate       = storage.VolumeBindingImmediate
+	storageClasses      = []*storage.StorageClass{
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
 
-		Provisioner:       mockPluginName,
-		Parameters:        class1Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		VolumeBindingMode: &modeImmediate,
-	},
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "silver",
-		},
-		Provisioner:       mockPluginName,
-		Parameters:        class2Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		VolumeBindingMode: &modeImmediate,
-	},
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "copper",
-		},
-		Provisioner:       mockPluginName,
-		Parameters:        class1Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		VolumeBindingMode: &modeWait,
-	},
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "external",
-		},
-		Provisioner:       "vendor.com/my-volume",
-		Parameters:        class1Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		VolumeBindingMode: &modeImmediate,
-	},
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "external-wait",
-		},
-		Provisioner:       "vendor.com/my-volume-wait",
-		Parameters:        class1Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		VolumeBindingMode: &modeWait,
-	},
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "unknown-internal",
-		},
-		Provisioner:       "kubernetes.io/unknown",
-		Parameters:        class1Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		VolumeBindingMode: &modeImmediate,
-	},
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "unsupported-mountoptions",
-		},
-		Provisioner:       mockPluginName,
-		Parameters:        class1Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		MountOptions:      []string{"foo"},
-		VolumeBindingMode: &modeImmediate,
-	},
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gold",
+			},
 
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "csi",
+			Provisioner:       mockPluginName,
+			Parameters:        class1Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &modeImmediate,
 		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "silver",
+			},
+			Provisioner:       mockPluginName,
+			Parameters:        class2Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &modeImmediate,
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "copper",
+			},
+			Provisioner:       mockPluginName,
+			Parameters:        class1Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &modeWait,
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "external",
+			},
+			Provisioner:       "vendor.com/my-volume",
+			Parameters:        class1Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &modeImmediate,
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "external-wait",
+			},
+			Provisioner:       "vendor.com/my-volume-wait",
+			Parameters:        class1Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &modeWait,
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unknown-internal",
+			},
+			Provisioner:       "kubernetes.io/unknown",
+			Parameters:        class1Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &modeImmediate,
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unsupported-mountoptions",
+			},
+			Provisioner:       mockPluginName,
+			Parameters:        class1Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			MountOptions:      []string{"foo"},
+			VolumeBindingMode: &modeImmediate,
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "StorageClass",
+			},
 
-		Provisioner:       "mydriver.csi.k8s.io",
-		Parameters:        class1Parameters,
-		ReclaimPolicy:     &deleteReclaimPolicy,
-		VolumeBindingMode: &modeImmediate,
-	},
-}
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "csi",
+			},
+
+			Provisioner:       "mydriver.csi.k8s.io",
+			Parameters:        class1Parameters,
+			ReclaimPolicy:     &deleteReclaimPolicy,
+			VolumeBindingMode: &modeImmediate,
+		},
+	}
+)
 
 // call to storageClass 1, returning an error
 var provision1Error = provisionCall{
@@ -176,7 +180,8 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, &classGold),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner, pvutil.AnnBetaStorageProvisioner),
-			[]string{"Normal ProvisioningSucceeded"}, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			[]string{"Normal ProvisioningSucceeded"},
+			noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision failure - plugin not found
@@ -185,7 +190,8 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim11-2", "uid11-2", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-2", "uid11-2", "1Gi", "", v1.ClaimPending, &classGold),
-			[]string{"Warning ProvisioningFailed"}, noerrors,
+			[]string{"Warning ProvisioningFailed"},
+			noerrors,
 			testSyncClaim,
 		},
 		{
@@ -195,7 +201,8 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim11-3", "uid11-3", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-3", "uid11-3", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner, pvutil.AnnBetaStorageProvisioner),
-			[]string{"Warning ProvisioningFailed"}, noerrors,
+			[]string{"Warning ProvisioningFailed"},
+			noerrors,
 			wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
@@ -205,7 +212,8 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			newClaimArray("claim11-4", "uid11-4", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-4", "uid11-4", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner, pvutil.AnnBetaStorageProvisioner),
-			[]string{"Warning ProvisioningFailed"}, noerrors,
+			[]string{"Warning ProvisioningFailed"},
+			noerrors,
 			wrapTestWithProvisionCalls([]provisionCall{provision1Error}, testSyncClaim),
 		},
 		{
@@ -367,7 +375,8 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending, &classSilver),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending, &classSilver, pvutil.AnnStorageProvisioner, pvutil.AnnBetaStorageProvisioner),
-			[]string{"Normal ProvisioningSucceeded"}, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision2Success}, testSyncClaim),
+			[]string{"Normal ProvisioningSucceeded"},
+			noerrors, wrapTestWithProvisionCalls([]provisionCall{provision2Success}, testSyncClaim),
 		},
 		{
 			// Provision error - non existing class
@@ -532,7 +541,8 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-25", "uid11-25", "1Gi", "", v1.ClaimPending, &classGold)),
 			claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-25", "uid11-25", "1Gi", "", v1.ClaimPending, &classGold)),
-			[]string{"Warning ProvisioningFailed"}, noerrors,
+			[]string{"Warning ProvisioningFailed"},
+			noerrors,
 			testSyncClaim,
 		},
 		{

@@ -36,7 +36,6 @@ import (
 )
 
 var _ = common.SIGDescribe("HostPort", func() {
-
 	f := framework.NewDefaultFramework("hostport")
 
 	var (
@@ -47,7 +46,6 @@ var _ = common.SIGDescribe("HostPort", func() {
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
-
 	})
 
 	/*
@@ -59,7 +57,6 @@ var _ = common.SIGDescribe("HostPort", func() {
 	*/
 
 	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly]", func() {
-
 		localhost := "127.0.0.1"
 		family := v1.IPv4Protocol
 		if framework.TestContext.ClusterIsIPv6() {
@@ -71,7 +68,6 @@ var _ = common.SIGDescribe("HostPort", func() {
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
 			framework.Failf("No nodes available")
-
 		}
 		randomNode := &nodes.Items[rand.Intn(len(nodes.Items))]
 

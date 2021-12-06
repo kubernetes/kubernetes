@@ -47,9 +47,7 @@ const (
 	hostpathInTreePluginName = "kubernetes.io/hostpath"
 )
 
-var (
-	scName = "csi-sc"
-)
+var scName = "csi-sc"
 
 // getVolumeLimitKey returns a ResourceName by filter type
 func getVolumeLimitKey(filterType string) v1.ResourceName {
@@ -699,7 +697,6 @@ func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.
 			}
 			pvLister = append(pvLister, pv)
 		}
-
 	}
 	return pvLister
 }

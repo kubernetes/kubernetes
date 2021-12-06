@@ -97,11 +97,13 @@ func (s step) done() <-chan struct{} {
 	close(s.waitCh)
 	return s.doneCh
 }
+
 func (s step) execute() {
 	defer close(s.doneCh)
 	<-s.waitCh
 	s.fn()
 }
+
 func newStep(fn func()) *step {
 	return &step{
 		fn:     fn,
@@ -304,7 +306,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 		t.Fatalf("Waited for 5s for the in-flight request to reach the server")
 	}
 
-	//step 1: /readyz should return OK
+	// step 1: /readyz should return OK
 	resultGot := doer.Do(connReusingClient, func(httptrace.GotConnInfo) {}, "/readyz", time.Second)
 	assertResponse(t, resultGot, http.StatusOK)
 
@@ -420,6 +422,7 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 		t.Fatalf("%s wasn't closed", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 	}
 }
+
 func shouldReuseConnection(t *testing.T) func(httptrace.GotConnInfo) {
 	return func(ci httptrace.GotConnInfo) {
 		if !ci.Reused {
@@ -479,7 +482,6 @@ func waitForAPIServerStarted(t *testing.T, doer doer) {
 		t.Log("The API server has started")
 		return true, nil
 	})
-
 	if err != nil {
 		t.Fatalf("The server has failed to start - err: %v", err)
 	}

@@ -622,7 +622,6 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				waitForPVControllerSync(metricsGrabber, boundPVKey, classKey)
 				waitForPVControllerSync(metricsGrabber, boundPVCKey, namespaceKey)
 				validator([]map[string]int64{{className: 1}, nil, {ns: 1}, nil})
-
 			})
 		ginkgo.It("should create total pv count metrics for with plugin and volume mode labels after creating pv",
 			func() {
@@ -672,7 +671,6 @@ func waitForDetachAndGrabMetrics(oldMetrics *storageControllerMetrics, metricsGr
 
 	verifyMetricFunc := func() (bool, error) {
 		updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
-
 		if err != nil {
 			framework.Logf("Error fetching controller-manager metrics")
 			return false, err

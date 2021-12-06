@@ -319,7 +319,6 @@ func TestCSINodeValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			testValidation := func(csiNode *storage.CSINode, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 					APIGroup:   "storage.k8s.io",

@@ -658,6 +658,7 @@ func helpTextForResourceQuotaScope(scope corev1.ResourceQuotaScope) string {
 		return ""
 	}
 }
+
 func describeQuota(resourceQuota *corev1.ResourceQuota) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -2589,7 +2590,6 @@ func (i *IngressDescriber) describeBackendV1beta1(ns string, backend *networking
 }
 
 func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.IngressBackend) string {
-
 	if backend.Service != nil {
 		sb := serviceBackendStringer(backend.Service)
 		endpoints, err := i.client.CoreV1().Endpoints(ns).Get(context.TODO(), backend.Service.Name, metav1.GetOptions{})
@@ -3716,7 +3716,6 @@ type CertificateSigningRequestDescriber struct {
 }
 
 func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-
 	var (
 		crBytes           []byte
 		metadata          metav1.ObjectMeta
@@ -4069,8 +4068,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	w.Write(LEVEL_1, "Resource\tRequests\tLimits\n")
 	w.Write(LEVEL_1, "--------\t--------\t------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
-	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits :=
-		reqs[corev1.ResourceCPU], limits[corev1.ResourceCPU], reqs[corev1.ResourceMemory], limits[corev1.ResourceMemory], reqs[corev1.ResourceEphemeralStorage], limits[corev1.ResourceEphemeralStorage]
+	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits := reqs[corev1.ResourceCPU], limits[corev1.ResourceCPU], reqs[corev1.ResourceMemory], limits[corev1.ResourceMemory], reqs[corev1.ResourceEphemeralStorage], limits[corev1.ResourceEphemeralStorage]
 	fractionCpuReqs := float64(0)
 	fractionCpuLimits := float64(0)
 	if allocatable.Cpu().MilliValue() != 0 {
@@ -4404,7 +4402,6 @@ func describeNetworkPolicySpec(nps networkingv1.NetworkPolicySpec, w PrefixWrite
 		printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
 	} else {
 		w.Write(LEVEL_1, "Not affecting egress traffic\n")
-
 	}
 	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
 }

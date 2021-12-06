@@ -27,12 +27,10 @@ import (
 	cmint "k8s.io/metrics/pkg/apis/custom_metrics"
 )
 
-var (
-	// metricVersionsToGV is the map of string group-versions
-	// accepted by the converter to group-version objects (so
-	// we don't have to re-parse)
-	metricVersionsToGV map[string]schema.GroupVersion
-)
+// metricVersionsToGV is the map of string group-versions
+// accepted by the converter to group-version objects (so
+// we don't have to re-parse)
+var metricVersionsToGV map[string]schema.GroupVersion
 
 func init() {
 	metricVersionsToGV = make(map[string]schema.GroupVersion)

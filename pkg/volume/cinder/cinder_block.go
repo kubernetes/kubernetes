@@ -34,12 +34,14 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-var _ volume.VolumePlugin = &cinderPlugin{}
-var _ volume.PersistentVolumePlugin = &cinderPlugin{}
-var _ volume.BlockVolumePlugin = &cinderPlugin{}
-var _ volume.DeletableVolumePlugin = &cinderPlugin{}
-var _ volume.ProvisionableVolumePlugin = &cinderPlugin{}
-var _ volume.ExpandableVolumePlugin = &cinderPlugin{}
+var (
+	_ volume.VolumePlugin              = &cinderPlugin{}
+	_ volume.PersistentVolumePlugin    = &cinderPlugin{}
+	_ volume.BlockVolumePlugin         = &cinderPlugin{}
+	_ volume.DeletableVolumePlugin     = &cinderPlugin{}
+	_ volume.ProvisionableVolumePlugin = &cinderPlugin{}
+	_ volume.ExpandableVolumePlugin    = &cinderPlugin{}
+)
 
 func (plugin *cinderPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(cinderVolumePluginName)
@@ -136,7 +138,8 @@ func (plugin *cinderPlugin) newUnmapperInternal(volName string, podUID types.UID
 			manager: manager,
 			mounter: mounter,
 			plugin:  plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 type cinderPluginUnmapper struct {

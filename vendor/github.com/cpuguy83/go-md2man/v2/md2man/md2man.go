@@ -9,6 +9,8 @@ func Render(doc []byte) []byte {
 	renderer := NewRoffRenderer()
 
 	return blackfriday.Run(doc,
-		[]blackfriday.Option{blackfriday.WithRenderer(renderer),
-			blackfriday.WithExtensions(renderer.GetExtensions())}...)
+		[]blackfriday.Option{
+			blackfriday.WithRenderer(renderer),
+			blackfriday.WithExtensions(renderer.GetExtensions()),
+		}...)
 }

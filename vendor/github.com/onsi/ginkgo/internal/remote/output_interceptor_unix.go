@@ -1,3 +1,4 @@
+//go:build freebsd || openbsd || netbsd || dragonfly || darwin || linux || solaris
 // +build freebsd openbsd netbsd dragonfly darwin linux solaris
 
 package remote

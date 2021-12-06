@@ -90,7 +90,8 @@ func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePe
 			samplePeriod: samplePeriod,
 			samples:      compbasemetrics.NewHistogramVec(sampleOpts, labelNames),
 			waterMarks:   compbasemetrics.NewHistogramVec(waterMarkOpts, append([]string{labelNameMark}, labelNames...)),
-		}}
+		},
+	}
 }
 
 func (swg *sampleAndWaterMarkObserverGenerator) quantize(when time.Time) int64 {
@@ -114,7 +115,8 @@ func (swg *sampleAndWaterMarkObserverGenerator) Generate(initialNumerator, initi
 			ratio:      ratio,
 			loRatio:    ratio,
 			hiRatio:    ratio,
-		}}
+		},
+	}
 }
 
 func (swg *sampleAndWaterMarkObserverGenerator) metrics() Registerables {

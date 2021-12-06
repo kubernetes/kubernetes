@@ -284,6 +284,7 @@ func (e *RequiredNotSetError) Error() string {
 	}
 	return fmt.Sprintf("proto: required field %q not set", e.field)
 }
+
 func (e *RequiredNotSetError) RequiredNotSet() bool {
 	return true
 }
@@ -296,6 +297,7 @@ func (e *invalidUTF8Error) Error() string {
 	}
 	return fmt.Sprintf("proto: field %q contains invalid UTF-8", e.field)
 }
+
 func (e *invalidUTF8Error) InvalidUTF8() bool {
 	return true
 }

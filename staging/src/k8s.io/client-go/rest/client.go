@@ -150,7 +150,8 @@ func readExpBackoffConfig() BackoffManager {
 	return &URLBackoff{
 		Backoff: flowcontrol.NewBackOff(
 			time.Duration(backoffBaseInt)*time.Second,
-			time.Duration(backoffDurationInt)*time.Second)}
+			time.Duration(backoffDurationInt)*time.Second),
+	}
 }
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).

@@ -51,6 +51,7 @@ func (obj *Config) GetObjectKind() schema.ObjectKind { return obj }
 func (obj *Config) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
+
 func (obj *Config) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }

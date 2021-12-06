@@ -103,8 +103,10 @@ var (
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
 			// Thus we customize buckets significantly, to empower both usecases.
-			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
-				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			Buckets: []float64{
+				0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60,
+			},
 			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
@@ -116,8 +118,10 @@ var (
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request duration excluding webhooks as they are mostly
 			// dependant on user configuration.
-			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
-				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			Buckets: []float64{
+				0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60,
+			},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
@@ -593,7 +597,7 @@ func cleanVerb(verb, suggestedVerb string, request *http.Request) string {
 	return OtherRequestMethod
 }
 
-//getVerbIfWatch additionally ensures that GET or List would be transformed to WATCH
+// getVerbIfWatch additionally ensures that GET or List would be transformed to WATCH
 func getVerbIfWatch(req *http.Request) string {
 	if strings.ToUpper(req.Method) == "GET" || strings.ToUpper(req.Method) == "LIST" {
 		if checkIfWatch(req) {
@@ -603,7 +607,7 @@ func getVerbIfWatch(req *http.Request) string {
 	return ""
 }
 
-//checkIfWatch check request is watch
+// checkIfWatch check request is watch
 func checkIfWatch(req *http.Request) bool {
 	// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
 	if values := req.URL.Query()["watch"]; len(values) > 0 {
@@ -630,8 +634,10 @@ func cleanDryRun(u *url.URL) string {
 	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
 }
 
-var _ http.ResponseWriter = (*ResponseWriterDelegator)(nil)
-var _ responsewriter.UserProvidedDecorator = (*ResponseWriterDelegator)(nil)
+var (
+	_ http.ResponseWriter                  = (*ResponseWriterDelegator)(nil)
+	_ responsewriter.UserProvidedDecorator = (*ResponseWriterDelegator)(nil)
+)
 
 // ResponseWriterDelegator interface wraps http.ResponseWriter to additionally record content-length, status-code, etc.
 type ResponseWriterDelegator struct {

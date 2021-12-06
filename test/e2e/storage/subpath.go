@@ -124,7 +124,6 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			}, privilegedSecurityContext)
 			testsuites.TestBasicSubpath(f, "configmap-value", pod)
 		})
-
 	})
 
 	ginkgo.Context("Container restart", func() {

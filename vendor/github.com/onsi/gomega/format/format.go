@@ -53,10 +53,12 @@ type Ctx interface {
 	Value(key interface{}) interface{}
 }
 
-var contextType = reflect.TypeOf((*Ctx)(nil)).Elem()
-var timeType = reflect.TypeOf(time.Time{})
+var (
+	contextType = reflect.TypeOf((*Ctx)(nil)).Elem()
+	timeType    = reflect.TypeOf(time.Time{})
+)
 
-//The default indentation string emitted by the format package
+// The default indentation string emitted by the format package
 var Indent = "    "
 
 var longFormThreshold = 20

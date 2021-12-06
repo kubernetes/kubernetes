@@ -40,8 +40,8 @@ func typedDecodeHook(h DecodeHookFunc) DecodeHookFunc {
 // that took reflect.Kind instead of reflect.Type.
 func DecodeHookExec(
 	raw DecodeHookFunc,
-	from reflect.Value, to reflect.Value) (interface{}, error) {
-
+	from reflect.Value, to reflect.Value) (interface{}, error,
+) {
 	switch f := typedDecodeHook(raw).(type) {
 	case DecodeHookFuncType:
 		return f(from.Type(), to.Type(), from.Interface())

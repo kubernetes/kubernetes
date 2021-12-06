@@ -64,7 +64,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	*/
 	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly] [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
-		defaultMode := int32(0400)
+		defaultMode := int32(0o400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", nil, &defaultMode)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
@@ -80,7 +80,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	*/
 	framework.ConformanceIt("should set mode on item file [LinuxOnly] [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
-		mode := int32(0400)
+		mode := int32(0o400)
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
 
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
@@ -108,7 +108,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		gid := int64(1234)
-		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		mode := int32(0o440) /* setting fsGroup sets mode to at least 440 */
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			FSGroup: &gid,
@@ -140,7 +140,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
-		//modify labels
+		// modify labels
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
@@ -171,7 +171,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
-		//modify annotations
+		// modify annotations
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})
@@ -347,7 +347,6 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 			},
 		},
 	}
-
 }
 
 func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container {
@@ -364,7 +363,6 @@ func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container
 			},
 		},
 	}
-
 }
 
 func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[string]string, filePath string) *v1.Pod {

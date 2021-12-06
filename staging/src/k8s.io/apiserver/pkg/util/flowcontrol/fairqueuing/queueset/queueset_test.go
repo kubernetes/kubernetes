@@ -450,8 +450,9 @@ func TestNoRestraint(t *testing.T) {
 				t.Fatal(err)
 			}
 			nr := nrc.Complete(fq.DispatchingConfig{})
-			uniformScenario{name: "NoRestraint/" + testCase.name,
-				qs: nr,
+			uniformScenario{
+				name: "NoRestraint/" + testCase.name,
+				qs:   nr,
 				clients: []uniformClient{
 					newUniformClient(1001001001, 5, 15, time.Second, time.Second),
 					newUniformClient(2002002002, 2, 15, time.Second, time.Second/2),
@@ -487,8 +488,9 @@ func TestBaseline(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(1001001001, 1, 21, time.Second, 0),
 		},
@@ -555,8 +557,9 @@ func TestSeparations(t *testing.T) {
 				t.Fatal(err)
 			}
 			qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: seps.conc})
-			uniformScenario{name: qCfg.Name,
-				qs: qs,
+			uniformScenario{
+				name: qCfg.Name,
+				qs:   qs,
 				clients: []uniformClient{
 					newUniformClient(1001001001, 1, 25, time.Second, seps.think).pad(seps.finalSeats, seps.pad),
 					newUniformClient(2002002002, 1, 25, time.Second, seps.think).pad(seps.finalSeats, seps.pad),
@@ -595,8 +598,9 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(1001001001, 8, 20, time.Second, time.Second-1),
 			newUniformClient(2002002002, 8, 20, time.Second, time.Second-1),
@@ -631,8 +635,9 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 		t.Fatal(err)
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(400900100100, 8, 30, time.Second, time.Second-1),
 			newUniformClient(300900200200, 8, 30, time.Second, time.Second-1),
@@ -668,8 +673,9 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(1001001001, 8, 20, time.Second, time.Second),
 			newUniformClient(2002002002, 7, 30, time.Second, time.Second/2),
@@ -708,8 +714,9 @@ func TestSeatSecondsRollover(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 2000})
 
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(1001001001, 8, 20, Quarter, Quarter).setInitWidth(500),
 			newUniformClient(2002002002, 7, 30, Quarter, Quarter/2).setInitWidth(500),
@@ -746,8 +753,9 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
 
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(1001001001, 4, 20, time.Second, time.Second-1),
 			newUniformClient(2002002002, 2, 20, time.Second, time.Second-1),
@@ -782,8 +790,9 @@ func TestDifferentWidths(t *testing.T) {
 		t.Fatal(err)
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(10010010010010, 13, 10, time.Second, time.Second-1),
 			newUniformClient(20020020020020, 7, 10, time.Second, time.Second-1).setInitWidth(2),
@@ -818,8 +827,9 @@ func TestTooWide(t *testing.T) {
 		t.Fatal(err)
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(40040040040040, 15, 21, time.Second, time.Second-1).setInitWidth(2),
 			newUniformClient(50050050050050, 15, 21, time.Second, time.Second-1).setInitWidth(2),
@@ -880,7 +890,8 @@ func TestWindup(t *testing.T) {
 			}
 			qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
 
-			uniformScenario{name: qCfg.Name, qs: qs,
+			uniformScenario{
+				name: qCfg.Name, qs: qs,
 				clients: []uniformClient{
 					newUniformClient(1001001001, 2, 40, time.Second, -1),
 					newUniformClient(2002002002, 2, 40, time.Second, -1).setSplit(),
@@ -915,8 +926,9 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
 
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(1001001001, 6, 10, time.Second, 57*time.Millisecond),
 			newUniformClient(2002002002, 4, 15, time.Second, 750*time.Millisecond),
@@ -951,8 +963,9 @@ func TestTimeout(t *testing.T) {
 	}
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 
-	uniformScenario{name: qCfg.Name,
-		qs: qs,
+	uniformScenario{
+		name: qCfg.Name,
+		qs:   qs,
 		clients: []uniformClient{
 			newUniformClient(1001001001, 5, 100, time.Second, time.Second),
 		},

@@ -72,7 +72,6 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 		ssdlabels["volume-type"] = "ssd"
 		vvollabels = make(map[string]string)
 		vvollabels["volume-type"] = "vvol"
-
 	})
 
 	ginkgo.Describe("Selector-Label Volume Binding:vsphere [Feature:vsphere]", func() {

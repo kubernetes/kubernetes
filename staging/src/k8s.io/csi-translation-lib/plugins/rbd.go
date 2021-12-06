@@ -73,7 +73,7 @@ func (p rbdCSITranslator) TranslateInTreeStorageClassToCSI(sc *storagev1.Storage
 		return nil, fmt.Errorf("sc is nil")
 	}
 
-	var params = map[string]string{}
+	params := map[string]string{}
 
 	fillDefaultSCParams(params)
 	for k, v := range sc.Parameters {

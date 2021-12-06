@@ -28,8 +28,10 @@ import (
 // extension points. It communicates through state with another function.
 type CommunicatingPlugin struct{}
 
-var _ framework.ReservePlugin = CommunicatingPlugin{}
-var _ framework.PreBindPlugin = CommunicatingPlugin{}
+var (
+	_ framework.ReservePlugin = CommunicatingPlugin{}
+	_ framework.PreBindPlugin = CommunicatingPlugin{}
+)
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "multipoint-communicating-plugin"

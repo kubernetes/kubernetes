@@ -170,7 +170,6 @@ func TestMutatingWebhookDuplicateOwnerReferences(t *testing.T) {
 	if warningWriter.WarningCount() != 2 {
 		t.Errorf("expected two warnings, got: %v", warningWriter.WarningCount())
 	}
-
 }
 
 func newDuplicateOwnerReferencesWebhookHandler(t *testing.T) http.Handler {

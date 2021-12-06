@@ -67,6 +67,7 @@ func (r listReflect) RangeUsing(a Allocator) ListRange {
 func (r listReflect) Equals(other List) bool {
 	return r.EqualsUsing(HeapAllocator, other)
 }
+
 func (r listReflect) EqualsUsing(a Allocator, other List) bool {
 	if otherReflectList, ok := other.(*listReflect); ok {
 		return reflect.DeepEqual(r.Value.Interface(), otherReflectList.Value.Interface())

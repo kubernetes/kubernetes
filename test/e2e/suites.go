@@ -80,7 +80,7 @@ func gatherTestSuiteMetrics() error {
 	metricsJSON := metricsForE2E.PrintJSON()
 	if framework.TestContext.ReportDir != "" {
 		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
-		if err := ioutil.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
+		if err := ioutil.WriteFile(filePath, []byte(metricsJSON), 0o644); err != nil {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
 	} else {

@@ -103,7 +103,6 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) && oldNode != nil {
 		node.Spec.ConfigSource = nil
 	}
-
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)

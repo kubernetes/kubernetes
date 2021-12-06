@@ -473,7 +473,8 @@ func TestUpdateExpiredEvent(t *testing.T) {
 				ErrStatus: metav1.Status{
 					Code:   http.StatusNotFound,
 					Reason: metav1.StatusReasonNotFound,
-				}}
+				},
+			}
 		},
 		OnCreate: func(event *v1.Event) (*v1.Event, error) {
 			createdEvent = event

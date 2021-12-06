@@ -21,9 +21,7 @@ import (
 	"gopkg.in/tomb.v1"
 )
 
-var (
-	ErrStop = errors.New("tail should now stop")
-)
+var ErrStop = errors.New("tail should now stop")
 
 type Line struct {
 	Text     string

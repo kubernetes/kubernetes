@@ -282,7 +282,6 @@ func TestKeyringMiss(t *testing.T) {
 			t.Errorf("Expected not to find URL %s, but found", test.lookupURL)
 		}
 	}
-
 }
 
 func TestKeyringMissWithDockerHubCredentials(t *testing.T) {

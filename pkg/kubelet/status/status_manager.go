@@ -321,7 +321,6 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 	}
 
 	return nil, false, false
-
 }
 
 func (m *manager) TerminatePod(pod *v1.Pod) {

@@ -6,15 +6,15 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-//Ignore ignores the actual value and always succeeds.
+// Ignore ignores the actual value and always succeeds.
 //  Expect(nil).To(Ignore())
 //  Expect(true).To(Ignore())
 func Ignore() types.GomegaMatcher {
 	return &IgnoreMatcher{true}
 }
 
-//Reject ignores the actual value and always fails. It can be used in conjunction with IgnoreMissing
-//to catch problematic elements, or to verify tests are running.
+// Reject ignores the actual value and always fails. It can be used in conjunction with IgnoreMissing
+// to catch problematic elements, or to verify tests are running.
 //  Expect(nil).NotTo(Reject())
 //  Expect(true).NotTo(Reject())
 func Reject() types.GomegaMatcher {

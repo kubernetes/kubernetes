@@ -206,7 +206,6 @@ func TestEnforceVersionPolicies(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-
 			newK8sVer, err := version.ParseSemantic(rt.newK8sVersion)
 			if err != nil {
 				t.Fatalf("couldn't parse version %s: %v", rt.newK8sVersion, err)

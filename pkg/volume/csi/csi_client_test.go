@@ -733,8 +733,8 @@ func TestClientNodeSupportsVolumeMountGroup(t *testing.T) {
 func testClientNodeSupportsCapabilities(
 	t *testing.T,
 	capabilityMethodToTest func(*csiDriverClient) (bool, error),
-	nodeClientGenerator func(bool) *fake.NodeClient) {
-
+	nodeClientGenerator func(bool) *fake.NodeClient,
+) {
 	testCases := []struct {
 		name    string
 		capable bool
@@ -889,7 +889,6 @@ func TestVolumeHealthEnable(t *testing.T) {
 					assert.Nil(t, metrics.Message)
 				}
 			}
-
 		})
 	}
 }
@@ -1011,7 +1010,6 @@ func TestVolumeStats(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestAccessModeMapping(t *testing.T) {

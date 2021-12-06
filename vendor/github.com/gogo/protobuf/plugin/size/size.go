@@ -657,7 +657,7 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 		p.P(`}`)
 		p.P()
 
-		//Generate Size methods for oneof fields
+		// Generate Size methods for oneof fields
 		m := proto.Clone(message.DescriptorProto).(*descriptor.DescriptorProto)
 		for _, f := range m.Field {
 			oneof := f.OneofIndex != nil
@@ -688,7 +688,6 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 
 	p.sizeVarint()
 	p.sizeZigZag()
-
 }
 
 func init() {

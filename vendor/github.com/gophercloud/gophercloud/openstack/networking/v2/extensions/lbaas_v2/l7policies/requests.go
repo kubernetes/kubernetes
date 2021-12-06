@@ -11,9 +11,11 @@ type CreateOptsBuilder interface {
 	ToL7PolicyCreateMap() (map[string]interface{}, error)
 }
 
-type Action string
-type RuleType string
-type CompareType string
+type (
+	Action      string
+	RuleType    string
+	CompareType string
+)
 
 const (
 	ActionRedirectToPool Action = "REDIRECT_TO_POOL"

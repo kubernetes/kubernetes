@@ -248,7 +248,7 @@ func isExecutable(fullPath string) (bool, error) {
 		return false, nil
 	}
 
-	if m := info.Mode(); !m.IsDir() && m&0111 != 0 {
+	if m := info.Mode(); !m.IsDir() && m&0o111 != 0 {
 		return true, nil
 	}
 

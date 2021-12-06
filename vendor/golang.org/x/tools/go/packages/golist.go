@@ -1063,7 +1063,7 @@ func (state *golistState) writeOverlays() (filename string, cleanup func(), err 
 	}
 	// Write out the overlay file that contains the filepath mappings.
 	filename = filepath.Join(dir, "overlay.json")
-	if err := ioutil.WriteFile(filename, b, 0665); err != nil {
+	if err := ioutil.WriteFile(filename, b, 0o665); err != nil {
 		return "", func() {}, err
 	}
 	return filename, cleanup, nil

@@ -117,9 +117,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	specifierRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
-)
+var specifierRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // Matcher matches platforms specifications, provided by an image or runtime.
 type Matcher interface {

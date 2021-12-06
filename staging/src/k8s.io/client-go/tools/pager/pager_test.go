@@ -373,7 +373,8 @@ func TestListPager_eachListPageBuffered(t *testing.T) {
 			pagesProcessed: 1,
 			wantPageLists:  1,
 			pageBufferSize: 0,
-		}, {
+		},
+		{
 			name:           "no buffer, 1/5 pages processed",
 			totalPages:     5,
 			pagesProcessed: 1,

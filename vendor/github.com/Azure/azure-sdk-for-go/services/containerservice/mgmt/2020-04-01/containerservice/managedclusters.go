@@ -8,11 +8,12 @@ package containerservice
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ManagedClustersClient is the the Container Service Client.
@@ -49,51 +50,100 @@ func (client ManagedClustersClient) CreateOrUpdate(ctx context.Context, resource
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}},
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.ManagedClusterProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.LinuxProfile", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.LinuxProfile.AdminUsername", Name: validation.Null, Rule: true,
-						Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.LinuxProfile.AdminUsername", Name: validation.Pattern, Rule: `^[A-Za-z][-A-Za-z0-9_]*$`, Chain: nil}}},
-						{Target: "parameters.ManagedClusterProperties.LinuxProfile.SSH", Name: validation.Null, Rule: true,
-							Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.LinuxProfile.SSH.PublicKeys", Name: validation.Null, Rule: true, Chain: nil}}},
-					}},
-					{Target: "parameters.ManagedClusterProperties.WindowsProfile", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.WindowsProfile.AdminUsername", Name: validation.Null, Rule: true, Chain: nil}}},
-					{Target: "parameters.ManagedClusterProperties.ServicePrincipalProfile", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.ServicePrincipalProfile.ClientID", Name: validation.Null, Rule: true, Chain: nil}}},
-					{Target: "parameters.ManagedClusterProperties.NetworkProfile", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.PodCidr", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.PodCidr", Name: validation.Pattern, Rule: `^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$`, Chain: nil}}},
-							{Target: "parameters.ManagedClusterProperties.NetworkProfile.ServiceCidr", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.ServiceCidr", Name: validation.Pattern, Rule: `^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$`, Chain: nil}}},
-							{Target: "parameters.ManagedClusterProperties.NetworkProfile.DNSServiceIP", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.DNSServiceIP", Name: validation.Pattern, Rule: `^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`, Chain: nil}}},
-							{Target: "parameters.ManagedClusterProperties.NetworkProfile.DockerBridgeCidr", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.DockerBridgeCidr", Name: validation.Pattern, Rule: `^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$`, Chain: nil}}},
-							{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs", Name: validation.Null, Rule: false,
-									Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs.Count", Name: validation.Null, Rule: false,
-										Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs.Count", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
-											{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs.Count", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-										}},
-									}},
-									{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.AllocatedOutboundPorts", Name: validation.Null, Rule: false,
-										Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.AllocatedOutboundPorts", Name: validation.InclusiveMaximum, Rule: int64(64000), Chain: nil},
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.ManagedClusterProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.ManagedClusterProperties.LinuxProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.ManagedClusterProperties.LinuxProfile.AdminUsername", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.LinuxProfile.AdminUsername", Name: validation.Pattern, Rule: `^[A-Za-z][-A-Za-z0-9_]*$`, Chain: nil}},
+							},
+							{
+								Target: "parameters.ManagedClusterProperties.LinuxProfile.SSH", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.LinuxProfile.SSH.PublicKeys", Name: validation.Null, Rule: true, Chain: nil}},
+							},
+						},
+					},
+					{
+						Target: "parameters.ManagedClusterProperties.WindowsProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.WindowsProfile.AdminUsername", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+					{
+						Target: "parameters.ManagedClusterProperties.ServicePrincipalProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.ServicePrincipalProfile.ClientID", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+					{
+						Target: "parameters.ManagedClusterProperties.NetworkProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.ManagedClusterProperties.NetworkProfile.PodCidr", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.PodCidr", Name: validation.Pattern, Rule: `^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$`, Chain: nil}},
+							},
+							{
+								Target: "parameters.ManagedClusterProperties.NetworkProfile.ServiceCidr", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.ServiceCidr", Name: validation.Pattern, Rule: `^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$`, Chain: nil}},
+							},
+							{
+								Target: "parameters.ManagedClusterProperties.NetworkProfile.DNSServiceIP", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.DNSServiceIP", Name: validation.Pattern, Rule: `^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`, Chain: nil}},
+							},
+							{
+								Target: "parameters.ManagedClusterProperties.NetworkProfile.DockerBridgeCidr", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.DockerBridgeCidr", Name: validation.Pattern, Rule: `^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$`, Chain: nil}},
+							},
+							{
+								Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{
+										Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{
+												Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs.Count", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs.Count", Name: validation.InclusiveMaximum, Rule: int64(100), Chain: nil},
+													{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.ManagedOutboundIPs.Count", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+												},
+											},
+										},
+									},
+									{
+										Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.AllocatedOutboundPorts", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.AllocatedOutboundPorts", Name: validation.InclusiveMaximum, Rule: int64(64000), Chain: nil},
 											{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.AllocatedOutboundPorts", Name: validation.InclusiveMinimum, Rule: int64(0), Chain: nil},
-										}},
-									{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.IdleTimeoutInMinutes", Name: validation.Null, Rule: false,
-										Chain: []validation.Constraint{{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.IdleTimeoutInMinutes", Name: validation.InclusiveMaximum, Rule: int64(120), Chain: nil},
+										},
+									},
+									{
+										Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.IdleTimeoutInMinutes", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.IdleTimeoutInMinutes", Name: validation.InclusiveMaximum, Rule: int64(120), Chain: nil},
 											{Target: "parameters.ManagedClusterProperties.NetworkProfile.LoadBalancerProfile.IdleTimeoutInMinutes", Name: validation.InclusiveMinimum, Rule: int64(4), Chain: nil},
-										}},
-								}},
-						}},
-				}}}}}); err != nil {
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -178,12 +228,19 @@ func (client ManagedClustersClient) Delete(ctx context.Context, resourceGroupNam
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "Delete", err.Error())
 	}
 
@@ -265,12 +322,19 @@ func (client ManagedClustersClient) Get(ctx context.Context, resourceGroupName s
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "Get", err.Error())
 	}
 
@@ -357,12 +421,19 @@ func (client ManagedClustersClient) GetAccessProfile(ctx context.Context, resour
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "GetAccessProfile", err.Error())
 	}
 
@@ -445,12 +516,19 @@ func (client ManagedClustersClient) GetUpgradeProfile(ctx context.Context, resou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "GetUpgradeProfile", err.Error())
 	}
 
@@ -645,8 +723,11 @@ func (client ManagedClustersClient) ListByResourceGroup(ctx context.Context, res
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "ListByResourceGroup", err.Error())
 	}
 
@@ -769,12 +850,19 @@ func (client ManagedClustersClient) ListClusterAdminCredentials(ctx context.Cont
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "ListClusterAdminCredentials", err.Error())
 	}
 
@@ -856,12 +944,19 @@ func (client ManagedClustersClient) ListClusterMonitoringUserCredentials(ctx con
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "ListClusterMonitoringUserCredentials", err.Error())
 	}
 
@@ -943,12 +1038,19 @@ func (client ManagedClustersClient) ListClusterUserCredentials(ctx context.Conte
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "ListClusterUserCredentials", err.Error())
 	}
 
@@ -1030,12 +1132,19 @@ func (client ManagedClustersClient) ResetAADProfile(ctx context.Context, resourc
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "ResetAADProfile", err.Error())
 	}
 
@@ -1120,14 +1229,23 @@ func (client ManagedClustersClient) ResetServicePrincipalProfile(ctx context.Con
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}},
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.ClientID", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.ClientID", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "ResetServicePrincipalProfile", err.Error())
 	}
 
@@ -1211,12 +1329,19 @@ func (client ManagedClustersClient) RotateClusterCertificates(ctx context.Contex
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "RotateClusterCertificates", err.Error())
 	}
 
@@ -1299,12 +1424,19 @@ func (client ManagedClustersClient) UpdateTags(ctx context.Context, resourceGrou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.ManagedClustersClient", "UpdateTags", err.Error())
 	}
 

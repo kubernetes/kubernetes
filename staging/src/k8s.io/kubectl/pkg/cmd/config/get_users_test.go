@@ -25,7 +25,7 @@ import (
 )
 
 func TestGetUsersRun(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		config   clientcmdapi.Config
 		expected string

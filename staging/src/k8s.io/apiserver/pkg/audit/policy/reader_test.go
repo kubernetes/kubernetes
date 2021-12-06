@@ -116,7 +116,7 @@ func TestParsePolicyWithNoVersionOrKind(t *testing.T) {
 }
 
 func TestPolicyCntCheck(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		caseName, policy string
 	}{
 		{

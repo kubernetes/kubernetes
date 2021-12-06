@@ -50,27 +50,31 @@ func TestPrune(t *testing.T) {
 				},
 			},
 		}, expectedObject: `[{"a":1},{},{"a":1,"c":3}]`, expectedPruned: []string{"[1].b", "[2].b"}},
-		{name: "object array with nil schema", json: `[{"a":1},{"b":1},{"a":1,"b":2,"c":3}]`, expectedObject: `[{},{},{}]`,
-			expectedPruned: []string{"[0].a", "[1].b", "[2].a", "[2].b", "[2].c"}},
-		{name: "object array object", json: `{"array":[{"a":1},{"b":1},{"a":1,"b":2,"c":3}],"unspecified":{"a":1},"specified":{"a":1,"b":2,"c":3}}`, schema: &structuralschema.Structural{
-			Properties: map[string]structuralschema.Structural{
-				"array": {
-					Items: &structuralschema.Structural{
+		{
+			name: "object array with nil schema", json: `[{"a":1},{"b":1},{"a":1,"b":2,"c":3}]`, expectedObject: `[{},{},{}]`,
+			expectedPruned: []string{"[0].a", "[1].b", "[2].a", "[2].b", "[2].c"},
+		},
+		{
+			name: "object array object", json: `{"array":[{"a":1},{"b":1},{"a":1,"b":2,"c":3}],"unspecified":{"a":1},"specified":{"a":1,"b":2,"c":3}}`, schema: &structuralschema.Structural{
+				Properties: map[string]structuralschema.Structural{
+					"array": {
+						Items: &structuralschema.Structural{
+							Properties: map[string]structuralschema.Structural{
+								"a": {},
+								"c": {},
+							},
+						},
+					},
+					"specified": {
 						Properties: map[string]structuralschema.Structural{
 							"a": {},
 							"c": {},
 						},
 					},
 				},
-				"specified": {
-					Properties: map[string]structuralschema.Structural{
-						"a": {},
-						"c": {},
-					},
-				},
-			},
-		}, expectedObject: `{"array":[{"a":1},{},{"a":1,"c":3}],"specified":{"a":1,"c":3}}`,
-			expectedPruned: []string{"array[1].b", "array[2].b", "specified.b", "unspecified"}},
+			}, expectedObject: `{"array":[{"a":1},{},{"a":1,"c":3}],"specified":{"a":1,"c":3}}`,
+			expectedPruned: []string{"array[1].b", "array[2].b", "specified.b", "unspecified"},
+		},
 		{name: "nested x-kubernetes-preserve-unknown-fields", json: `
 {
   "unspecified":"bar",
@@ -191,36 +195,40 @@ func TestPrune(t *testing.T) {
   }
 }
 `, expectedPruned: []string{"preserving.pruning.unspecified", "preservingAdditionalPropertiesKeyPruneValues.foo.specified.unspecified", "preservingAdditionalPropertiesKeyPruneValues.foo.unspecified", "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields.foo.specified.unspecified", "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields.foo.unspecified", "pruning.apiVersion", "pruning.pruning.unspecified", "pruning.unspecified", "pruning.unspecifiedObject"}},
-		{name: "additionalProperties with schema", json: `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1}}}`, schema: &structuralschema.Structural{
-			Properties: map[string]structuralschema.Structural{
-				"a": {},
-				"c": {
-					Generic: structuralschema.Generic{
-						AdditionalProperties: &structuralschema.StructuralOrBool{
-							Structural: &structuralschema.Structural{
-								Generic: structuralschema.Generic{
-									Type: "integer",
+		{
+			name: "additionalProperties with schema", json: `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1}}}`, schema: &structuralschema.Structural{
+				Properties: map[string]structuralschema.Structural{
+					"a": {},
+					"c": {
+						Generic: structuralschema.Generic{
+							AdditionalProperties: &structuralschema.StructuralOrBool{
+								Structural: &structuralschema.Structural{
+									Generic: structuralschema.Generic{
+										Type: "integer",
+									},
 								},
 							},
 						},
 					},
 				},
-			},
-		}, expectedObject: `{"a":1,"c":{"a":1,"b":2,"c":{}}}`,
-			expectedPruned: []string{"b", "c.c.a"}},
-		{name: "additionalProperties with bool", json: `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1, "apiVersion": "unknown"}}}`, schema: &structuralschema.Structural{
-			Properties: map[string]structuralschema.Structural{
-				"a": {},
-				"c": {
-					Generic: structuralschema.Generic{
-						AdditionalProperties: &structuralschema.StructuralOrBool{
-							Bool: false,
+			}, expectedObject: `{"a":1,"c":{"a":1,"b":2,"c":{}}}`,
+			expectedPruned: []string{"b", "c.c.a"},
+		},
+		{
+			name: "additionalProperties with bool", json: `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1, "apiVersion": "unknown"}}}`, schema: &structuralschema.Structural{
+				Properties: map[string]structuralschema.Structural{
+					"a": {},
+					"c": {
+						Generic: structuralschema.Generic{
+							AdditionalProperties: &structuralschema.StructuralOrBool{
+								Bool: false,
+							},
 						},
 					},
 				},
-			},
-		}, expectedObject: `{"a":1,"c":{"a":1,"b":2,"c":{}}}`,
-			expectedPruned: []string{"b", "c.c.a", "c.c.apiVersion"}},
+			}, expectedObject: `{"a":1,"c":{"a":1,"b":2,"c":{}}}`,
+			expectedPruned: []string{"b", "c.c.a", "c.c.apiVersion"},
+		},
 		{name: "x-kubernetes-embedded-resource", json: `
 {
   "apiVersion": "foo/v1",

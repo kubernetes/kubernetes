@@ -43,8 +43,8 @@ func StorageWithCacher() generic.StorageDecorator {
 		newListFunc func() runtime.Object,
 		getAttrsFunc storage.AttrFunc,
 		triggerFuncs storage.IndexerFuncs,
-		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
-
+		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error,
+	) {
 		s, d, err := generic.NewRawStorage(storageConfig, newFunc)
 		if err != nil {
 			return s, d, err
@@ -103,8 +103,10 @@ func objectTypeToArgs(obj runtime.Object) []interface{} {
 // only from the test harness, so Register/Cleanup will be
 // no-op at runtime.
 
-var cleanupLock sync.Mutex
-var cleanup []func() = nil
+var (
+	cleanupLock sync.Mutex
+	cleanup     []func() = nil
+)
 
 func TrackStorageCleanup() {
 	cleanupLock.Lock()

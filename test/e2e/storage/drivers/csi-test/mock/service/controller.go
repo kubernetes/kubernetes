@@ -38,8 +38,8 @@ const (
 func (s *service) CreateVolume(
 	ctx context.Context,
 	req *csi.CreateVolumeRequest) (
-	*csi.CreateVolumeResponse, error) {
-
+	*csi.CreateVolumeResponse, error,
+) {
 	if len(req.Name) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume Name cannot be empty")
 	}
@@ -121,8 +121,8 @@ func (s *service) CreateVolume(
 func (s *service) DeleteVolume(
 	ctx context.Context,
 	req *csi.DeleteVolumeRequest) (
-	*csi.DeleteVolumeResponse, error) {
-
+	*csi.DeleteVolumeResponse, error,
+) {
 	s.volsRWL.Lock()
 	defer s.volsRWL.Unlock()
 
@@ -158,8 +158,8 @@ func (s *service) DeleteVolume(
 func (s *service) ControllerPublishVolume(
 	ctx context.Context,
 	req *csi.ControllerPublishVolumeRequest) (
-	*csi.ControllerPublishVolumeResponse, error) {
-
+	*csi.ControllerPublishVolumeResponse, error,
+) {
 	if s.config.DisableAttach {
 		return nil, status.Error(codes.Unimplemented, "ControllerPublish is not supported")
 	}
@@ -260,8 +260,8 @@ func (s *service) ControllerPublishVolume(
 func (s *service) ControllerUnpublishVolume(
 	ctx context.Context,
 	req *csi.ControllerUnpublishVolumeRequest) (
-	*csi.ControllerUnpublishVolumeResponse, error) {
-
+	*csi.ControllerUnpublishVolumeResponse, error,
+) {
 	if s.config.DisableAttach {
 		return nil, status.Error(codes.Unimplemented, "ControllerPublish is not supported")
 	}
@@ -318,8 +318,8 @@ func (s *service) ControllerUnpublishVolume(
 func (s *service) ValidateVolumeCapabilities(
 	ctx context.Context,
 	req *csi.ValidateVolumeCapabilitiesRequest) (
-	*csi.ValidateVolumeCapabilitiesResponse, error) {
-
+	*csi.ValidateVolumeCapabilitiesResponse, error,
+) {
 	if len(req.GetVolumeId()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID cannot be empty")
 	}
@@ -347,8 +347,8 @@ func (s *service) ValidateVolumeCapabilities(
 func (s *service) ControllerGetVolume(
 	ctx context.Context,
 	req *csi.ControllerGetVolumeRequest) (
-	*csi.ControllerGetVolumeResponse, error) {
-
+	*csi.ControllerGetVolumeResponse, error,
+) {
 	if hookVal, hookMsg := s.execHook("GetVolumeStart"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
 	}
@@ -382,8 +382,8 @@ func (s *service) ControllerGetVolume(
 func (s *service) ListVolumes(
 	ctx context.Context,
 	req *csi.ListVolumesRequest) (
-	*csi.ListVolumesResponse, error) {
-
+	*csi.ListVolumesResponse, error,
+) {
 	if hookVal, hookMsg := s.execHook("ListVolumesStart"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
 	}
@@ -476,8 +476,8 @@ func (s *service) ListVolumes(
 func (s *service) GetCapacity(
 	ctx context.Context,
 	req *csi.GetCapacityRequest) (
-	*csi.GetCapacityResponse, error) {
-
+	*csi.GetCapacityResponse, error,
+) {
 	if hookVal, hookMsg := s.execHook("GetCapacity"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
 	}
@@ -490,8 +490,8 @@ func (s *service) GetCapacity(
 func (s *service) ControllerGetCapabilities(
 	ctx context.Context,
 	req *csi.ControllerGetCapabilitiesRequest) (
-	*csi.ControllerGetCapabilitiesResponse, error) {
-
+	*csi.ControllerGetCapabilitiesResponse, error,
+) {
 	if hookVal, hookMsg := s.execHook("ControllerGetCapabilitiesStart"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
 	}
@@ -630,8 +630,8 @@ func (s *service) CreateSnapshot(ctx context.Context,
 }
 
 func (s *service) DeleteSnapshot(ctx context.Context,
-	req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-
+	req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error,
+) {
 	//  If the snapshot is not specified, return error
 	if len(req.SnapshotId) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Snapshot ID cannot be empty")
@@ -661,8 +661,8 @@ func (s *service) DeleteSnapshot(ctx context.Context,
 }
 
 func (s *service) ListSnapshots(ctx context.Context,
-	req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-
+	req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error,
+) {
 	if hookVal, hookMsg := s.execHook("ListSnapshots"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
 	}

@@ -29,7 +29,8 @@ func ClearAnnotation(key string) AnnotationClearer {
 // and metadata if they are empty/null
 func ClearEmptyAnnotations(rn *RNode) error {
 	_, err := rn.Pipe(Lookup(MetadataField), FieldClearer{
-		Name: AnnotationsField, IfEmpty: true})
+		Name: AnnotationsField, IfEmpty: true,
+	})
 	if err != nil {
 		return errors.Wrap(err)
 	}
@@ -128,7 +129,8 @@ func (s LabelSetter) Filter(rn *RNode) (*RNode, error) {
 func addMetadataNode(rn *RNode, field, key string, v *RNode) (*RNode, error) {
 	return rn.Pipe(
 		PathGetter{
-			Path: []string{MetadataField, field}, Create: yaml.MappingNode},
+			Path: []string{MetadataField, field}, Create: yaml.MappingNode,
+		},
 		FieldSetter{Name: key, Value: v})
 }
 

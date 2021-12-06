@@ -114,7 +114,7 @@ func (fake *fakeDiskManager) MakeGlobalVDPDName(disk iscsiDisk) string {
 
 func (fake *fakeDiskManager) AttachDisk(b iscsiDiskMounter) (string, error) {
 	globalPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
-	err := os.MkdirAll(globalPath, 0750)
+	err := os.MkdirAll(globalPath, 0o750)
 	if err != nil {
 		return "", err
 	}
@@ -398,7 +398,6 @@ func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
 				err, resultNs, resultName)
 		}
 	}
-
 }
 
 func TestGetISCSIInitiatorInfo(t *testing.T) {

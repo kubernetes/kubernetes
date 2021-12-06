@@ -103,7 +103,6 @@ func TestOptions(t *testing.T) {
 
 			if !assert.ElementsMatch(t, tc.errs.ToAggregate(), err) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, err)
-
 			}
 		})
 	}

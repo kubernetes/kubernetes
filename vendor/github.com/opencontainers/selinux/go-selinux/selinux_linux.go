@@ -784,7 +784,7 @@ func enforceMode() int {
 // setEnforceMode sets the current SELinux mode Enforcing, Permissive.
 // Disabled is not valid, since this needs to be set at boot time.
 func setEnforceMode(mode int) error {
-	return ioutil.WriteFile(selinuxEnforcePath(), []byte(strconv.Itoa(mode)), 0644)
+	return ioutil.WriteFile(selinuxEnforcePath(), []byte(strconv.Itoa(mode)), 0o644)
 }
 
 // defaultEnforceMode returns the systems default SELinux mode Enforcing,
@@ -985,7 +985,7 @@ func addMcs(processLabel, fileLabel string) (string, string) {
 
 // securityCheckContext validates that the SELinux label is understood by the kernel
 func securityCheckContext(val string) error {
-	return ioutil.WriteFile(path.Join(getSelinuxMountPoint(), "context"), []byte(val), 0644)
+	return ioutil.WriteFile(path.Join(getSelinuxMountPoint(), "context"), []byte(val), 0o644)
 }
 
 // copyLevel returns a label with the MLS/MCS level from src label replaced on
@@ -1072,7 +1072,8 @@ func dupSecOpt(src string) ([]string, error) {
 		con["type"] == "" {
 		return nil, nil
 	}
-	dup := []string{"user:" + con["user"],
+	dup := []string{
+		"user:" + con["user"],
 		"role:" + con["role"],
 		"type:" + con["type"],
 	}

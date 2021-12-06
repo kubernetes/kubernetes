@@ -425,7 +425,7 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 
 	// save volume data
 	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
-	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+	if err := os.MkdirAll(dir, 0o755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 

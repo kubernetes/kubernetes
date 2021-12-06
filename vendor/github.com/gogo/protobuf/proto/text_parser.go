@@ -210,9 +210,7 @@ func (p *textParser) advance() {
 	p.offset += len(p.cur.value)
 }
 
-var (
-	errBadUTF8 = errors.New("proto: bad UTF-8")
-)
+var errBadUTF8 = errors.New("proto: bad UTF-8")
 
 func unquoteC(s string, quote rune) (string, error) {
 	// This is based on C++'s tokenizer.cc.

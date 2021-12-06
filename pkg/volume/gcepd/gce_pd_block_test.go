@@ -47,12 +47,12 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
-	//deferred clean up
+	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
-	//Bad Path
+	// Bad Path
 	badspec, err := getVolumeSpecFromGlobalMapPath("", "")
 	if badspec != nil || err == nil {
 		t.Errorf("Expected not to get spec from GlobalMapPath but did")
@@ -105,7 +105,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
-	//deferred clean up
+	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
@@ -131,7 +131,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 		t.Fatalf("Got a nil Mounter")
 	}
 
-	//GetGlobalMapPath
+	// GetGlobalMapPath
 	gMapPath, err := mapper.GetGlobalMapPath(spec)
 	if err != nil || len(gMapPath) == 0 {
 		t.Fatalf("Invalid GlobalMapPath from spec: %s", spec.PersistentVolume.Spec.GCEPersistentDisk.PDName)
@@ -140,7 +140,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 		t.Errorf("Failed to get GlobalMapPath: %s %s", gMapPath, expectedGlobalPath)
 	}
 
-	//GetPodDeviceMapPath
+	// GetPodDeviceMapPath
 	gDevicePath, gVolName := mapper.GetPodDeviceMapPath()
 	if gDevicePath != expectedPodPath {
 		t.Errorf("Got unexpected pod path: %s, expected %s", gDevicePath, expectedPodPath)

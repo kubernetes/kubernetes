@@ -202,8 +202,7 @@ func createDecoderOfNative(ctx *ctx, typ reflect2.Type) ValDecoder {
 	return nil
 }
 
-type stringCodec struct {
-}
+type stringCodec struct{}
 
 func (codec *stringCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	*((*string)(ptr)) = iter.ReadString()
@@ -218,8 +217,7 @@ func (codec *stringCodec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*string)(ptr)) == ""
 }
 
-type int8Codec struct {
-}
+type int8Codec struct{}
 
 func (codec *int8Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -235,8 +233,7 @@ func (codec *int8Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*int8)(ptr)) == 0
 }
 
-type int16Codec struct {
-}
+type int16Codec struct{}
 
 func (codec *int16Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -252,8 +249,7 @@ func (codec *int16Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*int16)(ptr)) == 0
 }
 
-type int32Codec struct {
-}
+type int32Codec struct{}
 
 func (codec *int32Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -269,8 +265,7 @@ func (codec *int32Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*int32)(ptr)) == 0
 }
 
-type int64Codec struct {
-}
+type int64Codec struct{}
 
 func (codec *int64Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -286,8 +281,7 @@ func (codec *int64Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*int64)(ptr)) == 0
 }
 
-type uint8Codec struct {
-}
+type uint8Codec struct{}
 
 func (codec *uint8Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -303,8 +297,7 @@ func (codec *uint8Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*uint8)(ptr)) == 0
 }
 
-type uint16Codec struct {
-}
+type uint16Codec struct{}
 
 func (codec *uint16Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -320,8 +313,7 @@ func (codec *uint16Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*uint16)(ptr)) == 0
 }
 
-type uint32Codec struct {
-}
+type uint32Codec struct{}
 
 func (codec *uint32Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -337,8 +329,7 @@ func (codec *uint32Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*uint32)(ptr)) == 0
 }
 
-type uint64Codec struct {
-}
+type uint64Codec struct{}
 
 func (codec *uint64Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -354,8 +345,7 @@ func (codec *uint64Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*uint64)(ptr)) == 0
 }
 
-type float32Codec struct {
-}
+type float32Codec struct{}
 
 func (codec *float32Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -371,8 +361,7 @@ func (codec *float32Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*float32)(ptr)) == 0
 }
 
-type float64Codec struct {
-}
+type float64Codec struct{}
 
 func (codec *float64Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {
@@ -388,8 +377,7 @@ func (codec *float64Codec) IsEmpty(ptr unsafe.Pointer) bool {
 	return *((*float64)(ptr)) == 0
 }
 
-type boolCodec struct {
-}
+type boolCodec struct{}
 
 func (codec *boolCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	if !iter.ReadNil() {

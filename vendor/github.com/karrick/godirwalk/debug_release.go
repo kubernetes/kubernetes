@@ -1,3 +1,4 @@
+//go:build !godirwalk_debug
 // +build !godirwalk_debug
 
 package godirwalk

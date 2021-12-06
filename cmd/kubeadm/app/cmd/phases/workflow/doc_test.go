@@ -39,7 +39,7 @@ type myPhaseData interface {
 
 func ExamplePhase() {
 	// Create a phase
-	var myPhase1 = Phase{
+	myPhase1 := Phase{
 		Name:  "myPhase1",
 		Short: "A phase of a kubeadm composable workflow...",
 		Run: func(data RunData) error {
@@ -56,7 +56,7 @@ func ExamplePhase() {
 	}
 
 	// Create another phase
-	var myPhase2 = Phase{
+	myPhase2 := Phase{
 		Name:  "myPhase2",
 		Short: "Another phase of a kubeadm composable workflow...",
 		Run: func(data RunData) error {
@@ -80,7 +80,7 @@ func ExamplePhase() {
 
 func ExampleRunner_Run() {
 	// Create a phase
-	var myPhase = Phase{
+	myPhase := Phase{
 		Name:  "myPhase",
 		Short: "A phase of a kubeadm composable workflow...",
 		Run: func(data RunData) error {
@@ -97,7 +97,7 @@ func ExampleRunner_Run() {
 	}
 
 	// Adds the new phase to the workflow
-	var myWorkflowRunner = NewRunner()
+	myWorkflowRunner := NewRunner()
 	myWorkflowRunner.AppendPhase(myPhase)
 
 	// Defines the method that creates the runtime data shared

@@ -218,6 +218,7 @@ type sortedMapContents yaml.Node
 func (s sortedMapContents) Len() int {
 	return len(s.Content) / 2
 }
+
 func (s sortedMapContents) Swap(i, j int) {
 	// yaml MappingNode Contents are a list of field names followed by
 	// field values, rather than a list of field <name, value> pairs.
@@ -230,8 +231,7 @@ func (s sortedMapContents) Swap(i, j int) {
 	jFieldValueIndex := jFieldNameIndex + 1
 
 	// swap field names
-	s.Content[iFieldNameIndex], s.Content[jFieldNameIndex] =
-		s.Content[jFieldNameIndex], s.Content[iFieldNameIndex]
+	s.Content[iFieldNameIndex], s.Content[jFieldNameIndex] = s.Content[jFieldNameIndex], s.Content[iFieldNameIndex]
 
 	// swap field values
 	s.Content[iFieldValueIndex], s.Content[jFieldValueIndex] = s.
@@ -274,9 +274,11 @@ type sortedSeqContents struct {
 func (s sortedSeqContents) Len() int {
 	return len(s.Content)
 }
+
 func (s sortedSeqContents) Swap(i, j int) {
 	s.Content[i], s.Content[j] = s.Content[j], s.Content[i]
 }
+
 func (s sortedSeqContents) Less(i, j int) bool {
 	// primitive lists -- sort by the element's primitive values
 	if s.sortField == "" {

@@ -19,10 +19,8 @@ import (
 
 type SemanticContext interface {
 	comparable
-
 	evaluate(parser Recognizer, outerContext RuleContext) bool
 	evalPrecedence(parser Recognizer, outerContext RuleContext) SemanticContext
-
 	hash() int
 	String() string
 }
@@ -75,8 +73,8 @@ func NewPredicate(ruleIndex, predIndex int, isCtxDependent bool) *Predicate {
 	return p
 }
 
-//The default {@link SemanticContext}, which is semantically equivalent to
-//a predicate of the form {@code {true}?}.
+// The default {@link SemanticContext}, which is semantically equivalent to
+// a predicate of the form {@code {true}?}.
 
 var SemanticContextNone SemanticContext = NewPredicate(-1, -1, false)
 
@@ -85,7 +83,6 @@ func (p *Predicate) evalPrecedence(parser Recognizer, outerContext RuleContext) 
 }
 
 func (p *Predicate) evaluate(parser Recognizer, outerContext RuleContext) bool {
-
 	var localctx RuleContext
 
 	if p.isCtxDependent {
@@ -120,7 +117,6 @@ type PrecedencePredicate struct {
 }
 
 func NewPrecedencePredicate(precedence int) *PrecedencePredicate {
-
 	p := new(PrecedencePredicate)
 	p.precedence = precedence
 
@@ -181,7 +177,6 @@ type AND struct {
 }
 
 func NewAND(a, b SemanticContext) *AND {
-
 	operands := NewSet(nil, nil)
 	if aa, ok := a.(*AND); ok {
 		for _, o := range aa.opnds {
@@ -333,7 +328,6 @@ type OR struct {
 }
 
 func NewOR(a, b SemanticContext) *OR {
-
 	operands := NewSet(nil, nil)
 	if aa, ok := a.(*OR); ok {
 		for _, o := range aa.opnds {

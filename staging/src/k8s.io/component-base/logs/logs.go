@@ -30,8 +30,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const logFlushFreqFlagName = "log-flush-frequency"
-const deprecated = "will be removed in a future release, see https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components"
+const (
+	logFlushFreqFlagName = "log-flush-frequency"
+	deprecated           = "will be removed in a future release, see https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components"
+)
 
 // TODO (https://github.com/kubernetes/kubernetes/issues/105310): once klog
 // flags are removed, stop warning about "Non-default formats don't honor these

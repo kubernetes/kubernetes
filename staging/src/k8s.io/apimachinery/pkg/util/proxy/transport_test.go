@@ -345,7 +345,6 @@ func TestRewriteResponse(t *testing.T) {
 		for _, exp := range expected {
 			resp := v.writer(exp)
 			gotResponse, err := testTransport.rewriteResponse(request, resp)
-
 			if err != nil {
 				errFn(v.encodeType, err)
 			}

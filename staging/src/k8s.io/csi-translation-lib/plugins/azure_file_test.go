@@ -546,7 +546,6 @@ func TestTranslateCSIPVToInTree(t *testing.T) {
 			t.Errorf("Got parameters: %v, expected :%v", got, tc.expVol)
 		}
 	}
-
 }
 
 func TestGetStorageAccount(t *testing.T) {

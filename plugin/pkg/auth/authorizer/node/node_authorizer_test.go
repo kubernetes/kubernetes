@@ -522,7 +522,6 @@ func BenchmarkPopulationAllocation(b *testing.B) {
 }
 
 func BenchmarkPopulationRetention(b *testing.B) {
-
 	// Run with:
 	// go test ./plugin/pkg/auth/authorizer/node -benchmem -bench . -run None -v -o node.test -timeout 300m
 
@@ -564,7 +563,6 @@ func BenchmarkPopulationRetention(b *testing.B) {
 }
 
 func BenchmarkWriteIndexMaintenance(b *testing.B) {
-
 	// Run with:
 	// go test ./plugin/pkg/auth/authorizer/node -benchmem -bench BenchmarkWriteIndexMaintenance -run None
 

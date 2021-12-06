@@ -155,7 +155,6 @@ type OperationExecutor interface {
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(
 	operationGenerator OperationGenerator) OperationExecutor {
-
 	return &operationExecutor{
 		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
 			true /* exponentialBackOffOnError */),
@@ -678,8 +677,7 @@ func (oe *operationExecutor) IsOperationSafeToRetry(
 func (oe *operationExecutor) AttachVolume(
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	generatedOperations :=
-		oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
+	generatedOperations := oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
 
 	if util.IsMultiAttachAllowed(volumeToAttach.VolumeSpec) {
 		return oe.pendingOperations.Run(
@@ -694,8 +692,7 @@ func (oe *operationExecutor) DetachVolume(
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	generatedOperations, err :=
-		oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
+	generatedOperations, err := oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -706,13 +703,12 @@ func (oe *operationExecutor) DetachVolume(
 	}
 	return oe.pendingOperations.Run(
 		volumeToDetach.VolumeName, "" /* podName */, "" /* nodeName */, generatedOperations)
-
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(
 	attachedVolumes map[types.NodeName][]AttachedVolume,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) {
-
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater,
+) {
 	// A map of plugin names and nodes on which they exist with volumes they manage
 	bulkVerifyPluginsByNode := make(map[string]map[types.NodeName][]*volume.Spec)
 	volumeSpecMapByPlugin := make(map[string]map[*volume.Spec]v1.UniqueVolumeName)
@@ -725,8 +721,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 				continue
 			}
 
-			volumePlugin, err :=
-				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
+			volumePlugin, err := oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
 			if err != nil {
 				klog.Errorf(
 					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
@@ -804,8 +799,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttachedPerNode(
 	attachedVolumes []AttachedVolume,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	generatedOperations, err :=
-		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
+	generatedOperations, err := oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -829,7 +823,6 @@ func (oe *operationExecutor) MountVolume(
 		// Mount/remount a volume when a volume is attached
 		generatedOperations = oe.operationGenerator.GenerateMountVolumeFunc(
 			waitForAttachTimeout, volumeToMount, actualStateOfWorld, isRemount)
-
 	} else {
 		// Block volume case
 		// Creates a map to device if a volume is attached
@@ -929,8 +922,7 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
-	generatedOperations, err :=
-		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
+	generatedOperations, err := oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -948,8 +940,8 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	podName volumetypes.UniquePodName,
 	volumeSpecName string,
 	volumePath string,
-	pluginName string) (*volume.Spec, error) {
-
+	pluginName string) (*volume.Spec, error,
+) {
 	// Filesystem Volume case
 	if volumeMode == v1.PersistentVolumeFilesystem {
 		// Create volumeSpec from mount path

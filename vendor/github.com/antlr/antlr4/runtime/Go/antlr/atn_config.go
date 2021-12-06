@@ -19,21 +19,15 @@ type comparable interface {
 // before reaching an ATN state.
 type ATNConfig interface {
 	comparable
-
 	hash() int
-
 	GetState() ATNState
 	GetAlt() int
 	GetSemanticContext() SemanticContext
-
 	GetContext() PredictionContext
 	SetContext(PredictionContext)
-
 	GetReachesIntoOuterContext() int
 	SetReachesIntoOuterContext(int)
-
 	String() string
-
 	getPrecedenceFilterSuppressed() bool
 	setPrecedenceFilterSuppressed(bool)
 }
@@ -119,6 +113,7 @@ func (b *BaseATNConfig) GetAlt() int {
 func (b *BaseATNConfig) SetContext(v PredictionContext) {
 	b.context = v
 }
+
 func (b *BaseATNConfig) GetContext() PredictionContext {
 	return b.context
 }
@@ -142,7 +137,7 @@ func (b *BaseATNConfig) equals(o interface{}) bool {
 		return true
 	}
 
-	var other, ok = o.(*BaseATNConfig)
+	other, ok := o.(*BaseATNConfig)
 
 	if !ok {
 		return false
@@ -262,7 +257,7 @@ func (l *LexerATNConfig) hash() int {
 }
 
 func (l *LexerATNConfig) equals(other interface{}) bool {
-	var othert, ok = other.(*LexerATNConfig)
+	othert, ok := other.(*LexerATNConfig)
 
 	if l == other {
 		return true
@@ -287,9 +282,8 @@ func (l *LexerATNConfig) equals(other interface{}) bool {
 	return l.BaseATNConfig.equals(othert.BaseATNConfig)
 }
 
-
 func checkNonGreedyDecision(source *LexerATNConfig, target ATNState) bool {
-	var ds, ok = target.(DecisionState)
+	ds, ok := target.(DecisionState)
 
 	return source.passedThroughNonGreedyDecision || (ok && ds.getNonGreedy())
 }

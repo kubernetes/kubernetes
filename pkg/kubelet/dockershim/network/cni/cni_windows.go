@@ -22,13 +22,14 @@ package cni
 import (
 	"context"
 	"fmt"
+	"net"
+	"time"
+
 	cniTypes020 "github.com/containernetworking/cni/pkg/types/020"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
-	"net"
-	"time"
 )
 
 func getLoNetwork(binDirs []string) *cniNetwork {
@@ -69,7 +70,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, err
 	}
 
-	var list = []net.IP{result020.IP4.IP.IP}
+	list := []net.IP{result020.IP4.IP.IP}
 
 	if result020.IP6 != nil {
 		list = append(list, result020.IP6.IP.IP)

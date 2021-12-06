@@ -30,9 +30,7 @@ const (
 	vSphereConfFileEnvVar = "VSPHERE_CONF_FILE"
 )
 
-var (
-	confFileLocation = os.Getenv(vSphereConfFileEnvVar)
-)
+var confFileLocation = os.Getenv(vSphereConfFileEnvVar)
 
 // Config represents vSphere configuration
 type Config struct {

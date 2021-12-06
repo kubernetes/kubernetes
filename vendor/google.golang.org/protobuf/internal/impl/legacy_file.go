@@ -73,9 +73,11 @@ type resolverOnly struct {
 func (r resolverOnly) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
 	return r.reg.FindFileByPath(path)
 }
+
 func (r resolverOnly) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
 	return r.reg.FindDescriptorByName(name)
 }
+
 func (resolverOnly) RegisterFile(protoreflect.FileDescriptor) error {
 	return nil
 }

@@ -29,19 +29,18 @@ func getProtoField(clientType int, op int) int {
 }
 
 func uint64ToGuidString(guid uint64) string {
-	//Convert to byte array
+	// Convert to byte array
 	sysGuidBytes := new(bytes.Buffer)
 	binary.Write(sysGuidBytes, binary.LittleEndian, guid)
 
-	//Convert to HardwareAddr
+	// Convert to HardwareAddr
 	sysGuidNet := net.HardwareAddr(sysGuidBytes.Bytes())
 
-	//Get the String
+	// Get the String
 	return sysGuidNet.String()
 }
 
 func executeOneGetRdmaLink(data []byte) (*RdmaLink, error) {
-
 	link := RdmaLink{}
 
 	reader := bytes.NewReader(data)
@@ -78,7 +77,6 @@ func executeOneGetRdmaLink(data []byte) (*RdmaLink, error) {
 }
 
 func execRdmaGetLink(req *nl.NetlinkRequest, name string) (*RdmaLink, error) {
-
 	msgs, err := req.Execute(unix.NETLINK_RDMA, 0)
 	if err != nil {
 		return nil, err
@@ -96,7 +94,6 @@ func execRdmaGetLink(req *nl.NetlinkRequest, name string) (*RdmaLink, error) {
 }
 
 func execRdmaSetLink(req *nl.NetlinkRequest) error {
-
 	_, err := req.Execute(unix.NETLINK_RDMA, 0)
 	return err
 }
@@ -110,7 +107,6 @@ func RdmaLinkByName(name string) (*RdmaLink, error) {
 // RdmaLinkByName finds a link by name and returns a pointer to the object if
 // found and nil error, otherwise returns error code.
 func (h *Handle) RdmaLinkByName(name string) (*RdmaLink, error) {
-
 	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_GET)
 	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK|unix.NLM_F_DUMP)
 
@@ -188,7 +184,6 @@ func RdmaSystemGetNetnsMode() (string, error) {
 // otherwise.
 // Equivalent to: `rdma system show netns'
 func (h *Handle) RdmaSystemGetNetnsMode() (string, error) {
-
 	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_SYS_GET)
 	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK)
 

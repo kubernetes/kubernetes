@@ -168,7 +168,7 @@ func TestCreateRenewCSR(t *testing.T) {
 
 	outdir := filepath.Join(dir, "out")
 
-	if err := os.MkdirAll(outdir, 0755); err != nil {
+	if err := os.MkdirAll(outdir, 0o755); err != nil {
 		t.Fatalf("couldn't create %s", outdir)
 	}
 
@@ -227,7 +227,6 @@ func TestCreateRenewCSR(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestCertToConfig(t *testing.T) {
@@ -259,7 +258,6 @@ func TestCertToConfig(t *testing.T) {
 
 	if len(cfg.Organization) != 1 || cfg.Organization[0] != expectedConfig.Organization[0] {
 		t.Errorf("expected organization %v, got %v", expectedConfig.Organization, cfg.Organization)
-
 	}
 
 	if len(cfg.Usages) != 1 || cfg.Usages[0] != expectedConfig.Usages[0] {

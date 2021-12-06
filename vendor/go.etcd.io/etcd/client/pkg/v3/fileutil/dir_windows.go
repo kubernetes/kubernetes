@@ -24,7 +24,7 @@ import (
 
 const (
 	// PrivateDirMode grants owner to make/remove files inside the directory.
-	PrivateDirMode = 0777
+	PrivateDirMode = 0o777
 )
 
 // OpenDir opens a directory in windows with write access for syncing.

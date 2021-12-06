@@ -19,7 +19,6 @@ func (tid TypeID) ID() TypeID {
 // Type represents a type described by BTF.
 type Type interface {
 	ID() TypeID
-
 	String() string
 
 	// Make a copy of the type, without copying Type members.

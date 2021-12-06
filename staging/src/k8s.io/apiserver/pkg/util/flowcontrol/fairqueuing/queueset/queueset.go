@@ -158,7 +158,8 @@ func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsObsPair
 		reqsObsPair:  reqsObsPair,
 		execSeatsObs: execSeatsObs,
 		qCfg:         qCfg,
-		dealer:       dealer}, nil
+		dealer:       dealer,
+	}, nil
 }
 
 // checkConfig returns a non-nil Dealer if the config is valid and
@@ -210,7 +211,8 @@ func (qs *queueSet) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetComplet
 	return &queueSetCompleter{
 		theSet: qs,
 		qCfg:   qCfg,
-		dealer: dealer}, nil
+		dealer: dealer,
+	}, nil
 }
 
 // setConfiguration is used to set the configuration for a queueSet.
@@ -943,7 +945,7 @@ func (qs *queueSet) boundNextDispatchLocked(queue *queue) {
 	if oldestReqFromMinQueue == nil {
 		return
 	}
-	var virtualStartBound = oldestReqFromMinQueue.arrivalR
+	virtualStartBound := oldestReqFromMinQueue.arrivalR
 	if queue.nextDispatchR < virtualStartBound {
 		if klog.V(4).Enabled() {
 			klog.InfoS("AntiWindup tweaked queue", "QS", qs.qCfg.Name, "queue", queue.index, "time", qs.clock.Now().Format(nsTimeFmt), "requestDescr1", oldestReqFromMinQueue.descr1, "requestDescr2", oldestReqFromMinQueue.descr2, "newVirtualStart", virtualStartBound, "deltaVirtualStart", (virtualStartBound - queue.nextDispatchR))

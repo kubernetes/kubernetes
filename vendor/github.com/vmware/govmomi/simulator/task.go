@@ -26,8 +26,10 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-const vTaskSuffix = "_Task" // vmomi suffix
-const sTaskSuffix = "Task"  // simulator suffix (avoiding golint warning)
+const (
+	vTaskSuffix = "_Task" // vmomi suffix
+	sTaskSuffix = "Task"  // simulator suffix (avoiding golint warning)
+)
 
 type Task struct {
 	mo.Task
@@ -73,7 +75,6 @@ func CreateTask(e mo.Reference, name string, run func(*Task) (types.AnyType, typ
 
 type TaskRunner interface {
 	mo.Reference
-
 	Run(*Task) (types.AnyType, types.BaseMethodFault)
 }
 

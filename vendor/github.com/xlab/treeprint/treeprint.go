@@ -8,8 +8,10 @@ import (
 	"reflect"
 )
 
-type Value interface{}
-type MetaValue interface{}
+type (
+	Value     interface{}
+	MetaValue interface{}
+)
 
 // Tree represents a tree structure with leaf-nodes and branch-nodes.
 type Tree interface {
@@ -36,7 +38,6 @@ type Tree interface {
 	String() string
 	// Bytes renders the tree or subtree as byteslice.
 	Bytes() []byte
-
 	SetValue(value Value)
 	SetMetaValue(meta MetaValue)
 }
@@ -131,7 +132,7 @@ func (n *node) Bytes() []byte {
 		if n.Meta != nil {
 			buf.WriteString(fmt.Sprintf("[%v]  %v", n.Meta, n.Value))
 		} else {
-			buf.WriteString(fmt.Sprintf("%v",n.Value))
+			buf.WriteString(fmt.Sprintf("%v", n.Value))
 		}
 		buf.WriteByte('\n')
 	} else {
@@ -152,17 +153,17 @@ func (n *node) String() string {
 	return string(n.Bytes())
 }
 
-func (n *node) SetValue(value Value){
+func (n *node) SetValue(value Value) {
 	n.Value = value
 }
 
-func (n *node) SetMetaValue(meta MetaValue){
+func (n *node) SetMetaValue(meta MetaValue) {
 	n.Meta = meta
 }
 
 func printNodes(wr io.Writer,
-	level int, levelsEnded []int, nodes []*node) {
-
+	level int, levelsEnded []int, nodes []*node,
+) {
 	for i, node := range nodes {
 		edge := EdgeTypeMid
 		if i == len(nodes)-1 {
@@ -177,8 +178,8 @@ func printNodes(wr io.Writer,
 }
 
 func printValues(wr io.Writer,
-	level int, levelsEnded []int, edge EdgeType, meta MetaValue, val Value) {
-
+	level int, levelsEnded []int, edge EdgeType, meta MetaValue, val Value,
+) {
 	for i := 0; i < level; i++ {
 		if isEnded(levelsEnded, i) {
 			fmt.Fprint(wr, "    ")
@@ -205,9 +206,9 @@ func isEnded(levelsEnded []int, level int) bool {
 type EdgeType string
 
 var (
-	EdgeTypeLink  EdgeType = "│"
-	EdgeTypeMid   EdgeType = "├──"
-	EdgeTypeEnd   EdgeType = "└──"
+	EdgeTypeLink EdgeType = "│"
+	EdgeTypeMid  EdgeType = "├──"
+	EdgeTypeEnd  EdgeType = "└──"
 )
 
 func New() Tree {

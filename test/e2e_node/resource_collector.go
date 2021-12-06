@@ -63,9 +63,7 @@ const (
 	houseKeepingInterval = 1
 )
 
-var (
-	systemContainers map[string]string
-)
+var systemContainers map[string]string
 
 // ResourceCollector is a collector object which collects
 // resource usage periodically from Cadvisor.

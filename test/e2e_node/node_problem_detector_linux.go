@@ -446,7 +446,7 @@ current-context: local-context
 
 // injectLog injects kernel log into specified file.
 func injectLog(file string, timestamp time.Time, log string, num int) error {
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_APPEND, 0666)
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_APPEND, 0o666)
 	if err != nil {
 		return err
 	}

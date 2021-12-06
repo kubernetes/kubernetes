@@ -140,7 +140,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pods, err = podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pods")
 			framework.ExpectEqual(len(pods.Items), 0)
-
 		})
 	})
 
@@ -205,7 +204,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.It("should never report success for a pending container", func() {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 
-			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~(secret|projected).*no such file or directory`)
+			reBug88766 := regexp.MustCompile(`rootfs_linux.*kubernetes\.io~(secret|projected).*no such file or directory`)
 
 			var (
 				lock sync.Mutex
@@ -453,7 +452,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 						h.WithLabelValues(pod.Spec.NodeName).Observe(end.Sub(start).Seconds())
 						framework.Logf("Pod %s on node %s timings total=%s t=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, end.Sub(start), t, completeDuration, duration)
 					}
-
 				}(i)
 			}
 

@@ -46,7 +46,6 @@ import (
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	ginkgo.Context("when gracefully shutting down", func() {
-
 		const (
 			pollInterval                        = 1 * time.Second
 			podStatusUpdateTimeout              = 30 * time.Second
@@ -215,7 +214,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 	})
 
 	ginkgo.Context("when gracefully shutting down with Pod priority", func() {
-
 		const (
 			pollInterval           = 1 * time.Second
 			podStatusUpdateTimeout = 10 * time.Second
@@ -254,7 +252,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 					ShutdownGracePeriodSeconds: int64(podStatusUpdateTimeout / time.Second),
 				},
 			}
-
 		})
 
 		ginkgo.BeforeEach(func() {
@@ -391,6 +388,7 @@ func getPriorityClass(name string, value int32) *schedulingv1.PriorityClass {
 	}
 	return priority
 }
+
 func getGracePeriodOverrideTestPod(name string, node string, gracePeriod int64, priorityClassName string) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -473,11 +471,11 @@ ExecStop=
 )
 
 func overlayDbusConfig() error {
-	err := os.MkdirAll(filepath.Dir(dbusConfPath), 0755)
+	err := os.MkdirAll(filepath.Dir(dbusConfPath), 0o755)
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(dbusConfPath, []byte(dbusConf), 0644)
+	err = os.WriteFile(dbusConfPath, []byte(dbusConf), 0o644)
 	if err != nil {
 		return err
 	}

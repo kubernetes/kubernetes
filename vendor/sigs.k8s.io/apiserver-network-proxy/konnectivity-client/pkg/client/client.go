@@ -120,7 +120,7 @@ func (t *grpcTunnel) serve(c clientConn) {
 					err:    resp.Error,
 					connid: resp.ConnectID,
 				}
-				select  {
+				select {
 				case ch <- result:
 				default:
 					klog.ErrorS(fmt.Errorf("blocked pending channel"), "Received second dial response for connection request", "connectionID", resp.ConnectID, "dialID", resp.Random)

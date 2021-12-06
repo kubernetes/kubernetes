@@ -175,7 +175,7 @@ func (ms *MemoryStorage) ApplySnapshot(snap pb.Snapshot) error {
 	ms.Lock()
 	defer ms.Unlock()
 
-	//handle check for old snapshot being applied
+	// handle check for old snapshot being applied
 	msIndex := ms.snapshot.Metadata.Index
 	snapIndex := snap.Metadata.Index
 	if msIndex >= snapIndex {

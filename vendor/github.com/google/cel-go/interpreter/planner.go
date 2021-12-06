@@ -147,10 +147,12 @@ func (p *planner) planIdent(expr *exprpb.Expr) (Interpretable, error) {
 func (p *planner) planCheckedIdent(id int64, identRef *exprpb.Reference) (Interpretable, error) {
 	// Plan a constant reference if this is the case for this simple identifier.
 	if identRef.Value != nil {
-		return p.Plan(&exprpb.Expr{Id: id,
+		return p.Plan(&exprpb.Expr{
+			Id: id,
 			ExprKind: &exprpb.Expr_ConstExpr{
 				ConstExpr: identRef.Value,
-			}})
+			},
+		})
 	}
 
 	// Check to see whether the type map indicates this is a type name. All types should be

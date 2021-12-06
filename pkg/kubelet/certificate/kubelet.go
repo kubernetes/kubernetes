@@ -56,7 +56,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate store: %v", err)
 	}
-	var certificateRenewFailure = compbasemetrics.NewCounter(
+	certificateRenewFailure := compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      metrics.KubeletSubsystem,
 			Name:           "server_expiration_renew_errors",
@@ -200,7 +200,6 @@ func NewKubeletClientCertificateManager(
 	keyFile string,
 	clientsetFn certificate.ClientsetFunc,
 ) (certificate.Manager, error) {
-
 	certificateStore, err := certificate.NewFileStore(
 		"kubelet-client",
 		certDirectory,
@@ -210,7 +209,7 @@ func NewKubeletClientCertificateManager(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate store: %v", err)
 	}
-	var certificateRenewFailure = compbasemetrics.NewCounter(
+	certificateRenewFailure := compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
 			Namespace:      metrics.KubeletSubsystem,
 			Subsystem:      "certificate_manager",

@@ -96,7 +96,6 @@ func main() {
 		klog.Fatalf("Failed to make client: %v", err)
 	}
 	client, err := clientset.NewForConfig(cc)
-
 	if err != nil {
 		klog.Fatalf("Failed to make client: %v", err)
 	}

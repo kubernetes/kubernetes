@@ -114,7 +114,6 @@ func (r ProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 			Name(string(pod.Name)).
 			Do(ctx).
 			Raw()
-
 		if err != nil {
 			if ctx.Err() != nil {
 				// We may encounter errors here because of a race between the pod readiness and apiserver
@@ -450,14 +449,14 @@ func logPodLogs(c clientset.Interface, namespace string, pods []v1.Pod, reportDi
 			}
 
 			logDir := filepath.Join(reportDir, namespace, pod.Name, container.Name)
-			err = os.MkdirAll(logDir, 0755)
+			err = os.MkdirAll(logDir, 0o755)
 			if err != nil {
 				e2elog.Logf("Unable to create path '%s'. Err: %v", logDir, err)
 				continue
 			}
 
 			logPath := filepath.Join(logDir, "logs.txt")
-			err = os.WriteFile(logPath, []byte(logs), 0644)
+			err = os.WriteFile(logPath, []byte(logs), 0o644)
 			if err != nil {
 				e2elog.Logf("Could not write the container logs in: %s. Err: %v", logPath, err)
 			}

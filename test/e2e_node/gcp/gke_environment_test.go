@@ -269,7 +269,7 @@ func checkDockerSeccomp() error {
         ]}`
 		image = "gcr.io/google-appengine/debian8:2017-06-07-171918"
 	)
-	if err := ioutil.WriteFile(seccompProfileFileName, []byte(seccompProfile), 0644); err != nil {
+	if err := ioutil.WriteFile(seccompProfileFileName, []byte(seccompProfile), 0o644); err != nil {
 		return err
 	}
 	// Starts a container with no seccomp profile and ensures that unshare

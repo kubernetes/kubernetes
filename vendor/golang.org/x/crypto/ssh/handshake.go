@@ -257,7 +257,6 @@ func (t *handshakeTransport) resetWriteThresholds() {
 }
 
 func (t *handshakeTransport) kexLoop() {
-
 write:
 	for t.getWriteError() == nil {
 		var request *pendingKex

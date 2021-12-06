@@ -242,7 +242,7 @@ func TestGetDataDisksWithVMSS(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	var testCases = []struct {
+	testCases := []struct {
 		desc              string
 		nodeName          types.NodeName
 		isDataDiskNull    bool

@@ -266,7 +266,7 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 	for _, ns := range namespaces {
 		nsMap[ns] = true
 	}
-	//Now POLL until all namespaces have been eradicated.
+	// Now POLL until all namespaces have been eradicated.
 	return wait.Poll(2*time.Second, timeout,
 		func() (bool, error) {
 			nsList, err := c.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
@@ -412,7 +412,7 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
 }
 
-//WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+// WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
@@ -641,7 +641,7 @@ func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			var rc = 127
+			rc := 127
 			if ee, ok := err.(*exec.ExitError); ok {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)

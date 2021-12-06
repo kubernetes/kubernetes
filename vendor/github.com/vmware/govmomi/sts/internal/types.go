@@ -190,7 +190,7 @@ func NewReference(id string, val string) Reference {
 		Transforms: Transforms{
 			XMLName: xml.Name{Local: "ds:Transforms"},
 			Transform: []Transform{
-				Transform{
+				{
 					XMLName:   xml.Name{Local: "ds:Transform"},
 					Algorithm: "http://www.w3.org/2001/10/xml-exc-c14n#",
 				},

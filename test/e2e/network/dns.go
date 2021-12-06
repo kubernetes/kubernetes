@@ -34,8 +34,10 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-const dnsTestPodHostName = "dns-querier-1"
-const dnsTestServiceName = "dns-test-service"
+const (
+	dnsTestPodHostName = "dns-querier-1"
+	dnsTestServiceName = "dns-test-service"
+)
 
 var _ = common.SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
@@ -566,5 +568,4 @@ var _ = common.SIGDescribe("DNS", func() {
 
 		// TODO: Add more test cases for other DNSPolicies.
 	})
-
 })

@@ -19,14 +19,11 @@ package utils
 import (
 	"regexp"
 	"strconv"
-
 	"sync"
 )
 
-var (
-	// Regexp, matching the contents of log entries, parsed or not
-	logEntryMessageRegex = regexp.MustCompile("(?:I\\d+ \\d+:\\d+:\\d+.\\d+ {7}\\d+ logs_generator.go:67] )?(\\d+) .*")
-)
+// Regexp, matching the contents of log entries, parsed or not
+var logEntryMessageRegex = regexp.MustCompile("(?:I\\d+ \\d+:\\d+:\\d+.\\d+ {7}\\d+ logs_generator.go:67] )?(\\d+) .*")
 
 // LogEntry represents a log entry, received from the logging backend.
 type LogEntry struct {

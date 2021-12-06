@@ -17,9 +17,7 @@ import (
 // It may return a modified context and event.
 type Exporter func(context.Context, Event, label.Map) context.Context
 
-var (
-	exporter unsafe.Pointer
-)
+var exporter unsafe.Pointer
 
 // SetExporter sets the global exporter function that handles all events.
 // The exporter is called synchronously from the event call site, so it should

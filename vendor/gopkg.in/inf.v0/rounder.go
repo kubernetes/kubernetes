@@ -31,7 +31,6 @@ var (
 var RoundExact Rounder
 
 type rounder interface {
-
 	// When UseRemainder() returns true, the Round() method is passed the
 	// remainder of the division, expressed as the numerator and denominator of
 	// a rational.
@@ -95,41 +94,51 @@ func roundHalf(f func(c int, odd uint) (roundUp bool)) func(z, q *Dec, rA, rB *b
 }
 
 func init() {
-	RoundExact = rndr{true,
+	RoundExact = rndr{
+		true,
 		func(z, q *Dec, rA, rB *big.Int) *Dec {
 			if rA.Sign() != 0 {
 				return nil
 			}
 			return z.Set(q)
-		}}
-	RoundDown = rndr{false,
+		},
+	}
+	RoundDown = rndr{
+		false,
 		func(z, q *Dec, rA, rB *big.Int) *Dec {
 			return z.Set(q)
-		}}
-	RoundUp = rndr{true,
+		},
+	}
+	RoundUp = rndr{
+		true,
 		func(z, q *Dec, rA, rB *big.Int) *Dec {
 			z.Set(q)
 			if rA.Sign() != 0 {
 				z.UnscaledBig().Add(z.UnscaledBig(), intSign[rA.Sign()*rB.Sign()+1])
 			}
 			return z
-		}}
-	RoundFloor = rndr{true,
+		},
+	}
+	RoundFloor = rndr{
+		true,
 		func(z, q *Dec, rA, rB *big.Int) *Dec {
 			z.Set(q)
 			if rA.Sign()*rB.Sign() < 0 {
 				z.UnscaledBig().Add(z.UnscaledBig(), intSign[0])
 			}
 			return z
-		}}
-	RoundCeil = rndr{true,
+		},
+	}
+	RoundCeil = rndr{
+		true,
 		func(z, q *Dec, rA, rB *big.Int) *Dec {
 			z.Set(q)
 			if rA.Sign()*rB.Sign() > 0 {
 				z.UnscaledBig().Add(z.UnscaledBig(), intSign[2])
 			}
 			return z
-		}}
+		},
+	}
 	RoundHalfDown = rndr{true, roundHalf(
 		func(c int, odd uint) bool {
 			return c > 0

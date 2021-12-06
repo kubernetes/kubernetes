@@ -31,6 +31,7 @@ func (e *sliceEdgeHolder) Visit(visitor func(neighbor int, edge graph.Edge)) {
 		}
 	}
 }
+
 func (e *sliceEdgeHolder) Delete(neighbor int) edgeHolder {
 	edges := e.edges[:0]
 	for i, edge := range e.edges {
@@ -48,6 +49,7 @@ func (e *sliceEdgeHolder) Delete(neighbor int) edgeHolder {
 	e.edges = edges
 	return e
 }
+
 func (e *sliceEdgeHolder) Set(neighbor int, newEdge graph.Edge) edgeHolder {
 	for i, edge := range e.edges {
 		if edge.From().ID() == e.self {
@@ -79,6 +81,7 @@ func (e *sliceEdgeHolder) Set(neighbor int, newEdge graph.Edge) edgeHolder {
 	h[neighbor] = newEdge
 	return h
 }
+
 func (e *sliceEdgeHolder) Get(neighbor int) (graph.Edge, bool) {
 	for _, edge := range e.edges {
 		if edge.From().ID() == e.self {
@@ -93,6 +96,7 @@ func (e *sliceEdgeHolder) Get(neighbor int) (graph.Edge, bool) {
 	}
 	return nil, false
 }
+
 func (e *sliceEdgeHolder) Len() int {
 	return len(e.edges)
 }
@@ -105,18 +109,22 @@ func (e mapEdgeHolder) Visit(visitor func(neighbor int, edge graph.Edge)) {
 		visitor(neighbor, edge)
 	}
 }
+
 func (e mapEdgeHolder) Delete(neighbor int) edgeHolder {
 	delete(e, neighbor)
 	return e
 }
+
 func (e mapEdgeHolder) Set(neighbor int, edge graph.Edge) edgeHolder {
 	e[neighbor] = edge
 	return e
 }
+
 func (e mapEdgeHolder) Get(neighbor int) (graph.Edge, bool) {
 	edge, ok := e[neighbor]
 	return edge, ok
 }
+
 func (e mapEdgeHolder) Len() int {
 	return len(e)
 }

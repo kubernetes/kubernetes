@@ -49,7 +49,8 @@ func (r *FakeImageService) SetFakeImages(images []string) {
 		r.Images[image] = r.makeFakeImage(
 			&runtimeapi.ImageSpec{
 				Image:       image,
-				Annotations: make(map[string]string)})
+				Annotations: make(map[string]string),
+			})
 	}
 }
 

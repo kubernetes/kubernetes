@@ -35,8 +35,10 @@ type MultipointExample struct {
 	mu              sync.RWMutex
 }
 
-var _ framework.ReservePlugin = &MultipointExample{}
-var _ framework.PreBindPlugin = &MultipointExample{}
+var (
+	_ framework.ReservePlugin = &MultipointExample{}
+	_ framework.PreBindPlugin = &MultipointExample{}
+)
 
 // Name is the name of the plug used in Registry and configurations.
 const Name = "multipoint-plugin-example"

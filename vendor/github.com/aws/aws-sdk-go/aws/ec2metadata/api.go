@@ -37,7 +37,6 @@ func (c *EC2Metadata) getToken(ctx aws.Context, duration time.Duration) (tokenOu
 	req.HTTPRequest.Header.Set(ttlHeader, ttl)
 
 	err := req.Send()
-
 	// Errors with bad request status should be returned.
 	if err != nil {
 		err = awserr.NewRequestFailure(

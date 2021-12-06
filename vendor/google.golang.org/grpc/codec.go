@@ -31,8 +31,10 @@ type baseCodec interface {
 	Unmarshal(data []byte, v interface{}) error
 }
 
-var _ baseCodec = Codec(nil)
-var _ baseCodec = encoding.Codec(nil)
+var (
+	_ baseCodec = Codec(nil)
+	_ baseCodec = encoding.Codec(nil)
+)
 
 // Codec defines the interface gRPC uses to encode and decode messages.
 // Note that implementations of this interface must be thread safe;

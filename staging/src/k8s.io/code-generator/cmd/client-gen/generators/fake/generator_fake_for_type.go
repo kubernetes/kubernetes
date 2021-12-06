@@ -268,7 +268,6 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		}
 
 		if e.HasVerb("list") {
-
 			sw.Do(adjustTemplate(e.VerbName, e.VerbType, listTemplate), m)
 		}
 
@@ -430,6 +429,7 @@ func (c *Fake$.type|publicPlural$) DeleteCollection(ctx context.Context, opts $.
 	return err
 }
 `
+
 var createTemplate = `
 // Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *Fake$.type|publicPlural$) Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {

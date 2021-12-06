@@ -119,7 +119,8 @@ func (p *protoTypeRegistry) FindFieldType(messageType string,
 	return &ref.FieldType{
 			Type:    field.CheckedType(),
 			IsSet:   field.IsSet,
-			GetFrom: field.GetFrom},
+			GetFrom: field.GetFrom,
+		},
 		true
 }
 
@@ -144,7 +145,11 @@ func (p *protoTypeRegistry) FindType(typeName string) (*exprpb.Type, bool) {
 		TypeKind: &exprpb.Type_Type{
 			Type: &exprpb.Type{
 				TypeKind: &exprpb.Type_MessageType{
-					MessageType: typeName}}}}, true
+					MessageType: typeName,
+				},
+			},
+		},
+	}, true
 }
 
 func (p *protoTypeRegistry) NewValue(typeName string, fields map[string]ref.Val) ref.Val {
@@ -240,10 +245,8 @@ func (p *protoTypeRegistry) registerAllTypes(fd *pb.FileDescription) error {
 // defaultTypeAdapter converts go native types to CEL values.
 type defaultTypeAdapter struct{}
 
-var (
-	// DefaultTypeAdapter adapts canonical CEL types from their equivalent Go values.
-	DefaultTypeAdapter = &defaultTypeAdapter{}
-)
+// DefaultTypeAdapter adapts canonical CEL types from their equivalent Go values.
+var DefaultTypeAdapter = &defaultTypeAdapter{}
 
 // NativeToValue implements the ref.TypeAdapter interface.
 func (a *defaultTypeAdapter) NativeToValue(value interface{}) ref.Val {

@@ -262,6 +262,7 @@ func hasAddressType(addresses []v1.NodeAddress, addressType v1.NodeAddressType) 
 	}
 	return false
 }
+
 func hasAddressValue(addresses []v1.NodeAddress, addressValue string) bool {
 	for _, address := range addresses {
 		if address.Address == addressValue {

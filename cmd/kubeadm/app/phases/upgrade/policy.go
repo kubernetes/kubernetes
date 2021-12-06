@@ -46,7 +46,6 @@ type VersionSkewPolicyErrors struct {
 
 // EnforceVersionPolicies enforces that the proposed new version is compatible with all the different version skew policies
 func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades bool) *VersionSkewPolicyErrors {
-
 	skewErrors := &VersionSkewPolicyErrors{
 		Mandatory: []error{},
 		Skippable: []error{},

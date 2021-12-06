@@ -76,8 +76,10 @@ var (
 	ErrPlatformNotSupported = hcs.ErrPlatformNotSupported
 )
 
-type EndpointNotFoundError = hns.EndpointNotFoundError
-type NetworkNotFoundError = hns.NetworkNotFoundError
+type (
+	EndpointNotFoundError = hns.EndpointNotFoundError
+	NetworkNotFoundError  = hns.NetworkNotFoundError
+)
 
 // ProcessError is an error encountered in HCS during an operation on a Process object
 type ProcessError struct {

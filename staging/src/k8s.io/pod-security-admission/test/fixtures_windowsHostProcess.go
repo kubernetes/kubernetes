@@ -36,7 +36,6 @@ containerFields: []string{
 */
 
 func init() {
-
 	fixtureData_1_0 := fixtureGenerator{
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			// minimal valid pod already captures all valid combinations

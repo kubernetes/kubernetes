@@ -12,7 +12,6 @@ import "fmt"
 //  node payloads to get the text for the nodes.  Detect
 //  parse trees and extract data appropriately.
 func TreesStringTree(tree Tree, ruleNames []string, recog Recognizer) string {
-
 	if recog != nil {
 		ruleNames = recog.GetRuleNames()
 	}

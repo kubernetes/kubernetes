@@ -34,7 +34,6 @@ func NewImportTracker(typesToAdd ...*types.Type) namer.ImportTracker {
 
 	tracker.AddTypes(typesToAdd...)
 	return &tracker
-
 }
 
 func golangTrackerLocalName(tracker namer.ImportTracker, t types.Name) string {

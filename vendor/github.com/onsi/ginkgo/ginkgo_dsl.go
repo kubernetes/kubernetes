@@ -32,8 +32,9 @@ import (
 	"github.com/onsi/ginkgo/types"
 )
 
-const GINKGO_VERSION = config.VERSION
-const GINKGO_PANIC = `
+const (
+	GINKGO_VERSION = config.VERSION
+	GINKGO_PANIC   = `
 Your test failed.
 Ginkgo panics to prevent subsequent assertions from running.
 Normally Ginkgo rescues this panic so you shouldn't see it.
@@ -45,33 +46,34 @@ To circumvent this, you should call
 
 at the top of the goroutine that caused this panic.
 `
+)
 
 func init() {
 	config.Flags(flag.CommandLine, "ginkgo", true)
 	GinkgoWriter = writer.New(os.Stdout)
 }
 
-//GinkgoWriter implements an io.Writer
-//When running in verbose mode any writes to GinkgoWriter will be immediately printed
-//to stdout.  Otherwise, GinkgoWriter will buffer any writes produced during the current test and flush them to screen
-//only if the current test fails.
+// GinkgoWriter implements an io.Writer
+// When running in verbose mode any writes to GinkgoWriter will be immediately printed
+// to stdout.  Otherwise, GinkgoWriter will buffer any writes produced during the current test and flush them to screen
+// only if the current test fails.
 var GinkgoWriter io.Writer
 
-//The interface by which Ginkgo receives *testing.T
+// The interface by which Ginkgo receives *testing.T
 type GinkgoTestingT interface {
 	Fail()
 }
 
-//GinkgoRandomSeed returns the seed used to randomize spec execution order.  It is
-//useful for seeding your own pseudorandom number generators (PRNGs) to ensure
-//consistent executions from run to run, where your tests contain variability (for
-//example, when selecting random test data).
+// GinkgoRandomSeed returns the seed used to randomize spec execution order.  It is
+// useful for seeding your own pseudorandom number generators (PRNGs) to ensure
+// consistent executions from run to run, where your tests contain variability (for
+// example, when selecting random test data).
 func GinkgoRandomSeed() int64 {
 	return config.GinkgoConfig.RandomSeed
 }
 
-//GinkgoParallelNode returns the parallel node number for the current ginkgo process
-//The node number is 1-indexed
+// GinkgoParallelNode returns the parallel node number for the current ginkgo process
+// The node number is 1-indexed
 func GinkgoParallelNode() int {
 	return config.GinkgoConfig.ParallelNode
 }
@@ -96,8 +98,8 @@ func GinkgoT(optionalOffset ...int) GinkgoTInterface {
 	return testingtproxy.New(GinkgoWriter, Fail, offset)
 }
 
-//The interface returned by GinkgoT().  This covers most of the methods
-//in the testing package's T.
+// The interface returned by GinkgoT().  This covers most of the methods
+// in the testing package's T.
 type GinkgoTInterface interface {
 	Fail()
 	Error(args ...interface{})
@@ -121,11 +123,11 @@ type GinkgoTInterface interface {
 //and a SpecSummary just before a spec begins and just after a spec ends
 type Reporter reporters.Reporter
 
-//Asynchronous specs are given a channel of the Done type.  You must close or write to the channel
-//to tell Ginkgo that your async test is done.
+// Asynchronous specs are given a channel of the Done type.  You must close or write to the channel
+// to tell Ginkgo that your async test is done.
 type Done chan<- interface{}
 
-//GinkgoTestDescription represents the information about the current running test returned by CurrentGinkgoTestDescription
+// GinkgoTestDescription represents the information about the current running test returned by CurrentGinkgoTestDescription
 //	FullTestText: a concatenation of ComponentTexts and the TestText
 //	ComponentTexts: a list of all texts for the Describes & Contexts leading up to the current test
 //	TestText: the text in the actual It or Measure node
@@ -147,7 +149,7 @@ type GinkgoTestDescription struct {
 	Duration time.Duration
 }
 
-//CurrentGinkgoTestDescripton returns information about the current running test.
+// CurrentGinkgoTestDescripton returns information about the current running test.
 func CurrentGinkgoTestDescription() GinkgoTestDescription {
 	summary, ok := global.Suite.CurrentRunningSpecSummary()
 	if !ok {
@@ -200,15 +202,15 @@ func RunSpecs(t GinkgoTestingT, description string) bool {
 	return RunSpecsWithCustomReporters(t, description, specReporters)
 }
 
-//To run your tests with Ginkgo's default reporter and your custom reporter(s), replace
-//RunSpecs() with this method.
+// To run your tests with Ginkgo's default reporter and your custom reporter(s), replace
+// RunSpecs() with this method.
 func RunSpecsWithDefaultAndCustomReporters(t GinkgoTestingT, description string, specReporters []Reporter) bool {
 	specReporters = append(specReporters, buildDefaultReporter())
 	return RunSpecsWithCustomReporters(t, description, specReporters)
 }
 
-//To run your tests with your custom reporter(s) (and *not* Ginkgo's default reporter), replace
-//RunSpecs() with this method.  Note that parallel tests will not work correctly without the default reporter
+// To run your tests with your custom reporter(s) (and *not* Ginkgo's default reporter), replace
+// RunSpecs() with this method.  Note that parallel tests will not work correctly without the default reporter
 func RunSpecsWithCustomReporters(t GinkgoTestingT, description string, specReporters []Reporter) bool {
 	writer := GinkgoWriter.(*writer.Writer)
 	writer.SetStream(config.DefaultReporterConfig.Verbose)
@@ -238,7 +240,7 @@ func buildDefaultReporter() Reporter {
 	}
 }
 
-//Skip notifies Ginkgo that the current spec was skipped.
+// Skip notifies Ginkgo that the current spec was skipped.
 func Skip(message string, callerSkip ...int) {
 	skip := 0
 	if len(callerSkip) > 0 {
@@ -249,7 +251,7 @@ func Skip(message string, callerSkip ...int) {
 	panic(GINKGO_PANIC)
 }
 
-//Fail notifies Ginkgo that the current spec has failed. (Gomega will call Fail for you automatically when an assertion fails.)
+// Fail notifies Ginkgo that the current spec has failed. (Gomega will call Fail for you automatically when an assertion fails.)
 func Fail(message string, callerSkip ...int) {
 	skip := 0
 	if len(callerSkip) > 0 {
@@ -288,19 +290,19 @@ func Describe(text string, body func()) bool {
 	return true
 }
 
-//You can focus the tests within a describe block using FDescribe
+// You can focus the tests within a describe block using FDescribe
 func FDescribe(text string, body func()) bool {
 	global.Suite.PushContainerNode(text, body, types.FlagTypeFocused, codelocation.New(1))
 	return true
 }
 
-//You can mark the tests within a describe block as pending using PDescribe
+// You can mark the tests within a describe block as pending using PDescribe
 func PDescribe(text string, body func()) bool {
 	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
-//You can mark the tests within a describe block as pending using XDescribe
+// You can mark the tests within a describe block as pending using XDescribe
 func XDescribe(text string, body func()) bool {
 	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
@@ -317,19 +319,19 @@ func Context(text string, body func()) bool {
 	return true
 }
 
-//You can focus the tests within a describe block using FContext
+// You can focus the tests within a describe block using FContext
 func FContext(text string, body func()) bool {
 	global.Suite.PushContainerNode(text, body, types.FlagTypeFocused, codelocation.New(1))
 	return true
 }
 
-//You can mark the tests within a describe block as pending using PContext
+// You can mark the tests within a describe block as pending using PContext
 func PContext(text string, body func()) bool {
 	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
-//You can mark the tests within a describe block as pending using XContext
+// You can mark the tests within a describe block as pending using XContext
 func XContext(text string, body func()) bool {
 	global.Suite.PushContainerNode(text, body, types.FlagTypePending, codelocation.New(1))
 	return true
@@ -346,19 +348,19 @@ func When(text string, body func()) bool {
 	return true
 }
 
-//You can focus the tests within a describe block using FWhen
+// You can focus the tests within a describe block using FWhen
 func FWhen(text string, body func()) bool {
 	global.Suite.PushContainerNode("when "+text, body, types.FlagTypeFocused, codelocation.New(1))
 	return true
 }
 
-//You can mark the tests within a describe block as pending using PWhen
+// You can mark the tests within a describe block as pending using PWhen
 func PWhen(text string, body func()) bool {
 	global.Suite.PushContainerNode("when "+text, body, types.FlagTypePending, codelocation.New(1))
 	return true
 }
 
-//You can mark the tests within a describe block as pending using XWhen
+// You can mark the tests within a describe block as pending using XWhen
 func XWhen(text string, body func()) bool {
 	global.Suite.PushContainerNode("when "+text, body, types.FlagTypePending, codelocation.New(1))
 	return true
@@ -374,45 +376,45 @@ func It(text string, body interface{}, timeout ...float64) bool {
 	return true
 }
 
-//You can focus individual Its using FIt
+// You can focus individual Its using FIt
 func FIt(text string, body interface{}, timeout ...float64) bool {
 	global.Suite.PushItNode(text, body, types.FlagTypeFocused, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
-//You can mark Its as pending using PIt
+// You can mark Its as pending using PIt
 func PIt(text string, _ ...interface{}) bool {
 	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
-//You can mark Its as pending using XIt
+// You can mark Its as pending using XIt
 func XIt(text string, _ ...interface{}) bool {
 	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
-//Specify blocks are aliases for It blocks and allow for more natural wording in situations
-//which "It" does not fit into a natural sentence flow. All the same protocols apply for Specify blocks
-//which apply to It blocks.
+// Specify blocks are aliases for It blocks and allow for more natural wording in situations
+// which "It" does not fit into a natural sentence flow. All the same protocols apply for Specify blocks
+// which apply to It blocks.
 func Specify(text string, body interface{}, timeout ...float64) bool {
 	global.Suite.PushItNode(text, body, types.FlagTypeNone, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
-//You can focus individual Specifys using FSpecify
+// You can focus individual Specifys using FSpecify
 func FSpecify(text string, body interface{}, timeout ...float64) bool {
 	global.Suite.PushItNode(text, body, types.FlagTypeFocused, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
-//You can mark Specifys as pending using PSpecify
+// You can mark Specifys as pending using PSpecify
 func PSpecify(text string, is ...interface{}) bool {
 	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
-//You can mark Specifys as pending using XSpecify
+// You can mark Specifys as pending using XSpecify
 func XSpecify(text string, is ...interface{}) bool {
 	global.Suite.PushItNode(text, func() {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
@@ -449,19 +451,19 @@ func Measure(text string, body interface{}, samples int) bool {
 	return true
 }
 
-//You can focus individual Measures using FMeasure
+// You can focus individual Measures using FMeasure
 func FMeasure(text string, body interface{}, samples int) bool {
 	global.Suite.PushMeasureNode(text, body, types.FlagTypeFocused, codelocation.New(1), samples)
 	return true
 }
 
-//You can mark Measurements as pending using PMeasure
+// You can mark Measurements as pending using PMeasure
 func PMeasure(text string, _ ...interface{}) bool {
 	global.Suite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
-//You can mark Measurements as pending using XMeasure
+// You can mark Measurements as pending using XMeasure
 func XMeasure(text string, _ ...interface{}) bool {
 	global.Suite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true

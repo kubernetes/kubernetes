@@ -91,7 +91,8 @@ func TestShouldCallHook(t *testing.T) {
 				Rules: []v1.RuleWithOperations{{
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"example.com"}, APIVersions: []string{"v1"}, Resources: []string{"widgets"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"example.com", "v2", "Widget"}, "ns", "name", schema.GroupVersionResource{"example.com", "v2", "widgets"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 			expectErr:  "unknown kind",
@@ -104,7 +105,8 @@ func TestShouldCallHook(t *testing.T) {
 				Rules: []v1.RuleWithOperations{{
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
 			expectCallKind:        schema.GroupVersionKind{"apps", "v1", "Deployment"},
@@ -125,7 +127,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
 			expectCallKind:        schema.GroupVersionKind{"apps", "v1", "Deployment"},
@@ -143,7 +146,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
@@ -159,7 +163,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
@@ -175,7 +180,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
 			expectCallKind:        schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"},
@@ -194,7 +200,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
 			expectCallKind:        schema.GroupVersionKind{"apps", "v1beta1", "Deployment"},
@@ -216,7 +223,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
 			expectCallKind:        schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
@@ -234,7 +242,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
@@ -250,7 +259,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
@@ -266,7 +276,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
 			expectCallKind:        schema.GroupVersionKind{"extensions", "v1beta1", "Scale"},
@@ -285,7 +296,8 @@ func TestShouldCallHook(t *testing.T) {
 				}, {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
-				}}},
+				}},
+			},
 			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:            true,
 			expectCallKind:        schema.GroupVersionKind{"apps", "v1beta1", "Scale"},
@@ -340,6 +352,7 @@ type fakeNamespaceLister struct {
 func (f fakeNamespaceLister) List(selector labels.Selector) (ret []*corev1.Namespace, err error) {
 	return nil, nil
 }
+
 func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
 	ns, ok := f.namespaces[name]
 	if ok {

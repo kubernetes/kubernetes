@@ -51,8 +51,10 @@ const (
 	DeleteMethod   = "Delete"
 )
 
-var node *corev1.Node
-var cordonedNode *corev1.Node
+var (
+	node         *corev1.Node
+	cordonedNode *corev1.Node
+)
 
 func TestMain(m *testing.M) {
 	// Create a node.

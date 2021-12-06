@@ -259,6 +259,7 @@ func (*fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return n
 func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
 	return map[string]volume.Volume{}, true
 }
+
 func (*fakeKubelet) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
 	return map[string]volume.BlockVolume{}, true
 }
@@ -273,6 +274,7 @@ func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { re
 func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
+
 func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	return nil, nil
 }
@@ -286,9 +288,11 @@ type fakeAuth struct {
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	return f.authenticateFunc(req)
 }
+
 func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
 	return f.attributesFunc(u, req)
 }
+
 func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorizeFunc(a)
 }
@@ -315,7 +319,6 @@ func newServerTestWithDebug(enableDebugging bool, streamingServer streaming.Serv
 }
 
 func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletConfiguration, streamingServer streaming.Server) *serverTestFramework {
-
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -415,7 +418,6 @@ func TestServeRunInContainer(t *testing.T) {
 	}
 
 	resp, err := http.Post(fw.testHTTPServer.URL+"/run/"+podNamespace+"/"+podName+"/"+expectedContainerName+"?cmd=ls%20-a", "", nil)
-
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -459,7 +461,6 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 
 	resp, err := http.Post(fw.testHTTPServer.URL+"/run/"+podNamespace+"/"+podName+"/"+testUID+"/"+expectedContainerName+"?cmd=ls%20-a", "", nil)
-
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}

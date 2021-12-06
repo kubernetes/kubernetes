@@ -17,14 +17,15 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"os"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	"os"
-	"testing"
 
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -60,7 +61,8 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			pvSpec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
-				}},
+				},
+			},
 			probVolumePlugins: gcepd.ProbeVolumePlugins(),
 		},
 		{
@@ -69,7 +71,8 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			pvSpec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{},
-				}},
+				},
+			},
 			probVolumePlugins: awsebs.ProbeVolumePlugins(),
 		},
 	}
@@ -117,7 +120,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 }
 
 func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name                 string
 		pvc                  *v1.PersistentVolumeClaim
 		pv                   *v1.PersistentVolume
@@ -210,7 +213,7 @@ func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
 }
 
 func TestOperationGenerator_callNodeExpansionOnPlugin(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name               string
 		pvc                *v1.PersistentVolumeClaim
 		pv                 *v1.PersistentVolume

@@ -41,10 +41,8 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-var (
-	// The default dns opt strings.
-	defaultDNSOptions = []string{"ndots:5"}
-)
+// The default dns opt strings.
+var defaultDNSOptions = []string{"ndots:5"}
 
 type podDNSType int
 
@@ -452,7 +450,7 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 			}
 		}
 	}
-	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
+	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0o600); err != nil {
 		klog.ErrorS(err, "Could not write dns nameserver in the file", "path", resolvePath)
 	}
 }

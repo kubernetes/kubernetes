@@ -41,7 +41,7 @@ func ToJSON(caddyfile []byte) ([]byte, error) {
 		}
 
 		// Extract directives deterministically by sorting them
-		var directives = make([]string, len(sb.Tokens))
+		directives := make([]string, len(sb.Tokens))
 		for dir := range sb.Tokens {
 			directives = append(directives, dir)
 		}
@@ -121,7 +121,7 @@ func FromJSON(jsonBytes []byte) ([]byte, error) {
 			if i > 0 {
 				result += ", "
 			}
-			//result += standardizeScheme(key)
+			// result += standardizeScheme(key)
 			result += key
 		}
 		result += jsonToText(sb.Body, 1)

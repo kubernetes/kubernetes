@@ -86,7 +86,6 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 	f := framework.NewDefaultFramework("host-process-test-windows")
 
 	ginkgo.It("should run as a process on the host/node", func() {
-
 		ginkgo.By("selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
 		framework.ExpectNoError(err, "Error finding Windows node")
@@ -416,7 +415,6 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 				framework.Failf("Pod '%s' did failed.", p.Name)
 			}
 		}
-
 	})
 
 	ginkgo.It("should support various volume mount types", func() {
@@ -573,7 +571,6 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 		framework.ExpectEqual(beforeMetrics.StartedInitContainersCount < afterMetrics.StartedInitContainersCount, true, "Count of started HostProcess init containers should increase")
 		framework.ExpectEqual(beforeMetrics.StartedInitContainersErrorCount < afterMetrics.StartedInitContainersErrorCount, true, "Count of started HostProcess errors init containers should increase")
 	})
-
 })
 
 func makeTestPodWithVolumeMounts(name string) *v1.Pod {

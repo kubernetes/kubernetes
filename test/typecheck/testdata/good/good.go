@@ -18,22 +18,28 @@ package main
 
 import "fmt"
 
-var i int = int(0)
-var pi *int = new(int)
-var i16 int16 = int16(0)
-var pi16 *int16 = new(int16)
-var i32 int32 = int32(0)
-var pi32 *int32 = new(int32)
-var i64 int64 = int64(0)
-var pi64 *int64 = new(int64)
+var (
+	i    int    = int(0)
+	pi   *int   = new(int)
+	i16  int16  = int16(0)
+	pi16 *int16 = new(int16)
+	i32  int32  = int32(0)
+	pi32 *int32 = new(int32)
+	i64  int64  = int64(0)
+	pi64 *int64 = new(int64)
+)
 
-var f32 float32 = float32(0.0)
-var pf32 *float32 = new(float32)
-var f64 float64 = float64(0.0)
-var pf64 *float64 = new(float64)
+var (
+	f32  float32  = float32(0.0)
+	pf32 *float32 = new(float32)
+	f64  float64  = float64(0.0)
+	pf64 *float64 = new(float64)
+)
 
-var str string = "a string"
-var pstr *string = new(string)
+var (
+	str  string  = "a string"
+	pstr *string = new(string)
+)
 
 type struc struct {
 	i int
@@ -41,11 +47,15 @@ type struc struct {
 	s string
 }
 
-var stru struc = struc{}
-var pstru *struc = &struc{}
+var (
+	stru  struc  = struc{}
+	pstru *struc = &struc{}
+)
 
-var sli []int = []int{0}
-var ma map[string]int = map[string]int{"zero": 0}
+var (
+	sli []int          = []int{0}
+	ma  map[string]int = map[string]int{"zero": 0}
+)
 
 func main() {
 	fmt.Println("hello, world!")

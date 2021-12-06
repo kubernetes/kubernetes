@@ -6,8 +6,6 @@
 
 package impl
 
-import ()
-
 func mergeBool(dst, src pointer, _ *coderFieldInfo, _ mergeOptions) {
 	*dst.Bool() = *src.Bool()
 }

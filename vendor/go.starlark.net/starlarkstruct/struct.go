@@ -172,6 +172,7 @@ func (s *Struct) Hash() (uint32, error) {
 	}
 	return x, nil
 }
+
 func (s *Struct) Freeze() {
 	for _, e := range s.entries {
 		e.value.Freeze()

@@ -18,9 +18,10 @@ package remote
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"testing"
 )
 
 func makePodSandboxMetadata(name, namespace, uid string) *runtimeapi.PodSandboxMetadata {

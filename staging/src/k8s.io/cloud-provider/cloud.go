@@ -87,10 +87,10 @@ type Clusters interface {
 // replace this method call in GetLoadBalancerName with a provider-specific implementation that
 // is less cryptic than the Service's UUID.
 func DefaultLoadBalancerName(service *v1.Service) string {
-	//GCE requires that the name of a load balancer starts with a lower case letter.
+	// GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
-	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	// AWS requires that the name of a load balancer is shorter than 32 bytes.
 	if len(ret) > 32 {
 		ret = ret[:32]
 	}

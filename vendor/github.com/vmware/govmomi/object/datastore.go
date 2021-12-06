@@ -420,7 +420,6 @@ func (d Datastore) Stat(ctx context.Context, file string) (types.BaseFileInfo, e
 	}
 
 	return res.File[0], nil
-
 }
 
 // Type returns the type of file system volume.

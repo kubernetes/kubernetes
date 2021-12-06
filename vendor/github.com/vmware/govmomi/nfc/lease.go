@@ -185,7 +185,6 @@ func (l *Lease) Wait(ctx context.Context, items []types.OvfFileItem) (*LeaseInfo
 
 		return done
 	})
-
 	if err != nil {
 		return nil, err
 	}

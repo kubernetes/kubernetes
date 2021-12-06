@@ -265,7 +265,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
-	//Can have at most 2 ips (one for v4 and one for v6)
+	// Can have at most 2 ips (one for v4 and one for v6)
 	if len(cidrStrings) > 2 {
 		klog.InfoS("Got more than 2 ips, truncating to 2", "cidrStrings", cidrStrings)
 		cidrStrings = cidrStrings[:2]

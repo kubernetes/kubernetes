@@ -41,7 +41,6 @@ import (
 type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskURI string) error
-
 	CreateManagedDisk(options *azure.ManagedDiskOptions) (string, error)
 	DeleteManagedDisk(diskURI string) error
 
@@ -80,14 +79,16 @@ type azureDataDiskPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &azureDataDiskPlugin{}
-var _ volume.PersistentVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.DeletableVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.AttachableVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
-var _ volume.ExpandableVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.DeviceMountableVolumePlugin = &azureDataDiskPlugin{}
+var (
+	_ volume.VolumePlugin                 = &azureDataDiskPlugin{}
+	_ volume.PersistentVolumePlugin       = &azureDataDiskPlugin{}
+	_ volume.DeletableVolumePlugin        = &azureDataDiskPlugin{}
+	_ volume.ProvisionableVolumePlugin    = &azureDataDiskPlugin{}
+	_ volume.AttachableVolumePlugin       = &azureDataDiskPlugin{}
+	_ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
+	_ volume.ExpandableVolumePlugin       = &azureDataDiskPlugin{}
+	_ volume.DeviceMountableVolumePlugin  = &azureDataDiskPlugin{}
+)
 
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
@@ -321,7 +322,6 @@ func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath str
 	hu := kvh.GetHostUtil()
 	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
 	sourceName, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
-
 	if err != nil {
 		return nil, err
 	}

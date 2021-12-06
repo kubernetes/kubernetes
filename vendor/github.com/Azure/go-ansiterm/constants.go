@@ -124,8 +124,10 @@ func getByteRange(start byte, end byte) []byte {
 	return bytes
 }
 
-var toGroundBytes = getToGroundBytes()
-var executors = getExecuteBytes()
+var (
+	toGroundBytes = getToGroundBytes()
+	executors     = getExecuteBytes()
+)
 
 // SPACE		  20+A0 hex  Always and everywhere a blank space
 // Intermediate	  20-2F hex   !"#$%&'()*+,-./
@@ -148,8 +150,10 @@ var alphabetics = append(upperCase, lowerCase...)
 
 var printables = getByteRange(0x20, 0x7F)
 
-var escapeIntermediateToGroundBytes = getByteRange(0x30, 0x7E)
-var escapeToGroundBytes = getEscapeToGroundBytes()
+var (
+	escapeIntermediateToGroundBytes = getByteRange(0x30, 0x7E)
+	escapeToGroundBytes             = getEscapeToGroundBytes()
+)
 
 // See http://www.vt100.net/emu/vt500_parser.png for description of the complex
 // byte ranges below

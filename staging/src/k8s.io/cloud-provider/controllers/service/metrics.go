@@ -17,9 +17,10 @@ limitations under the License.
 package service
 
 import (
+	"sync"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"sync"
 )
 
 const (

@@ -38,7 +38,8 @@ func init() {
 	// This must remain valid for all versions.
 	baseline_1_0 := &corev1.Pod{Spec: corev1.PodSpec{
 		InitContainers: []corev1.Container{{Name: "initcontainer1", Image: "k8s.gcr.io/pause"}},
-		Containers:     []corev1.Container{{Name: "container1", Image: "k8s.gcr.io/pause"}}}}
+		Containers:     []corev1.Container{{Name: "container1", Image: "k8s.gcr.io/pause"}},
+	}}
 	minimalValidPods[api.LevelBaseline][api.MajorMinorVersion(1, 0)] = baseline_1_0
 
 	//

@@ -21,7 +21,6 @@ type command struct {
 }
 
 func (c *command) Run(arg ...string) ([][]string, error) {
-
 	cmd := exec.Command(c.Command, arg...)
 
 	var stdout, stderr bytes.Buffer
@@ -34,7 +33,6 @@ func (c *command) Run(arg ...string) ([][]string, error) {
 
 	if c.Stdin != nil {
 		cmd.Stdin = c.Stdin
-
 	}
 	cmd.Stderr = &stderr
 
@@ -60,7 +58,7 @@ func (c *command) Run(arg ...string) ([][]string, error) {
 
 	lines := strings.Split(stdout.String(), "\n")
 
-	//last line is always blank
+	// last line is always blank
 	lines = lines[0 : len(lines)-1]
 	output := make([][]string, len(lines))
 
@@ -179,6 +177,7 @@ var changeTypeMap = map[string]ChangeType{
 	"M": Modified,
 	"R": Renamed,
 }
+
 var inodeTypeMap = map[string]InodeType{
 	"B": BlockDevice,
 	"C": CharacterDevice,

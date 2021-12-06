@@ -165,7 +165,8 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 			podUID:  podUID,
 			volName: volName,
 			mounter: mounter,
-			plugin:  plugin},
+			plugin:  plugin,
+		},
 	}, nil
 }
 
@@ -235,7 +236,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 		return nil
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
 
@@ -347,7 +348,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		klog.V(4).Info("cephfs mount begin using fuse.")
 
 		keyringPath := cephfsVolume.GetKeyringPath()
-		os.MkdirAll(keyringPath, 0750)
+		os.MkdirAll(keyringPath, 0o750)
 
 		payload := make(map[string]util.FileProjection, 1)
 		var fileProjection util.FileProjection
@@ -355,7 +356,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		keyring := fmt.Sprintf("[client.%s]\nkey = %s\n", cephfsVolume.id, cephfsVolume.secret)
 
 		fileProjection.Data = []byte(keyring)
-		fileProjection.Mode = int32(0644)
+		fileProjection.Mode = int32(0o644)
 		fileName := cephfsVolume.id + ".keyring"
 
 		payload[fileName] = fileProjection

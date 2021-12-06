@@ -36,7 +36,6 @@ func TestMakeBindOpts(t *testing.T) {
 			[]string{},
 		},
 		{
-
 			[]string{"bind", "vers=2", "ro", "_netdev"},
 			true,
 			[]string{"bind", "_netdev"},
@@ -78,7 +77,6 @@ func TestMakeBindOptsSensitive(t *testing.T) {
 			expectedSensitiveRemountOpts: []string{"user=foo", "pass=bar"},
 		},
 		{
-
 			mountOptions:                 []string{"vers=2", "ro", "_netdev"},
 			sensitiveMountOptions:        []string{"user=foo", "pass=bar", "bind"},
 			isBind:                       true,
@@ -103,7 +101,6 @@ func TestMakeBindOptsSensitive(t *testing.T) {
 			expectedSensitiveRemountOpts: []string{"user=foo", "pass=bar"},
 		},
 		{
-
 			mountOptions:                 []string{"vers=2", "bind", "ro", "_netdev"},
 			sensitiveMountOptions:        []string{"user=foo", "remount", "pass=bar"},
 			isBind:                       true,
@@ -112,7 +109,6 @@ func TestMakeBindOptsSensitive(t *testing.T) {
 			expectedSensitiveRemountOpts: []string{"user=foo", "pass=bar"},
 		},
 		{
-
 			mountOptions:                 []string{"vers=2", "bind", "ro", "_netdev"},
 			sensitiveMountOptions:        []string{"user=foo", "remount", "pass=bar"},
 			isBind:                       true,

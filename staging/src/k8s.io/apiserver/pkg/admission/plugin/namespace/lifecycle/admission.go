@@ -70,8 +70,10 @@ type Lifecycle struct {
 	forceLiveLookupCache *utilcache.LRUExpireCache
 }
 
-var _ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
-var _ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
+var (
+	_ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
+	_ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
+)
 
 // Admit makes an admission decision based on the request attributes
 func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {

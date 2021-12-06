@@ -433,7 +433,6 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 }
 
 func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
-
 	var (
 		imageFsMountpoint = "/test/mount/point"
 		unknownMountpoint = "/unknown/mount/point"

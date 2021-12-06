@@ -49,6 +49,7 @@ const (
 	SEG6_IPTUNNEL_SRH
 	__SEG6_IPTUNNEL_MAX
 )
+
 const (
 	SEG6_IPTUNNEL_MAX = __SEG6_IPTUNNEL_MAX - 1
 )
@@ -121,6 +122,7 @@ func DecodeSEG6Srh(buf []byte) ([]net.IP, error) {
 	}
 	return srh.Segments, nil
 }
+
 func EncodeSEG6Srh(segments []net.IP) ([]byte, error) {
 	nsegs := len(segments) // nsegs: number of segments
 	if nsegs == 0 {

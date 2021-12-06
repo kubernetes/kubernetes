@@ -296,7 +296,6 @@ func TestPrintEvent(t *testing.T) {
 }
 
 func TestPrintEventsResultSorted(t *testing.T) {
-
 	eventList := api.EventList{
 		Items: []api.Event{
 			{
@@ -493,7 +492,6 @@ func TestPrintServiceAccount(t *testing.T) {
 }
 
 func TestPrintNodeStatus(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -520,7 +518,8 @@ func TestPrintNodeStatus(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
 					{Type: api.NodeReady, Status: api.ConditionTrue},
-					{Type: api.NodeReady, Status: api.ConditionTrue}}},
+					{Type: api.NodeReady, Status: api.ConditionTrue},
+				}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
 			expected: []metav1.TableRow{{Cells: []interface{}{"foo3", "Ready", "<none>", "<unknown>", ""}}},
@@ -593,7 +592,6 @@ func TestPrintNodeStatus(t *testing.T) {
 }
 
 func TestPrintNodeRole(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -642,7 +640,6 @@ func TestPrintNodeRole(t *testing.T) {
 }
 
 func TestPrintNodeOSImage(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -694,7 +691,6 @@ func TestPrintNodeOSImage(t *testing.T) {
 }
 
 func TestPrintNodeKernelVersion(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -746,7 +742,6 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 }
 
 func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -798,7 +793,6 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 }
 
 func TestPrintNodeName(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -809,7 +803,8 @@ func TestPrintNodeName(t *testing.T) {
 				Status:     api.NodeStatus{},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1.TableRow{{Cells: []interface{}{"127.0.0.1", "Unknown", "<none>", "<unknown>", ""}}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"127.0.0.1", "Unknown", "<none>", "<unknown>", ""}}},
+		},
 		{
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: ""},
@@ -835,7 +830,6 @@ func TestPrintNodeName(t *testing.T) {
 }
 
 func TestPrintNodeExternalIP(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -896,7 +890,6 @@ func TestPrintNodeExternalIP(t *testing.T) {
 }
 
 func TestPrintNodeInternalIP(t *testing.T) {
-
 	table := []struct {
 		node     api.Node
 		expected []metav1.TableRow
@@ -1081,7 +1074,8 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}}},
+						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}},
+					},
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -1113,7 +1107,8 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}}},
+						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}},
+					},
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -1131,7 +1126,8 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}, {IP: "5.6.7.8", Hostname: "host5678"}}},
+						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}, {IP: "5.6.7.8", Hostname: "host5678"}},
+					},
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -1150,7 +1146,8 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}, {IP: "5.6.7.8", Hostname: "host5678"}}},
+						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}, {IP: "5.6.7.8", Hostname: "host5678"}},
+					},
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
@@ -1759,7 +1756,6 @@ func TestPrintPodList(t *testing.T) {
 
 	for _, test := range tests {
 		rows, err := printPodList(&test.pods, printers.GenerateOptions{})
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1966,7 +1962,6 @@ func TestPrintPodTemplate(t *testing.T) {
 }
 
 func TestPrintPodTemplateList(t *testing.T) {
-
 	templateList := api.PodTemplateList{
 		Items: []api.PodTemplate{
 			{
@@ -2065,7 +2060,6 @@ func TestTranslateTimestampUntil(t *testing.T) {
 }
 
 func TestPrintDeployment(t *testing.T) {
-
 	testDeployment := apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
@@ -2133,7 +2127,6 @@ func TestPrintDeployment(t *testing.T) {
 }
 
 func TestPrintDaemonSet(t *testing.T) {
-
 	testDaemonSet := apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
@@ -2201,7 +2194,6 @@ func TestPrintDaemonSet(t *testing.T) {
 }
 
 func TestPrintDaemonSetList(t *testing.T) {
-
 	daemonSetList := apps.DaemonSetList{
 		Items: []apps.DaemonSet{
 			{
@@ -3976,6 +3968,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 		}
 	}
 }
+
 func TestPrintCertificateSigningRequest(t *testing.T) {
 	tests := []struct {
 		csr      certificates.CertificateSigningRequest
@@ -4337,7 +4330,6 @@ func TestPrintReplicaSet(t *testing.T) {
 }
 
 func TestPrintReplicaSetList(t *testing.T) {
-
 	replicaSetList := apps.ReplicaSetList{
 		Items: []apps.ReplicaSet{
 			{
@@ -5046,8 +5038,10 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/glusterfs",
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"sc1", "kubernetes.io/glusterfs", "Delete",
-				"Immediate", false, "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{
+				"sc1", "kubernetes.io/glusterfs", "Delete",
+				"Immediate", false, "0s",
+			}}},
 		},
 		{
 			sc: storage.StorageClass{
@@ -5057,8 +5051,10 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/nfs",
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"sc2", "kubernetes.io/nfs", "Delete",
-				"Immediate", false, "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{
+				"sc2", "kubernetes.io/nfs", "Delete",
+				"Immediate", false, "5m",
+			}}},
 		},
 		{
 			sc: storage.StorageClass{
@@ -5069,8 +5065,10 @@ func TestPrintStorageClass(t *testing.T) {
 				Provisioner:   "kubernetes.io/nfs",
 				ReclaimPolicy: &policyDelte,
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"sc3", "kubernetes.io/nfs", "Delete",
-				"Immediate", false, "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{
+				"sc3", "kubernetes.io/nfs", "Delete",
+				"Immediate", false, "5m",
+			}}},
 		},
 		{
 			sc: storage.StorageClass{
@@ -5082,8 +5080,10 @@ func TestPrintStorageClass(t *testing.T) {
 				ReclaimPolicy:     &policyRetain,
 				VolumeBindingMode: &bindModeImmediate,
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"sc4", "kubernetes.io/nfs", "Retain",
-				"Immediate", false, "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{
+				"sc4", "kubernetes.io/nfs", "Retain",
+				"Immediate", false, "5m",
+			}}},
 		},
 		{
 			sc: storage.StorageClass{
@@ -5095,8 +5095,10 @@ func TestPrintStorageClass(t *testing.T) {
 				ReclaimPolicy:     &policyRetain,
 				VolumeBindingMode: &bindModeWait,
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"sc5", "kubernetes.io/nfs", "Retain",
-				"WaitForFirstConsumer", false, "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{
+				"sc5", "kubernetes.io/nfs", "Retain",
+				"WaitForFirstConsumer", false, "5m",
+			}}},
 		},
 		{
 			sc: storage.StorageClass{
@@ -5109,8 +5111,10 @@ func TestPrintStorageClass(t *testing.T) {
 				AllowVolumeExpansion: boolP(true),
 				VolumeBindingMode:    &bindModeWait,
 			},
-			expected: []metav1.TableRow{{Cells: []interface{}{"sc6", "kubernetes.io/nfs", "Retain",
-				"WaitForFirstConsumer", true, "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{
+				"sc6", "kubernetes.io/nfs", "Retain",
+				"WaitForFirstConsumer", true, "5m",
+			}}},
 		},
 	}
 
@@ -5259,7 +5263,6 @@ func TestPrintRuntimeClass(t *testing.T) {
 }
 
 func TestPrintEndpoint(t *testing.T) {
-
 	tests := []struct {
 		endpoint api.Endpoints
 		expected []metav1.TableRow
@@ -5376,7 +5379,6 @@ func TestPrintEndpoint(t *testing.T) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
-
 }
 
 func TestPrintEndpointSlice(t *testing.T) {

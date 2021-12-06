@@ -196,8 +196,8 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"kustomizationapi": &bintree{nil, map[string]*bintree{
-		"swagger.json": &bintree{kustomizationapiSwaggerJson, map[string]*bintree{}},
+	"kustomizationapi": {nil, map[string]*bintree{
+		"swagger.json": {kustomizationapiSwaggerJson, map[string]*bintree{}},
 	}},
 }}
 
@@ -211,7 +211,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(_filePath(dir, filepath.Dir(name)), os.FileMode(0755))
+	err = os.MkdirAll(_filePath(dir, filepath.Dir(name)), os.FileMode(0o755))
 	if err != nil {
 		return err
 	}

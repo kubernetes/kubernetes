@@ -55,7 +55,6 @@ type OperationExecutor interface {
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(
 	operationGenerator OperationGenerator) OperationExecutor {
-
 	return &operationExecutor{
 		pendingOperations:  goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
 		operationGenerator: operationGenerator,
@@ -97,8 +96,7 @@ func (oe *operationExecutor) RegisterPlugin(
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	generatedOperation :=
-		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, actualStateOfWorld)
+	generatedOperation := oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		socketPath, generatedOperation)
@@ -107,8 +105,7 @@ func (oe *operationExecutor) RegisterPlugin(
 func (oe *operationExecutor) UnregisterPlugin(
 	pluginInfo cache.PluginInfo,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
-	generatedOperation :=
-		oe.operationGenerator.GenerateUnregisterPluginFunc(pluginInfo, actualStateOfWorld)
+	generatedOperation := oe.operationGenerator.GenerateUnregisterPluginFunc(pluginInfo, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		pluginInfo.SocketPath, generatedOperation)

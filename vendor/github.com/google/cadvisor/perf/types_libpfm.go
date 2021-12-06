@@ -19,6 +19,7 @@
 package perf
 
 import "C"
+
 import (
 	"io"
 	"unsafe"

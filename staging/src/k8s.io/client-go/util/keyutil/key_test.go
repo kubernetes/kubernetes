@@ -125,21 +125,21 @@ func TestReadPrivateKey(t *testing.T) {
 		t.Fatalf("Expected error reading key from empty file, got none")
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte(rsaPrivateKey), os.FileMode(0600)); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(rsaPrivateKey), os.FileMode(0o600)); err != nil {
 		t.Fatalf("error writing private key to tmpfile: %v", err)
 	}
 	if _, err := PrivateKeyFromFile(f.Name()); err != nil {
 		t.Fatalf("error reading private RSA key: %v", err)
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPrivateKey), os.FileMode(0600)); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPrivateKey), os.FileMode(0o600)); err != nil {
 		t.Fatalf("error writing private key to tmpfile: %v", err)
 	}
 	if _, err := PrivateKeyFromFile(f.Name()); err != nil {
 		t.Fatalf("error reading private ECDSA key: %v", err)
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPrivateKeyWithParams), os.FileMode(0600)); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPrivateKeyWithParams), os.FileMode(0o600)); err != nil {
 		t.Fatalf("error writing private key to tmpfile: %v", err)
 	}
 	if _, err := PrivateKeyFromFile(f.Name()); err != nil {
@@ -158,7 +158,7 @@ func TestReadPublicKeys(t *testing.T) {
 		t.Fatalf("Expected error reading keys from empty file, got none")
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey), os.FileMode(0600)); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey), os.FileMode(0o600)); err != nil {
 		t.Fatalf("error writing public key to tmpfile: %v", err)
 	}
 	if keys, err := PublicKeysFromFile(f.Name()); err != nil {
@@ -167,7 +167,7 @@ func TestReadPublicKeys(t *testing.T) {
 		t.Fatalf("expected 1 key, got %d", len(keys))
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPublicKey), os.FileMode(0600)); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPublicKey), os.FileMode(0o600)); err != nil {
 		t.Fatalf("error writing public key to tmpfile: %v", err)
 	}
 	if keys, err := PublicKeysFromFile(f.Name()); err != nil {
@@ -176,7 +176,7 @@ func TestReadPublicKeys(t *testing.T) {
 		t.Fatalf("expected 1 key, got %d", len(keys))
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey+"\n"+ecdsaPublicKey), os.FileMode(0600)); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey+"\n"+ecdsaPublicKey), os.FileMode(0o600)); err != nil {
 		t.Fatalf("error writing public key to tmpfile: %v", err)
 	}
 	if keys, err := PublicKeysFromFile(f.Name()); err != nil {
@@ -185,7 +185,7 @@ func TestReadPublicKeys(t *testing.T) {
 		t.Fatalf("expected 2 keys, got %d", len(keys))
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte(certificate), os.FileMode(0600)); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(certificate), os.FileMode(0o600)); err != nil {
 		t.Fatalf("error writing certificate to tmpfile: %v", err)
 	}
 	if keys, err := PublicKeysFromFile(f.Name()); err != nil {
@@ -193,5 +193,4 @@ func TestReadPublicKeys(t *testing.T) {
 	} else if len(keys) != 1 {
 		t.Fatalf("expected 1 keys, got %d", len(keys))
 	}
-
 }

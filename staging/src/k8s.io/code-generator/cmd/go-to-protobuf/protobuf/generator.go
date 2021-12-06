@@ -431,9 +431,7 @@ type protoField struct {
 	CommentLines []string
 }
 
-var (
-	errUnrecognizedType = fmt.Errorf("did not recognize the provided type")
-)
+var errUnrecognizedType = fmt.Errorf("did not recognize the provided type")
 
 func isFundamentalProtoType(t *types.Type) (*types.Type, bool) {
 	// TODO: when we enable proto3, also include other fundamental types in the google.protobuf package

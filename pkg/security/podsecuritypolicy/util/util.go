@@ -210,7 +210,6 @@ func AllowsHostVolumePath(psp *policy.PodSecurityPolicy, hostPath string) (pathI
 // hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary
 // the string and pathPrefix are both normalized to remove trailing slashes prior to checking.
 func hasPathPrefix(s, pathPrefix string) bool {
-
 	s = strings.TrimSuffix(s, "/")
 	pathPrefix = strings.TrimSuffix(pathPrefix, "/")
 

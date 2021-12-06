@@ -37,8 +37,10 @@ const (
 	DecisionDeny  = "deny"  // Policy evaluated, request denied
 )
 
-type Decision string
-type Mode string
+type (
+	Decision string
+	Mode     string
+)
 
 type Recorder interface {
 	RecordEvaluation(Decision, api.LevelVersion, Mode, api.Attributes)

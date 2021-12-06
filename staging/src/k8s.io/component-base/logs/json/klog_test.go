@@ -261,7 +261,6 @@ func TestKlogIntegration(t *testing.T) {
 			if !assert.Equal(t, expect, logString) {
 				t.Errorf("Info has wrong format \n expect:%s\n got:%s", expect, logString)
 			}
-
 		})
 	}
 }

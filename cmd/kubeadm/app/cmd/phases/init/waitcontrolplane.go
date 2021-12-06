@@ -34,8 +34,7 @@ import (
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
-var (
-	kubeletFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
+var kubeletFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
 	Unfortunately, an error has occurred:
 		{{ .Error }}
 
@@ -61,7 +60,6 @@ var (
 		- 'crictl --runtime-endpoint {{ .Socket }} logs CONTAINERID'
 {{ end }}
 	`)))
-)
 
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
 func NewWaitControlPlanePhase() workflow.Phase {

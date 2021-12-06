@@ -909,7 +909,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "approved condition",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 				},
@@ -917,7 +918,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "denied condition",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 				},
@@ -925,7 +927,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "failed condition",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 				},
@@ -933,7 +936,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "approved+issued",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions:  []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 					Certificate: validCertificate,
@@ -959,7 +963,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		// invalid condition cases
 		{
 			name: "empty condition type",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions: []capi.CertificateSigningRequestCondition{{Status: core.ConditionTrue}},
 				},
@@ -969,7 +974,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "approved and denied",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}, {Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 				},
@@ -979,7 +985,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "duplicate condition",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}, {Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 				},
@@ -991,7 +998,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		// invalid allowArbitraryCertificate cases
 		{
 			name: "status.certificate, no PEM",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions:  []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 					Certificate: invalidCertificateNoPEM,
@@ -1002,7 +1010,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "status.certificate, non-CERTIFICATE PEM",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions:  []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 					Certificate: invalidCertificateNonCertificatePEM,
@@ -1013,7 +1022,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "status.certificate, PEM headers",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions:  []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 					Certificate: invalidCertificatePEMHeaders,
@@ -1024,7 +1034,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "status.certificate, non-base64 PEM",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions:  []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 					Certificate: invalidCertificateNonBase64PEM,
@@ -1035,7 +1046,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "status.certificate, empty PEM block",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions:  []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 					Certificate: invalidCertificateEmptyPEM,
@@ -1046,7 +1058,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		},
 		{
 			name: "status.certificate, non-ASN1 data",
-			csr: &capi.CertificateSigningRequest{ObjectMeta: validObjectMeta, Spec: validSpec,
+			csr: &capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta, Spec: validSpec,
 				Status: capi.CertificateSigningRequestStatus{
 					Conditions:  []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 					Certificate: invalidCertificateNonASN1Data,

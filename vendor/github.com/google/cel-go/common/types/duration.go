@@ -40,15 +40,13 @@ func durationOf(d time.Duration) Duration {
 	return Duration{Duration: d}
 }
 
-var (
-	// DurationType singleton.
-	DurationType = NewTypeValue("google.protobuf.Duration",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.NegatorType,
-		traits.ReceiverType,
-		traits.SubtractorType)
-)
+// DurationType singleton.
+var DurationType = NewTypeValue("google.protobuf.Duration",
+	traits.AdderType,
+	traits.ComparerType,
+	traits.NegatorType,
+	traits.ReceiverType,
+	traits.SubtractorType)
 
 // Add implements traits.Adder.Add.
 func (d Duration) Add(other ref.Val) ref.Val {
@@ -198,5 +196,6 @@ var (
 		},
 		overloads.TimeGetMilliseconds: func(dur time.Duration) ref.Val {
 			return Int(dur.Milliseconds())
-		}}
+		},
+	}
 )

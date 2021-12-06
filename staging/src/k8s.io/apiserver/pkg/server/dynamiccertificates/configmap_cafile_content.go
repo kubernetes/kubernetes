@@ -58,8 +58,10 @@ type ConfigMapCAController struct {
 	preRunCaches []cache.InformerSynced
 }
 
-var _ CAContentProvider = &ConfigMapCAController{}
-var _ ControllerRunner = &ConfigMapCAController{}
+var (
+	_ CAContentProvider = &ConfigMapCAController{}
+	_ ControllerRunner  = &ConfigMapCAController{}
+)
 
 // NewDynamicCAFromConfigMapController returns a CAContentProvider based on a configmap that automatically reloads content.
 // It is near-realtime via an informer.

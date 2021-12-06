@@ -59,7 +59,6 @@ func toConfChangeSingle(cs pb.ConfState) (out []pb.ConfChangeSingle, in []pb.Con
 			Type:   pb.ConfChangeAddNode,
 			NodeID: id,
 		})
-
 	}
 
 	// We're done constructing the outgoing slice, now on to the incoming one

@@ -21,7 +21,6 @@ func resolveCredentials(cfg *aws.Config,
 	handlers request.Handlers,
 	sessOpts Options,
 ) (*credentials.Credentials, error) {
-
 	switch {
 	case len(sessOpts.Profile) != 0:
 		// User explicitly provided an Profile in the session's configuration
@@ -60,7 +59,6 @@ func assumeWebIdentity(cfg *aws.Config, handlers request.Handlers,
 	filepath string,
 	roleARN, sessionName string,
 ) (*credentials.Credentials, error) {
-
 	if len(filepath) == 0 {
 		return nil, WebIdentityEmptyTokenFilePathErr
 	}
@@ -87,7 +85,6 @@ func resolveCredsFromProfile(cfg *aws.Config,
 	handlers request.Handlers,
 	sessOpts Options,
 ) (creds *credentials.Credentials, err error) {
-
 	switch {
 	case sharedCfg.SourceProfile != nil:
 		// Assume IAM role with credentials source from a different profile.
@@ -186,7 +183,6 @@ func resolveCredsFromSource(cfg *aws.Config,
 	handlers request.Handlers,
 	sessOpts Options,
 ) (creds *credentials.Credentials, err error) {
-
 	switch sharedCfg.CredentialSource {
 	case credSourceEc2Metadata:
 		p := defaults.RemoteCredProvider(*cfg, handlers)
@@ -215,7 +211,6 @@ func credsFromAssumeRole(cfg aws.Config,
 	sharedCfg sharedConfig,
 	sessOpts Options,
 ) (*credentials.Credentials, error) {
-
 	if len(sharedCfg.MFASerial) != 0 && sessOpts.AssumeRoleTokenProvider == nil {
 		// AssumeRole Token provider is required if doing Assume Role
 		// with MFA.
@@ -285,6 +280,7 @@ type credProviderError struct {
 func (c credProviderError) Retrieve() (credentials.Value, error) {
 	return credentials.Value{}, c.Err
 }
+
 func (c credProviderError) IsExpired() bool {
 	return true
 }

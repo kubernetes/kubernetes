@@ -209,7 +209,6 @@ func newSelFooBar() *metav1.LabelSelector {
 }
 
 func newMinAvailablePodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
-
 	pdb := &policy.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -257,14 +256,14 @@ func newMaxUnavailablePodDisruptionBudget(t *testing.T, maxUnavailable intstr.In
 
 func updatePodOwnerToRc(t *testing.T, pod *v1.Pod, rc *v1.ReplicationController) {
 	var controllerReference metav1.OwnerReference
-	var trueVar = true
+	trueVar := true
 	controllerReference = metav1.OwnerReference{UID: rc.UID, APIVersion: controllerKindRC.GroupVersion().String(), Kind: controllerKindRC.Kind, Name: rc.Name, Controller: &trueVar}
 	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
 }
 
 func updatePodOwnerToRs(t *testing.T, pod *v1.Pod, rs *apps.ReplicaSet) {
 	var controllerReference metav1.OwnerReference
-	var trueVar = true
+	trueVar := true
 	controllerReference = metav1.OwnerReference{UID: rs.UID, APIVersion: controllerKindRS.GroupVersion().String(), Kind: controllerKindRS.Kind, Name: rs.Name, Controller: &trueVar}
 	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
 }
@@ -272,7 +271,7 @@ func updatePodOwnerToRs(t *testing.T, pod *v1.Pod, rs *apps.ReplicaSet) {
 //	pod, podName := newPod(t, name)
 func updatePodOwnerToSs(t *testing.T, pod *v1.Pod, ss *apps.StatefulSet) {
 	var controllerReference metav1.OwnerReference
-	var trueVar = true
+	trueVar := true
 	controllerReference = metav1.OwnerReference{UID: ss.UID, APIVersion: controllerKindSS.GroupVersion().String(), Kind: controllerKindSS.Kind, Name: ss.Name, Controller: &trueVar}
 	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
 }
@@ -559,7 +558,6 @@ func TestStatusForUnmanagedPod(t *testing.T) {
 	dc.sync(pdbName)
 
 	ps.VerifyNoStatusError(t, pdbName)
-
 }
 
 // Check if the unmanaged pods are correctly collected or not
@@ -582,7 +580,6 @@ func TestTotalUnmanagedPods(t *testing.T) {
 		t.Fatalf("expected one pod to be unmanaged pod but found %d", len(unmanagedPods))
 	}
 	ps.VerifyNoStatusError(t, pdbName)
-
 }
 
 // Verify that we count the scale of a ReplicaSet even when it has no Deployment.
@@ -760,7 +757,7 @@ func TestMultipleControllers(t *testing.T) {
 
 	// 100%>1% healthy BUT two RCs => no disruption allowed
 	// TODO: Find out if this assert is still needed
-	//ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	// ps.VerifyDisruptionAllowed(t, pdbName, 0)
 }
 
 func TestReplicationController(t *testing.T) {

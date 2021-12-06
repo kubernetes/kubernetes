@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package ipvs
@@ -181,7 +182,6 @@ func (i *Handle) GetDestinations(s *Service) ([]*Destination, error) {
 
 // GetService gets details of a specific IPVS services, useful in updating statisics etc.,
 func (i *Handle) GetService(s *Service) (*Service, error) {
-
 	res, err := i.doGetServicesCmd(s)
 	if err != nil {
 		return nil, err

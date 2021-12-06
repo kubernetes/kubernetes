@@ -48,8 +48,10 @@ func NewPropertyCollector(ref types.ManagedObjectReference) object.Reference {
 	return s
 }
 
-var errMissingField = errors.New("missing field")
-var errEmptyField = errors.New("empty field")
+var (
+	errMissingField = errors.New("missing field")
+	errEmptyField   = errors.New("empty field")
+)
 
 func getObject(ctx *Context, ref types.ManagedObjectReference) (reflect.Value, bool) {
 	var obj mo.Reference
@@ -260,11 +262,13 @@ func (rr *retrieveResult) add(ctx *Context, name string, val types.AnyType, cont
 
 	content.MissingSet = append(content.MissingSet, types.MissingProperty{
 		Path: name,
-		Fault: types.LocalizedMethodFault{Fault: &types.NotAuthenticated{
-			NoPermission: types.NoPermission{
-				Object:      content.Obj,
-				PrivilegeId: "System.Read",
-			}},
+		Fault: types.LocalizedMethodFault{
+			Fault: &types.NotAuthenticated{
+				NoPermission: types.NoPermission{
+					Object:      content.Obj,
+					PrivilegeId: "System.Read",
+				},
+			},
 		},
 	})
 }

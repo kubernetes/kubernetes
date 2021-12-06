@@ -19,8 +19,8 @@ package spec3
 import (
 	"encoding/json"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Example https://swagger.io/specification/#example-object

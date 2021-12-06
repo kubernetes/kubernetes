@@ -84,7 +84,7 @@ func NewTargeted(targetMap map[float64]float64) *Stream {
 	targets := targetMapToSlice(targetMap)
 
 	ƒ := func(s *stream, r float64) float64 {
-		var m = math.MaxFloat64
+		m := math.MaxFloat64
 		var f float64
 		for _, t := range targets {
 			if t.quantile*s.n <= r {

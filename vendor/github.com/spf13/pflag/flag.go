@@ -668,7 +668,6 @@ func wrap(i, w int, s string) string {
 	}
 
 	return r
-
 }
 
 // FlagUsagesWrapped returns a string containing the usage information

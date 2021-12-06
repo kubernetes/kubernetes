@@ -55,13 +55,13 @@ func TestGetDataFromInitConfig(t *testing.T) {
 		t.Fatalf(dedent.Dedent("failed to decode key.\nfatal error: %v"), err)
 	}
 
-	if err := os.Mkdir(path.Join(tmpdir, "etcd"), 0755); err != nil {
+	if err := os.Mkdir(path.Join(tmpdir, "etcd"), 0o755); err != nil {
 		t.Fatalf(dedent.Dedent("failed to create etcd cert dir.\nfatal error: %v"), err)
 	}
 
 	certs := certsToTransfer(cfg)
 	for name, path := range certs {
-		if err := ioutil.WriteFile(path, certData, 0644); err != nil {
+		if err := ioutil.WriteFile(path, certData, 0o644); err != nil {
 			t.Fatalf(dedent.Dedent("failed to write cert: %s\nfatal error: %v"), name, err)
 		}
 	}
@@ -231,8 +231,8 @@ func TestDownloadCerts(t *testing.T) {
 		t.Fatalf("error downloading certs: %v", err)
 	}
 
-	const keyFileMode = 0600
-	const certFileMode = 0644
+	const keyFileMode = 0o600
+	const certFileMode = 0o644
 
 	for certName, certPath := range certsToTransfer(initForDownloadConfiguration) {
 		diskCertData, err := ioutil.ReadFile(certPath)

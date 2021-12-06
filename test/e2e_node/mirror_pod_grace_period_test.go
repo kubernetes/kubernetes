@@ -142,7 +142,7 @@ spec:
 	file := staticPodPath(dir, name, namespace)
 	podYaml := fmt.Sprintf(template, name, namespace)
 
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0o666)
 	if err != nil {
 		return err
 	}

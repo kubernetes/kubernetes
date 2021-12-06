@@ -18,12 +18,11 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
-
-	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -193,7 +192,7 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 		return
 	}
 
-	var needUpdate = false
+	needUpdate := false
 
 	newCM := origCM.DeepCopy()
 
@@ -253,7 +252,6 @@ func (e *Signer) updateConfigMap(ctx context.Context, cm *v1.ConfigMap) {
 // getConfigMap gets the ConfigMap we are interested in
 func (e *Signer) getConfigMap() *v1.ConfigMap {
 	configMap, err := e.configMapLister.ConfigMaps(e.configMapNamespace).Get(e.configMapName)
-
 	// If we can't get the configmap just return nil. The resync will eventually
 	// sync things up.
 	if err != nil {

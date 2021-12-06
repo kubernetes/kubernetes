@@ -138,7 +138,6 @@ func TestPatches(t *testing.T) {
 			t.Errorf("\nexpected %#v\n, got %#v", testcase.expected, objTest)
 		}
 	}
-
 }
 
 func TestJSONPatchForUnstructured(t *testing.T) {

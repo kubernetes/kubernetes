@@ -129,7 +129,7 @@ func (fltr Filter) handleMap(obj *yaml.RNode) error {
 	}
 
 	// copy the current fltr and change the path on the copy
-	var next = fltr
+	next := fltr
 	// call filter for the next path element on the matching field
 	next.path = fltr.path[1:]
 	return next.filter(field)

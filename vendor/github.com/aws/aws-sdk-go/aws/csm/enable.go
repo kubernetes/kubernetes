@@ -6,9 +6,7 @@ import (
 	"sync"
 )
 
-var (
-	lock sync.Mutex
-)
+var lock sync.Mutex
 
 const (
 	// DefaultPort is used when no port is specified.

@@ -8,8 +8,7 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
-type BeEmptyMatcher struct {
-}
+type BeEmptyMatcher struct{}
 
 func (matcher *BeEmptyMatcher) Match(actual interface{}) (success bool, err error) {
 	length, ok := lengthOf(actual)

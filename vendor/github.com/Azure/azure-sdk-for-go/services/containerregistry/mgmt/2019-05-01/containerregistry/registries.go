@@ -8,11 +8,12 @@ package containerregistry
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // RegistriesClient is the client for the Registries methods of the Containerregistry service.
@@ -47,13 +48,21 @@ func (client RegistriesClient) CheckNameAvailability(ctx context.Context, regist
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: registryNameCheckRequest,
-			Constraints: []validation.Constraint{{Target: "registryNameCheckRequest.Name", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "registryNameCheckRequest.Name", Name: validation.MaxLength, Rule: 50, Chain: nil},
-					{Target: "registryNameCheckRequest.Name", Name: validation.MinLength, Rule: 5, Chain: nil},
-					{Target: "registryNameCheckRequest.Name", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
-				}},
-				{Target: "registryNameCheckRequest.Type", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: registryNameCheckRequest,
+			Constraints: []validation.Constraint{
+				{
+					Target: "registryNameCheckRequest.Name", Name: validation.Null, Rule: true,
+					Chain: []validation.Constraint{
+						{Target: "registryNameCheckRequest.Name", Name: validation.MaxLength, Rule: 50, Chain: nil},
+						{Target: "registryNameCheckRequest.Name", Name: validation.MinLength, Rule: 5, Chain: nil},
+						{Target: "registryNameCheckRequest.Name", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+					},
+				},
+				{Target: "registryNameCheckRequest.Type", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "CheckNameAvailability", err.Error())
 	}
 
@@ -135,18 +144,34 @@ func (client RegistriesClient) Create(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: registry,
-			Constraints: []validation.Constraint{{Target: "registry.Sku", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "registry.RegistryProperties", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "registry.RegistryProperties.StorageAccount", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "registry.RegistryProperties.StorageAccount.ID", Name: validation.Null, Rule: true, Chain: nil}}},
-					}}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: registry,
+			Constraints: []validation.Constraint{
+				{Target: "registry.Sku", Name: validation.Null, Rule: true, Chain: nil},
+				{
+					Target: "registry.RegistryProperties", Name: validation.Null, Rule: false,
+					Chain: []validation.Constraint{
+						{
+							Target: "registry.RegistryProperties.StorageAccount", Name: validation.Null, Rule: false,
+							Chain: []validation.Constraint{{Target: "registry.RegistryProperties.StorageAccount.ID", Name: validation.Null, Rule: true, Chain: nil}},
+						},
+					},
+				},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "Create", err.Error())
 	}
 
@@ -231,12 +256,19 @@ func (client RegistriesClient) Delete(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "Delete", err.Error())
 	}
 
@@ -318,12 +350,19 @@ func (client RegistriesClient) Get(ctx context.Context, resourceGroupName string
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "Get", err.Error())
 	}
 
@@ -404,12 +443,19 @@ func (client RegistriesClient) GetBuildSourceUploadURL(ctx context.Context, reso
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "GetBuildSourceUploadURL", err.Error())
 	}
 
@@ -491,18 +537,32 @@ func (client RegistriesClient) ImportImage(ctx context.Context, resourceGroupNam
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.Source", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.Source.Credentials", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.Source.Credentials.Password", Name: validation.Null, Rule: true, Chain: nil}}},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.Source", Name: validation.Null, Rule: true,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.Source.Credentials", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.Source.Credentials.Password", Name: validation.Null, Rule: true, Chain: nil}},
+					},
 					{Target: "parameters.Source.SourceImage", Name: validation.Null, Rule: true, Chain: nil},
-				}}}}}); err != nil {
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "ImportImage", err.Error())
 	}
 
@@ -698,8 +758,11 @@ func (client RegistriesClient) ListByResourceGroup(ctx context.Context, resource
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "ListByResourceGroup", err.Error())
 	}
 
@@ -821,12 +884,19 @@ func (client RegistriesClient) ListCredentials(ctx context.Context, resourceGrou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "ListCredentials", err.Error())
 	}
 
@@ -907,12 +977,19 @@ func (client RegistriesClient) ListUsages(ctx context.Context, resourceGroupName
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "ListUsages", err.Error())
 	}
 
@@ -995,12 +1072,19 @@ func (client RegistriesClient) RegenerateCredential(ctx context.Context, resourc
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "RegenerateCredential", err.Error())
 	}
 
@@ -1084,12 +1168,19 @@ func (client RegistriesClient) ScheduleRun(ctx context.Context, resourceGroupNam
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "ScheduleRun", err.Error())
 	}
 
@@ -1175,12 +1266,19 @@ func (client RegistriesClient) Update(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.RegistriesClient", "Update", err.Error())
 	}
 

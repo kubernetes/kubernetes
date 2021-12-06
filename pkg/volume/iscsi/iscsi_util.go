@@ -74,12 +74,14 @@ var (
 		"discovery.sendtargets.auth.username",
 		"discovery.sendtargets.auth.password",
 		"discovery.sendtargets.auth.username_in",
-		"discovery.sendtargets.auth.password_in"}
+		"discovery.sendtargets.auth.password_in",
+	}
 	chapSess = []string{
 		"node.session.auth.username",
 		"node.session.auth.password",
 		"node.session.auth.username_in",
-		"node.session.auth.password_in"}
+		"node.session.auth.password_in",
+	}
 	ifaceTransportNameRe = regexp.MustCompile(`iface.transport_name = (.*)\n`)
 	ifaceRe              = regexp.MustCompile(`.+/iface-([^/]+)/.+`)
 )
@@ -487,7 +489,7 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 		globalPDPath = b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	}
 
-	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+	if err := os.MkdirAll(globalPDPath, 0o750); err != nil {
 		klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
 		return err
 	}

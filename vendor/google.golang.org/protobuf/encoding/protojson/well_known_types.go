@@ -238,8 +238,10 @@ func (d decoder) unmarshalAny(m pref.Message) error {
 	return nil
 }
 
-var errEmptyObject = fmt.Errorf(`empty object`)
-var errMissingType = fmt.Errorf(`missing "@type" field`)
+var (
+	errEmptyObject = fmt.Errorf(`empty object`)
+	errMissingType = fmt.Errorf(`missing "@type" field`)
+)
 
 // findTypeURL returns the token for the "@type" field value from the given
 // JSON bytes. It is expected that the given bytes start with json.ObjectOpen.

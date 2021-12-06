@@ -36,7 +36,6 @@ type BaseTransition struct {
 }
 
 func NewBaseTransition(target ATNState) *BaseTransition {
-
 	if target == nil {
 		panic("target cannot be nil.")
 	}
@@ -132,7 +131,6 @@ type AtomTransition struct {
 }
 
 func NewAtomTransition(target ATNState, intervalSet int) *AtomTransition {
-
 	t := new(AtomTransition)
 	t.BaseTransition = NewBaseTransition(target)
 
@@ -165,7 +163,6 @@ type RuleTransition struct {
 }
 
 func NewRuleTransition(ruleStart ATNState, ruleIndex, precedence int, followState ATNState) *RuleTransition {
-
 	t := new(RuleTransition)
 	t.BaseTransition = NewBaseTransition(ruleStart)
 
@@ -189,7 +186,6 @@ type EpsilonTransition struct {
 }
 
 func NewEpsilonTransition(target ATNState, outermostPrecedenceReturn int) *EpsilonTransition {
-
 	t := new(EpsilonTransition)
 	t.BaseTransition = NewBaseTransition(target)
 
@@ -214,7 +210,6 @@ type RangeTransition struct {
 }
 
 func NewRangeTransition(target ATNState, start, stop int) *RangeTransition {
-
 	t := new(RangeTransition)
 	t.BaseTransition = NewBaseTransition(target)
 
@@ -249,7 +244,6 @@ type BaseAbstractPredicateTransition struct {
 }
 
 func NewBasePredicateTransition(target ATNState) *BaseAbstractPredicateTransition {
-
 	t := new(BaseAbstractPredicateTransition)
 	t.BaseTransition = NewBaseTransition(target)
 
@@ -266,7 +260,6 @@ type PredicateTransition struct {
 }
 
 func NewPredicateTransition(target ATNState, ruleIndex, predIndex int, isCtxDependent bool) *PredicateTransition {
-
 	t := new(PredicateTransition)
 	t.BaseAbstractPredicateTransition = NewBasePredicateTransition(target)
 
@@ -298,7 +291,6 @@ type ActionTransition struct {
 }
 
 func NewActionTransition(target ATNState, ruleIndex, actionIndex int, isCtxDependent bool) *ActionTransition {
-
 	t := new(ActionTransition)
 	t.BaseTransition = NewBaseTransition(target)
 
@@ -323,7 +315,6 @@ type SetTransition struct {
 }
 
 func NewSetTransition(target ATNState, set *IntervalSet) *SetTransition {
-
 	t := new(SetTransition)
 	t.BaseTransition = NewBaseTransition(target)
 
@@ -351,7 +342,6 @@ type NotSetTransition struct {
 }
 
 func NewNotSetTransition(target ATNState, set *IntervalSet) *NotSetTransition {
-
 	t := new(NotSetTransition)
 
 	t.SetTransition = NewSetTransition(target, set)
@@ -374,7 +364,6 @@ type WildcardTransition struct {
 }
 
 func NewWildcardTransition(target ATNState) *WildcardTransition {
-
 	t := new(WildcardTransition)
 	t.BaseTransition = NewBaseTransition(target)
 
@@ -397,7 +386,6 @@ type PrecedencePredicateTransition struct {
 }
 
 func NewPrecedencePredicateTransition(target ATNState, precedence int) *PrecedencePredicateTransition {
-
 	t := new(PrecedencePredicateTransition)
 	t.BaseAbstractPredicateTransition = NewBasePredicateTransition(target)
 

@@ -57,5 +57,4 @@ func TestFileRenewer(t *testing.T) {
 	if err != nil {
 		t.Errorf("couldn't verify new cert: %v", err)
 	}
-
 }

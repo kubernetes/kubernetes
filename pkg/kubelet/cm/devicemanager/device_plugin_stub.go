@@ -165,7 +165,8 @@ func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watch
 		Type:              watcherapi.DevicePlugin,
 		Name:              m.resourceName,
 		Endpoint:          m.endpoint,
-		SupportedVersions: []string{pluginapi.Version}}, nil
+		SupportedVersions: []string{pluginapi.Version},
+	}, nil
 }
 
 // NotifyRegistrationStatus receives the registration notification from watcher

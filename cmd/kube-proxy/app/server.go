@@ -410,7 +410,6 @@ func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyCon
 
 // loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
 func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-
 	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		// Try strict decoding first. If that fails decode with a lenient

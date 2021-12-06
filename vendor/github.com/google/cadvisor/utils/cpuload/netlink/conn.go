@@ -35,7 +35,6 @@ type Connection struct {
 
 // Create and bind a new netlink socket.
 func newConnection() (*Connection, error) {
-
 	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_DGRAM, syscall.NETLINK_GENERIC)
 	if err != nil {
 		return nil, err

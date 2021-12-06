@@ -210,12 +210,14 @@ func (t *Trace) logInfo(threshold time.Duration) (string, []zap.Field) {
 		lastStepTime = step.time
 	}
 
-	fs := []zap.Field{zap.String("detail", writeFields(t.fields)),
+	fs := []zap.Field{
+		zap.String("detail", writeFields(t.fields)),
 		zap.Duration("duration", totalDuration),
 		zap.Time("start", t.startTime),
 		zap.Time("end", endTime),
 		zap.Strings("steps", steps),
-		zap.Int("step_count", len(steps))}
+		zap.Int("step_count", len(steps)),
+	}
 	return msg, fs
 }
 

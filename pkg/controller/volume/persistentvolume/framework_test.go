@@ -104,13 +104,17 @@ const annSkipLocalStore = "pv-testing-skip-local-store"
 
 type testCall func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error
 
-const testNamespace = "default"
-const mockPluginName = "kubernetes.io/mock-volume"
+const (
+	testNamespace  = "default"
+	mockPluginName = "kubernetes.io/mock-volume"
+)
 
-var novolumes []*v1.PersistentVolume
-var noclaims []*v1.PersistentVolumeClaim
-var noevents = []string{}
-var noerrors = []pvtesting.ReactorError{}
+var (
+	novolumes []*v1.PersistentVolume
+	noclaims  []*v1.PersistentVolumeClaim
+	noevents  = []string{}
+	noerrors  = []pvtesting.ReactorError{}
+)
 
 type volumeReactor struct {
 	*pvtesting.VolumeReactor
@@ -505,7 +509,6 @@ func testSyncClaim(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeRe
 
 func testSyncClaimError(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 	err := ctrl.syncClaim(context.TODO(), test.initialClaims[0])
-
 	if err != nil {
 		return nil
 	}
@@ -518,8 +521,10 @@ func testSyncVolume(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeR
 
 type operationType string
 
-const operationDelete = "Delete"
-const operationRecycle = "Recycle"
+const (
+	operationDelete  = "Delete"
+	operationRecycle = "Recycle"
+)
 
 var (
 	classGold                    string = "gold"
@@ -607,7 +612,6 @@ func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 //   controller waits for the operation lock. Controller is then resumed and we
 //   check how it behaves.
 func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor)) testCall {
-
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 		// Inject a hook before async operation starts
 		ctrl.preOperationHook = func(operationName string) {
@@ -640,7 +644,6 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *pvtesting.Vo
 	// Evaluate results
 	if err := reactor.CheckClaims(test.expectedClaims); err != nil {
 		t.Errorf("Test %q: %v", test.name, err)
-
 	}
 	if err := reactor.CheckVolumes(test.expectedVolumes); err != nil {
 		t.Errorf("Test %q: %v", test.name, err)
@@ -868,10 +871,12 @@ type provisionCall struct {
 	ret                error
 }
 
-var _ vol.VolumePlugin = &mockVolumePlugin{}
-var _ vol.RecyclableVolumePlugin = &mockVolumePlugin{}
-var _ vol.DeletableVolumePlugin = &mockVolumePlugin{}
-var _ vol.ProvisionableVolumePlugin = &mockVolumePlugin{}
+var (
+	_ vol.VolumePlugin              = &mockVolumePlugin{}
+	_ vol.RecyclableVolumePlugin    = &mockVolumePlugin{}
+	_ vol.DeletableVolumePlugin     = &mockVolumePlugin{}
+	_ vol.ProvisionableVolumePlugin = &mockVolumePlugin{}
+)
 
 func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
 	return nil

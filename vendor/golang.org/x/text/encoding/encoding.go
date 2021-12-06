@@ -136,6 +136,7 @@ type nop struct{}
 func (nop) NewDecoder() *Decoder {
 	return &Decoder{Transformer: transform.Nop}
 }
+
 func (nop) NewEncoder() *Encoder {
 	return &Encoder{Transformer: transform.Nop}
 }
@@ -189,7 +190,6 @@ func (replacementEncoder) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int
 		// Decode a 1-byte rune.
 		if r < utf8.RuneSelf {
 			size = 1
-
 		} else {
 			// Decode a multi-byte rune.
 			r, size = utf8.DecodeRune(src[nSrc:])

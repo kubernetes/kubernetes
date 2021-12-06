@@ -66,10 +66,10 @@ func MakeEllipticPrivateKeyPEM() ([]byte, error) {
 // If the key file already exists, it will be overwritten.
 // The parent directory of the keyPath will be created as needed with file mode 0755.
 func WriteKey(keyPath string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
+	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0o755)); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(keyPath, data, os.FileMode(0600))
+	return ioutil.WriteFile(keyPath, data, os.FileMode(0o600))
 }
 
 // LoadOrGenerateKeyFile looks for a key in the file at the given path. If it

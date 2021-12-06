@@ -178,8 +178,10 @@ type NoopNetworkPlugin struct {
 	Sysctl utilsysctl.Interface
 }
 
-const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
-const sysctlBridgeCallIP6Tables = "net/bridge/bridge-nf-call-ip6tables"
+const (
+	sysctlBridgeCallIPTables  = "net/bridge/bridge-nf-call-iptables"
+	sysctlBridgeCallIP6Tables = "net/bridge/bridge-nf-call-ip6tables"
+)
 
 func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
@@ -276,7 +278,6 @@ func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName 
 		return nil, utilerrors.NewAggregate(errs)
 	}
 	return list, nil
-
 }
 
 type NoopPortMappingGetter struct{}

@@ -164,7 +164,6 @@ func TestCalculateStatusConditions(t *testing.T) {
 		manageReplicasErr            error
 		expectedReplicaSetConditions []apps.ReplicaSetCondition
 	}{
-
 		{
 			"manageReplicasErr != nil && failureCond == nil, diff < 0",
 			rs,

@@ -23,15 +23,19 @@ import (
 
 type NoopMeterProvider struct{}
 
-type noopInstrument struct{}
-type noopBoundInstrument struct{}
-type NoopSync struct{ noopInstrument }
-type NoopAsync struct{ noopInstrument }
+type (
+	noopInstrument      struct{}
+	noopBoundInstrument struct{}
+	NoopSync            struct{ noopInstrument }
+	NoopAsync           struct{ noopInstrument }
+)
 
-var _ MeterProvider = NoopMeterProvider{}
-var _ SyncImpl = NoopSync{}
-var _ BoundSyncImpl = noopBoundInstrument{}
-var _ AsyncImpl = NoopAsync{}
+var (
+	_ MeterProvider = NoopMeterProvider{}
+	_ SyncImpl      = NoopSync{}
+	_ BoundSyncImpl = noopBoundInstrument{}
+	_ AsyncImpl     = NoopAsync{}
+)
 
 func (NoopMeterProvider) Meter(_ string, _ ...MeterOption) Meter {
 	return Meter{}

@@ -11,10 +11,8 @@ import (
 	"strings"
 )
 
-var (
-	// ErrStructPointer is the error that a struct being validated is not specified as a pointer.
-	ErrStructPointer = errors.New("only a pointer to a struct can be validated")
-)
+// ErrStructPointer is the error that a struct being validated is not specified as a pointer.
+var ErrStructPointer = errors.New("only a pointer to a struct can be validated")
 
 type (
 	// ErrFieldPointer is the error that a field is not specified as a pointer.

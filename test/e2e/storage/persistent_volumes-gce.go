@@ -125,7 +125,6 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 	// Attach a persistent disk to a pod using a PVC.
 	// Delete the PVC and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
 	ginkgo.It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
-
 		ginkgo.By("Deleting the Claim")
 		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Unable to delete PVC ", pvc.Name)
 		framework.ExpectEqual(verifyGCEDiskAttached(diskName, node), true)
@@ -140,7 +139,6 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 	// Attach a persistent disk to a pod using a PVC.
 	// Delete the PV and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
 	ginkgo.It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
-
 		ginkgo.By("Deleting the Persistent Volume")
 		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 		framework.ExpectEqual(verifyGCEDiskAttached(diskName, node), true)
@@ -154,7 +152,6 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 
 	// Test that a Pod and PVC attached to a GCEPD successfully unmounts and detaches when the encompassing Namespace is deleted.
 	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk", func() {
-
 		ginkgo.By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)

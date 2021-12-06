@@ -27,8 +27,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
 
-type cadvisorUnsupported struct {
-}
+type cadvisorUnsupported struct{}
 
 var _ Interface = new(cadvisorUnsupported)
 

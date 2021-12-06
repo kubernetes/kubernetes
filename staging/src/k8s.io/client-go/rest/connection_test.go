@@ -345,7 +345,6 @@ func TestReconnectBrokenTCPInFlight_HTTP1(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("Test timed out waiting for the request to fail")
 	}
-
 }
 
 func TestRestClientTimeout(t *testing.T) {

@@ -9,8 +9,7 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
-type BeClosedMatcher struct {
-}
+type BeClosedMatcher struct{}
 
 func (matcher *BeClosedMatcher) Match(actual interface{}) (success bool, err error) {
 	if !isChan(actual) {

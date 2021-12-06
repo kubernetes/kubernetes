@@ -99,6 +99,7 @@ func (n *node) markObserved() {
 	defer n.virtualLock.Unlock()
 	n.virtual = false
 }
+
 func (n *node) isObserved() bool {
 	n.virtualLock.RLock()
 	defer n.virtualLock.RUnlock()

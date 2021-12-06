@@ -76,7 +76,7 @@ const (
 	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
 	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
-	//PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
+	// PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
 	PVDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 )
 
@@ -186,8 +186,8 @@ func FindMatchingVolume(
 	volumes []*v1.PersistentVolume,
 	node *v1.Node,
 	excludedVolumes map[string]*v1.PersistentVolume,
-	delayBinding bool) (*v1.PersistentVolume, error) {
-
+	delayBinding bool) (*v1.PersistentVolume, error,
+) {
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]

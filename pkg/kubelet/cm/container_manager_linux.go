@@ -81,10 +81,8 @@ const (
 	maxPidFileLength      = 1 << 10 // 1KB
 )
 
-var (
-	// The docker version in which containerd was introduced.
-	containerdAPIVersion = utilversion.MustParseGeneric("1.23")
-)
+// The docker version in which containerd was introduced.
+var containerdAPIVersion = utilversion.MustParseGeneric("1.23")
 
 // A non-user container tracked by the Kubelet.
 type systemContainer struct {
@@ -242,7 +240,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		}
 	}
 
-	var internalCapacity = v1.ResourceList{}
+	internalCapacity := v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -402,7 +400,6 @@ func createManager(containerName string) (cgroups.Manager, error) {
 
 	if cgroups.IsCgroup2UnifiedMode() {
 		return cgroupfs2.NewManager(cg, "", false)
-
 	}
 	return cgroupfs.NewManager(cg, nil, false), nil
 }
@@ -610,7 +607,6 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
-
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
 		containerMap, err := buildContainerMapFromRuntime(runtimeService)
@@ -678,7 +674,6 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 				}
 			}
 		}, time.Minute, wait.NeverStop)
-
 	}
 
 	if len(cm.periodicTasks) > 0 {

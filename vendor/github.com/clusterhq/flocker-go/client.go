@@ -36,13 +36,10 @@ var (
 type Clientable interface {
 	CreateDataset(options *CreateDatasetOptions) (*DatasetState, error)
 	DeleteDataset(datasetID string) error
-
 	GetDatasetState(datasetID string) (*DatasetState, error)
 	GetDatasetID(metaName string) (datasetID string, err error)
 	GetPrimaryUUID() (primaryUUID string, err error)
-
 	ListNodes() (nodes []NodeState, err error)
-
 	UpdatePrimaryForDataset(primaryUUID, datasetID string) (*DatasetState, error)
 }
 

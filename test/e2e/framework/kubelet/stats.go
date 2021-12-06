@@ -235,7 +235,6 @@ func GetStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 		Name(fmt.Sprintf("%v:%v", nodeName, framework.KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
-
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +255,6 @@ func getNodeStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv
 		Suffix("stats/summary").
 		SetHeader("Content-Type", "application/json").
 		Do(context.TODO()).Raw()
-
 	if err != nil {
 		return nil, err
 	}

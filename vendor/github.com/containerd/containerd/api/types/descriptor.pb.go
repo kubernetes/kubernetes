@@ -224,7 +224,7 @@ func (this *Descriptor) String() string {
 		return "nil"
 	}
 	keysForAnnotations := make([]string, 0, len(this.Annotations))
-	for k, _ := range this.Annotations {
+	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
 	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)

@@ -65,7 +65,6 @@ const (
 // Boye, Magnus. "Netfilter Connection Tracking and NAT Implementation." (2012).
 
 var _ = common.SIGDescribe("Conntrack", func() {
-
 	fr := framework.NewDefaultFramework("conntrack")
 
 	type nodeInfo struct {
@@ -128,7 +127,6 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	})
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a NodePort service", func() {
-
 		// Create a NodePort service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
 		ginkgo.By("creating a UDP service " + serviceName + " with type=NodePort in " + ns)
@@ -204,7 +202,6 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	})
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a ClusterIP service", func() {
-
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
 		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in " + ns)
@@ -291,7 +288,6 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	// installs the corresponding iptables rules (the endpoint is ready), a conntrack entry will be generated blackholing
 	// subsequent traffic.
 	ginkgo.It("should be able to preserve UDP traffic when initial unready endpoints get ready", func() {
-
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
 		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in " + ns)
@@ -349,7 +345,6 @@ var _ = common.SIGDescribe("Conntrack", func() {
 			framework.Logf("Pod client logs: %s", logs)
 			framework.Failf("Failed to connect to backend pod")
 		}
-
 	})
 
 	// Regression test for #74839, where:

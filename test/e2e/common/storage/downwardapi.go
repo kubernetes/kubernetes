@@ -103,7 +103,6 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralSt
 			testDownwardAPIUsingPod(f, pod, env, expectations)
 		})
 	})
-
 })
 
 func testDownwardAPIForEphemeralStorage(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {

@@ -47,7 +47,6 @@ type ObserverVec interface {
 	WithLabelValues(...string) Observer
 	CurryWith(Labels) (ObserverVec, error)
 	MustCurryWith(Labels) ObserverVec
-
 	Collector
 }
 

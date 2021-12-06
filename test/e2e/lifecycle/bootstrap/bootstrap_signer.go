@@ -37,7 +37,6 @@ const (
 )
 
 var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
-
 	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("bootstrap-signer")

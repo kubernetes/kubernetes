@@ -77,7 +77,7 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		logDir := framework.TestContext.ReportDir + "/" + strings.Join(components, "/")
 		to.LogPathPrefix = logDir + "/"
 
-		err := os.MkdirAll(logDir, 0755)
+		err := os.MkdirAll(logDir, 0o755)
 		framework.ExpectNoError(err, "create pod log directory")
 		f, err := os.Create(path.Join(logDir, "pod-event.log"))
 		framework.ExpectNoError(err, "create pod events log file")

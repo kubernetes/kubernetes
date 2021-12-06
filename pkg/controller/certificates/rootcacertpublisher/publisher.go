@@ -80,7 +80,6 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 	e.syncHandler = e.syncNamespace
 
 	return e, nil
-
 }
 
 // Publisher manages certificate ConfigMap objects inside Namespaces

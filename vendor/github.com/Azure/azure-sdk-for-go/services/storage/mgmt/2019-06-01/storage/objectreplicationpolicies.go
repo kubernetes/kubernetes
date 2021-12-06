@@ -8,11 +8,12 @@ package storage
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ObjectReplicationPoliciesClient is the the Azure Storage Management API.
@@ -53,22 +54,40 @@ func (client ObjectReplicationPoliciesClient) CreateOrUpdate(ctx context.Context
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: objectReplicationPolicyID,
-			Constraints: []validation.Constraint{{Target: "objectReplicationPolicyID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: properties,
-			Constraints: []validation.Constraint{{Target: "properties.ObjectReplicationPolicyProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "properties.ObjectReplicationPolicyProperties.SourceAccount", Name: validation.Null, Rule: true, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: objectReplicationPolicyID,
+			Constraints: []validation.Constraint{{Target: "objectReplicationPolicyID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: properties,
+			Constraints: []validation.Constraint{{
+				Target: "properties.ObjectReplicationPolicyProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{Target: "properties.ObjectReplicationPolicyProperties.SourceAccount", Name: validation.Null, Rule: true, Chain: nil},
 					{Target: "properties.ObjectReplicationPolicyProperties.DestinationAccount", Name: validation.Null, Rule: true, Chain: nil},
-				}}}}}); err != nil {
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.ObjectReplicationPoliciesClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -155,17 +174,30 @@ func (client ObjectReplicationPoliciesClient) Delete(ctx context.Context, resour
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: objectReplicationPolicyID,
-			Constraints: []validation.Constraint{{Target: "objectReplicationPolicyID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: objectReplicationPolicyID,
+			Constraints: []validation.Constraint{{Target: "objectReplicationPolicyID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.ObjectReplicationPoliciesClient", "Delete", err.Error())
 	}
 
@@ -249,17 +281,30 @@ func (client ObjectReplicationPoliciesClient) Get(ctx context.Context, resourceG
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: objectReplicationPolicyID,
-			Constraints: []validation.Constraint{{Target: "objectReplicationPolicyID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: objectReplicationPolicyID,
+			Constraints: []validation.Constraint{{Target: "objectReplicationPolicyID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.ObjectReplicationPoliciesClient", "Get", err.Error())
 	}
 
@@ -343,15 +388,26 @@ func (client ObjectReplicationPoliciesClient) List(ctx context.Context, resource
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.ObjectReplicationPoliciesClient", "List", err.Error())
 	}
 

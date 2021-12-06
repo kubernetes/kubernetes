@@ -21,15 +21,14 @@ package kuberuntime
 
 import (
 	"fmt"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-var (
-	windowsRootUserName = "ContainerAdministrator"
-)
+var windowsRootUserName = "ContainerAdministrator"
 
 // verifyRunAsNonRoot verifies RunAsNonRoot on windows.
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-windows/116-windows-node-support#v1container

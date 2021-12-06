@@ -48,7 +48,7 @@ func (b bootstrapSecrets) Get(name string) (*corev1.Secret, error) {
 func TestBootstrapTokenAuth(t *testing.T) {
 	validTokenID := "token1"
 	validSecret := "validtokensecret"
-	var bootstrapSecretValid = &corev1.Secret{
+	bootstrapSecretValid := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
 			Name:      bootstrapapi.BootstrapTokenSecretPrefix,
@@ -60,7 +60,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
 	}
-	var bootstrapSecretInvalid = &corev1.Secret{
+	bootstrapSecretInvalid := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
 			Name:      bootstrapapi.BootstrapTokenSecretPrefix,
@@ -73,7 +73,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		},
 	}
 	tokenExpiredTime := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
-	var expiredBootstrapToken = &corev1.Secret{
+	expiredBootstrapToken := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
 			Name:      bootstrapapi.BootstrapTokenSecretPrefix,
@@ -174,7 +174,6 @@ func TestBootstrapTokenAuth(t *testing.T) {
 					}
 				}
 			}
-
 		}()
 	}
 }

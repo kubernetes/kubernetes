@@ -5,8 +5,10 @@ import (
 	"regexp"
 )
 
-var ginkgoAndGomegaFilter = regexp.MustCompile(`github\.com/onsi/ginkgo|github\.com/onsi/gomega`)
-var ginkgoIntegrationTestFilter = regexp.MustCompile(`github\.com/onsi/ginkgo/integration`) //allow us to integration test this thing
+var (
+	ginkgoAndGomegaFilter       = regexp.MustCompile(`github\.com/onsi/ginkgo|github\.com/onsi/gomega`)
+	ginkgoIntegrationTestFilter = regexp.MustCompile(`github\.com/onsi/ginkgo/integration`) // allow us to integration test this thing
+)
 
 type Dependencies struct {
 	deps map[string]int

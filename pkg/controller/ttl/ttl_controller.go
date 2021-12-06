@@ -102,16 +102,14 @@ type ttlBoundary struct {
 	ttlSeconds int
 }
 
-var (
-	ttlBoundaries = []ttlBoundary{
-		{sizeMin: 0, sizeMax: 100, ttlSeconds: 0},
-		{sizeMin: 90, sizeMax: 500, ttlSeconds: 15},
-		{sizeMin: 450, sizeMax: 1000, ttlSeconds: 30},
-		{sizeMin: 900, sizeMax: 2000, ttlSeconds: 60},
-		{sizeMin: 1800, sizeMax: 10000, ttlSeconds: 300},
-		{sizeMin: 9000, sizeMax: math.MaxInt32, ttlSeconds: 600},
-	}
-)
+var ttlBoundaries = []ttlBoundary{
+	{sizeMin: 0, sizeMax: 100, ttlSeconds: 0},
+	{sizeMin: 90, sizeMax: 500, ttlSeconds: 15},
+	{sizeMin: 450, sizeMax: 1000, ttlSeconds: 30},
+	{sizeMin: 900, sizeMax: 2000, ttlSeconds: 60},
+	{sizeMin: 1800, sizeMax: 10000, ttlSeconds: 300},
+	{sizeMin: 9000, sizeMax: math.MaxInt32, ttlSeconds: 600},
+}
 
 // Run begins watching and syncing.
 func (ttlc *Controller) Run(ctx context.Context, workers int) {

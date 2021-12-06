@@ -180,8 +180,10 @@ type rlimit32 struct {
 
 //sysnb	getrlimit(resource int, rlim *rlimit32) (err error) = SYS_UGETRLIMIT
 
-const rlimInf32 = ^uint32(0)
-const rlimInf64 = ^uint64(0)
+const (
+	rlimInf32 = ^uint32(0)
+	rlimInf64 = ^uint64(0)
+)
 
 func Getrlimit(resource int, rlim *Rlimit) (err error) {
 	err = Prlimit(0, resource, nil, rlim)

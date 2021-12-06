@@ -23,7 +23,7 @@ import (
 )
 
 func TestBuildArgumentListFromMap(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name      string
 		base      map[string]string
 		overrides map[string]string
@@ -108,7 +108,7 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 }
 
 func TestParseArgumentListToMap(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		args        []string
 		expectedMap map[string]string
@@ -170,7 +170,7 @@ func TestParseArgumentListToMap(t *testing.T) {
 }
 
 func TestReplaceArgument(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name         string
 		args         []string
 		mutateFunc   func(map[string]string) map[string]string
@@ -230,7 +230,7 @@ func TestReplaceArgument(t *testing.T) {
 }
 
 func TestRoundtrip(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name string
 		args []string
 	}{
@@ -268,7 +268,7 @@ func TestRoundtrip(t *testing.T) {
 }
 
 func TestParseArgument(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		arg         string
 		expectedKey string

@@ -934,7 +934,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			m.healthyDevices[r] = sets.NewString()
 
 			for _, d := range tc.devices[r] {
-				//add `pluginapi.Device` with Topology
+				// add `pluginapi.Device` with Topology
 				m.allDevices[r][d.ID] = d
 				m.healthyDevices[r].Insert(d.ID)
 			}

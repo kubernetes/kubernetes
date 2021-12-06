@@ -80,8 +80,8 @@ func NewProxyServer(o *Options) (*ProxyServer, error) {
 func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
 	cleanupAndExit bool,
-	master string) (*ProxyServer, error) {
-
+	master string) (*ProxyServer, error,
+) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}

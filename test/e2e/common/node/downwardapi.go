@@ -154,7 +154,6 @@ var _ = SIGDescribe("Downward API", func() {
 		}
 
 		testDownwardAPIUsingPod(f, pod, env, expectations)
-
 	})
 
 	/*
@@ -385,7 +384,6 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPI
 			testDownwardAPIUsingPod(f, pod, env, expectations)
 		})
 	})
-
 })
 
 func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {

@@ -56,19 +56,10 @@ var (
 	EmptyEvent   = framework.ClusterEvent{}
 )
 
-var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
-var mediumPriority = (lowPriority + highPriority) / 2
-var highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedulablePodInfo = framework.NewPodInfo(&v1.Pod{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "hpp",
-		Namespace: "ns1",
-		UID:       "hppns1",
-	},
-	Spec: v1.PodSpec{
-		Priority: &highPriority,
-	},
-}),
-	framework.NewPodInfo(&v1.Pod{
+var (
+	lowPriority, midPriority, highPriority                                                 = int32(0), int32(100), int32(1000)
+	mediumPriority                                                                         = (lowPriority + highPriority) / 2
+	highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedulablePodInfo = framework.NewPodInfo(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hpp",
 			Namespace: "ns1",
@@ -77,49 +68,60 @@ var highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedula
 		Spec: v1.PodSpec{
 			Priority: &highPriority,
 		},
-		Status: v1.PodStatus{
-			NominatedNodeName: "node1",
-		},
 	}),
-	framework.NewPodInfo(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mpp",
-			Namespace: "ns2",
-			UID:       "mppns2",
-			Annotations: map[string]string{
-				"annot2": "val2",
+		framework.NewPodInfo(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "hpp",
+				Namespace: "ns1",
+				UID:       "hppns1",
 			},
-		},
-		Spec: v1.PodSpec{
-			Priority: &mediumPriority,
-		},
-		Status: v1.PodStatus{
-			NominatedNodeName: "node1",
-		},
-	}),
-	framework.NewPodInfo(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "up",
-			Namespace: "ns1",
-			UID:       "upns1",
-			Annotations: map[string]string{
-				"annot2": "val2",
+			Spec: v1.PodSpec{
+				Priority: &highPriority,
 			},
-		},
-		Spec: v1.PodSpec{
-			Priority: &lowPriority,
-		},
-		Status: v1.PodStatus{
-			Conditions: []v1.PodCondition{
-				{
-					Type:   v1.PodScheduled,
-					Status: v1.ConditionFalse,
-					Reason: v1.PodReasonUnschedulable,
+			Status: v1.PodStatus{
+				NominatedNodeName: "node1",
+			},
+		}),
+		framework.NewPodInfo(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mpp",
+				Namespace: "ns2",
+				UID:       "mppns2",
+				Annotations: map[string]string{
+					"annot2": "val2",
 				},
 			},
-			NominatedNodeName: "node1",
-		},
-	})
+			Spec: v1.PodSpec{
+				Priority: &mediumPriority,
+			},
+			Status: v1.PodStatus{
+				NominatedNodeName: "node1",
+			},
+		}),
+		framework.NewPodInfo(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "up",
+				Namespace: "ns1",
+				UID:       "upns1",
+				Annotations: map[string]string{
+					"annot2": "val2",
+				},
+			},
+			Spec: v1.PodSpec{
+				Priority: &lowPriority,
+			},
+			Status: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionFalse,
+						Reason: v1.PodReasonUnschedulable,
+					},
+				},
+				NominatedNodeName: "node1",
+			},
+		})
+)
 
 func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
 	pInfo := p.unschedulableQ.get(pod)
@@ -826,7 +828,7 @@ func TestPriorityQueue_NewWithOptions(t *testing.T) {
 }
 
 func TestUnschedulablePodsMap(t *testing.T) {
-	var pods = []*v1.Pod{
+	pods := []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "p0",
@@ -870,7 +872,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			},
 		},
 	}
-	var updatedPods = make([]*v1.Pod, len(pods))
+	updatedPods := make([]*v1.Pod, len(pods))
 	updatedPods[0] = pods[0].DeepCopy()
 	updatedPods[1] = pods[1].DeepCopy()
 	updatedPods[3] = pods[3].DeepCopy()
@@ -1339,7 +1341,7 @@ func TestPodTimestamp(t *testing.T) {
 		},
 	}
 
-	var timestamp = time.Now()
+	timestamp := time.Now()
 	pInfo1 := &framework.QueuedPodInfo{
 		PodInfo:   framework.NewPodInfo(pod1),
 		Timestamp: timestamp,
@@ -1640,7 +1642,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 func TestIncomingPodsMetrics(t *testing.T) {
 	timestamp := time.Now()
 	metrics.Register()
-	var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
+	pInfos := make([]*framework.QueuedPodInfo, 0, 3)
 	for i := 1; i <= 3; i++ {
 		p := &framework.QueuedPodInfo{
 			PodInfo: framework.NewPodInfo(&v1.Pod{
@@ -1724,7 +1726,6 @@ func TestIncomingPodsMetrics(t *testing.T) {
 			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingPods, strings.NewReader(queueMetricMetadata+test.want), metricName); err != nil {
 				t.Errorf("unexpected collecting result:\n%s", err)
 			}
-
 		})
 	}
 }
@@ -1979,7 +1980,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 }
 
 func makeQueuedPodInfos(num int, timestamp time.Time) []*framework.QueuedPodInfo {
-	var pInfos = make([]*framework.QueuedPodInfo, 0, num)
+	pInfos := make([]*framework.QueuedPodInfo, 0, num)
 	for i := 1; i <= num; i++ {
 		p := &framework.QueuedPodInfo{
 			PodInfo: framework.NewPodInfo(&v1.Pod{

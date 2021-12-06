@@ -251,7 +251,6 @@ func (m *ManagerImpl) getPodDeviceRequest(pod *v1.Pod) map[string]int {
 			}
 			if requested > initContainerRequests[resource] {
 				initContainerRequests[resource] = requested
-
 			}
 		}
 	}

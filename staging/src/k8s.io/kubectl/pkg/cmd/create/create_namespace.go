@@ -19,6 +19,7 @@ package create
 import (
 	"context"
 	"fmt"
+
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +74,6 @@ func NewNamespaceOptions(ioStreams genericclioptions.IOStreams) *NamespaceOption
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
 func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-
 	o := NewNamespaceOptions(ioStreams)
 
 	cmd := &cobra.Command{

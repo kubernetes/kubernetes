@@ -296,7 +296,6 @@ func (p *ProcessProvider) IsExpired() bool {
 
 // prepareCommand prepares the command to be executed.
 func (p *ProcessProvider) prepareCommand() error {
-
 	var cmdArgs []string
 	if runtime.GOOS == "windows" {
 		cmdArgs = []string{"cmd.exe", "/C"}
@@ -330,7 +329,6 @@ func (p *ProcessProvider) prepareCommand() error {
 // executeCredentialProcess starts the credential process on the OS and
 // returns the results or an error.
 func (p *ProcessProvider) executeCredentialProcess() ([]byte, error) {
-
 	if err := p.prepareCommand(); err != nil {
 		return nil, err
 	}

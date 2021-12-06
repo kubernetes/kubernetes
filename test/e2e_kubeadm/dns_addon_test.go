@@ -38,14 +38,11 @@ const (
 	kubeDNSDeploymentName     = "kube-dns"
 )
 
-var (
-	dnsType = ""
-)
+var dnsType = ""
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the dns as expected
 var _ = Describe("DNS addon", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("DNS")
 

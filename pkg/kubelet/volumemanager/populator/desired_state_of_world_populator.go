@@ -107,7 +107,8 @@ func NewDesiredStateOfWorldPopulator(
 		desiredStateOfWorld:       desiredStateOfWorld,
 		actualStateOfWorld:        actualStateOfWorld,
 		pods: processedPods{
-			processedPods: make(map[volumetypes.UniquePodName]bool)},
+			processedPods: make(map[volumetypes.UniquePodName]bool),
+		},
 		kubeContainerRuntime:     kubeContainerRuntime,
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
@@ -297,8 +298,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			continue
 		}
 
-		pvc, volumeSpec, volumeGidValue, err :=
-			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
+		pvc, volumeSpec, volumeGidValue, err := dswp.createVolumeSpec(podVolume, pod, mounts, devices)
 		if err != nil {
 			klog.ErrorS(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
@@ -340,7 +340,6 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		// ReprocessPod() which is triggered by SyncPod.
 		dswp.markPodProcessed(uniquePodName)
 	}
-
 }
 
 // checkVolumeFSResize checks whether a PVC mounted by the pod requires file
@@ -493,8 +492,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
 		klog.V(5).InfoS("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName)
 		// Fetch actual PV object
-		volumeSpec, volumeGidValue, err :=
-			dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
+		volumeSpec, volumeGidValue, err := dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
 				"error processing PVC %s/%s: %v",
@@ -564,8 +562,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 // An error is returned if the PVC object's phase is not "Bound".
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	namespace string, claimName string) (*v1.PersistentVolumeClaim, error) {
-	pvc, err :=
-		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+	pvc, err := dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
 		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
 	}

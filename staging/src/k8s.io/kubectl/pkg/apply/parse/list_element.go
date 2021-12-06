@@ -77,7 +77,6 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 		}
 
 		subitem, err := v.getItem(s, fmt.Sprintf("%d", i), l.RawElementData)
-
 		if err != nil {
 			return nil, err
 		}

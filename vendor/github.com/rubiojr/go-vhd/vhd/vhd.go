@@ -16,15 +16,17 @@ import (
 	"golang.org/x/text/transform"
 )
 
-const VHD_COOKIE = "636f6e6563746978"     // conectix
-const VHD_DYN_COOKIE = "6378737061727365" // cxsparse
-const VHD_CREATOR_APP = "676f2d766864"    // go-vhd
-const VHD_CREATOR_HOST_OS = "5769326B"    // Win2k
-const VHD_BLOCK_SIZE = 2 * 1024 * 1024    // 2MB
-const VHD_HEADER_SIZE = 512
-const SECTOR_SIZE = 512
-const FOURK_SECTOR_SIZE = 4096
-const VHD_EXTRA_HEADER_SIZE = 1024
+const (
+	VHD_COOKIE            = "636f6e6563746978" // conectix
+	VHD_DYN_COOKIE        = "6378737061727365" // cxsparse
+	VHD_CREATOR_APP       = "676f2d766864"     // go-vhd
+	VHD_CREATOR_HOST_OS   = "5769326B"         // Win2k
+	VHD_BLOCK_SIZE        = 2 * 1024 * 1024    // 2MB
+	VHD_HEADER_SIZE       = 512
+	SECTOR_SIZE           = 512
+	FOURK_SECTOR_SIZE     = 4096
+	VHD_EXTRA_HEADER_SIZE = 1024
+)
 
 // A VDH file
 type VHD struct {
@@ -347,7 +349,7 @@ func (vhd *VHD) PrintExtraHeader() {
 func (vhd *VHD) PrintFooter() {
 	header := vhd.Footer
 
-	//fmtField("Cookie", string(header.Cookie[:]))
+	// fmtField("Cookie", string(header.Cookie[:]))
 	fmtField("Cookie", fmt.Sprintf("%s (%s)",
 		hexs(header.Cookie[:]), string(header.Cookie[:])))
 	fmtField("Features", hexs(header.Features[:]))

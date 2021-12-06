@@ -87,10 +87,12 @@ type Plugin struct {
 	generateName func(string) string
 }
 
-var _ admission.MutationInterface = &Plugin{}
-var _ admission.ValidationInterface = &Plugin{}
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+var (
+	_ admission.MutationInterface   = &Plugin{}
+	_ admission.ValidationInterface = &Plugin{}
+	_                               = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
+	_                               = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+)
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"

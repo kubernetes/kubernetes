@@ -161,7 +161,8 @@ profiles:
 									{Name: "scalar0", Weight: 1},
 									{Name: "scalar1", Weight: 1},
 									{Name: "scalar2", Weight: 1},
-									{Name: "scalar3", Weight: 2}},
+									{Name: "scalar3", Weight: 2},
+								},
 							},
 						},
 					},
@@ -502,7 +503,8 @@ profiles:
 									{Name: "scalar0", Weight: 1},
 									{Name: "scalar1", Weight: 1},
 									{Name: "scalar2", Weight: 1},
-									{Name: "scalar3", Weight: 2}},
+									{Name: "scalar3", Weight: 2},
+								},
 							},
 						},
 					},
@@ -755,7 +757,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 		version schema.GroupVersion
 		want    string
 	}{
-		//v1beta2 tests
+		// v1beta2 tests
 		{
 			name:    "v1beta2 in-tree and out-of-tree plugins",
 			version: v1beta2.SchemeGroupVersion,
@@ -976,7 +978,7 @@ profiles:
   schedulerName: ""
 `,
 		},
-		//v1beta3 tests
+		// v1beta3 tests
 		{
 			name:    "v1beta3 in-tree and out-of-tree plugins",
 			version: v1beta3.SchemeGroupVersion,

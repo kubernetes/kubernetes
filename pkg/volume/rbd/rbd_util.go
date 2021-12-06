@@ -118,7 +118,6 @@ func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 }
 
 func getMaxNbds() (int, error) {
-
 	// the max number of nbd devices may be found in maxNbdsPath
 	// we will check sysfs for possible nbd devices even if this is not available
 	maxNbdsPath := "/sys/module/nbd/parameters/nbds_max"
@@ -375,7 +374,7 @@ func (util *rbdUtil) AttachDisk(b rbdMounter) (string, error) {
 	if pathExists, pathErr := mount.PathExists(globalPDPath); pathErr != nil {
 		return "", fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+		if err := os.MkdirAll(globalPDPath, 0o750); err != nil {
 			return "", err
 		}
 	}
@@ -513,7 +512,6 @@ func (util *rbdUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 
 // DetachBlockDisk detaches the disk from the node.
 func (util *rbdUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error {
-
 	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {

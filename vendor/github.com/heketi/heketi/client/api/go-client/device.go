@@ -65,7 +65,6 @@ func (c *Client) DeviceAdd(request *api.DeviceAddRequest) error {
 }
 
 func (c *Client) DeviceInfo(id string) (*api.DeviceInfoResponse, error) {
-
 	// Create request
 	req, err := http.NewRequest("GET", c.host+"/devices/"+id, nil)
 	if err != nil {
@@ -104,7 +103,6 @@ func (c *Client) DeviceDelete(id string) error {
 
 func (c *Client) DeviceDeleteWithOptions(
 	id string, request *api.DeviceDeleteOptions) error {
-
 	var buf io.Reader
 	if request != nil {
 		b, err := json.Marshal(request)
@@ -150,7 +148,6 @@ func (c *Client) DeviceDeleteWithOptions(
 
 func (c *Client) DeviceState(id string,
 	request *api.StateRequest) error {
-
 	// Marshal request to JSON
 	buffer, err := json.Marshal(request)
 	if err != nil {
@@ -195,7 +192,6 @@ func (c *Client) DeviceState(id string,
 }
 
 func (c *Client) DeviceResync(id string) error {
-
 	// Create a request
 	req, err := http.NewRequest("GET", c.host+"/devices/"+id+"/resync", nil)
 	if err != nil {

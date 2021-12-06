@@ -41,145 +41,158 @@ func TestFindPort(t *testing.T) {
 		port       intstr.IntOrString
 		expected   int
 		pass       bool
-	}{{
-		name:       "valid int, no ports",
-		containers: []v1.Container{{}},
-		port:       intstr.FromInt(93),
-		expected:   93,
-		pass:       true,
-	}, {
-		name: "valid int, with ports",
-		containers: []v1.Container{{Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "TCP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromInt(93),
-		expected: 93,
-		pass:     true,
-	}, {
-		name:       "valid str, no ports",
-		containers: []v1.Container{{}},
-		port:       intstr.FromString("p"),
-		expected:   0,
-		pass:       false,
-	}, {
-		name: "valid str, one ctr with ports",
-		containers: []v1.Container{{Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 33,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromString("q"),
-		expected: 33,
-		pass:     true,
-	}, {
-		name: "valid str, two ctr with ports",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 33,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromString("q"),
-		expected: 33,
-		pass:     true,
-	}, {
-		name: "valid str, two ctr with same port",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromString("q"),
-		expected: 22,
-		pass:     true,
-	}, {
-		name: "valid str, invalid protocol",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "a",
-			ContainerPort: 11,
-			Protocol:      "snmp",
-		},
-		}}},
-		port:     intstr.FromString("a"),
-		expected: 0,
-		pass:     false,
-	}, {
-		name: "valid hostPort",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "a",
-			ContainerPort: 11,
-			HostPort:      81,
-			Protocol:      "TCP",
-		},
-		}}},
-		port:     intstr.FromString("a"),
-		expected: 11,
-		pass:     true,
-	},
+	}{
 		{
-			name: "invalid hostPort",
-			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-				Name:          "a",
+			name:       "valid int, no ports",
+			containers: []v1.Container{{}},
+			port:       intstr.FromInt(93),
+			expected:   93,
+			pass:       true,
+		},
+		{
+			name: "valid int, with ports",
+			containers: []v1.Container{{Ports: []v1.ContainerPort{{
+				Name:          "",
 				ContainerPort: 11,
-				HostPort:      -1,
 				Protocol:      "TCP",
-			},
+			}, {
+				Name:          "p",
+				ContainerPort: 22,
+				Protocol:      "TCP",
+			}}}},
+			port:     intstr.FromInt(93),
+			expected: 93,
+			pass:     true,
+		},
+		{
+			name:       "valid str, no ports",
+			containers: []v1.Container{{}},
+			port:       intstr.FromString("p"),
+			expected:   0,
+			pass:       false,
+		},
+		{
+			name: "valid str, one ctr with ports",
+			containers: []v1.Container{{Ports: []v1.ContainerPort{{
+				Name:          "",
+				ContainerPort: 11,
+				Protocol:      "UDP",
+			}, {
+				Name:          "p",
+				ContainerPort: 22,
+				Protocol:      "TCP",
+			}, {
+				Name:          "q",
+				ContainerPort: 33,
+				Protocol:      "TCP",
+			}}}},
+			port:     intstr.FromString("q"),
+			expected: 33,
+			pass:     true,
+		},
+		{
+			name: "valid str, two ctr with ports",
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
+				Name:          "",
+				ContainerPort: 11,
+				Protocol:      "UDP",
+			}, {
+				Name:          "p",
+				ContainerPort: 22,
+				Protocol:      "TCP",
+			}, {
+				Name:          "q",
+				ContainerPort: 33,
+				Protocol:      "TCP",
+			}}}},
+			port:     intstr.FromString("q"),
+			expected: 33,
+			pass:     true,
+		},
+		{
+			name: "valid str, two ctr with same port",
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
+				Name:          "",
+				ContainerPort: 11,
+				Protocol:      "UDP",
+			}, {
+				Name:          "p",
+				ContainerPort: 22,
+				Protocol:      "TCP",
+			}, {
+				Name:          "q",
+				ContainerPort: 22,
+				Protocol:      "TCP",
+			}}}},
+			port:     intstr.FromString("q"),
+			expected: 22,
+			pass:     true,
+		},
+		{
+			name: "valid str, invalid protocol",
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{
+				{
+					Name:          "a",
+					ContainerPort: 11,
+					Protocol:      "snmp",
+				},
+			}}},
+			port:     intstr.FromString("a"),
+			expected: 0,
+			pass:     false,
+		},
+		{
+			name: "valid hostPort",
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{
+				{
+					Name:          "a",
+					ContainerPort: 11,
+					HostPort:      81,
+					Protocol:      "TCP",
+				},
 			}}},
 			port:     intstr.FromString("a"),
 			expected: 11,
 			pass:     true,
-			//this should fail but passes.
+		},
+		{
+			name: "invalid hostPort",
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{
+				{
+					Name:          "a",
+					ContainerPort: 11,
+					HostPort:      -1,
+					Protocol:      "TCP",
+				},
+			}}},
+			port:     intstr.FromString("a"),
+			expected: 11,
+			pass:     true,
+			// this should fail but passes.
 		},
 		{
 			name: "invalid ContainerPort",
-			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-				Name:          "a",
-				ContainerPort: -1,
-				Protocol:      "TCP",
-			},
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{
+				{
+					Name:          "a",
+					ContainerPort: -1,
+					Protocol:      "TCP",
+				},
 			}}},
 			port:     intstr.FromString("a"),
 			expected: -1,
 			pass:     true,
-			//this should fail but passes
+			// this should fail but passes
 		},
 		{
 			name: "HostIP Address",
-			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-				Name:          "a",
-				ContainerPort: 11,
-				HostIP:        "192.168.1.1",
-				Protocol:      "TCP",
-			},
+			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{
+				{
+					Name:          "a",
+					ContainerPort: 11,
+					HostIP:        "192.168.1.1",
+					Protocol:      "TCP",
+				},
 			}}},
 			port:     intstr.FromString("a"),
 			expected: 11,
@@ -402,83 +415,156 @@ func TestPodSecrets(t *testing.T) {
 				EnvFrom: []v1.EnvFromSource{{
 					SecretRef: &v1.SecretEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: "Spec.Containers[*].EnvFrom[*].SecretRef"}}}},
+							Name: "Spec.Containers[*].EnvFrom[*].SecretRef",
+						},
+					},
+				}},
 				Env: []v1.EnvVar{{
 					ValueFrom: &v1.EnvVarSource{
 						SecretKeyRef: &v1.SecretKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: "Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
+								Name: "Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			ImagePullSecrets: []v1.LocalObjectReference{{
-				Name: "Spec.ImagePullSecrets"}},
+				Name: "Spec.ImagePullSecrets",
+			}},
 			InitContainers: []v1.Container{{
 				EnvFrom: []v1.EnvFromSource{{
 					SecretRef: &v1.SecretEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: "Spec.InitContainers[*].EnvFrom[*].SecretRef"}}}},
+							Name: "Spec.InitContainers[*].EnvFrom[*].SecretRef",
+						},
+					},
+				}},
 				Env: []v1.EnvVar{{
 					ValueFrom: &v1.EnvVarSource{
 						SecretKeyRef: &v1.SecretKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: "Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
+								Name: "Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			Volumes: []v1.Volume{{
 				VolumeSource: v1.VolumeSource{
 					AzureFile: &v1.AzureFileVolumeSource{
-						SecretName: "Spec.Volumes[*].VolumeSource.AzureFile.SecretName"}}}, {
+						SecretName: "Spec.Volumes[*].VolumeSource.AzureFile.SecretName",
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					CephFS: &v1.CephFSVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.CephFS.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.CephFS.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					Cinder: &v1.CinderVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.Cinder.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.Cinder.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					FlexVolume: &v1.FlexVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					Projected: &v1.ProjectedVolumeSource{
 						Sources: []v1.VolumeProjection{{
 							Secret: &v1.SecretProjection{
 								LocalObjectReference: v1.LocalObjectReference{
-									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret"}}}}}}}, {
+									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret",
+								},
+							},
+						}},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					RBD: &v1.RBDVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.RBD.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.RBD.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					Secret: &v1.SecretVolumeSource{
-						SecretName: "Spec.Volumes[*].VolumeSource.Secret.SecretName"}}}, {
+						SecretName: "Spec.Volumes[*].VolumeSource.Secret.SecretName",
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					Secret: &v1.SecretVolumeSource{
-						SecretName: "Spec.Volumes[*].VolumeSource.Secret"}}}, {
+						SecretName: "Spec.Volumes[*].VolumeSource.Secret",
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					ScaleIO: &v1.ScaleIOVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					ISCSI: &v1.ISCSIVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					StorageOS: &v1.StorageOSVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}, {
+							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
+						},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					CSI: &v1.CSIVolumeSource{
 						NodePublishSecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef",
+						},
+					},
+				},
+			}},
 			EphemeralContainers: []v1.EphemeralContainer{{
 				EphemeralContainerCommon: v1.EphemeralContainerCommon{
 					EnvFrom: []v1.EnvFromSource{{
 						SecretRef: &v1.SecretEnvSource{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef"}}}},
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef",
+							},
+						},
+					}},
 					Env: []v1.EnvVar{{
 						ValueFrom: &v1.EnvVarSource{
 							SecretKeyRef: &v1.SecretKeySelector{
 								LocalObjectReference: v1.LocalObjectReference{
-									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef"}}}}}}}},
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef",
+								},
+							},
+						},
+					}},
+				},
+			}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -541,7 +627,11 @@ func TestPodSecrets(t *testing.T) {
 				EnvFrom: []v1.EnvFromSource{{
 					SecretRef: &v1.SecretEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: ""}}}}}},
+							Name: "",
+						},
+					},
+				}},
+			}},
 		},
 	}
 	VisitPodSecretNames(emptyPod, func(name string) bool {
@@ -601,44 +691,79 @@ func TestPodConfigmaps(t *testing.T) {
 				EnvFrom: []v1.EnvFromSource{{
 					ConfigMapRef: &v1.ConfigMapEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: "Spec.Containers[*].EnvFrom[*].ConfigMapRef"}}}},
+							Name: "Spec.Containers[*].EnvFrom[*].ConfigMapRef",
+						},
+					},
+				}},
 				Env: []v1.EnvVar{{
 					ValueFrom: &v1.EnvVarSource{
 						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			EphemeralContainers: []v1.EphemeralContainer{{
 				EphemeralContainerCommon: v1.EphemeralContainerCommon{
 					EnvFrom: []v1.EnvFromSource{{
 						ConfigMapRef: &v1.ConfigMapEnvSource{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef"}}}},
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef",
+							},
+						},
+					}},
 					Env: []v1.EnvVar{{
 						ValueFrom: &v1.EnvVarSource{
 							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 								LocalObjectReference: v1.LocalObjectReference{
-									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}}},
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef",
+								},
+							},
+						},
+					}},
+				},
+			}},
 			InitContainers: []v1.Container{{
 				EnvFrom: []v1.EnvFromSource{{
 					ConfigMapRef: &v1.ConfigMapEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: "Spec.InitContainers[*].EnvFrom[*].ConfigMapRef"}}}},
+							Name: "Spec.InitContainers[*].EnvFrom[*].ConfigMapRef",
+						},
+					},
+				}},
 				Env: []v1.EnvVar{{
 					ValueFrom: &v1.EnvVarSource{
 						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
-								Name: "Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+								Name: "Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+							},
+						},
+					},
+				}},
+			}},
 			Volumes: []v1.Volume{{
 				VolumeSource: v1.VolumeSource{
 					Projected: &v1.ProjectedVolumeSource{
 						Sources: []v1.VolumeProjection{{
 							ConfigMap: &v1.ConfigMapProjection{
 								LocalObjectReference: v1.LocalObjectReference{
-									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap"}}}}}}}, {
+									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap",
+								},
+							},
+						}},
+					},
+				},
+			}, {
 				VolumeSource: v1.VolumeSource{
 					ConfigMap: &v1.ConfigMapVolumeSource{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ConfigMap"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.ConfigMap",
+						},
+					},
+				},
+			}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -685,7 +810,11 @@ func TestPodConfigmaps(t *testing.T) {
 				EnvFrom: []v1.EnvFromSource{{
 					ConfigMapRef: &v1.ConfigMapEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: ""}}}}}},
+							Name: "",
+						},
+					},
+				}},
+			}},
 		},
 	}
 	VisitPodConfigmapNames(emptyPod, func(name string) bool {
@@ -826,7 +955,8 @@ func TestUpdatePodCondition(t *testing.T) {
 				Reason:             "successfully",
 				Message:            "sync pod successfully",
 				LastProbeTime:      time,
-				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+				LastTransitionTime: metav1.NewTime(time.Add(1000)),
+			},
 			expected: false,
 			desc:     "all equal, no update",
 		},
@@ -838,7 +968,8 @@ func TestUpdatePodCondition(t *testing.T) {
 				Reason:             "successfully",
 				Message:            "sync pod successfully",
 				LastProbeTime:      time,
-				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+				LastTransitionTime: metav1.NewTime(time.Add(1000)),
+			},
 			expected: true,
 			desc:     "not equal Type, should get updated",
 		},
@@ -850,7 +981,8 @@ func TestUpdatePodCondition(t *testing.T) {
 				Reason:             "successfully",
 				Message:            "sync pod successfully",
 				LastProbeTime:      time,
-				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+				LastTransitionTime: metav1.NewTime(time.Add(1000)),
+			},
 			expected: true,
 			desc:     "not equal Status, should get updated",
 		},

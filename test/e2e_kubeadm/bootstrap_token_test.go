@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +41,6 @@ const (
 // that kubeadm creates the bootstrap token, the system:bootstrappers:kubeadm:default-node-token group
 // and that all the related RBAC rules are in place
 var _ = Describe("bootstrap token", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("bootstrap token")
 

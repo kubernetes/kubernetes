@@ -17,13 +17,13 @@ limitations under the License.
 package apps
 
 import (
+	"fmt"
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/config"
 	. "github.com/onsi/ginkgo/types"
 	. "github.com/onsi/gomega"
-
-	"fmt"
-	"testing"
 )
 
 func TestApps(t *testing.T) {

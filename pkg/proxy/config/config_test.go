@@ -38,9 +38,11 @@ type sortedServices []*v1.Service
 func (s sortedServices) Len() int {
 	return len(s)
 }
+
 func (s sortedServices) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
+
 func (s sortedServices) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
 }
@@ -133,9 +135,11 @@ type sortedEndpoints []*v1.Endpoints
 func (s sortedEndpoints) Len() int {
 	return len(s)
 }
+
 func (s sortedEndpoints) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
+
 func (s sortedEndpoints) Less(i, j int) bool {
 	return s[i].Name < s[j].Name
 }

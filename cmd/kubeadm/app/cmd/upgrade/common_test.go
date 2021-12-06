@@ -67,7 +67,7 @@ func TestEnforceRequirements(t *testing.T) {
 }
 
 func TestPrintConfiguration(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		cfg           *kubeadmapi.ClusterConfiguration
 		buf           *bytes.Buffer

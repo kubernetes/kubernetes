@@ -86,7 +86,6 @@ func TimeStringFromNow(delta time.Duration) string {
 
 // WaitforSignedClusterInfoByBootStrapToken waits for signed cluster info by bootstrap token.
 func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID string) error {
-
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
@@ -103,7 +102,6 @@ func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID str
 
 // WaitForSignedClusterInfoGetUpdatedByBootstrapToken waits for signed cluster info to be updated by bootstrap token.
 func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, tokenID string, signedToken string) error {
-
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
@@ -120,7 +118,6 @@ func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, t
 
 // WaitForSignedClusterInfoByBootstrapTokenToDisappear waits for signed cluster info to be disappeared by bootstrap token.
 func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, tokenID string) error {
-
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
@@ -137,7 +134,6 @@ func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, 
 
 // WaitForBootstrapTokenSecretToDisappear waits for bootstrap token secret to be disappeared.
 func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID string) error {
-
 	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
 		_, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {

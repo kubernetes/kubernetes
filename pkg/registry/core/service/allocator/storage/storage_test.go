@@ -132,7 +132,6 @@ func TestAllocatedStorageButReleasedLocally(t *testing.T) {
 	if ok || err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 // Test that one item is free in storage but is  allocated locally
@@ -157,5 +156,4 @@ func TestAllocatedLocallyButReleasedStorage(t *testing.T) {
 	if !ok || err != nil {
 		t.Fatal(err)
 	}
-
 }

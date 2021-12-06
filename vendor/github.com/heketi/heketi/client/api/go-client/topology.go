@@ -62,5 +62,4 @@ func (c *Client) TopologyInfo() (*api.TopologyInfoResponse, error) {
 		topo.ClusterList = append(topo.ClusterList, cluster)
 	}
 	return topo, nil
-
 }

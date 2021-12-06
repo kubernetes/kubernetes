@@ -25,7 +25,6 @@ import (
 )
 
 func TestCheckAppArmor(t *testing.T) {
-
 	testCases := []struct {
 		name           string
 		metaData       *metav1.ObjectMeta
@@ -34,29 +33,32 @@ func TestCheckAppArmor(t *testing.T) {
 	}{
 		{
 			name: "container with default AppArmor + extra annotations",
-			metaData: &metav1.ObjectMeta{Annotations: map[string]string{
-				corev1.AppArmorBetaProfileNamePrefix + "test": "runtime/default",
-				"env": "prod",
-			},
+			metaData: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					corev1.AppArmorBetaProfileNamePrefix + "test": "runtime/default",
+					"env": "prod",
+				},
 			},
 			podSpec:        &corev1.PodSpec{},
 			expectedResult: &CheckResult{Allowed: true},
 		},
 		{
 			name: "container with local AppArmor + extra annotations",
-			metaData: &metav1.ObjectMeta{Annotations: map[string]string{
-				corev1.AppArmorBetaProfileNamePrefix + "test": "localhost/sec-profile01",
-				"env": "dev",
-			},
+			metaData: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					corev1.AppArmorBetaProfileNamePrefix + "test": "localhost/sec-profile01",
+					"env": "dev",
+				},
 			},
 			podSpec:        &corev1.PodSpec{},
 			expectedResult: &CheckResult{Allowed: true},
 		},
 		{
 			name: "container with no AppArmor annotations",
-			metaData: &metav1.ObjectMeta{Annotations: map[string]string{
-				"env": "dev",
-			},
+			metaData: &metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"env": "dev",
+				},
 			},
 			podSpec:        &corev1.PodSpec{},
 			expectedResult: &CheckResult{Allowed: true},

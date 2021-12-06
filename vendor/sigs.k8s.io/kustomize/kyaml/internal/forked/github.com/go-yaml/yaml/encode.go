@@ -121,7 +121,7 @@ func (e *encoder) marshal(tag string, in reflect.Value) {
 		return
 	case Node:
 		if !in.CanAddr() {
-			var n = reflect.New(in.Type()).Elem()
+			n := reflect.New(in.Type()).Elem()
 			n.Set(in)
 			in = n
 		}
@@ -438,8 +438,8 @@ func (e *encoder) node(node *Node, tail string) {
 
 	// If the tag was not explicitly requested, and dropping it won't change the
 	// implicit tag of the value, don't include it in the presentation.
-	var tag = node.Tag
-	var stag = shortTag(tag)
+	tag := node.Tag
+	stag := shortTag(tag)
 	var forceQuoting bool
 	if tag != "" && node.Style&TaggedStyle == 0 {
 		if node.Kind == ScalarNode {

@@ -90,18 +90,23 @@ func (g *ClientConfigGetter) Load() (*clientcmdapi.Config, error) {
 func (g *ClientConfigGetter) GetLoadingPrecedence() []string {
 	return nil
 }
+
 func (g *ClientConfigGetter) GetStartingConfig() (*clientcmdapi.Config, error) {
 	return g.kubeconfigGetter()
 }
+
 func (g *ClientConfigGetter) GetDefaultFilename() string {
 	return ""
 }
+
 func (g *ClientConfigGetter) IsExplicitFile() bool {
 	return false
 }
+
 func (g *ClientConfigGetter) GetExplicitFile() string {
 	return ""
 }
+
 func (g *ClientConfigGetter) IsDefaultConfig(config *restclient.Config) bool {
 	return false
 }
@@ -286,7 +291,7 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return err
 		}
 		// destination is created with mode 0666 before umask
-		err = ioutil.WriteFile(destination, data, 0666)
+		err = ioutil.WriteFile(destination, data, 0o666)
 		if err != nil {
 			return err
 		}
@@ -422,12 +427,12 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 	}
 	dir := filepath.Dir(filename)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
+		if err = os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
 	}
 
-	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
+	if err := ioutil.WriteFile(filename, content, 0o600); err != nil {
 		return err
 	}
 	return nil
@@ -440,7 +445,7 @@ func lockFile(filename string) error {
 	// Make sure the dir exists before we try to create a lock file.
 	dir := filepath.Dir(filename)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
+		if err = os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
 	}

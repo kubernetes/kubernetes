@@ -8,10 +8,12 @@ import (
 	"github.com/modern-go/reflect2"
 )
 
-var marshalerType = reflect2.TypeOfPtr((*json.Marshaler)(nil)).Elem()
-var unmarshalerType = reflect2.TypeOfPtr((*json.Unmarshaler)(nil)).Elem()
-var textMarshalerType = reflect2.TypeOfPtr((*encoding.TextMarshaler)(nil)).Elem()
-var textUnmarshalerType = reflect2.TypeOfPtr((*encoding.TextUnmarshaler)(nil)).Elem()
+var (
+	marshalerType       = reflect2.TypeOfPtr((*json.Marshaler)(nil)).Elem()
+	unmarshalerType     = reflect2.TypeOfPtr((*json.Unmarshaler)(nil)).Elem()
+	textMarshalerType   = reflect2.TypeOfPtr((*encoding.TextMarshaler)(nil)).Elem()
+	textUnmarshalerType = reflect2.TypeOfPtr((*encoding.TextUnmarshaler)(nil)).Elem()
+)
 
 func createDecoderOfMarshaler(ctx *ctx, typ reflect2.Type) ValDecoder {
 	ptrType := reflect2.PtrTo(typ)

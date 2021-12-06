@@ -138,7 +138,8 @@ func TestSchedulerCreation(t *testing.T) {
 							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
-				)},
+				),
+			},
 			wantProfiles: []string{"default-scheduler"},
 		},
 		{
@@ -153,7 +154,8 @@ func TestSchedulerCreation(t *testing.T) {
 							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
-				)},
+				),
+			},
 			wantProfiles: []string{"default-scheduler"},
 			wantErr:      "a plugin named DefaultBinder already exists",
 		},
@@ -175,7 +177,8 @@ func TestSchedulerCreation(t *testing.T) {
 							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
-				)},
+				),
+			},
 			wantProfiles: []string{"bar", "foo"},
 		},
 		{
@@ -203,7 +206,8 @@ func TestSchedulerCreation(t *testing.T) {
 							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 						},
 					},
-				)},
+				),
+			},
 			wantErr: "duplicate profile with scheduler name \"foo\"",
 		},
 		{
@@ -540,7 +544,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	// We use a fake filter that only allows one particular node. We create two
 	// profiles, each with a different node in the filter configuration.
 	objs := append([]runtime.Object{
-		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, nodes...)
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}},
+	}, nodes...)
 	client := clientsetfake.NewSimpleClientset(objs...)
 	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -554,7 +559,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		profile.NewRecorderFactory(broadcaster),
 		ctx.Done(),
 		WithProfiles(
-			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-machine2",
+			schedulerapi.KubeSchedulerProfile{
+				SchedulerName: "match-machine2",
 				Plugins: &schedulerapi.Plugins{
 					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelector"}}},
 					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
@@ -778,8 +784,8 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
-	informerFactory informers.SharedInformerFactory, stop chan struct{}, pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
-
+	informerFactory informers.SharedInformerFactory, stop chan struct{}, pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error,
+) {
 	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, fns...)
 
 	informerFactory.Start(stop)
@@ -815,8 +821,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	scache := internalcache.New(10*time.Minute, stop)
 
 	// Design the baseline for the pods, and we will make nodes that don't fit it later.
-	var cpu = int64(4)
-	var mem = int64(500)
+	cpu := int64(4)
+	mem := int64(500)
 	podWithTooBigResourceRequests := podWithResources("bar", "", v1.ResourceList{
 		v1.ResourceCPU:    *(resource.NewQuantity(cpu, resource.DecimalSI)),
 		v1.ResourceMemory: *(resource.NewQuantity(mem, resource.DecimalSI)),
@@ -842,7 +848,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 					v1.ResourceCPU:    *(resource.NewQuantity(cpu/2, resource.DecimalSI)),
 					v1.ResourceMemory: *(resource.NewQuantity(mem/5, resource.DecimalSI)),
 					v1.ResourcePods:   *(resource.NewQuantity(10, resource.DecimalSI)),
-				}},
+				},
+			},
 		}
 		scache.AddNode(&node)
 		nodes = append(nodes, &node)
@@ -954,8 +961,10 @@ func setupTestSchedulerWithVolumeBinding(volumeBinder volumebinding.SchedulerVol
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")
 	pod.Namespace = "foo-ns"
-	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
-		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+		Name:         "testVol",
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}},
+	})
 	queuedPodStore.Add(pod)
 	scache := internalcache.New(10*time.Minute, stop)
 	scache.AddNode(&testNode)
@@ -1220,7 +1229,6 @@ func TestSchedulerBinding(t *testing.T) {
 					t.Errorf("got bound with extender #%d: %v, want %v", i, gotBound, wantBound)
 				}
 			}
-
 		})
 	}
 }

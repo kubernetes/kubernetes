@@ -90,7 +90,6 @@ func NewController(
 	sampleclientset clientset.Interface,
 	deploymentInformer appsinformers.DeploymentInformer,
 	fooInformer informers.FooInformer) *Controller {
-
 	// Create event broadcaster
 	// Add sample-controller types to the default Kubernetes Scheme so Events can be
 	// logged for sample-controller types.
@@ -228,7 +227,6 @@ func (c *Controller) processNextWorkItem() bool {
 		klog.Infof("Successfully synced '%s'", key)
 		return nil
 	}(obj)
-
 	if err != nil {
 		utilruntime.HandleError(err)
 		return true

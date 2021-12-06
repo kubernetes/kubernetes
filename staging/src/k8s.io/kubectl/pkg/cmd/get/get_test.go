@@ -88,7 +88,7 @@ func testComponentStatusData() *corev1.ComponentStatusList {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
-	var openapiSchemaPath = filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")
+	openapiSchemaPath := filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
@@ -1108,10 +1108,8 @@ func TestRuntimeSorter(t *testing.T) {
 			if tc.expect != out.String() {
 				t.Fatalf("unexpected output: expecting %s, but got %s", tc.expect, out.String())
 			}
-
 		})
 	}
-
 }
 
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
@@ -2301,7 +2299,6 @@ b      false
 }
 
 func TestWatchResourceWatchEvents(t *testing.T) {
-
 	testcases := []struct {
 		format   string
 		table    bool
@@ -2820,7 +2817,8 @@ func podTableWatchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser 
 				Rows: []metav1.TableRow{{
 					Object: runtime.RawExtension{Raw: b.Bytes()},
 					Cells:  []interface{}{e.Object.(*corev1.Pod).Name, "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
-				}}},
+				}},
+			},
 		})
 	}
 	return watchBody(codec, tableEvents)

@@ -1,6 +1,6 @@
-//This package is copied from Go library text/template.
-//The original private functions eq, ge, gt, le, lt, and ne
-//are exported as public functions.
+// This package is copied from Go library text/template.
+// The original private functions eq, ge, gt, le, lt, and ne
+// are exported as public functions.
 package template
 
 import (
@@ -15,12 +15,14 @@ import (
 	"unicode/utf8"
 )
 
-var Equal = eq
-var GreaterEqual = ge
-var Greater = gt
-var LessEqual = le
-var Less = lt
-var NotEqual = ne
+var (
+	Equal        = eq
+	GreaterEqual = ge
+	Greater      = gt
+	LessEqual    = le
+	Less         = lt
+	NotEqual     = ne
+)
 
 // FuncMap is the type of the map defining the mapping from names to functions.
 // Each function must have either a single return value, or two return values of

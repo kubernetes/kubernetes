@@ -71,7 +71,6 @@ func (n *Notifier) SendSuiteCompletionNotification(suite testsuite.TestSuite, su
 }
 
 func (n *Notifier) SendNotification(title string, subtitle string) {
-
 	if n.commandFlags.Notify {
 		onLinux := (runtime.GOOS == "linux")
 		onOSX := (runtime.GOOS == "darwin")
@@ -104,7 +103,6 @@ func (n *Notifier) SendNotification(title string, subtitle string) {
 }
 
 func (n *Notifier) RunCommand(suite testsuite.TestSuite, suitePassed bool) {
-
 	command := n.commandFlags.AfterSuiteHook
 	if command != "" {
 

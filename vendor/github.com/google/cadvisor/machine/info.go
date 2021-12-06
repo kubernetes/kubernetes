@@ -34,11 +34,15 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const hugepagesDirectory = "/sys/kernel/mm/hugepages/"
-const memoryControllerPath = "/sys/devices/system/edac/mc/"
+const (
+	hugepagesDirectory   = "/sys/kernel/mm/hugepages/"
+	memoryControllerPath = "/sys/devices/system/edac/mc/"
+)
 
-var machineIDFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
-var bootIDFilePath = flag.String("boot_id_file", "/proc/sys/kernel/random/boot_id", "Comma-separated list of files to check for boot-id. Use the first one that exists.")
+var (
+	machineIDFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
+	bootIDFilePath    = flag.String("boot_id_file", "/proc/sys/kernel/random/boot_id", "Comma-separated list of files to check for boot-id. Use the first one that exists.")
+)
 
 func getInfoFromFiles(filePaths string) string {
 	if len(filePaths) == 0 {

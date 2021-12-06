@@ -59,10 +59,12 @@ const (
 	NSWLTolerations      string = "scheduler.alpha.kubernetes.io/tolerationsWhitelist"
 )
 
-var _ admission.MutationInterface = &Plugin{}
-var _ admission.ValidationInterface = &Plugin{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
+var (
+	_ admission.MutationInterface   = &Plugin{}
+	_ admission.ValidationInterface = &Plugin{}
+	_                               = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+	_                               = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
+)
 
 // Plugin contains the client used by the admission controller
 type Plugin struct {
@@ -188,7 +190,6 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 	namespaceInformer := f.Core().V1().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
-
 }
 
 // ValidateInitialization checks the object is properly initialized

@@ -359,7 +359,6 @@ func TestAuthorizeV1beta1(t *testing.T) {
 		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectAnyGroup",   "apiGroup": "*"}}
 		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectEmptyGroup", "apiGroup": "" }}
 		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectXGroup",     "apiGroup": "x"}}`)
-
 	if err != nil {
 		t.Fatalf("unable to read policy file: %v", err)
 	}
@@ -824,7 +823,7 @@ func newWithContents(t *testing.T, contents string) (PolicyList, error) {
 	f.Close()
 	defer os.Remove(f.Name())
 
-	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0o700); err != nil {
 		t.Fatalf("unexpected error writing policyfile: %v", err)
 	}
 

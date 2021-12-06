@@ -137,8 +137,8 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 		return s
 	}
 	result := &schema.Structural{
-		Generic: s.Generic,
-		Extensions: s.Extensions,
+		Generic:         s.Generic,
+		Extensions:      s.Extensions,
 		ValueValidation: s.ValueValidation,
 	}
 	props := make(map[string]schema.Structural, len(s.Properties))
@@ -151,7 +151,7 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 	props["metadata"] = schema.Structural{
 		Generic: schema.Generic{Type: "object"},
 		Properties: map[string]schema.Structural{
-			"name": stringType,
+			"name":         stringType,
 			"generateName": stringType,
 		},
 	}

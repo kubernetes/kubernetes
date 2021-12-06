@@ -238,7 +238,8 @@ func TestLabelsMatch(t *testing.T) {
 				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
 				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
 				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
-			}}, labelFilter: map[string]string{
+			},
+		}, labelFilter: map[string]string{
 			"a": "1",
 			"b": "2",
 			"c": "3",
@@ -248,7 +249,8 @@ func TestLabelsMatch(t *testing.T) {
 				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
 				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
 				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
-			}}, labelFilter: map[string]string{
+			},
+		}, labelFilter: map[string]string{
 			"a": "1",
 			"b": "2",
 		}, expectedMatch: true},
@@ -256,7 +258,8 @@ func TestLabelsMatch(t *testing.T) {
 			Label: []*dto.LabelPair{
 				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
 				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
-			}}, labelFilter: map[string]string{
+			},
+		}, labelFilter: map[string]string{
 			"a": "1",
 			"b": "2",
 			"c": "3",
@@ -266,7 +269,8 @@ func TestLabelsMatch(t *testing.T) {
 				{Name: pointer.StringPtr("aa"), Value: pointer.StringPtr("11")},
 				{Name: pointer.StringPtr("bb"), Value: pointer.StringPtr("22")},
 				{Name: pointer.StringPtr("cc"), Value: pointer.StringPtr("33")},
-			}}, labelFilter: map[string]string{
+			},
+		}, labelFilter: map[string]string{
 			"a": "1",
 			"b": "2",
 			"c": "3",
@@ -276,7 +280,8 @@ func TestLabelsMatch(t *testing.T) {
 				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
 				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
 				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("3")},
-			}}, labelFilter: map[string]string{
+			},
+		}, labelFilter: map[string]string{
 			"a": "11",
 			"b": "2",
 			"c": "3",
@@ -287,13 +292,15 @@ func TestLabelsMatch(t *testing.T) {
 				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
 				{Name: pointer.StringPtr("c"), Value: pointer.StringPtr("33")},
 				{Name: pointer.StringPtr("d"), Value: pointer.StringPtr("4")},
-			}}, labelFilter: map[string]string{
+			},
+		}, labelFilter: map[string]string{
 			"a": "1",
 			"b": "2",
 			"c": "3",
 		}, expectedMatch: false},
 		{name: "metric labels is empty and labelFilter is not empty", metric: &dto.Metric{
-			Label: []*dto.LabelPair{}}, labelFilter: map[string]string{
+			Label: []*dto.LabelPair{},
+		}, labelFilter: map[string]string{
 			"a": "1",
 			"b": "2",
 			"c": "3",
@@ -302,7 +309,8 @@ func TestLabelsMatch(t *testing.T) {
 			Label: []*dto.LabelPair{
 				{Name: pointer.StringPtr("a"), Value: pointer.StringPtr("1")},
 				{Name: pointer.StringPtr("b"), Value: pointer.StringPtr("2")},
-			}}, labelFilter: map[string]string{}, expectedMatch: true},
+			},
+		}, labelFilter: map[string]string{}, expectedMatch: true},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -574,7 +582,7 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			}
 			vec := metrics.NewHistogramVec(HistogramOpts, labels)
 			// Use local registry
-			var registry = metrics.NewKubeRegistry()
+			registry := metrics.NewKubeRegistry()
 			var gather metrics.Gatherer = registry
 			registry.MustRegister(vec)
 			// Observe two metrics with same value for label1 but different value of label2.

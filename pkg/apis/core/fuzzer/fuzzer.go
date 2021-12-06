@@ -114,12 +114,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(j *core.ReplicationControllerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			//j.TemplateRef = nil // this is required for round trip
+			// j.TemplateRef = nil // this is required for round trip
 		},
 		func(j *core.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			// TODO: uncomment when round trip starts from a versioned object
-			if false { //j.Items == nil {
+			if false { // j.Items == nil {
 				j.Items = []runtime.Object{}
 			}
 		},
@@ -181,7 +181,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			m.FieldRef.FieldPath = c.RandString()
 			c.Fuzz(m.Mode)
 			if m.Mode != nil {
-				*m.Mode &= 0777
+				*m.Mode &= 0o777
 			}
 		},
 		func(s *core.SecretVolumeSource, c fuzz.Continue) {
@@ -195,7 +195,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// value and it is expected to be between 0 and 0777
 			var mode int32
 			c.Fuzz(&mode)
-			mode &= 0777
+			mode &= 0o777
 			s.DefaultMode = &mode
 		},
 		func(cm *core.ConfigMapVolumeSource, c fuzz.Continue) {
@@ -209,7 +209,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// value and it is expected to be between 0 and 0777
 			var mode int32
 			c.Fuzz(&mode)
-			mode &= 0777
+			mode &= 0o777
 			cm.DefaultMode = &mode
 		},
 		func(d *core.DownwardAPIVolumeSource, c fuzz.Continue) {
@@ -219,7 +219,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// value and it is expected to be between 0 and 0777
 			var mode int32
 			c.Fuzz(&mode)
-			mode &= 0777
+			mode &= 0o777
 			d.DefaultMode = &mode
 		},
 		func(s *core.ProjectedVolumeSource, c fuzz.Continue) {
@@ -229,7 +229,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// value and it is expected to be between 0 and 0777
 			var mode int32
 			c.Fuzz(&mode)
-			mode &= 0777
+			mode &= 0o777
 			s.DefaultMode = &mode
 		},
 		func(k *core.KeyToPath, c fuzz.Continue) {
@@ -240,7 +240,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// Mode is not mandatory, but if it is set, it should be
 			// a value between 0 and 0777
 			if k.Mode != nil {
-				*k.Mode &= 0777
+				*k.Mode &= 0o777
 			}
 		},
 		func(vs *core.VolumeSource, c fuzz.Continue) {
@@ -412,8 +412,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(obj *core.HostPathVolumeSource, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
-			types := []core.HostPathType{core.HostPathUnset, core.HostPathDirectoryOrCreate, core.HostPathDirectory,
-				core.HostPathFileOrCreate, core.HostPathFile, core.HostPathSocket, core.HostPathCharDev, core.HostPathBlockDev}
+			types := []core.HostPathType{
+				core.HostPathUnset, core.HostPathDirectoryOrCreate, core.HostPathDirectory,
+				core.HostPathFileOrCreate, core.HostPathFile, core.HostPathSocket, core.HostPathCharDev, core.HostPathBlockDev,
+			}
 			typeVol := types[c.Rand.Intn(len(types))]
 			if obj.Type == nil {
 				obj.Type = &typeVol

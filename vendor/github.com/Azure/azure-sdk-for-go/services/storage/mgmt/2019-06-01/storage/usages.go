@@ -8,11 +8,12 @@ package storage
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // UsagesClient is the the Azure Storage Management API.
@@ -46,8 +47,11 @@ func (client UsagesClient) ListByLocation(ctx context.Context, location string) 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.UsagesClient", "ListByLocation", err.Error())
 	}
 

@@ -135,7 +135,7 @@ func TestPrepareForCreate(t *testing.T) {
 	genericDataSource := makeDataSource("generic.storage.k8s.io", "Generic", "my-foo")
 	coreDataSource := makeDataSource("", "Pod", "my-pod")
 
-	var tests = map[string]struct {
+	tests := map[string]struct {
 		anyEnabled    bool
 		dataSource    *api.TypedLocalObjectReference
 		dataSourceRef *api.TypedLocalObjectReference

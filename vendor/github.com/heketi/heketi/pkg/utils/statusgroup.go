@@ -50,7 +50,6 @@ func (s *StatusGroup) Err(err error) {
 // This function must be called last after the last
 // s.Register() function
 func (s *StatusGroup) Result() error {
-
 	// This goroutine will wait until all
 	// other privously spawned goroutines finish.
 	// Once they finish, it will close the channel

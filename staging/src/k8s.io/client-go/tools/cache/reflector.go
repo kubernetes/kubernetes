@@ -139,11 +139,9 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 	}
 }
 
-var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	minWatchTimeout = 5 * time.Minute
-)
+// We try to spread the load on apiserver by setting timeouts for
+// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+var minWatchTimeout = 5 * time.Minute
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
 // The indexer is configured to key on namespace

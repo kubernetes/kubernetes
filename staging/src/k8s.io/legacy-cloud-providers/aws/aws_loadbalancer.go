@@ -1604,7 +1604,6 @@ func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
 // We ignore Nodes (with a log message) where the instanceid cannot be determined from the provider,
 // and we ignore instances which are not found
 func (c *Cloud) findInstancesForELB(nodes []*v1.Node, annotations map[string]string) (map[InstanceID]*ec2.Instance, error) {
-
 	targetNodes := filterTargetNodes(nodes, annotations)
 
 	// Map to instance ids ignoring Nodes where we cannot find the id (but logging)
@@ -1628,7 +1627,6 @@ func (c *Cloud) findInstancesForELB(nodes []*v1.Node, annotations map[string]str
 // filterTargetNodes uses node labels to filter the nodes that should be targeted by the ELB,
 // checking if all the labels provided in an annotation are present in the nodes
 func filterTargetNodes(nodes []*v1.Node, annotations map[string]string) []*v1.Node {
-
 	targetNodeLabels := getKeyValuePropertiesFromAnnotation(annotations, ServiceAnnotationLoadBalancerTargetNodeLabels)
 
 	if len(targetNodeLabels) == 0 {

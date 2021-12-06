@@ -28,11 +28,9 @@ import (
 // ErrCrashLoopBackOff returned when a container Terminated and Kubelet is backing off the restart.
 var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 
-var (
-	// ErrContainerNotFound returned when a container in the given pod with the
-	// given container name was not found, amongst those managed by the kubelet.
-	ErrContainerNotFound = errors.New("no matching container")
-)
+// ErrContainerNotFound returned when a container in the given pod with the
+// given container name was not found, amongst those managed by the kubelet.
+var ErrContainerNotFound = errors.New("no matching container")
 
 var (
 	// ErrRunContainer returned when runtime failed to start any of pod's container.

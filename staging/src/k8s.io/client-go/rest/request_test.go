@@ -2041,7 +2041,7 @@ func TestWatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var table = []struct {
+			table := []struct {
 				t   watch.EventType
 				obj runtime.Object
 			}{
@@ -2110,7 +2110,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchNonDefaultContentType(t *testing.T) {
-	var table = []struct {
+	table := []struct {
 		t   watch.EventType
 		obj runtime.Object
 	}{
@@ -2170,7 +2170,7 @@ func TestWatchNonDefaultContentType(t *testing.T) {
 }
 
 func TestWatchUnknownContentType(t *testing.T) {
-	var table = []struct {
+	table := []struct {
 		t   watch.EventType
 		obj runtime.Object
 	}{
@@ -2255,7 +2255,6 @@ func testRESTClientWithConfig(t testing.TB, srv *httptest.Server, contentConfig 
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
-
 }
 
 func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
@@ -2561,6 +2560,7 @@ func (c *count) close() {
 	defer c.lock.Unlock()
 	c.closes++
 }
+
 func (c *count) getCloseCount() int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -2915,7 +2915,7 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 }
 
 func TestReuseRequest(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		enableHTTP2 bool
 	}{
@@ -2924,7 +2924,6 @@ func TestReuseRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(r.RemoteAddr))
 			}))
@@ -2954,13 +2953,12 @@ func TestReuseRequest(t *testing.T) {
 			if string(req1) != string(req2) {
 				t.Fatalf("Expected %v to be equal to %v", string(req1), string(req2))
 			}
-
 		})
 	}
 }
 
 func TestHTTP1DoNotReuseRequestAfterTimeout(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		enableHTTP2 bool
 	}{
@@ -3044,7 +3042,7 @@ func TestHTTP1DoNotReuseRequestAfterTimeout(t *testing.T) {
 
 func TestTransportConcurrency(t *testing.T) {
 	const numReqs = 10
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		enableHTTP2 bool
 	}{
@@ -3053,7 +3051,6 @@ func TestTransportConcurrency(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				t.Logf("Connected from %v %v", r.RemoteAddr, r.URL)
 				fmt.Fprintf(w, "%v", r.FormValue("echo"))

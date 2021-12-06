@@ -34,10 +34,12 @@ Depending on your vendoring solution you may be inadvertently importing gomega a
 
 var globalFailWrapper *types.GomegaFailWrapper
 
-var defaultEventuallyTimeout = time.Second
-var defaultEventuallyPollingInterval = 10 * time.Millisecond
-var defaultConsistentlyDuration = 100 * time.Millisecond
-var defaultConsistentlyPollingInterval = 10 * time.Millisecond
+var (
+	defaultEventuallyTimeout           = time.Second
+	defaultEventuallyPollingInterval   = 10 * time.Millisecond
+	defaultConsistentlyDuration        = 100 * time.Millisecond
+	defaultConsistentlyPollingInterval = 10 * time.Millisecond
+)
 
 // RegisterFailHandler connects Ginkgo to Gomega. When a matcher fails
 // the fail handler passed into RegisterFailHandler is called.
@@ -333,7 +335,6 @@ type GomegaAsyncAssertion = AsyncAssertion
 type Assertion interface {
 	Should(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool
 	ShouldNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool
-
 	To(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool
 	ToNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool
 	NotTo(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool

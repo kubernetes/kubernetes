@@ -56,7 +56,6 @@ type Set struct {
 func NewSet(
 	hashcodeFunction func(interface{}) int,
 	equalsFunction func(interface{}, interface{}) bool) *Set {
-
 	s := new(Set)
 
 	s.data = make(map[int][]interface{})
@@ -77,7 +76,6 @@ func NewSet(
 }
 
 func standardEqualsFunction(a interface{}, b interface{}) bool {
-
 	ac, oka := a.(comparable)
 	bc, okb := b.(comparable)
 
@@ -105,7 +103,6 @@ func (s *Set) length() int {
 }
 
 func (s *Set) add(value interface{}) interface{} {
-
 	key := s.hashcodeFunction(value)
 
 	values := s.data[key]
@@ -129,7 +126,6 @@ func (s *Set) add(value interface{}) interface{} {
 }
 
 func (s *Set) contains(value interface{}) bool {
-
 	key := s.hashcodeFunction(value)
 
 	values := s.data[key]
@@ -316,7 +312,6 @@ func (d *DoubleDict) set(a, b int, o interface{}) {
 }
 
 func EscapeWhitespace(s string, escapeSpaces bool) string {
-
 	s = strings.Replace(s, "\t", "\\t", -1)
 	s = strings.Replace(s, "\n", "\\n", -1)
 	s = strings.Replace(s, "\r", "\\r", -1)
@@ -380,7 +375,6 @@ func rotateLeft64(x uint64, k int) uint64 {
 	return x<<s | x>>(n-s)
 }
 
-
 // murmur hash
 const (
 	c1_32 uint = 0xCC9E2D51
@@ -398,7 +392,7 @@ func murmurUpdate(h1 int, k1 int) int {
 	k1u = rotateLeft(k1u, 15)
 	k1u *= c2_32
 
-	var h1u = uint(h1) ^ k1u
+	h1u := uint(h1) ^ k1u
 	k1u = rotateLeft(k1u, 13)
 	h1u = h1u*5 + 0xe6546b64
 	return int(h1u)

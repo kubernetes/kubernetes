@@ -417,7 +417,7 @@ func TestRefreshCreds(t *testing.T) {
 					"expirationTimestamp": "2006-01-02T15:04:05Z"
 				}
 			}`,
-			wantExpiry: time.Date(2006, 01, 02, 15, 04, 05, 0, time.UTC),
+			wantExpiry: time.Date(2006, 0o1, 0o2, 15, 0o4, 0o5, 0, time.UTC),
 			wantCreds:  credentials{token: "foo-bar"},
 		},
 		{
@@ -771,7 +771,7 @@ func TestRefreshCreds(t *testing.T) {
 					"expirationTimestamp": "2006-01-02T15:04:05Z"
 				}
 			}`,
-			wantExpiry: time.Date(2006, 01, 02, 15, 04, 05, 0, time.UTC),
+			wantExpiry: time.Date(2006, 0o1, 0o2, 15, 0o4, 0o5, 0, time.UTC),
 			wantCreds:  credentials{token: "foo-bar"},
 		},
 		{

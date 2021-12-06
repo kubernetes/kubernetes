@@ -76,8 +76,7 @@ func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decod
 	return versioning.NewDefaultingCodecForScheme(s.scheme, nil, decoder, nil, gv)
 }
 
-type unstructuredObjectTyper struct {
-}
+type unstructuredObjectTyper struct{}
 
 // NewUnstructuredObjectTyper returns an object typer that can deal with unstructured things
 func NewUnstructuredObjectTyper() runtime.ObjectTyper {
@@ -117,8 +116,7 @@ func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, 
 	return ret, nil
 }
 
-type unstructuredDefaulter struct {
-}
+type unstructuredDefaulter struct{}
 
 // NewUnstructuredDefaulter returns defaulter suitable for unstructured types that doesn't default anything
 func NewUnstructuredDefaulter() runtime.ObjectDefaulter {

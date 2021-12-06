@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package winio
@@ -184,7 +185,6 @@ func (s pipeAddress) String() string {
 // tryDialPipe attempts to dial the pipe at `path` until `ctx` cancellation or timeout.
 func tryDialPipe(ctx context.Context, path *string, access uint32) (syscall.Handle, error) {
 	for {
-
 		select {
 		case <-ctx.Done():
 			return syscall.Handle(0), ctx.Err()

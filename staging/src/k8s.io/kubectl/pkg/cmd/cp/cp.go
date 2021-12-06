@@ -38,8 +38,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	cpExample = templates.Examples(i18n.T(`
+var cpExample = templates.Examples(i18n.T(`
 		# !!!Important Note!!!
 		# Requires that the 'tar' binary is present in your container
 		# image.  If 'tar' is not present, 'kubectl cp' will fail.
@@ -64,7 +63,6 @@ var (
 
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
 		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
-)
 
 // CopyOptions have the data required to perform the copy operation
 type CopyOptions struct {
@@ -161,9 +159,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-var (
-	errFileSpecDoesntMatchFormat = errors.New("filespec must match the canonical format: [[namespace/]pod:]file/path")
-)
+var errFileSpecDoesntMatchFormat = errors.New("filespec must match the canonical format: [[namespace/]pod:]file/path")
 
 func extractFileSpec(arg string) (fileSpec, error) {
 	i := strings.Index(arg, ":")
@@ -426,7 +422,7 @@ func recursiveTar(srcDir, srcFile localPath, destDir, destFile remotePath, tw *t
 				return err
 			}
 			if len(files) == 0 {
-				//case empty directory
+				// case empty directory
 				hdr, _ := tar.FileInfoHeader(stat, fpath)
 				hdr.Name = destFile.String()
 				if err := tw.WriteHeader(hdr); err != nil {
@@ -441,7 +437,7 @@ func recursiveTar(srcDir, srcFile localPath, destDir, destFile remotePath, tw *t
 			}
 			return nil
 		} else if stat.Mode()&os.ModeSymlink != 0 {
-			//case soft link
+			// case soft link
 			hdr, _ := tar.FileInfoHeader(stat, fpath)
 			target, err := os.Readlink(fpath)
 			if err != nil {
@@ -454,7 +450,7 @@ func recursiveTar(srcDir, srcFile localPath, destDir, destFile remotePath, tw *t
 				return err
 			}
 		} else {
-			//case regular file or other file type like pipe
+			// case regular file or other file type like pipe
 			hdr, err := tar.FileInfoHeader(stat, fpath)
 			if err != nil {
 				return err
@@ -514,11 +510,11 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 			continue
 		}
 
-		if err := os.MkdirAll(destFileName.Dir().String(), 0755); err != nil {
+		if err := os.MkdirAll(destFileName.Dir().String(), 0o755); err != nil {
 			return err
 		}
 		if header.FileInfo().IsDir() {
-			if err := os.MkdirAll(destFileName.String(), 0755); err != nil {
+			if err := os.MkdirAll(destFileName.String(), 0o755); err != nil {
 				return err
 			}
 			continue

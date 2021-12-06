@@ -172,7 +172,6 @@ func (sv *projectedVolume) GetAttributes() volume.Attributes {
 		Managed:         true,
 		SupportsSELinux: true,
 	}
-
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
@@ -326,7 +325,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			// change from 0600 to 0640.
 			mode := *s.source.DefaultMode
 			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
-				mode = 0600
+				mode = 0o600
 			}
 
 			var auds []string

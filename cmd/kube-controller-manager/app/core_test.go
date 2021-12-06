@@ -49,6 +49,7 @@ func (m TestClientBuilder) ClientOrDie(name string) clientset.Interface {
 func (m TestClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
 	return m.clientset.Discovery(), nil
 }
+
 func (m TestClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
 	ret, err := m.DiscoveryClient(name)
 	if err != nil {

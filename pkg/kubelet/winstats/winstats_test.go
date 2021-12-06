@@ -52,6 +52,7 @@ func (f fakeWinNodeStatsClient) getNodeInfo() nodeInfo {
 		memoryPhysicalCapacityBytes: 1.6e+10,
 	}
 }
+
 func (f fakeWinNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return &cadvisorapi.MachineInfo{
 		NumCores:       4,
@@ -121,7 +122,8 @@ func TestWinMachineInfo(t *testing.T) {
 		NumCores:       4,
 		MemoryCapacity: 1.6e+10,
 		MachineID:      "somehostname",
-		SystemUUID:     "E6C8AC43-582B-3575-4E1F-6DA170888906"})
+		SystemUUID:     "E6C8AC43-582B-3575-4E1F-6DA170888906",
+	})
 }
 
 func TestWinVersionInfo(t *testing.T) {
@@ -130,7 +132,8 @@ func TestWinVersionInfo(t *testing.T) {
 	versionInfo, err := c.WinVersionInfo()
 	assert.NoError(t, err)
 	assert.Equal(t, versionInfo, &cadvisorapi.VersionInfo{
-		KernelVersion: "v42"})
+		KernelVersion: "v42",
+	})
 }
 
 func TestConvertCPUValue(t *testing.T) {
@@ -142,7 +145,7 @@ func TestConvertCPUValue(t *testing.T) {
 		{cpuValue: uint64(0), expected: uint64(0)},
 		{cpuValue: uint64(100), expected: uint64(4000000000)},
 	}
-	var cpuCores = 4
+	cpuCores := 4
 
 	for _, tc := range testCases {
 		p := perfCounterNodeStatsClient{}

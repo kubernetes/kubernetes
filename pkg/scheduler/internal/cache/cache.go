@@ -30,9 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
-var (
-	cleanAssumedPeriod = 1 * time.Second
-)
+var cleanAssumedPeriod = 1 * time.Second
 
 // New returns a Cache implementation.
 // It automatically starts a go routine that manages expiration of assumed pods.

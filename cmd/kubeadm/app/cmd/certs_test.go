@@ -353,7 +353,7 @@ func TestGenCSRConfig(t *testing.T) {
 
 	// A minimal kubeadm config with just enough values to avoid triggering
 	// auto-detection of config values at runtime.
-	var kubeadmConfig = fmt.Sprintf(`
+	kubeadmConfig := fmt.Sprintf(`
 apiVersion: %s
 kind: InitConfiguration
 localAPIEndpoint:

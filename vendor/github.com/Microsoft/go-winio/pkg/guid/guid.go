@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 // Package guid provides a GUID type. The backing structure for a GUID is
@@ -38,8 +39,10 @@ const (
 // hash of an input string.
 type Version uint8
 
-var _ = (encoding.TextMarshaler)(GUID{})
-var _ = (encoding.TextUnmarshaler)(&GUID{})
+var (
+	_ = (encoding.TextMarshaler)(GUID{})
+	_ = (encoding.TextUnmarshaler)(&GUID{})
+)
 
 // GUID represents a GUID/UUID. It has the same structure as
 // golang.org/x/sys/windows.GUID so that it can be used with functions expecting

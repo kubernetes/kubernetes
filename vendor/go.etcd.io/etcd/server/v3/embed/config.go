@@ -305,7 +305,7 @@ type Config struct {
 	AuthToken  string `json:"auth-token"`
 	BcryptCost uint   `json:"bcrypt-cost"`
 
-	//The AuthTokenTTL in seconds of the simple token
+	// The AuthTokenTTL in seconds of the simple token
 	AuthTokenTTL uint `json:"auth-token-ttl"`
 
 	ExperimentalInitialCorruptCheck bool          `json:"experimental-initial-corrupt-check"`

@@ -63,6 +63,7 @@ func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 		*obj.Spec.Replicas = 1
 	}
 }
+
 func SetDefaults_Volume(obj *v1.Volume) {
 	if utilpointer.AllPtrFieldsNil(&obj.VolumeSource) {
 		obj.VolumeSource = v1.VolumeSource{
@@ -70,6 +71,7 @@ func SetDefaults_Volume(obj *v1.Volume) {
 		}
 	}
 }
+
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere
@@ -144,6 +146,7 @@ func SetDefaults_Service(obj *v1.Service) {
 		}
 	}
 }
+
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
@@ -178,6 +181,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
 	}
 }
+
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
 	// https://github.com/kubernetes/kubernetes/issues/69445
@@ -204,6 +208,7 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 		obj.SchedulerName = v1.DefaultSchedulerName
 	}
 }
+
 func SetDefaults_Probe(obj *v1.Probe) {
 	if obj.TimeoutSeconds == 0 {
 		obj.TimeoutSeconds = 1
@@ -218,41 +223,48 @@ func SetDefaults_Probe(obj *v1.Probe) {
 		obj.FailureThreshold = 3
 	}
 }
+
 func SetDefaults_SecretVolumeSource(obj *v1.SecretVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.SecretVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
+
 func SetDefaults_ConfigMapVolumeSource(obj *v1.ConfigMapVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.ConfigMapVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
+
 func SetDefaults_DownwardAPIVolumeSource(obj *v1.DownwardAPIVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.DownwardAPIVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
+
 func SetDefaults_Secret(obj *v1.Secret) {
 	if obj.Type == "" {
 		obj.Type = v1.SecretTypeOpaque
 	}
 }
+
 func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.ProjectedVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
+
 func SetDefaults_ServiceAccountTokenProjection(obj *v1.ServiceAccountTokenProjection) {
 	hour := int64(time.Hour.Seconds())
 	if obj.ExpirationSeconds == nil {
 		obj.ExpirationSeconds = &hour
 	}
 }
+
 func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 	if obj.Status.Phase == "" {
 		obj.Status.Phase = v1.VolumePending
@@ -265,27 +277,32 @@ func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 		*obj.Spec.VolumeMode = v1.PersistentVolumeFilesystem
 	}
 }
+
 func SetDefaults_PersistentVolumeClaim(obj *v1.PersistentVolumeClaim) {
 	if obj.Status.Phase == "" {
 		obj.Status.Phase = v1.ClaimPending
 	}
 }
+
 func SetDefaults_PersistentVolumeClaimSpec(obj *v1.PersistentVolumeClaimSpec) {
 	if obj.VolumeMode == nil {
 		obj.VolumeMode = new(v1.PersistentVolumeMode)
 		*obj.VolumeMode = v1.PersistentVolumeFilesystem
 	}
 }
+
 func SetDefaults_ISCSIVolumeSource(obj *v1.ISCSIVolumeSource) {
 	if obj.ISCSIInterface == "" {
 		obj.ISCSIInterface = "default"
 	}
 }
+
 func SetDefaults_ISCSIPersistentVolumeSource(obj *v1.ISCSIPersistentVolumeSource) {
 	if obj.ISCSIInterface == "" {
 		obj.ISCSIInterface = "default"
 	}
 }
+
 func SetDefaults_AzureDiskVolumeSource(obj *v1.AzureDiskVolumeSource) {
 	if obj.CachingMode == nil {
 		obj.CachingMode = new(v1.AzureDataDiskCachingMode)
@@ -304,6 +321,7 @@ func SetDefaults_AzureDiskVolumeSource(obj *v1.AzureDiskVolumeSource) {
 		*obj.ReadOnly = false
 	}
 }
+
 func SetDefaults_Endpoints(obj *v1.Endpoints) {
 	for i := range obj.Subsets {
 		ss := &obj.Subsets[i]
@@ -315,6 +333,7 @@ func SetDefaults_Endpoints(obj *v1.Endpoints) {
 		}
 	}
 }
+
 func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 	if obj.Path == "" {
 		obj.Path = "/"
@@ -348,6 +367,7 @@ func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 		obj.Phase = v1.NamespaceActive
 	}
 }
+
 func SetDefaults_NodeStatus(obj *v1.NodeStatus) {
 	if obj.Allocatable == nil && obj.Capacity != nil {
 		obj.Allocatable = make(v1.ResourceList, len(obj.Capacity))
@@ -357,11 +377,13 @@ func SetDefaults_NodeStatus(obj *v1.NodeStatus) {
 		obj.Allocatable = obj.Capacity
 	}
 }
+
 func SetDefaults_ObjectFieldSelector(obj *v1.ObjectFieldSelector) {
 	if obj.APIVersion == "" {
 		obj.APIVersion = "v1"
 	}
 }
+
 func SetDefaults_LimitRangeItem(obj *v1.LimitRangeItem) {
 	// for container limits, we apply default values
 	if obj.Type == v1.LimitTypeContainer {
@@ -393,6 +415,7 @@ func SetDefaults_LimitRangeItem(obj *v1.LimitRangeItem) {
 		}
 	}
 }
+
 func SetDefaults_ConfigMap(obj *v1.ConfigMap) {
 	if obj.Data == nil {
 		obj.Data = make(map[string]string)

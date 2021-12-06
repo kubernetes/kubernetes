@@ -29,8 +29,10 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
 )
 
-var Scheme = runtime.NewScheme()
-var Codecs = serializer.NewCodecFactory(Scheme)
+var (
+	Scheme = runtime.NewScheme()
+	Codecs = serializer.NewCodecFactory(Scheme)
+)
 
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})

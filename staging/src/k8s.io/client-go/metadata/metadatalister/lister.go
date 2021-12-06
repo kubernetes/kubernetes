@@ -24,8 +24,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ Lister = &metadataLister{}
-var _ NamespaceLister = &metadataNamespaceLister{}
+var (
+	_ Lister          = &metadataLister{}
+	_ NamespaceLister = &metadataNamespaceLister{}
+)
 
 // metadataLister implements the Lister interface.
 type metadataLister struct {

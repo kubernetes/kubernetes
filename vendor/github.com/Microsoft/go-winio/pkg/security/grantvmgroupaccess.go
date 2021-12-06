@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package security
@@ -140,7 +141,7 @@ func generateDACLWithAcesAdded(name string, isDir bool, origDACL uintptr) (uintp
 	}
 
 	eaArray := []explicitAccess{
-		explicitAccess{
+		{
 			accessPermissions: accessMaskDesiredPermission,
 			accessMode:        accessModeGrant,
 			inheritance:       inheritance,

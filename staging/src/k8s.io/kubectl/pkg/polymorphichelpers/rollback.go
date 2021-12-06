@@ -80,7 +80,6 @@ func RollbackerFor(kind schema.GroupKind, c kubernetes.Interface) (Rollbacker, e
 	}
 
 	err := elem.Accept(visitor)
-
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving rollbacker for %q, %v", kind.String(), err)
 	}
@@ -210,7 +209,6 @@ func getDeploymentPatch(podTemplate *corev1.PodTemplateSpec, annotations map[str
 }
 
 func deploymentRevision(deployment *appsv1.Deployment, c kubernetes.Interface, toRevision int64) (revision *appsv1.ReplicaSet, err error) {
-
 	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.AppsV1())
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)

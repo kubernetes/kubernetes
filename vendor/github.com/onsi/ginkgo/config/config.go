@@ -15,9 +15,8 @@ package config
 
 import (
 	"flag"
-	"time"
-
 	"fmt"
+	"time"
 )
 
 const VERSION = "1.14.0"
@@ -102,7 +101,6 @@ func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 	flagSet.BoolVar(&(DefaultReporterConfig.FullTrace), prefix+"trace", false, "If set, default reporter prints out the full stack trace when a failure occurs")
 	flagSet.BoolVar(&(DefaultReporterConfig.ReportPassed), prefix+"reportPassed", false, "If set, default reporter prints out captured output of passed tests.")
 	flagSet.StringVar(&(DefaultReporterConfig.ReportFile), prefix+"reportFile", "", "Override the default reporter output file path.")
-
 }
 
 func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultReporterConfigType) []string {

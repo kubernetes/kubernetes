@@ -148,33 +148,43 @@ func (mfc *monitorFakeCmd) SetStdin(in io.Reader) {
 func (mfc *monitorFakeCmd) Run() error {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) Output() ([]byte, error) {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) SetDir(dir string) {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) SetStdout(out io.Writer) {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) SetStderr(out io.Writer) {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) SetEnv(env []string) {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) StdoutPipe() (io.ReadCloser, error) {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) StderrPipe() (io.ReadCloser, error) {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) Start() error {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) Wait() error {
 	panic("should not be reached")
 }
+
 func (mfc *monitorFakeCmd) Stop() {
 	panic("should not be reached")
 }

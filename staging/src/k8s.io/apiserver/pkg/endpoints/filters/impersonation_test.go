@@ -495,7 +495,6 @@ func TestImpersonationFilter(t *testing.T) {
 		if _, ok := req.Header[authenticationapi.ImpersonateUIDHeader]; ok {
 			t.Fatal("uid header still present")
 		}
-
 	})
 	handler := func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

@@ -107,99 +107,100 @@ func TestAssumePodScheduled(t *testing.T) {
 		pods []*v1.Pod
 
 		wNodeInfo *framework.NodeInfo
-	}{{
-		pods: []*v1.Pod{testPods[0]},
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			[]*v1.Pod{testPods[0]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}, {
-		pods: []*v1.Pod{testPods[1], testPods[2]},
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 300,
-				Memory:   1524,
-			},
-			&framework.Resource{
-				MilliCPU: 300,
-				Memory:   1524,
-			},
-			[]*v1.Pod{testPods[1], testPods[2]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}, { // test non-zero request
-		pods: []*v1.Pod{testPods[3]},
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 0,
-				Memory:   0,
-			},
-			&framework.Resource{
-				MilliCPU: schedutil.DefaultMilliCPURequest,
-				Memory:   schedutil.DefaultMemoryRequest,
-			},
-			[]*v1.Pod{testPods[3]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}, {
-		pods: []*v1.Pod{testPods[4]},
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU:        100,
-				Memory:          500,
-				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 3},
-			},
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			[]*v1.Pod{testPods[4]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}, {
-		pods: []*v1.Pod{testPods[4], testPods[5]},
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU:        300,
-				Memory:          1524,
-				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 8},
-			},
-			&framework.Resource{
-				MilliCPU: 300,
-				Memory:   1524,
-			},
-			[]*v1.Pod{testPods[4], testPods[5]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}, {
-		pods: []*v1.Pod{testPods[6]},
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			&framework.Resource{
-				MilliCPU: 100,
-				Memory:   500,
-			},
-			[]*v1.Pod{testPods[6]},
-			newHostPortInfoBuilder().build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	},
+	}{
+		{
+			pods: []*v1.Pod{testPods[0]},
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU: 100,
+					Memory:   500,
+				},
+				&framework.Resource{
+					MilliCPU: 100,
+					Memory:   500,
+				},
+				[]*v1.Pod{testPods[0]},
+				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+		}, {
+			pods: []*v1.Pod{testPods[1], testPods[2]},
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU: 300,
+					Memory:   1524,
+				},
+				&framework.Resource{
+					MilliCPU: 300,
+					Memory:   1524,
+				},
+				[]*v1.Pod{testPods[1], testPods[2]},
+				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+		}, { // test non-zero request
+			pods: []*v1.Pod{testPods[3]},
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU: 0,
+					Memory:   0,
+				},
+				&framework.Resource{
+					MilliCPU: schedutil.DefaultMilliCPURequest,
+					Memory:   schedutil.DefaultMemoryRequest,
+				},
+				[]*v1.Pod{testPods[3]},
+				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+		}, {
+			pods: []*v1.Pod{testPods[4]},
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU:        100,
+					Memory:          500,
+					ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 3},
+				},
+				&framework.Resource{
+					MilliCPU: 100,
+					Memory:   500,
+				},
+				[]*v1.Pod{testPods[4]},
+				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+		}, {
+			pods: []*v1.Pod{testPods[4], testPods[5]},
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU:        300,
+					Memory:          1524,
+					ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 8},
+				},
+				&framework.Resource{
+					MilliCPU: 300,
+					Memory:   1524,
+				},
+				[]*v1.Pod{testPods[4], testPods[5]},
+				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+		}, {
+			pods: []*v1.Pod{testPods[6]},
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU: 100,
+					Memory:   500,
+				},
+				&framework.Resource{
+					MilliCPU: 100,
+					Memory:   500,
+				},
+				[]*v1.Pod{testPods[6]},
+				newHostPortInfoBuilder().build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+		},
 	}
 
 	for i, tt := range tests {

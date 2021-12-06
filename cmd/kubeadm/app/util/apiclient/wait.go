@@ -92,7 +92,6 @@ func (w *KubeWaiter) WaitForAPI() error {
 // WaitForPodsWithLabel will lookup pods with the given label and wait until they are all
 // reporting status as running.
 func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
-
 	lastKnownPodNumber := -1
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		listOpts := metav1.ListOptions{LabelSelector: kvLabel}
@@ -183,7 +182,6 @@ func (w *KubeWaiter) SetTimeout(timeout time.Duration) {
 
 // WaitForStaticPodControlPlaneHashes blocks until it timeouts or gets a hash map for all components and their Static Pods
 func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error) {
-
 	componentHash := ""
 	var err error
 	mirrorPodHashes := map[string]string{}
@@ -206,7 +204,6 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 
 // WaitForStaticPodSingleHash blocks until it timeouts or gets a hash for a single component and its Static Pod
 func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component string) (string, error) {
-
 	componentPodHash := ""
 	var err error
 	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
@@ -224,7 +221,6 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 // This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
 func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-
 		hash, err := getStaticPodSingleHash(w.client, nodeName, component)
 		if err != nil {
 			return false, nil
@@ -240,7 +236,6 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 
 // getStaticPodSingleHash computes hashes for a single Static Pod resource
 func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
-
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
 	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), staticPodName, metav1.GetOptions{})
 	if err != nil {

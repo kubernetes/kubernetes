@@ -139,7 +139,6 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 	switch a.Cipher {
 	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcmCipherID, aes128cbcID:
 		return 16 * (1 << 32)
-
 	}
 
 	// For others, stick with RFC4253 recommendation to rekey after 1 Gb of data.

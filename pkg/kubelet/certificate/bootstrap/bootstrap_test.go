@@ -60,9 +60,9 @@ func copyFile(src, dst string) (err error) {
 }
 
 func TestLoadClientConfig(t *testing.T) {
-	//Create a temporary folder under tmp to store the required certificate files and configuration files.
+	// Create a temporary folder under tmp to store the required certificate files and configuration files.
 	fileDir := t.TempDir()
-	//Copy the required certificate file to the temporary directory.
+	// Copy the required certificate file to the temporary directory.
 	copyFile("./testdata/mycertinvalid.crt", fileDir+"/mycertinvalid.crt")
 	copyFile("./testdata/mycertvalid.crt", fileDir+"/mycertvalid.crt")
 	copyFile("./testdata/mycertinvalid.key", fileDir+"/mycertinvalid.key")
@@ -105,7 +105,7 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(filevalid.Name(), testDataValid, os.FileMode(0755))
+	ioutil.WriteFile(filevalid.Name(), testDataValid, os.FileMode(0o755))
 
 	testDataInvalid := []byte(`
 apiVersion: v1
@@ -145,7 +145,7 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(fileinvalid.Name(), testDataInvalid, os.FileMode(0755))
+	ioutil.WriteFile(fileinvalid.Name(), testDataInvalid, os.FileMode(0o755))
 
 	testDatabootstrap := []byte(`
 apiVersion: v1
@@ -182,7 +182,7 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(fileboot.Name(), testDatabootstrap, os.FileMode(0755))
+	ioutil.WriteFile(fileboot.Name(), testDatabootstrap, os.FileMode(0o755))
 
 	dir, err := ioutil.TempDir(fileDir, "k8s-test-certstore-current")
 	if err != nil {
@@ -321,7 +321,7 @@ users:
 		t.Fatal(err)
 	}
 	defer os.Remove(f.Name())
-	ioutil.WriteFile(f.Name(), testData, os.FileMode(0755))
+	ioutil.WriteFile(f.Name(), testData, os.FileMode(0o755))
 
 	config, err := loadRESTClientConfig(f.Name())
 	if err != nil {

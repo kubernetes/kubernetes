@@ -59,7 +59,7 @@ func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast
 		return err
 	}
 
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}

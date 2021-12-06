@@ -52,14 +52,14 @@ var _ = SIGDescribe("ConfigMap", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
-		defaultMode := int32(0400)
+		defaultMode := int32(0o400)
 		doConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		defaultMode := int32(0o440) /* setting fsGroup sets mode to at least 440 */
 		doConfigMapE2EWithoutMappings(f, true, 1001, &defaultMode)
 	})
 
@@ -94,7 +94,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
-		mode := int32(0400)
+		mode := int32(0o400)
 		doConfigMapE2EWithMappings(f, false, 0, &mode)
 	})
 
@@ -486,7 +486,6 @@ var _ = SIGDescribe("ConfigMap", func() {
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"content of file \"/etc/configmap-volume/data-1\": value-1",
 		})
-
 	})
 
 	/*

@@ -64,7 +64,6 @@ func SetTracerProvider(tp trace.TracerProvider) {
 		} else if def, ok := current.(*tracerProvider); ok {
 			def.setDelegate(tp)
 		}
-
 	})
 	globalTracer.Store(tracerProviderHolder{tp: tp})
 }

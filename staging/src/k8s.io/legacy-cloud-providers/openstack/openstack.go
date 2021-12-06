@@ -133,8 +133,10 @@ type MetadataOpts struct {
 	RequestTimeout MyDuration `gcfg:"request-timeout"`
 }
 
-var _ cloudprovider.Interface = (*OpenStack)(nil)
-var _ cloudprovider.Zones = (*OpenStack)(nil)
+var (
+	_ cloudprovider.Interface = (*OpenStack)(nil)
+	_ cloudprovider.Zones     = (*OpenStack)(nil)
+)
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {

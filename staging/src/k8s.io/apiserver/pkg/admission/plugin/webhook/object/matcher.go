@@ -27,8 +27,7 @@ import (
 )
 
 // Matcher decides if a request selected by the ObjectSelector.
-type Matcher struct {
-}
+type Matcher struct{}
 
 func matchObject(obj runtime.Object, selector labels.Selector) bool {
 	if obj == nil {
@@ -40,7 +39,6 @@ func matchObject(obj runtime.Object, selector labels.Selector) bool {
 		return false
 	}
 	return selector.Matches(labels.Set(accessor.GetLabels()))
-
 }
 
 // MatchObjectSelector decideds whether the request matches the ObjectSelector

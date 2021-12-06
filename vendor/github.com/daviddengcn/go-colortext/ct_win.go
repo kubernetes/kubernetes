@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package ct
@@ -16,7 +17,8 @@ var fg_colors = []uint16{
 	foreground_blue,
 	foreground_red | foreground_blue,
 	foreground_green | foreground_blue,
-	foreground_red | foreground_green | foreground_blue}
+	foreground_red | foreground_green | foreground_blue,
+}
 
 var bg_colors = []uint16{
 	0,
@@ -27,7 +29,8 @@ var bg_colors = []uint16{
 	background_blue,
 	background_red | background_blue,
 	background_green | background_blue,
-	background_red | background_green | background_blue}
+	background_red | background_green | background_blue,
+}
 
 const (
 	foreground_blue      = uint16(0x0001)

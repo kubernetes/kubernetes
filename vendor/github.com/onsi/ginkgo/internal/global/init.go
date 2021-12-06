@@ -9,8 +9,10 @@ import (
 
 const DefaultTimeout = time.Duration(1 * time.Second)
 
-var Suite *suite.Suite
-var Failer *failer.Failer
+var (
+	Suite  *suite.Suite
+	Failer *failer.Failer
+)
 
 func init() {
 	InitializeGlobals()

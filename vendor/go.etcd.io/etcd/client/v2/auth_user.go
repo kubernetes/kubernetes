@@ -23,9 +23,7 @@ import (
 	"path"
 )
 
-var (
-	defaultV2AuthPrefix = "/v2/auth"
-)
+var defaultV2AuthPrefix = "/v2/auth"
 
 type User struct {
 	User     string   `json:"user"`

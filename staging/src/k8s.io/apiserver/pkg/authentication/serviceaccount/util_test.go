@@ -24,7 +24,6 @@ import (
 )
 
 func TestMakeUsername(t *testing.T) {
-
 	testCases := map[string]struct {
 		Namespace   string
 		Name        string
@@ -89,7 +88,6 @@ func TestMakeUsername(t *testing.T) {
 }
 
 func TestMatchUsername(t *testing.T) {
-
 	testCases := []struct {
 		TestName  string
 		Namespace string
@@ -125,7 +123,6 @@ func TestMatchUsername(t *testing.T) {
 }
 
 func TestIsServiceAccountToken(t *testing.T) {
-
 	secretIns := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "token-secret-1",
@@ -219,5 +216,4 @@ func TestIsServiceAccountToken(t *testing.T) {
 			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
 		}
 	}
-
 }

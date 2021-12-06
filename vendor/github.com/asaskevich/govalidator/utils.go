@@ -228,7 +228,6 @@ func PadBoth(str string, padStr string, padLen int) string {
 // PadString either left, right or both sides, not the padding string can be unicode and more then one
 // character
 func buildPadStr(str string, padStr string, padLen int, padLeft bool, padRight bool) string {
-
 	// When padded length is less then the current string size
 	if padLen < utf8.RuneCountInString(str) {
 		return str

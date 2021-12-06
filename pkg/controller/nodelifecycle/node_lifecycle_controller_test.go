@@ -156,7 +156,6 @@ func newNodeLifecycleControllerFromClient(
 	nodeMonitorPeriod time.Duration,
 	useTaints bool,
 ) (*nodeLifecycleController, error) {
-
 	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 
 	leaseInformer := factory.Coordination().V1().Leases()

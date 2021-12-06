@@ -95,7 +95,6 @@ func (u *namespaceConditionUpdater) ProcessDiscoverResourcesErr(err error) {
 		Message:            msg,
 	}
 	u.newConditions = append(u.newConditions, d)
-
 }
 
 // ProcessContentTotals may create conditions for NamespaceContentRemaining and NamespaceFinalizersRemaining.

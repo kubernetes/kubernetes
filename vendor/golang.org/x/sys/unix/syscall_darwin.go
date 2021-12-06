@@ -373,7 +373,7 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 	if raceenabled {
 		raceReleaseMerge(unsafe.Pointer(&ioSync))
 	}
-	var length = int64(count)
+	length := int64(count)
 	err = sendfile(infd, outfd, *offset, &length, nil, 0)
 	written = int(length)
 	return

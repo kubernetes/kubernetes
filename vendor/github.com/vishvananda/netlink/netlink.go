@@ -13,10 +13,8 @@ import (
 	"net"
 )
 
-var (
-	// ErrNotImplemented is returned when a requested feature is not implemented.
-	ErrNotImplemented = errors.New("not implemented")
-)
+// ErrNotImplemented is returned when a requested feature is not implemented.
+var ErrNotImplemented = errors.New("not implemented")
 
 // ParseIPNet parses a string in ip/net format and returns a net.IPNet.
 // This is valuable because addresses in netlink are often IPNets and

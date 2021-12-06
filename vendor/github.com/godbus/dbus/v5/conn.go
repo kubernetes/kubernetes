@@ -76,7 +76,6 @@ func SessionBus() (conn *Conn, err error) {
 func getSessionBusAddress() (string, error) {
 	if address := os.Getenv("DBUS_SESSION_BUS_ADDRESS"); address != "" && address != "autolaunch:" {
 		return address, nil
-
 	} else if address := tryDiscoverDbusSessionBusAddress(); address != "" {
 		os.Setenv("DBUS_SESSION_BUS_ADDRESS", address)
 		return address, nil
@@ -708,9 +707,7 @@ type transport interface {
 	SendMessage(*Message) error
 }
 
-var (
-	transports = make(map[string]func(string) (transport, error))
-)
+var transports = make(map[string]func(string) (transport, error))
 
 func getTransport(address string) (transport, error) {
 	var err error
@@ -816,16 +813,19 @@ type nameTracker struct {
 func newNameTracker() *nameTracker {
 	return &nameTracker{names: map[string]struct{}{}}
 }
+
 func (tracker *nameTracker) acquireUniqueConnectionName(name string) {
 	tracker.lck.Lock()
 	defer tracker.lck.Unlock()
 	tracker.unique = name
 }
+
 func (tracker *nameTracker) acquireName(name string) {
 	tracker.lck.Lock()
 	defer tracker.lck.Unlock()
 	tracker.names[name] = struct{}{}
 }
+
 func (tracker *nameTracker) loseName(name string) {
 	tracker.lck.Lock()
 	defer tracker.lck.Unlock()
@@ -837,12 +837,14 @@ func (tracker *nameTracker) uniqueNameIsKnown() bool {
 	defer tracker.lck.RUnlock()
 	return tracker.unique != ""
 }
+
 func (tracker *nameTracker) isKnownName(name string) bool {
 	tracker.lck.RLock()
 	defer tracker.lck.RUnlock()
 	_, ok := tracker.names[name]
 	return ok || name == tracker.unique
 }
+
 func (tracker *nameTracker) listKnownNames() []string {
 	tracker.lck.RLock()
 	defer tracker.lck.RUnlock()

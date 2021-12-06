@@ -36,9 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
-var (
-	errorUnableToAllocate = errors.New("unable to allocate")
-)
+var errorUnableToAllocate = errors.New("unable to allocate")
 
 // Etcd exposes a service.Allocator
 // TODO: allow multiple allocations to be tried at once
@@ -141,7 +139,6 @@ func (e *Etcd) Release(item int) error {
 	return e.tryUpdate(func() error {
 		return e.alloc.Release(item)
 	})
-
 }
 
 func (e *Etcd) ForEach(fn func(int)) {

@@ -92,7 +92,6 @@ func TestInstallPathHandler(t *testing.T) {
 	if w.Body.String() != "ok" {
 		t.Errorf("expected %v, got %v", "ok", w.Body.String())
 	}
-
 }
 
 func testMultipleChecks(path, name string, t *testing.T) {
@@ -213,15 +212,18 @@ func TestGetExcludedChecks(t *testing.T) {
 		r    *http.Request
 		want sets.String
 	}{
-		{"Should have no excluded health checks",
+		{
+			"Should have no excluded health checks",
 			createGetRequestWithUrl("/healthz?verbose=true"),
 			sets.NewString(),
 		},
-		{"Should extract out the ping health check",
+		{
+			"Should extract out the ping health check",
 			createGetRequestWithUrl("/healthz?exclude=ping"),
 			sets.NewString("ping"),
 		},
-		{"Should extract out ping and log health check",
+		{
+			"Should extract out ping and log health check",
 			createGetRequestWithUrl("/healthz?exclude=ping&exclude=log"),
 			sets.NewString("ping", "log"),
 		},

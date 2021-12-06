@@ -131,7 +131,7 @@ spec:
 					t.Fatal(err)
 				}
 				defer os.Remove(f.Name())
-				if err := ioutil.WriteFile(f.Name(), []byte(tc.contents), os.FileMode(0755)); err != nil {
+				if err := ioutil.WriteFile(f.Name(), []byte(tc.contents), os.FileMode(0o755)); err != nil {
 					t.Fatal(err)
 				}
 				proxyConfig = f.Name()

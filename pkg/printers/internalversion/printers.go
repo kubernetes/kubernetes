@@ -2472,7 +2472,6 @@ func printRuntimeClassList(list *nodeapi.RuntimeClassList, options printers.Gene
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printRuntimeClass(&list.Items[i], options)
-
 		if err != nil {
 			return nil, err
 		}

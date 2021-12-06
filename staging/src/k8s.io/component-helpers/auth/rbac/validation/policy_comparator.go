@@ -64,11 +64,9 @@ func BreakdownRule(rule rbacv1.PolicyRule) []rbacv1.PolicyRule {
 					for _, resourceName := range rule.ResourceNames {
 						subrules = append(subrules, rbacv1.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}, ResourceNames: []string{resourceName}})
 					}
-
 				} else {
 					subrules = append(subrules, rbacv1.PolicyRule{APIGroups: []string{group}, Resources: []string{resource}, Verbs: []string{verb}})
 				}
-
 			}
 		}
 	}

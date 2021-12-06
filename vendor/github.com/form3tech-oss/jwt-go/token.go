@@ -65,7 +65,7 @@ func (t *Token) SignedString(key interface{}) (string, error) {
 func (t *Token) SigningString() (string, error) {
 	var err error
 	parts := make([]string, 2)
-	for i, _ := range parts {
+	for i := range parts {
 		var jsonValue []byte
 		if i == 0 {
 			if jsonValue, err = json.Marshal(t.Header); err != nil {

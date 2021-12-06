@@ -98,7 +98,7 @@ func (a *ATNDeserializer) DeserializeFromUInt16(data []uint16) *ATN {
 	sets = a.readSets(atn, sets, a.readInt)
 	// Next, if the ATN was serialized with the Unicode SMP feature,
 	// deserialize sets with 32-bit arguments <= U+10FFFF.
-	if (a.isFeatureSupported(AddedUnicodeSMP, a.uuid)) {
+	if a.isFeatureSupported(AddedUnicodeSMP, a.uuid) {
 		sets = a.readSets(atn, sets, a.readInt32)
 	}
 
@@ -115,7 +115,6 @@ func (a *ATNDeserializer) DeserializeFromUInt16(data []uint16) *ATN {
 	}
 
 	return atn
-
 }
 
 func (a *ATNDeserializer) reset(data []rune) {
@@ -128,7 +127,7 @@ func (a *ATNDeserializer) reset(data []rune) {
 		} else if c > 1 {
 			temp[i] = c - 2
 		} else {
-		    temp[i] = c + 65533
+			temp[i] = c + 65533
 		}
 	}
 
@@ -255,7 +254,7 @@ func (a *ATNDeserializer) readRules(atn *ATN) {
 		}
 	}
 
-	atn.ruleToStopState = make([]*RuleStopState, nrules) //initIntArray(nrules, 0)
+	atn.ruleToStopState = make([]*RuleStopState, nrules) // initIntArray(nrules, 0)
 
 	for i := 0; i < len(atn.states); i++ {
 		state := atn.states[i]
@@ -326,7 +325,7 @@ func (a *ATNDeserializer) readEdges(atn *ATN, sets []*IntervalSet) {
 		state := atn.states[i]
 
 		for j := 0; j < len(state.GetTransitions()); j++ {
-			var t, ok = state.GetTransitions()[j].(*RuleTransition)
+			t, ok := state.GetTransitions()[j].(*RuleTransition)
 
 			if !ok {
 				continue
@@ -529,7 +528,7 @@ func (a *ATNDeserializer) stateIsEndStateFor(state ATNState, idx int) ATNState {
 		return nil
 	}
 
-	var _, ok = maybeLoopEndState.GetTransitions()[0].getTarget().(*RuleStopState)
+	_, ok := maybeLoopEndState.GetTransitions()[0].getTarget().(*RuleStopState)
 
 	if maybeLoopEndState.(*LoopEndState).epsilonOnlyTransitions && ok {
 		return state
@@ -554,7 +553,7 @@ func (a *ATNDeserializer) markPrecedenceDecisions(atn *ATN) {
 			maybeLoopEndState := state.GetTransitions()[len(state.GetTransitions())-1].getTarget()
 
 			if s3, ok := maybeLoopEndState.(*LoopEndState); ok {
-				var _, ok2 = maybeLoopEndState.GetTransitions()[0].getTarget().(*RuleStopState)
+				_, ok2 := maybeLoopEndState.GetTransitions()[0].getTarget().(*RuleStopState)
 
 				if s3.epsilonOnlyTransitions && ok2 {
 					state.(*StarLoopEntryState).precedenceRuleDecision = true
@@ -589,13 +588,13 @@ func (a *ATNDeserializer) verifyATN(atn *ATN) {
 
 			switch s2 := state.(type) {
 			case *StarBlockStartState:
-				var _, ok2 = s2.GetTransitions()[1].getTarget().(*LoopEndState)
+				_, ok2 := s2.GetTransitions()[1].getTarget().(*LoopEndState)
 
 				a.checkCondition(ok2, "")
 				a.checkCondition(!s2.nonGreedy, "")
 
 			case *LoopEndState:
-				var s3, ok2 = s2.GetTransitions()[1].getTarget().(*StarBlockStartState)
+				s3, ok2 := s2.GetTransitions()[1].getTarget().(*StarBlockStartState)
 
 				a.checkCondition(ok2, "")
 				a.checkCondition(s3.nonGreedy, "")
@@ -607,7 +606,7 @@ func (a *ATNDeserializer) verifyATN(atn *ATN) {
 		case *StarLoopbackState:
 			a.checkCondition(len(state.GetTransitions()) == 1, "")
 
-			var _, ok2 = state.GetTransitions()[0].getTarget().(*StarLoopEntryState)
+			_, ok2 := state.GetTransitions()[0].getTarget().(*StarLoopEntryState)
 
 			a.checkCondition(ok2, "")
 
@@ -627,7 +626,7 @@ func (a *ATNDeserializer) verifyATN(atn *ATN) {
 			a.checkCondition(len(s2.GetTransitions()) <= 1 || s2.getDecision() >= 0, "")
 
 		default:
-			var _, ok = s2.(*RuleStopState)
+			_, ok := s2.(*RuleStopState)
 
 			a.checkCondition(len(s2.GetTransitions()) <= 1 || ok, "")
 		}
@@ -653,8 +652,8 @@ func (a *ATNDeserializer) readInt() int {
 }
 
 func (a *ATNDeserializer) readInt32() int {
-	var low = a.readInt()
-	var high = a.readInt()
+	low := a.readInt()
+	high := a.readInt()
 	return low | (high << 16)
 }
 

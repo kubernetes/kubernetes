@@ -84,5 +84,4 @@ func TestReferenceTypename(t *testing.T) {
 			}
 		})
 	}
-
 }

@@ -360,11 +360,12 @@ func (w *Writer) String(s string) {
 	w.Buffer.AppendByte('"')
 }
 
-const encode = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-const padChar = '='
+const (
+	encode  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	padChar = '='
+)
 
 func (w *Writer) base64(in []byte) {
-
 	if len(in) == 0 {
 		return
 	}

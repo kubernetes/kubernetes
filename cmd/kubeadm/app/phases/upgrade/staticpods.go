@@ -104,7 +104,6 @@ func NewKubeStaticPodPathManager(kubernetesDir, patchesDir, tempDir, backupDir, 
 
 // NewKubeStaticPodPathManagerUsingTempDirs creates a new instance of KubeStaticPodPathManager with temporary directories backing it
 func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, patchesDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
-
 	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm(kubernetesDir, "kubeadm-upgraded-manifests")
 	if err != nil {
 		return nil, err
@@ -556,7 +555,7 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, 
 	}
 
 	// if apiserver, renew apiserver serving certificate, kubelet and front-proxy client certificate.
-	//if local etcd, renew also the etcd client certificate
+	// if local etcd, renew also the etcd client certificate
 	if component == constants.KubeAPIServer {
 		certificates = []string{
 			certsphase.KubeadmCertAPIServer().Name,
@@ -617,7 +616,6 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
 func DryRunStaticPodUpgrade(patchesDir string, internalcfg *kubeadmapi.InitConfiguration) error {
-
 	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	if err != nil {
 		return err

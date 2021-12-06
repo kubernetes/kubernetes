@@ -133,10 +133,12 @@ func initHostPathCSIDriver(name string, capabilities map[storageframework.Capabi
 	}
 }
 
-var _ storageframework.TestDriver = &hostpathCSIDriver{}
-var _ storageframework.DynamicPVTestDriver = &hostpathCSIDriver{}
-var _ storageframework.SnapshottableTestDriver = &hostpathCSIDriver{}
-var _ storageframework.EphemeralTestDriver = &hostpathCSIDriver{}
+var (
+	_ storageframework.TestDriver              = &hostpathCSIDriver{}
+	_ storageframework.DynamicPVTestDriver     = &hostpathCSIDriver{}
+	_ storageframework.SnapshottableTestDriver = &hostpathCSIDriver{}
+	_ storageframework.EphemeralTestDriver     = &hostpathCSIDriver{}
+)
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver() storageframework.TestDriver {
@@ -231,7 +233,8 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 		OldDriverName:       h.driverInfo.Name,
 		NewDriverName:       config.GetUniqueDriverName(),
 		DriverContainerName: "hostpath",
-		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName(),
+		DriverContainerArguments: []string{
+			"--drivername=" + config.GetUniqueDriverName(),
 			// This is needed for the
 			// testsuites/volumelimits.go `should support volume limits`
 			// test.
@@ -281,7 +284,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 		}
 		return nil
 	}, h.manifests...)
-
 	if err != nil {
 		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
 	}
@@ -450,9 +452,11 @@ func (c *MockCSICalls) LogGRPC(method string, request, reply interface{}, err er
 	c.Add(call)
 }
 
-var _ storageframework.TestDriver = &mockCSIDriver{}
-var _ storageframework.DynamicPVTestDriver = &mockCSIDriver{}
-var _ storageframework.SnapshottableTestDriver = &mockCSIDriver{}
+var (
+	_ storageframework.TestDriver              = &mockCSIDriver{}
+	_ storageframework.DynamicPVTestDriver     = &mockCSIDriver{}
+	_ storageframework.SnapshottableTestDriver = &mockCSIDriver{}
+)
 
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
 func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
@@ -684,7 +688,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 
 		return nil
 	}, m.manifests...)
-
 	if err != nil {
 		framework.Failf("deploying csi mock driver: %v", err)
 	}
@@ -777,9 +780,11 @@ type gcePDCSIDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-var _ storageframework.TestDriver = &gcePDCSIDriver{}
-var _ storageframework.DynamicPVTestDriver = &gcePDCSIDriver{}
-var _ storageframework.SnapshottableTestDriver = &gcePDCSIDriver{}
+var (
+	_ storageframework.TestDriver              = &gcePDCSIDriver{}
+	_ storageframework.DynamicPVTestDriver     = &gcePDCSIDriver{}
+	_ storageframework.SnapshottableTestDriver = &gcePDCSIDriver{}
+)
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
 func InitGcePDCSIDriver() storageframework.TestDriver {
@@ -994,7 +999,6 @@ func generateDriverCleanupFunc(
 	f *framework.Framework,
 	driverName, testns, driverns string,
 	driverCleanup, cancelLogging func()) func() {
-
 	cleanupHandle := new(framework.CleanupActionHandle)
 
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be

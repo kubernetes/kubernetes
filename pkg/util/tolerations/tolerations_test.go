@@ -31,91 +31,89 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-var (
-	tolerations = map[string]api.Toleration{
-		"all": {Operator: api.TolerationOpExists},
-		"all-nosched": {
-			Operator: api.TolerationOpExists,
-			Effect:   api.TaintEffectNoSchedule,
-		},
-		"all-noexec": {
-			Operator: api.TolerationOpExists,
-			Effect:   api.TaintEffectNoExecute,
-		},
-		"foo": {
-			Key:      "foo",
-			Operator: api.TolerationOpExists,
-		},
-		"foo-bar": {
-			Key:      "foo",
-			Operator: api.TolerationOpEqual,
-			Value:    "bar",
-		},
-		"foo-nosched": {
-			Key:      "foo",
-			Operator: api.TolerationOpExists,
-			Effect:   api.TaintEffectNoSchedule,
-		},
-		"foo-bar-nosched": {
-			Key:      "foo",
-			Operator: api.TolerationOpEqual,
-			Value:    "bar",
-			Effect:   api.TaintEffectNoSchedule,
-		},
-		"foo-baz-nosched": {
-			Key:      "foo",
-			Operator: api.TolerationOpEqual,
-			Value:    "baz",
-			Effect:   api.TaintEffectNoSchedule,
-		},
-		"faz-nosched": {
-			Key:      "faz",
-			Operator: api.TolerationOpExists,
-			Effect:   api.TaintEffectNoSchedule,
-		},
-		"faz-baz-nosched": {
-			Key:      "faz",
-			Operator: api.TolerationOpEqual,
-			Value:    "baz",
-			Effect:   api.TaintEffectNoSchedule,
-		},
-		"foo-prefnosched": {
-			Key:      "foo",
-			Operator: api.TolerationOpExists,
-			Effect:   api.TaintEffectPreferNoSchedule,
-		},
-		"foo-noexec": {
-			Key:      "foo",
-			Operator: api.TolerationOpExists,
-			Effect:   api.TaintEffectNoExecute,
-		},
-		"foo-bar-noexec": {
-			Key:      "foo",
-			Operator: api.TolerationOpEqual,
-			Value:    "bar",
-			Effect:   api.TaintEffectNoExecute,
-		},
-		"foo-noexec-10": {
-			Key:               "foo",
-			Operator:          api.TolerationOpExists,
-			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(10),
-		},
-		"foo-noexec-0": {
-			Key:               "foo",
-			Operator:          api.TolerationOpExists,
-			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(0),
-		},
-		"foo-bar-noexec-10": {
-			Key:               "foo",
-			Operator:          api.TolerationOpEqual,
-			Value:             "bar",
-			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(10),
-		},
-	}
-)
+var tolerations = map[string]api.Toleration{
+	"all": {Operator: api.TolerationOpExists},
+	"all-nosched": {
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectNoSchedule,
+	},
+	"all-noexec": {
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectNoExecute,
+	},
+	"foo": {
+		Key:      "foo",
+		Operator: api.TolerationOpExists,
+	},
+	"foo-bar": {
+		Key:      "foo",
+		Operator: api.TolerationOpEqual,
+		Value:    "bar",
+	},
+	"foo-nosched": {
+		Key:      "foo",
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectNoSchedule,
+	},
+	"foo-bar-nosched": {
+		Key:      "foo",
+		Operator: api.TolerationOpEqual,
+		Value:    "bar",
+		Effect:   api.TaintEffectNoSchedule,
+	},
+	"foo-baz-nosched": {
+		Key:      "foo",
+		Operator: api.TolerationOpEqual,
+		Value:    "baz",
+		Effect:   api.TaintEffectNoSchedule,
+	},
+	"faz-nosched": {
+		Key:      "faz",
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectNoSchedule,
+	},
+	"faz-baz-nosched": {
+		Key:      "faz",
+		Operator: api.TolerationOpEqual,
+		Value:    "baz",
+		Effect:   api.TaintEffectNoSchedule,
+	},
+	"foo-prefnosched": {
+		Key:      "foo",
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectPreferNoSchedule,
+	},
+	"foo-noexec": {
+		Key:      "foo",
+		Operator: api.TolerationOpExists,
+		Effect:   api.TaintEffectNoExecute,
+	},
+	"foo-bar-noexec": {
+		Key:      "foo",
+		Operator: api.TolerationOpEqual,
+		Value:    "bar",
+		Effect:   api.TaintEffectNoExecute,
+	},
+	"foo-noexec-10": {
+		Key:               "foo",
+		Operator:          api.TolerationOpExists,
+		Effect:            api.TaintEffectNoExecute,
+		TolerationSeconds: utilpointer.Int64Ptr(10),
+	},
+	"foo-noexec-0": {
+		Key:               "foo",
+		Operator:          api.TolerationOpExists,
+		Effect:            api.TaintEffectNoExecute,
+		TolerationSeconds: utilpointer.Int64Ptr(0),
+	},
+	"foo-bar-noexec-10": {
+		Key:               "foo",
+		Operator:          api.TolerationOpEqual,
+		Value:             "bar",
+		Effect:            api.TaintEffectNoExecute,
+		TolerationSeconds: utilpointer.Int64Ptr(10),
+	},
+}
 
 func TestIsSuperset(t *testing.T) {
 	tests := []struct {

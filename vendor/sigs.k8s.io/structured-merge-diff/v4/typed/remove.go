@@ -143,7 +143,6 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 		if w.toRemove.Has(path) {
 			if w.shouldExtract {
 				newMap[k] = removeItemsWithSchema(val, w.toRemove, w.schema, fieldType, w.shouldExtract).Unstructured()
-
 			}
 			return true
 		}

@@ -62,9 +62,7 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 // If there are too many (>100) unstarted times, it will raise a warning and but still return
 // the list of missed times.
 func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
-	var (
-		earliestTime time.Time
-	)
+	var earliestTime time.Time
 	if cj.Status.LastScheduleTime != nil {
 		earliestTime = cj.Status.LastScheduleTime.Time
 	} else {

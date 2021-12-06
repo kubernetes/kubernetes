@@ -253,18 +253,20 @@ func TestMultipleSchedulers(t *testing.T) {
 
 	// 5. create and start a scheduler with name "foo-scheduler"
 	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(fooScheduler),
-			PluginConfig: []v1beta3.PluginConfig{
-				{
-					Name: "VolumeBinding",
-					Args: runtime.RawExtension{
-						Object: &v1beta3.VolumeBindingArgs{
-							BindTimeoutSeconds: pointer.Int64Ptr(30),
+		Profiles: []v1beta3.KubeSchedulerProfile{
+			{
+				SchedulerName: pointer.StringPtr(fooScheduler),
+				PluginConfig: []v1beta3.PluginConfig{
+					{
+						Name: "VolumeBinding",
+						Args: runtime.RawExtension{
+							Object: &v1beta3.VolumeBindingArgs{
+								BindTimeoutSeconds: pointer.Int64Ptr(30),
+							},
 						},
 					},
 				},
-			}},
+			},
 		},
 	})
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, scheduler.WithProfiles(cfg.Profiles...))
@@ -477,9 +479,11 @@ func TestSchedulerInformers(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI)},
+	defaultPodRes := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+		},
 	}
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",

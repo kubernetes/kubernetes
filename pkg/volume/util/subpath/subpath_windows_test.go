@@ -46,7 +46,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 	defer os.RemoveAll(base)
 
 	testingVolumePath := filepath.Join(base, "testingVolumePath")
-	os.MkdirAll(testingVolumePath, 0755)
+	os.MkdirAll(testingVolumePath, 0o755)
 	defer os.RemoveAll(testingVolumePath)
 
 	tests := []struct {
@@ -109,7 +109,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 		if len(test.volumePath) > 0 && len(test.subPath) > 0 && len(test.symlinkTarget) > 0 {
 			// make all parent sub directories
 			if parent := filepath.Dir(test.subPath); parent != "." {
-				os.MkdirAll(parent, 0755)
+				os.MkdirAll(parent, 0o755)
 			}
 
 			// make last element as symlink
@@ -121,7 +121,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 			}
 		}
 
-		err := doSafeMakeDir(test.subPath, test.volumePath, os.FileMode(0755))
+		err := doSafeMakeDir(test.subPath, test.volumePath, os.FileMode(0o755))
 		if test.expectError {
 			assert.NotNil(t, err, "Expect error during doSafeMakeDir(%s, %s)", test.subPath, test.volumePath)
 			continue
@@ -203,14 +203,14 @@ func TestLockAndCheckSubPath(t *testing.T) {
 
 	for _, test := range tests {
 		if len(test.volumePath) > 0 && len(test.subPath) > 0 {
-			os.MkdirAll(test.volumePath, 0755)
+			os.MkdirAll(test.volumePath, 0o755)
 			if len(test.symlinkTarget) == 0 {
 				// make all intermediate sub directories
-				os.MkdirAll(test.subPath, 0755)
+				os.MkdirAll(test.subPath, 0o755)
 			} else {
 				// make all parent sub directories
 				if parent := filepath.Dir(test.subPath); parent != "." {
-					os.MkdirAll(parent, 0755)
+					os.MkdirAll(parent, 0o755)
 				}
 
 				// make last element as symlink
@@ -307,14 +307,14 @@ func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 
 	for _, test := range tests {
 		if len(test.volumePath) > 0 && len(test.subPath) > 0 {
-			os.MkdirAll(test.volumePath, 0755)
+			os.MkdirAll(test.volumePath, 0o755)
 			if len(test.symlinkTarget) == 0 {
 				// make all intermediate sub directories
-				os.MkdirAll(test.subPath, 0755)
+				os.MkdirAll(test.subPath, 0o755)
 			} else {
 				// make all parent sub directories
 				if parent := filepath.Dir(test.subPath); parent != "." {
-					os.MkdirAll(parent, 0755)
+					os.MkdirAll(parent, 0o755)
 				}
 
 				// make last element as symlink
@@ -419,7 +419,7 @@ func TestFindExistingPrefix(t *testing.T) {
 
 	for _, test := range tests {
 		if test.createSubPathBeforeTest {
-			os.MkdirAll(test.pathname, 0755)
+			os.MkdirAll(test.pathname, 0o755)
 		}
 
 		existingPath, toCreate, err := findExistingPrefix(test.base, test.pathname)

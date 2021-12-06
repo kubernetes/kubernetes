@@ -62,7 +62,6 @@ type csiClient interface {
 		mountOptions []string,
 		fsGroup *int64,
 	) error
-
 	NodeExpandVolume(ctx context.Context, rsOpts csiResizeOptions) (resource.Quantity, error)
 	NodeUnpublishVolume(
 		ctx context.Context,
@@ -84,7 +83,6 @@ type csiClient interface {
 		mountOptions []string,
 		fsGroup *int64,
 	) error
-
 	NodeGetVolumeStats(
 		ctx context.Context,
 		volID string,
@@ -190,8 +188,8 @@ func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
 	accessibleTopology map[string]string,
-	err error) {
-
+	err error,
+) {
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return "", 0, nil, err

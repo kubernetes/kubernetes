@@ -31,7 +31,7 @@ func TestDescCreate(t *testing.T) {
 		GitVersion: "v1.17.0-alpha-1.12345",
 	})
 
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		fqName            string
 		help              string
@@ -109,7 +109,7 @@ func TestDescClearState(t *testing.T) {
 		GitVersion: "v1.17.0-alpha-1.12345",
 	})
 
-	var tests = []struct {
+	tests := []struct {
 		name              string
 		fqName            string
 		help              string

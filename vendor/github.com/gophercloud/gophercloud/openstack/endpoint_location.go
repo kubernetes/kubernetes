@@ -18,7 +18,7 @@ available on your OpenStack deployment.
 */
 func V2EndpointURL(catalog *tokens2.ServiceCatalog, opts gophercloud.EndpointOpts) (string, error) {
 	// Extract Endpoints from the catalog entries that match the requested Type, Name if provided, and Region if provided.
-	var endpoints = make([]tokens2.Endpoint, 0, 1)
+	endpoints := make([]tokens2.Endpoint, 0, 1)
 	for _, entry := range catalog.Entries {
 		if (entry.Type == opts.Type) && (opts.Name == "" || entry.Name == opts.Name) {
 			for _, endpoint := range entry.Endpoints {
@@ -71,7 +71,7 @@ available on your OpenStack deployment.
 func V3EndpointURL(catalog *tokens3.ServiceCatalog, opts gophercloud.EndpointOpts) (string, error) {
 	// Extract Endpoints from the catalog entries that match the requested Type, Interface,
 	// Name if provided, and Region if provided.
-	var endpoints = make([]tokens3.Endpoint, 0, 1)
+	endpoints := make([]tokens3.Endpoint, 0, 1)
 	for _, entry := range catalog.Entries {
 		if (entry.Type == opts.Type) && (opts.Name == "" || entry.Name == opts.Name) {
 			for _, endpoint := range entry.Endpoints {

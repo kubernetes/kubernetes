@@ -81,6 +81,7 @@ func (s *store) enableAuth() error {
 	_, err := s.updateResource("/enabled", true)
 	return err
 }
+
 func (s *store) disableAuth() error {
 	_, err := s.updateResource("/enabled", false)
 	return err
@@ -135,9 +136,11 @@ func (s *store) requestResource(res string, quorum bool) (etcdserver.Response, e
 func (s *store) updateResource(res string, value interface{}) (etcdserver.Response, error) {
 	return s.setResource(res, value, true)
 }
+
 func (s *store) createResource(res string, value interface{}) (etcdserver.Response, error) {
 	return s.setResource(res, value, false)
 }
+
 func (s *store) setResource(res string, value interface{}, prevexist bool) (etcdserver.Response, error) {
 	err := s.ensureAuthDirectories()
 	if err != nil {

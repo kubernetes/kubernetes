@@ -50,7 +50,7 @@ func main() {
 	controllerInitializers := app.DefaultInitFuncConstructors
 	// Here is an example to remove the controller which is not needed.
 	// e.g. remove the cloud-node-lifecycle controller which current cloud provider does not need.
-	//delete(controllerInitializers, "cloud-node-lifecycle")
+	// delete(controllerInitializers, "cloud-node-lifecycle")
 
 	// Here is an example to add an controller(NodeIpamController) which will be used by cloud provider
 	// generate nodeIPAMConfig. Here is an sample code.

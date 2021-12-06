@@ -74,7 +74,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 	proxyCACertFile, _ := ioutil.TempFile(certDir, "proxy-ca.crt")
-	if err := ioutil.WriteFile(proxyCACertFile.Name(), utils.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(proxyCACertFile.Name(), utils.EncodeCertPEM(proxySigningCert), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	clientSigningKey, err := utils.NewPrivateKey()
@@ -86,7 +86,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 	clientCACertFile, _ := ioutil.TempFile(certDir, "client-ca.crt")
-	if err := ioutil.WriteFile(clientCACertFile.Name(), utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(clientCACertFile.Name(), utils.EncodeCertPEM(clientSigningCert), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,7 +100,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatalf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
-	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0o666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 

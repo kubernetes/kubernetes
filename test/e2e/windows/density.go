@@ -69,7 +69,6 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 			})
 		}
 	})
-
 })
 
 type densityTest struct {

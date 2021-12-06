@@ -53,7 +53,6 @@ func TestHistoryViewerFor(t *testing.T) {
 }
 
 func TestViewHistory(t *testing.T) {
-
 	t.Run("for statefulSet", func(t *testing.T) {
 		var (
 			trueVar  = true
@@ -96,7 +95,7 @@ func TestViewHistory(t *testing.T) {
 			t.Fatalf("create controllerRevisions error %v occurred ", err)
 		}
 
-		var sts = &StatefulSetHistoryViewer{
+		sts := &StatefulSetHistoryViewer{
 			fakeClientSet,
 		}
 
@@ -137,7 +136,6 @@ func TestViewHistory(t *testing.T) {
 				t.Fatalf("unexpected output  (%v was expected but got %v)", expected, result)
 			}
 		})
-
 	})
 
 	t.Run("for daemonSet", func(t *testing.T) {
@@ -181,7 +179,7 @@ func TestViewHistory(t *testing.T) {
 			t.Fatalf("create controllerRevisions error %v occurred ", err)
 		}
 
-		var daemonSetHistoryViewer = &DaemonSetHistoryViewer{
+		daemonSetHistoryViewer := &DaemonSetHistoryViewer{
 			fakeClientSet,
 		}
 
@@ -222,7 +220,6 @@ func TestViewHistory(t *testing.T) {
 				t.Fatalf("unexpected output  (%v was expected but got %v)", expected, result)
 			}
 		})
-
 	})
 }
 

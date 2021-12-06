@@ -6,8 +6,7 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
-type BeZeroMatcher struct {
-}
+type BeZeroMatcher struct{}
 
 func (matcher *BeZeroMatcher) Match(actual interface{}) (success bool, err error) {
 	if actual == nil {
@@ -16,7 +15,6 @@ func (matcher *BeZeroMatcher) Match(actual interface{}) (success bool, err error
 	zeroValue := reflect.Zero(reflect.TypeOf(actual)).Interface()
 
 	return reflect.DeepEqual(zeroValue, actual), nil
-
 }
 
 func (matcher *BeZeroMatcher) FailureMessage(actual interface{}) (message string) {

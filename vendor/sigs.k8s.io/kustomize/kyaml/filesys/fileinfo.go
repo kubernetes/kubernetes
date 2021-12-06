@@ -22,7 +22,7 @@ func (fi fileInfo) Name() string { return fi.node.Name() }
 func (fi fileInfo) Size() int64 { return fi.node.Size() }
 
 // Mode returns the file mode
-func (fi fileInfo) Mode() os.FileMode { return 0777 }
+func (fi fileInfo) Mode() os.FileMode { return 0o777 }
 
 // ModTime returns a bogus time
 func (fi fileInfo) ModTime() time.Time { return time.Time{} }

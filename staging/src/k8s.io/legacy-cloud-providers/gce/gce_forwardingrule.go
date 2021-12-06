@@ -31,6 +31,7 @@ import (
 func newForwardingRuleMetricContext(request, region string) *metricContext {
 	return newForwardingRuleMetricContextWithVersion(request, region, computeV1Version)
 }
+
 func newForwardingRuleMetricContextWithVersion(request, region, version string) *metricContext {
 	return newGenericMetricContext("forwardingrule", request, region, unusedMetricLabel, version)
 }

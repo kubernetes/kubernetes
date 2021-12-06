@@ -36,7 +36,6 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
-
 		ginkgo.Context("when running a container with a new image", func() {
 			// The service account only has pull permission
 			auth := `
@@ -81,7 +80,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					}
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
-					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
+					err := ioutil.WriteFile(configFile, []byte(auth), 0o644)
 					framework.ExpectNoError(err)
 					defer os.Remove(configFile)
 

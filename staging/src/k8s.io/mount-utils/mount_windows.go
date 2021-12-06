@@ -82,11 +82,11 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 
 	if source == "tmpfs" {
 		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, sanitizedOptionsForLogging)
-		return os.MkdirAll(target, 0755)
+		return os.MkdirAll(target, 0o755)
 	}
 
 	parentDir := filepath.Dir(target)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return err
 	}
 

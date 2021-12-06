@@ -19,7 +19,6 @@ package nodetaint
 import (
 	"context"
 	"reflect"
-
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,10 +37,14 @@ func Test_nodeTaints(t *testing.T) {
 		notReadyCondition = api.NodeCondition{Type: api.NodeReady, Status: api.ConditionFalse}
 		myNodeObjMeta     = metav1.ObjectMeta{Name: "mynode"}
 		myNodeObj         = api.Node{ObjectMeta: myNodeObjMeta}
-		myTaintedNodeObj  = api.Node{ObjectMeta: myNodeObjMeta,
-			Spec: api.NodeSpec{Taints: []api.Taint{notReadyTaint}}}
-		myUnreadyNodeObj = api.Node{ObjectMeta: myNodeObjMeta,
-			Status: api.NodeStatus{Conditions: []api.NodeCondition{notReadyCondition}}}
+		myTaintedNodeObj  = api.Node{
+			ObjectMeta: myNodeObjMeta,
+			Spec:       api.NodeSpec{Taints: []api.Taint{notReadyTaint}},
+		}
+		myUnreadyNodeObj = api.Node{
+			ObjectMeta: myNodeObjMeta,
+			Status:     api.NodeStatus{Conditions: []api.NodeCondition{notReadyCondition}},
+		}
 		nodeKind = api.Kind("Node").WithVersion("v1")
 	)
 	tests := []struct {

@@ -84,8 +84,8 @@ func NewREST(
 	portAlloc portallocator.Interface,
 	endpoints EndpointsStorage,
 	pods PodStorage,
-	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
-
+	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error,
+) {
 	strategy, _ := svcreg.StrategyForServiceCIDRs(ipAllocs[serviceIPFamily].CIDR(), len(ipAllocs) > 1)
 
 	store := &genericregistry.Store{
@@ -198,6 +198,7 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 type Before struct {
 	*api.Service
 }
+
 type After struct {
 	*api.Service
 }

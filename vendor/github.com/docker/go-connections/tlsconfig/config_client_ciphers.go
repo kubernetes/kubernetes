@@ -1,3 +1,4 @@
+//go:build go1.5
 // +build go1.5
 
 // Package tlsconfig provides primitives to retrieve secure-enough TLS configurations for both clients and servers.

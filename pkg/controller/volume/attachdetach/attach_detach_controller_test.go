@@ -67,7 +67,6 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		DefaultTimerConfig,
 		nil, /* filteredDialOptions */
 	)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
@@ -166,7 +165,7 @@ func Test_AttachDetachControllerRecovery(t *testing.T) {
 func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2 []*v1.Pod) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
-	//informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
+	// informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin()
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
@@ -192,7 +191,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		DefaultTimerConfig,
 		nil, /* filteredDialOptions */
 	)
-
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
@@ -346,7 +344,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	if testPlugin.GetErrorEncountered() {
 		t.Fatalf("Fatal error encountered in the testing volume plugin")
 	}
-
 }
 
 type vaTest struct {
@@ -574,7 +571,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		testPlugin := plugins[0].(*controllervolumetesting.TestPlugin)
 		verifyAttachDetachCalls(t, testPlugin, tc)
 	}
-
 }
 
 func verifyExpectedVolumeState(t *testing.T, adc *attachDetachController, tc vaTest) {

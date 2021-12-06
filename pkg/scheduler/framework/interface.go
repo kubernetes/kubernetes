@@ -595,7 +595,6 @@ type Handle interface {
 
 	// EventRecorder returns an event recorder.
 	EventRecorder() events.EventRecorder
-
 	SharedInformerFactory() informers.SharedInformerFactory
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.

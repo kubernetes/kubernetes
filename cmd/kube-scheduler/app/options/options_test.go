@@ -84,7 +84,7 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
 leaderElection:
-  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+  leaderElect: true`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 	if err := ioutil.WriteFile(configKubeconfig, []byte(fmt.Sprintf(`
@@ -105,7 +105,7 @@ users:
 - name: default
   user:
     username: config
-`, server.URL)), os.FileMode(0600)); err != nil {
+`, server.URL)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -116,7 +116,7 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
 leaderElection:
-  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+  leaderElect: true`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +127,7 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
 leaderElection:
-  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+  leaderElect: true`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -138,7 +138,7 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
 leaderElection:
-  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+  leaderElect: true`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -148,7 +148,7 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
 leaderElection:
-  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+  leaderElect: true`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -160,7 +160,7 @@ clientConnection:
   kubeconfig: "%s"
 leaderElection:
   leaderElect: true
-foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
+foo: bar`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -172,7 +172,7 @@ clientConnection:
   kubeconfig: "%s"
 leaderElection:
   leaderElect: true
-  leaderElect: false`, configKubeconfig)), os.FileMode(0600)); err != nil {
+  leaderElect: false`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,7 +196,7 @@ users:
 - name: default
   user:
     username: flag
-`, server.URL)), os.FileMode(0600)); err != nil {
+`, server.URL)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -227,7 +227,7 @@ profiles:
   - name: foo
     args:
       bar: baz
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -258,7 +258,7 @@ profiles:
   - name: foo
     args:
       bar: baz
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -285,7 +285,7 @@ profiles:
       - name: VolumeBinding
   pluginConfig:
   - name: foo
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -312,7 +312,7 @@ profiles:
       - name: VolumeBinding
   pluginConfig:
   - name: foo
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1152,7 +1152,6 @@ profiles:
 			}
 			// create the config
 			config, err := tc.options.Config()
-
 			// handle errors
 			if err != nil {
 				if tc.expectedError != "" || tc.checkErrFn != nil {

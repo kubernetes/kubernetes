@@ -22,7 +22,6 @@ import (
 )
 
 func (c *Client) ClusterCreate(request *api.ClusterCreateRequest) (*api.ClusterInfoResponse, error) {
-
 	buffer, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -63,7 +62,6 @@ func (c *Client) ClusterCreate(request *api.ClusterCreateRequest) (*api.ClusterI
 }
 
 func (c *Client) ClusterSetFlags(id string, request *api.ClusterSetFlagsRequest) error {
-
 	buffer, err := json.Marshal(request)
 	if err != nil {
 		return err
@@ -97,7 +95,6 @@ func (c *Client) ClusterSetFlags(id string, request *api.ClusterSetFlagsRequest)
 }
 
 func (c *Client) ClusterInfo(id string) (*api.ClusterInfoResponse, error) {
-
 	// Create request
 	req, err := http.NewRequest("GET", c.host+"/clusters/"+id, nil)
 	if err != nil {
@@ -131,7 +128,6 @@ func (c *Client) ClusterInfo(id string) (*api.ClusterInfoResponse, error) {
 }
 
 func (c *Client) ClusterList() (*api.ClusterListResponse, error) {
-
 	// Create request
 	req, err := http.NewRequest("GET", c.host+"/clusters", nil)
 	if err != nil {
@@ -165,7 +161,6 @@ func (c *Client) ClusterList() (*api.ClusterListResponse, error) {
 }
 
 func (c *Client) ClusterDelete(id string) error {
-
 	// Create DELETE request
 	req, err := http.NewRequest("DELETE", c.host+"/clusters/"+id, nil)
 	if err != nil {

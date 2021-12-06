@@ -531,7 +531,7 @@ func (p *testText) Generate(imports generator.PluginImports, file *generator.Fil
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = imports.NewImport("github.com/golang/protobuf/proto")
 	}
-	//fmtPkg := imports.NewImport("fmt")
+	// fmtPkg := imports.NewImport("fmt")
 	for _, message := range file.Messages() {
 		ccTypeName := generator.CamelCaseSlice(message.TypeName())
 		if message.DescriptorProto.GetOptions().GetMapEntry() {

@@ -145,7 +145,7 @@ const (
 	// FrontProxyClientKeyName defines front proxy key name
 	FrontProxyClientKeyName = "front-proxy-client.key"
 	// FrontProxyClientCertCommonName defines front proxy certificate common name
-	FrontProxyClientCertCommonName = "front-proxy-client" //used as subject.commonname attribute (CN)
+	FrontProxyClientCertCommonName = "front-proxy-client" // used as subject.commonname attribute (CN)
 
 	// AdminKubeConfigFileName defines name for the kubeconfig aimed to be used by the superuser/admin of the cluster
 	AdminKubeConfigFileName = "admin.conf"
@@ -604,7 +604,7 @@ func CreateTempDirForKubeadm(kubernetesDir, dirName string) (string, error) {
 	}
 
 	// creates target folder if not already exists
-	if err := os.MkdirAll(tempDir, 0700); err != nil {
+	if err := os.MkdirAll(tempDir, 0o700); err != nil {
 		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
@@ -623,13 +623,13 @@ func CreateTimestampDirForKubeadm(kubernetesDir, dirName string) (string, error)
 	}
 
 	// creates target folder if not already exists
-	if err := os.MkdirAll(tempDir, 0700); err != nil {
+	if err := os.MkdirAll(tempDir, 0o700); err != nil {
 		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
 	}
 
 	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
 	timestampDir := path.Join(tempDir, timestampDirName)
-	if err := os.Mkdir(timestampDir, 0700); err != nil {
+	if err := os.Mkdir(timestampDir, 0o700); err != nil {
 		return "", errors.Wrap(err, "could not create timestamp directory")
 	}
 

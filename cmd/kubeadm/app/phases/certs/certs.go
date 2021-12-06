@@ -191,7 +191,6 @@ func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
 func writeCertificateAuthorityFilesIfNotExist(pkiDir string, baseName string, caCert *x509.Certificate, caKey crypto.Signer) error {
-
 	// If cert or key exists, we should try to load them
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
 
@@ -228,7 +227,6 @@ func writeCertificateAuthorityFilesIfNotExist(pkiDir string, baseName string, ca
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
 func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert *x509.Certificate, cert *x509.Certificate, key crypto.Signer, cfg *pkiutil.CertConfig) error {
-
 	// Checks if the signed certificate exists in the PKI directory
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
 		// Try to load key from the PKI directory
@@ -339,7 +337,6 @@ func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error)
 // This allows us to, e.g., skip generating certs or not start the csr signing controller.
 // In case we are using an external front-proxy CA, the function validates the certificates signed by front-proxy CA that should be provided by the user.
 func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
-
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
 		return false, err
 	}
@@ -364,7 +361,6 @@ func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 // when the front proxy CA Cert is present but the front proxy CA Key is not.
 // In case we are using an external front-proxy CA, the function validates the certificates signed by front-proxy CA that should be provided by the user.
 func UsingExternalFrontProxyCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
-
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
 		return false, err
 	}

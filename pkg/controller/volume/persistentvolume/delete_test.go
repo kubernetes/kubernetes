@@ -63,7 +63,8 @@ func TestDeleteSync(t *testing.T) {
 			withMessage("error getting deleter volume plugin for volume \"volume8-3\": no volume plugin matched", newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"}, noerrors, testSyncVolume,
+			[]string{"Warning VolumeFailedDelete"},
+			noerrors, testSyncVolume,
 		},
 		{
 			// delete failure - newDeleter returns error
@@ -72,7 +73,8 @@ func TestDeleteSync(t *testing.T) {
 			withMessage("failed to create deleter for volume \"volume8-4\": Mock plugin error: no deleteCalls configured", newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"}, noerrors,
+			[]string{"Warning VolumeFailedDelete"},
+			noerrors,
 			wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume),
 		},
 		{
@@ -82,7 +84,8 @@ func TestDeleteSync(t *testing.T) {
 			withMessage("Mock delete error", newVolumeArray("volume8-5", "1Gi", "uid8-5", "claim8-5", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"}, noerrors,
+			[]string{"Warning VolumeFailedDelete"},
+			noerrors,
 			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("Mock delete error")}, testSyncVolume),
 		},
 		{
@@ -215,7 +218,8 @@ func TestDeleteMultiSync(t *testing.T) {
 			novolumes,
 			noclaims,
 			noclaims,
-			[]string{"Warning VolumeFailedDelete"}, noerrors,
+			[]string{"Warning VolumeFailedDelete"},
+			noerrors,
 			wrapTestWithReclaimCalls(operationDelete, []error{errors.New("Mock delete error"), nil}, testSyncVolume),
 		},
 	}

@@ -98,7 +98,7 @@ func TestRecycler(t *testing.T) {
 func TestDeleter(t *testing.T) {
 	// Deleter has a hard-coded regex for "/tmp".
 	tempPath := fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())
-	err := os.MkdirAll(tempPath, 0750)
+	err := os.MkdirAll(tempPath, 0o750)
 	if err != nil {
 		t.Fatalf("Failed to create tmp directory for deleter: %v", err)
 	}
@@ -158,7 +158,8 @@ func TestProvisioner(t *testing.T) {
 		nil,
 		volumetest.NewFakeKubeletVolumeHost(t, "/tmp/fake", nil, nil))
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{
-		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}}}}}
+		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}},
+	}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
@@ -198,7 +199,6 @@ func TestProvisioner(t *testing.T) {
 	}
 
 	os.RemoveAll(hostPathCreator.basePath)
-
 }
 
 func TestInvalidHostPath(t *testing.T) {
@@ -321,12 +321,12 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 }
 
 func setUp() error {
-	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
+	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0o755))
 	if err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile("/tmp/ExistingFolder/foo", os.O_CREATE, os.FileMode(0644))
+	f, err := os.OpenFile("/tmp/ExistingFolder/foo", os.O_CREATE, os.FileMode(0o644))
 	if err != nil {
 		return err
 	}
@@ -494,7 +494,6 @@ func TestOSFileTypeChecker(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 type fakeHostPathTypeChecker struct {
@@ -605,5 +604,4 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 			}
 		}
 	}
-
 }

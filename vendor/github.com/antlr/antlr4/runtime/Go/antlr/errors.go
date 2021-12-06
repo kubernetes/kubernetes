@@ -26,7 +26,6 @@ type BaseRecognitionException struct {
 }
 
 func NewBaseRecognitionException(message string, recognizer Recognizer, input IntStream, ctx RuleContext) *BaseRecognitionException {
-
 	// todo
 	//	Error.call(this)
 	//
@@ -104,7 +103,6 @@ type LexerNoViableAltException struct {
 }
 
 func NewLexerNoViableAltException(lexer Lexer, input CharStream, startIndex int, deadEndConfigs ATNConfigSet) *LexerNoViableAltException {
-
 	l := new(LexerNoViableAltException)
 
 	l.BaseRecognitionException = NewBaseRecognitionException("", lexer, input, nil)
@@ -138,7 +136,6 @@ type NoViableAltException struct {
 // in the various paths when the error. Reported by ReportNoViableAlternative()
 //
 func NewNoViableAltException(recognizer Parser, input TokenStream, startToken Token, offendingToken Token, deadEndConfigs ATNConfigSet, ctx ParserRuleContext) *NoViableAltException {
-
 	if ctx == nil {
 		ctx = recognizer.GetParserRuleContext()
 	}
@@ -179,14 +176,12 @@ type InputMisMatchException struct {
 // when the current input does not Match the expected token.
 //
 func NewInputMisMatchException(recognizer Parser) *InputMisMatchException {
-
 	i := new(InputMisMatchException)
 	i.BaseRecognitionException = NewBaseRecognitionException("", recognizer, recognizer.GetInputStream(), recognizer.GetParserRuleContext())
 
 	i.offendingToken = recognizer.GetCurrentToken()
 
 	return i
-
 }
 
 // A semantic predicate failed during validation. Validation of predicates
@@ -203,7 +198,6 @@ type FailedPredicateException struct {
 }
 
 func NewFailedPredicateException(recognizer Parser, predicate string, message string) *FailedPredicateException {
-
 	f := new(FailedPredicateException)
 
 	f.BaseRecognitionException = NewBaseRecognitionException(f.formatMessage(predicate, message), recognizer, recognizer.GetInputStream(), recognizer.GetParserRuleContext())
@@ -231,8 +225,7 @@ func (f *FailedPredicateException) formatMessage(predicate, message string) stri
 	return "failed predicate: {" + predicate + "}?"
 }
 
-type ParseCancellationException struct {
-}
+type ParseCancellationException struct{}
 
 func NewParseCancellationException() *ParseCancellationException {
 	//	Error.call(this)

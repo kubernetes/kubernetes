@@ -139,7 +139,6 @@ func PatchService(c corev1.CoreV1Interface, oldSvc, newSvc *v1.Service) (*v1.Ser
 	}
 
 	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-
 }
 
 func getPatchBytes(oldSvc, newSvc *v1.Service) ([]byte, error) {
@@ -158,7 +157,6 @@ func getPatchBytes(oldSvc, newSvc *v1.Service) ([]byte, error) {
 		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
 	}
 	return patchBytes, nil
-
 }
 
 func ingressSliceEqual(lhs, rhs []v1.LoadBalancerIngress) bool {

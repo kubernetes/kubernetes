@@ -169,6 +169,7 @@ func (i Int) Format(s fmt.State, ch rune) {
 	}
 	newBig(i.small).Format(s, ch)
 }
+
 func (i Int) String() string {
 	if i.big != nil {
 		return i.big.Text(10)
@@ -177,7 +178,8 @@ func (i Int) String() string {
 }
 func (i Int) Type() string { return "int" }
 func (i Int) Freeze()      {} // immutable
-func (i Int) Truth() Bool  { return i.Sign() != 0 }
+func (i Int) Truth() Bool { return i.Sign() != 0 }
+
 func (i Int) Hash() (uint32, error) {
 	var lo big.Word
 	if i.big != nil {
@@ -187,6 +189,7 @@ func (i Int) Hash() (uint32, error) {
 	}
 	return 12582917 * uint32(lo+3), nil
 }
+
 func (x Int) CompareSameType(op syntax.Token, v Value, depth int) (bool, error) {
 	y := v.(Int)
 	if x.big != nil || y.big != nil {
@@ -217,36 +220,42 @@ func (x Int) Add(y Int) Int {
 	}
 	return MakeInt64(x.small + y.small)
 }
+
 func (x Int) Sub(y Int) Int {
 	if x.big != nil || y.big != nil {
 		return MakeBigInt(new(big.Int).Sub(x.BigInt(), y.BigInt()))
 	}
 	return MakeInt64(x.small - y.small)
 }
+
 func (x Int) Mul(y Int) Int {
 	if x.big != nil || y.big != nil {
 		return MakeBigInt(new(big.Int).Mul(x.BigInt(), y.BigInt()))
 	}
 	return MakeInt64(x.small * y.small)
 }
+
 func (x Int) Or(y Int) Int {
 	if x.big != nil || y.big != nil {
 		return Int{big: new(big.Int).Or(x.BigInt(), y.BigInt())}
 	}
 	return Int{small: x.small | y.small}
 }
+
 func (x Int) And(y Int) Int {
 	if x.big != nil || y.big != nil {
 		return MakeBigInt(new(big.Int).And(x.BigInt(), y.BigInt()))
 	}
 	return Int{small: x.small & y.small}
 }
+
 func (x Int) Xor(y Int) Int {
 	if x.big != nil || y.big != nil {
 		return MakeBigInt(new(big.Int).Xor(x.BigInt(), y.BigInt()))
 	}
 	return Int{small: x.small ^ y.small}
 }
+
 func (x Int) Not() Int {
 	if x.big != nil {
 		return MakeBigInt(new(big.Int).Not(x.big))

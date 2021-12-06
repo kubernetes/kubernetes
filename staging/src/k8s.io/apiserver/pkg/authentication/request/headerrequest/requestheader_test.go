@@ -64,7 +64,8 @@ func TestRequestHeader(t *testing.T) {
 			requestHeaders: http.Header{
 				"X-Remote-User":          {"", "First header, second value"},
 				"A-Second-X-Remote-User": {"Second header, first value", "Second header, second value"},
-				"Another-X-Remote-User":  {"Third header, first value"}},
+				"Another-X-Remote-User":  {"Third header, first value"},
+			},
 			expectedUser: &user.DefaultInfo{
 				Name:   "Second header, first value",
 				Groups: []string{},

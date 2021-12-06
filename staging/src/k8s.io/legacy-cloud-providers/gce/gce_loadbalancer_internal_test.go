@@ -710,7 +710,6 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 	existingLegacyFirewall, err = gce.GetFirewall(lbName)
 	require.Error(t, err)
 	require.Nil(t, existingLegacyFirewall)
-
 }
 
 func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {

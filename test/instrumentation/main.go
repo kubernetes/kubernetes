@@ -283,7 +283,6 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 						// TODO: should we include/exclude based on the build tags?
 						localVariables[importK] = v
 					}
-
 				}
 			}
 		}

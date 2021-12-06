@@ -102,7 +102,6 @@ func BPFEnableStats(attr *BPFEnableStatsAttr) (*FD, error) {
 		return nil, fmt.Errorf("enable stats: %w", err)
 	}
 	return NewFD(uint32(ptr)), nil
-
 }
 
 type bpfObjAttr struct {

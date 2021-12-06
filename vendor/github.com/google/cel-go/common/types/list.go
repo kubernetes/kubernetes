@@ -27,15 +27,13 @@ import (
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
-var (
-	// ListType singleton.
-	ListType = NewTypeValue("list",
-		traits.AdderType,
-		traits.ContainerType,
-		traits.IndexerType,
-		traits.IterableType,
-		traits.SizerType)
-)
+// ListType singleton.
+var ListType = NewTypeValue("list",
+	traits.AdderType,
+	traits.ContainerType,
+	traits.IndexerType,
+	traits.IterableType,
+	traits.SizerType)
 
 // NewDynamicList returns a traits.Lister with heterogenous elements.
 // value should be an array of "native" types, i.e. any type that
@@ -126,7 +124,8 @@ func (l *baseList) Add(other ref.Val) ref.Val {
 	return &concatList{
 		TypeAdapter: l.TypeAdapter,
 		prevList:    l,
-		nextList:    otherList}
+		nextList:    otherList,
+	}
 }
 
 // Contains implements the traits.Container interface method.
@@ -175,8 +174,7 @@ func (l *baseList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 		}
 		return anypb.New(json.(proto.Message))
 	case jsonValueType, jsonListValueType:
-		jsonValues, err :=
-			l.ConvertToNative(reflect.TypeOf([]*structpb.Value{}))
+		jsonValues, err := l.ConvertToNative(reflect.TypeOf([]*structpb.Value{}))
 		if err != nil {
 			return nil, err
 		}
@@ -303,7 +301,8 @@ func (l *concatList) Add(other ref.Val) ref.Val {
 	return &concatList{
 		TypeAdapter: l.TypeAdapter,
 		prevList:    l,
-		nextList:    otherList}
+		nextList:    otherList,
+	}
 }
 
 // Contains implments the traits.Container interface method.

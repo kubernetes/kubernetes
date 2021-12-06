@@ -19,11 +19,10 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"golang.org/x/net/context"
-
-	"time"
 
 	v1 "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
@@ -110,7 +109,6 @@ func Images() ([]v1.DockerImage, error) {
 		out = append(out, di)
 	}
 	return out, nil
-
 }
 
 // Checks whether the dockerInfo reflects a valid docker setup, and returns it if it does, or an

@@ -27,8 +27,10 @@ type Manager struct {
 	producers map[Producer]struct{}
 }
 
-var prodMgr *Manager
-var once sync.Once
+var (
+	prodMgr *Manager
+	once    sync.Once
+)
 
 // GlobalManager is a single instance of producer manager
 // that is used by all producers and all readers.

@@ -73,14 +73,17 @@ type WantExternalKubeInformerFactory struct {
 func (self *WantExternalKubeInformerFactory) SetExternalKubeInformerFactory(sf informers.SharedInformerFactory) {
 	self.sf = sf
 }
+
 func (self *WantExternalKubeInformerFactory) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
 func (self *WantExternalKubeInformerFactory) Handles(o admission.Operation) bool { return false }
 func (self *WantExternalKubeInformerFactory) ValidateInitialization() error      { return nil }
 
-var _ admission.Interface = &WantExternalKubeInformerFactory{}
-var _ initializer.WantsExternalKubeInformerFactory = &WantExternalKubeInformerFactory{}
+var (
+	_ admission.Interface                          = &WantExternalKubeInformerFactory{}
+	_ initializer.WantsExternalKubeInformerFactory = &WantExternalKubeInformerFactory{}
+)
 
 // WantExternalKubeClientSet is a test stub that fulfills the WantsExternalKubeClientSet interface
 type WantExternalKubeClientSet struct {
@@ -90,14 +93,17 @@ type WantExternalKubeClientSet struct {
 func (self *WantExternalKubeClientSet) SetExternalKubeClientSet(cs kubernetes.Interface) {
 	self.cs = cs
 }
+
 func (self *WantExternalKubeClientSet) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
 func (self *WantExternalKubeClientSet) Handles(o admission.Operation) bool { return false }
 func (self *WantExternalKubeClientSet) ValidateInitialization() error      { return nil }
 
-var _ admission.Interface = &WantExternalKubeClientSet{}
-var _ initializer.WantsExternalKubeClientSet = &WantExternalKubeClientSet{}
+var (
+	_ admission.Interface                    = &WantExternalKubeClientSet{}
+	_ initializer.WantsExternalKubeClientSet = &WantExternalKubeClientSet{}
+)
 
 // WantAuthorizerAdmission is a test stub that fulfills the WantsAuthorizer interface.
 type WantAuthorizerAdmission struct {
@@ -111,8 +117,10 @@ func (self *WantAuthorizerAdmission) Admit(ctx context.Context, a admission.Attr
 func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool { return false }
 func (self *WantAuthorizerAdmission) ValidateInitialization() error      { return nil }
 
-var _ admission.Interface = &WantAuthorizerAdmission{}
-var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
+var (
+	_ admission.Interface         = &WantAuthorizerAdmission{}
+	_ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
+)
 
 // TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
 type TestAuthorizer struct{}

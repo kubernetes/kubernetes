@@ -210,8 +210,8 @@ func New(client clientset.Interface,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
 	stopCh <-chan struct{},
-	opts ...Option) (*Scheduler, error) {
-
+	opts ...Option) (*Scheduler, error,
+) {
 	stopEverything := stopCh
 	if stopEverything == nil {
 		stopEverything = wait.NeverStop

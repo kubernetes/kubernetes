@@ -36,7 +36,7 @@ func (h *Handle) BridgeVlanList() (map[int32][]*nl.BridgeVlanInfo, error) {
 		for _, attr := range attrs {
 			switch attr.Attr.Type {
 			case unix.IFLA_AF_SPEC:
-				//nested attr
+				// nested attr
 				nestAttrs, err := nl.ParseRouteAttr(attr.Value)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse nested attr %v", err)

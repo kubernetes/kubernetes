@@ -498,6 +498,7 @@ type testLW struct {
 func (t *testLW) List(options metav1.ListOptions) (runtime.Object, error) {
 	return t.ListFunc(options)
 }
+
 func (t *testLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options)
 }

@@ -32,8 +32,8 @@ import (
 func (s *service) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest) (
-	*csi.NodeStageVolumeResponse, error) {
-
+	*csi.NodeStageVolumeResponse, error,
+) {
 	device, ok := req.PublishContext["device"]
 	if !ok {
 		if s.config.DisableAttach {
@@ -98,8 +98,8 @@ func (s *service) NodeStageVolume(
 func (s *service) NodeUnstageVolume(
 	ctx context.Context,
 	req *csi.NodeUnstageVolumeRequest) (
-	*csi.NodeUnstageVolumeResponse, error) {
-
+	*csi.NodeUnstageVolumeResponse, error,
+) {
 	if len(req.GetVolumeId()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID cannot be empty")
 	}
@@ -138,8 +138,8 @@ func (s *service) NodeUnstageVolume(
 func (s *service) NodePublishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest) (
-	*csi.NodePublishVolumeResponse, error) {
-
+	*csi.NodePublishVolumeResponse, error,
+) {
 	if hookVal, hookMsg := s.execHook("NodePublishVolumeStart"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
 	}
@@ -238,8 +238,8 @@ func (s *service) NodePublishVolume(
 func (s *service) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest) (
-	*csi.NodeUnpublishVolumeResponse, error) {
-
+	*csi.NodeUnpublishVolumeResponse, error,
+) {
 	if len(req.GetVolumeId()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID cannot be empty")
 	}
@@ -332,8 +332,8 @@ func (s *service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 func (s *service) NodeGetCapabilities(
 	ctx context.Context,
 	req *csi.NodeGetCapabilitiesRequest) (
-	*csi.NodeGetCapabilitiesResponse, error) {
-
+	*csi.NodeGetCapabilitiesResponse, error,
+) {
 	if hookVal, hookMsg := s.execHook("NodeGetCapabilities"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
 	}
@@ -414,8 +414,8 @@ func (s *service) NodeGetInfo(ctx context.Context,
 }
 
 func (s *service) NodeGetVolumeStats(ctx context.Context,
-	req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-
+	req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error,
+) {
 	resp := &csi.NodeGetVolumeStatsResponse{
 		VolumeCondition: &csi.VolumeCondition{},
 	}

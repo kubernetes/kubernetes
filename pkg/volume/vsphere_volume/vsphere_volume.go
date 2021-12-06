@@ -51,10 +51,12 @@ type vsphereVolumePlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &vsphereVolumePlugin{}
-var _ volume.PersistentVolumePlugin = &vsphereVolumePlugin{}
-var _ volume.DeletableVolumePlugin = &vsphereVolumePlugin{}
-var _ volume.ProvisionableVolumePlugin = &vsphereVolumePlugin{}
+var (
+	_ volume.VolumePlugin              = &vsphereVolumePlugin{}
+	_ volume.PersistentVolumePlugin    = &vsphereVolumePlugin{}
+	_ volume.DeletableVolumePlugin     = &vsphereVolumePlugin{}
+	_ volume.ProvisionableVolumePlugin = &vsphereVolumePlugin{}
+)
 
 const (
 	vsphereVolumePluginName = "kubernetes.io/vsphere-volume"
@@ -147,7 +149,8 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 			mounter:         mounter,
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -243,7 +246,7 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	if runtime.GOOS != "windows" {
 		// On Windows, Mount will create the parent of dir and mklink (create a symbolic link) at dir later, so don't create a
 		// directory at dir now. Otherwise mklink will error: "Cannot create a file when that file already exists".
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			klog.Errorf("Could not create directory %s: %v", dir, err)
 			return err
 		}
@@ -340,7 +343,8 @@ func (plugin *vsphereVolumePlugin) newDeleterInternal(spec *volume.Spec, manager
 			volPath: spec.PersistentVolume.Spec.VsphereVolume.VolumePath,
 			manager: manager,
 			plugin:  plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 func (r *vsphereVolumeDeleter) Delete() error {

@@ -167,7 +167,8 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 				defaultVars: p.defaultVars,
 				Env:         e,
 				dispatcher:  disp,
-				interpreter: interp}
+				interpreter: interp,
+			}
 			return initInterpretable(clone, ast, decs)
 		}
 		return initProgGen(factory)
@@ -182,7 +183,8 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 				defaultVars: p.defaultVars,
 				Env:         e,
 				dispatcher:  disp,
-				interpreter: interp}
+				interpreter: interp,
+			}
 			return initInterpretable(clone, ast, decs)
 		}
 		return initProgGen(factory)
@@ -211,8 +213,7 @@ func initInterpretable(
 	// Unchecked programs do not contain type and reference information and may be
 	// slower to execute than their checked counterparts.
 	if !ast.IsChecked() {
-		p.interpretable, err =
-			p.interpreter.NewUncheckedInterpretable(ast.Expr(), decorators...)
+		p.interpretable, err = p.interpreter.NewUncheckedInterpretable(ast.Expr(), decorators...)
 		if err != nil {
 			return nil, err
 		}
@@ -300,9 +301,7 @@ func (gen *progGen) Cost() (min, max int64) {
 	return estimateCost(p)
 }
 
-var (
-	emptyEvalState = interpreter.NewEvalState()
-)
+var emptyEvalState = interpreter.NewEvalState()
 
 // EstimateCost returns the heuristic cost interval for the program.
 func EstimateCost(p Program) (min, max int64) {

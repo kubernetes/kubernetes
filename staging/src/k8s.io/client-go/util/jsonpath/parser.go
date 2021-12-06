@@ -161,7 +161,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		return fmt.Errorf("unclosed action")
 	case r == ' ':
 		p.consumeText()
-	case r == '@' || r == '$': //the current object, just pass it
+	case r == '@' || r == '$': // the current object, just pass it
 		p.consumeText()
 	case r == '[':
 		return p.parseArray(cur)
@@ -272,7 +272,7 @@ Loop:
 		text = ":"
 	}
 
-	//union operator
+	// union operator
 	strs := strings.Split(text, ",")
 	if len(strs) > 1 {
 		union := []*ListNode{}
@@ -300,7 +300,7 @@ Loop:
 		return p.parseInsideAction(cur)
 	}
 
-	//slice operator
+	// slice operator
 	value = sliceOperatorRex.FindStringSubmatch(text)
 	if value == nil {
 		return fmt.Errorf("invalid array index %s", text)
@@ -353,18 +353,18 @@ Loop:
 			return fmt.Errorf("unterminated filter")
 		case '"', '\'':
 			if begin == false {
-				//save the paired rune
+				// save the paired rune
 				begin = true
 				pair = r
 				continue
 			}
-			//only add when met paired rune
+			// only add when met paired rune
 			if p.input[p.pos-2] != '\\' && r == pair {
 				end = true
 			}
 		case ')':
-			//in rightParser below quotes only appear zero or once
-			//and must be paired at the beginning and end
+			// in rightParser below quotes only appear zero or once
+			// and must be paired at the beginning and end
 			if begin == end {
 				break Loop
 			}
@@ -405,7 +405,7 @@ Loop:
 		case eof, '\n':
 			return fmt.Errorf("unterminated quoted string")
 		case end:
-			//if it's not escape break the Loop
+			// if it's not escape break the Loop
 			if p.input[p.pos-2] != '\\' {
 				break Loop
 			}
@@ -478,7 +478,7 @@ func isBool(s string) bool {
 	return s == "true" || s == "false"
 }
 
-//UnquoteExtend is almost same as strconv.Unquote(), but it support parse single quotes as a string
+// UnquoteExtend is almost same as strconv.Unquote(), but it support parse single quotes as a string
 func UnquoteExtend(s string) (string, error) {
 	n := len(s)
 	if n < 2 {

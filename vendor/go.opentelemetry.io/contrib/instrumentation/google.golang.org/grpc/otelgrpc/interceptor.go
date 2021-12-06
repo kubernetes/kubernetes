@@ -175,7 +175,6 @@ func (w *clientStream) SendMsg(m interface{}) error {
 
 func (w *clientStream) Header() (metadata.MD, error) {
 	md, err := w.ClientStream.Header()
-
 	if err != nil {
 		w.sendStreamEvent(errorEvent, err)
 	}

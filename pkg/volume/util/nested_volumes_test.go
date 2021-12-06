@@ -207,7 +207,7 @@ func TestGetNestedMountpoints(t *testing.T) {
 		defer os.RemoveAll(dir)
 
 		rootdir := filepath.Join(dir, "vol")
-		err = os.Mkdir(rootdir, 0755)
+		err = os.Mkdir(rootdir, 0o755)
 		if err != nil {
 			t.Errorf("Unexpected error trying to create temp root directory: %v", err)
 			return

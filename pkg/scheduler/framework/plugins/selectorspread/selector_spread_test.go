@@ -250,15 +250,18 @@ func TestSelectorSpreadScore(t *testing.T) {
 			nodes: []string{"machine1", "machine2"},
 			rcs: []*v1.ReplicationController{{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "rc3"},
-				Spec:       v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+				Spec:       v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}},
+			}},
 			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			// Taken together Service and Replication Controller should match no pods.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and replication controller matches no pods",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: map[string]string{"foo": "bar", "bar": "foo"},
-				OwnerReferences: controllerRef("rs3", rsKind)}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Namespace: metav1.NamespaceDefault, Labels: map[string]string{"foo": "bar", "bar": "foo"},
+				OwnerReferences: controllerRef("rs3", rsKind),
+			}},
 			pods: []*v1.Pod{
 				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("rs2", rsKind)}},
 				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
@@ -267,7 +270,8 @@ func TestSelectorSpreadScore(t *testing.T) {
 			nodes:    []string{"machine1", "machine2"},
 			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			rss: []*apps.ReplicaSet{
-				{ObjectMeta: metav1.ObjectMeta{Name: "rs3", Namespace: metav1.NamespaceDefault}, Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "rs3", Namespace: metav1.NamespaceDefault}, Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}},
+			},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and replica set matches no pods",
@@ -282,7 +286,8 @@ func TestSelectorSpreadScore(t *testing.T) {
 			nodes:    []string{"machine1", "machine2"},
 			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			sss: []*apps.StatefulSet{
-				{ObjectMeta: metav1.ObjectMeta{Name: "ss3", Namespace: metav1.NamespaceDefault}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "ss3", Namespace: metav1.NamespaceDefault}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}},
+			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and stateful set matches no pods",
 		},
@@ -629,7 +634,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine1Zone3, labels1, nil),
 			},
 			rcs: []*v1.ReplicationController{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "rc1"}, Spec: v1.ReplicationControllerSpec{Selector: labels1}}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "rc1"}, Spec: v1.ReplicationControllerSpec{Selector: labels1}},
+			},
 			expectedList: []framework.NodeScore{
 				// Note that because we put two pods on the same node (nodeMachine1Zone3),
 				// the values here are questionable for zone2, in particular for nodeMachine1Zone2.

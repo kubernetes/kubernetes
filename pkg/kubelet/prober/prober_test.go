@@ -185,8 +185,10 @@ func TestHTTPHeaders(t *testing.T) {
 		{[]v1.HTTPHeader{
 			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
 			{Name: "X-Muffins-Or-Plumcakes", Value: "Muffins!"},
-		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"},
-			"X-Muffins-Or-Plumcakes": {"Muffins!"}}},
+		}, http.Header{
+			"X-Muffins-Or-Cupcakes":  {"Muffins"},
+			"X-Muffins-Or-Plumcakes": {"Muffins!"},
+		}},
 		{[]v1.HTTPHeader{
 			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
 			{Name: "X-Muffins-Or-Cupcakes", Value: "Cupcakes, too"},

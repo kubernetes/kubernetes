@@ -58,8 +58,10 @@ func List(c *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pager {
 	})
 }
 
-type LBMethod string
-type Protocol string
+type (
+	LBMethod string
+	Protocol string
+)
 
 // Supported attributes for create/update operations.
 const (

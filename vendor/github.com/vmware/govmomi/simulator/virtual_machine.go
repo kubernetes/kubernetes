@@ -773,7 +773,7 @@ func (vm *VirtualMachine) createFile(spec string, name string, register bool) (*
 
 	dir := path.Dir(file)
 
-	_ = os.MkdirAll(dir, 0700)
+	_ = os.MkdirAll(dir, 0o700)
 
 	_, err := os.Stat(file)
 	if err == nil {

@@ -241,8 +241,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	if attachable || deviceMountable {
 		// For attachable/device-mountable volumes, use the unique volume name as reported by
 		// the plugin.
-		volumeName, err =
-			util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
+		volumeName, err = util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
 		if err != nil {
 			return "", fmt.Errorf(
 				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
@@ -407,7 +406,9 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
 						VolumeGidValue:          volumeObj.volumeGidValue,
 						ReportedInUse:           volumeObj.reportedInUse,
-						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
+						DesiredSizeLimit:        volumeObj.desiredSizeLimit,
+					},
+				})
 		}
 	}
 	return volumesToMount

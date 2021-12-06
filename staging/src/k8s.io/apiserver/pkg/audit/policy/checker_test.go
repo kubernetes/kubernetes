@@ -290,7 +290,7 @@ func stageEqual(s1, s2 []audit.Stage) bool {
 }
 
 func TestUnionStages(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		s1, s2, exp []audit.Stage
 	}{
 		{

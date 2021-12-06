@@ -33,8 +33,7 @@ import (
 	volumeattachmentstore "k8s.io/kubernetes/pkg/registry/storage/volumeattachment/storage"
 )
 
-type RESTStorageProvider struct {
-}
+type RESTStorageProvider struct{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(storageapi.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)

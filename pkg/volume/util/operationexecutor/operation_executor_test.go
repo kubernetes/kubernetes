@@ -593,6 +593,7 @@ func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout
 		OperationFunc: opFunc,
 	}
 }
+
 func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
@@ -602,6 +603,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount Mo
 		OperationFunc: opFunc,
 	}, nil
 }
+
 func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
@@ -611,6 +613,7 @@ func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach Volu
 		OperationFunc: opFunc,
 	}
 }
+
 func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
@@ -620,6 +623,7 @@ func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach Atta
 		OperationFunc: opFunc,
 	}, nil
 }
+
 func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
@@ -629,6 +633,7 @@ func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolum
 		OperationFunc: opFunc,
 	}, nil
 }
+
 func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
@@ -638,6 +643,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach Att
 		OperationFunc: opFunc,
 	}, nil
 }
+
 func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
@@ -753,7 +759,8 @@ func getTestPodWithSecret(podName, secretName string) *v1.Pod {
 					Image: "k8s.gcr.io/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
-						"--file_mode=/etc/secret-volume/data-1"},
+						"--file_mode=/etc/secret-volume/data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      secretName,

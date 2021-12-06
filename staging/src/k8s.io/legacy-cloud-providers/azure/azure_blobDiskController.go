@@ -57,15 +57,13 @@ type storageAccountState struct {
 	defaultContainerCreated bool
 }
 
-//BlobDiskController : blob disk controller struct
+// BlobDiskController : blob disk controller struct
 type BlobDiskController struct {
 	common   *controllerCommon
 	accounts map[string]*storageAccountState
 }
 
-var (
-	accountsLock = &sync.Mutex{}
-)
+var accountsLock = &sync.Mutex{}
 
 func (c *BlobDiskController) initStorageAccounts() {
 	accountsLock.Lock()
@@ -139,7 +137,6 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 	}
 	klog.V(4).Infof("azureDisk - blob %s deleted", diskURI)
 	return nil
-
 }
 
 // get diskURI https://foo.blob.core.windows.net/vhds/bar.vhd and return foo (account) and bar.vhd (blob name)
@@ -227,7 +224,7 @@ func (c *BlobDiskController) deleteVhdBlob(accountName, accountKey, blobName str
 	return blob.Delete(nil)
 }
 
-//CreateBlobDisk : create a blob disk in a node
+// CreateBlobDisk : create a blob disk in a node
 func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error) {
 	klog.V(4).Infof("azureDisk - creating blob data disk named:%s on StorageAccountType:%s", dataDiskName, storageAccountType)
 
@@ -253,7 +250,7 @@ func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountT
 	return diskURI, nil
 }
 
-//DeleteBlobDisk : delete a blob disk from a node
+// DeleteBlobDisk : delete a blob disk from a node
 func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 	storageAccountName, vhdName, err := diskNameAndSANameFromURI(diskURI)
 	if err != nil {
@@ -379,7 +376,6 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 
 		err = kwait.ExponentialBackoff(defaultBackOff, func() (bool, error) {
 			_, provisionState, err := c.getStorageAccountState(storageAccountName)
-
 			if err != nil {
 				klog.V(4).Infof("azureDisk - GetStorageAccount:%s err %s", storageAccountName, err.Error())
 				return false, nil // error performing the query - retryable
@@ -505,7 +501,8 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 			// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
 			Kind:     defaultStorageAccountKind,
 			Tags:     map[string]*string{"created-by": to.StringPtr("azure-dd")},
-			Location: &location}
+			Location: &location,
+		}
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -602,7 +599,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 	return SAName, nil
 }
 
-//Gets storage account exist, provisionStatus, Error if any
+// Gets storage account exist, provisionStatus, Error if any
 func (c *BlobDiskController) getStorageAccountState(storageAccountName string) (bool, storage.ProvisioningState, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()

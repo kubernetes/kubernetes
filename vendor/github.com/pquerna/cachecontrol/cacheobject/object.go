@@ -242,8 +242,8 @@ func ExpirationObject(obj *Object, rv *ObjectResults) {
 func UsingRequestResponse(req *http.Request,
 	statusCode int,
 	respHeaders http.Header,
-	privateCache bool) ([]Reason, time.Time, error) {
-
+	privateCache bool) ([]Reason, time.Time, error,
+) {
 	var reqHeaders http.Header
 	var reqMethod string
 

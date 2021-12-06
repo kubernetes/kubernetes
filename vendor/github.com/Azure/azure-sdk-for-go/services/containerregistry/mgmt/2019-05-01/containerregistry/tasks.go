@@ -8,11 +8,12 @@ package containerregistry
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // TasksClient is the client for the Tasks methods of the Containerregistry service.
@@ -49,28 +50,52 @@ func (client TasksClient) Create(ctx context.Context, resourceGroupName string, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: taskName,
-			Constraints: []validation.Constraint{{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: taskName,
+			Constraints: []validation.Constraint{
+				{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "taskName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil}}},
-		{TargetValue: taskCreateParameters,
-			Constraints: []validation.Constraint{{Target: "taskCreateParameters.TaskProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "taskCreateParameters.TaskProperties.Platform", Name: validation.Null, Rule: true, Chain: nil},
-					{Target: "taskCreateParameters.TaskProperties.Timeout", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "taskCreateParameters.TaskProperties.Timeout", Name: validation.InclusiveMaximum, Rule: int64(28800), Chain: nil},
+				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: taskCreateParameters,
+			Constraints: []validation.Constraint{{
+				Target: "taskCreateParameters.TaskProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{Target: "taskCreateParameters.TaskProperties.Platform", Name: validation.Null, Rule: true, Chain: nil},
+					{
+						Target: "taskCreateParameters.TaskProperties.Timeout", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "taskCreateParameters.TaskProperties.Timeout", Name: validation.InclusiveMaximum, Rule: int64(28800), Chain: nil},
 							{Target: "taskCreateParameters.TaskProperties.Timeout", Name: validation.InclusiveMinimum, Rule: int64(300), Chain: nil},
-						}},
-					{Target: "taskCreateParameters.TaskProperties.Trigger", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "taskCreateParameters.TaskProperties.Trigger.BaseImageTrigger", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "taskCreateParameters.TaskProperties.Trigger.BaseImageTrigger.Name", Name: validation.Null, Rule: true, Chain: nil}}},
-						}},
-				}}}}}); err != nil {
+						},
+					},
+					{
+						Target: "taskCreateParameters.TaskProperties.Trigger", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "taskCreateParameters.TaskProperties.Trigger.BaseImageTrigger", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "taskCreateParameters.TaskProperties.Trigger.BaseImageTrigger.Name", Name: validation.Null, Rule: true, Chain: nil}},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.TasksClient", "Create", err.Error())
 	}
 
@@ -157,16 +182,27 @@ func (client TasksClient) Delete(ctx context.Context, resourceGroupName string, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: taskName,
-			Constraints: []validation.Constraint{{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: taskName,
+			Constraints: []validation.Constraint{
+				{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "taskName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil}}}}); err != nil {
+				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.TasksClient", "Delete", err.Error())
 	}
 
@@ -250,16 +286,27 @@ func (client TasksClient) Get(ctx context.Context, resourceGroupName string, reg
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: taskName,
-			Constraints: []validation.Constraint{{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: taskName,
+			Constraints: []validation.Constraint{
+				{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "taskName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil}}}}); err != nil {
+				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.TasksClient", "Get", err.Error())
 	}
 
@@ -342,16 +389,27 @@ func (client TasksClient) GetDetails(ctx context.Context, resourceGroupName stri
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: taskName,
-			Constraints: []validation.Constraint{{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: taskName,
+			Constraints: []validation.Constraint{
+				{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "taskName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil}}}}); err != nil {
+				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.TasksClient", "GetDetails", err.Error())
 	}
 
@@ -433,12 +491,19 @@ func (client TasksClient) List(ctx context.Context, resourceGroupName string, re
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.TasksClient", "List", err.Error())
 	}
 
@@ -563,16 +628,27 @@ func (client TasksClient) Update(ctx context.Context, resourceGroupName string, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: taskName,
-			Constraints: []validation.Constraint{{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: taskName,
+			Constraints: []validation.Constraint{
+				{Target: "taskName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "taskName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil}}}}); err != nil {
+				{Target: "taskName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9-_]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.TasksClient", "Update", err.Error())
 	}
 

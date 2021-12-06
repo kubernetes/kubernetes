@@ -365,9 +365,11 @@ type criAdapter struct {
 	Runtime
 }
 
-var _ remotecommandserver.Executor = &criAdapter{}
-var _ remotecommandserver.Attacher = &criAdapter{}
-var _ portforward.PortForwarder = &criAdapter{}
+var (
+	_ remotecommandserver.Executor = &criAdapter{}
+	_ remotecommandserver.Attacher = &criAdapter{}
+	_ portforward.PortForwarder    = &criAdapter{}
+)
 
 func (a *criAdapter) ExecInContainer(podName string, podUID types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	return a.Runtime.Exec(container, cmd, in, out, err, tty, resize)

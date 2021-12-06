@@ -48,8 +48,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-var (
-	initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
+var initDoneTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
 		Your Kubernetes control-plane has initialized successfully!
 
 		To start using your cluster, you need to run the following as a regular user:
@@ -86,7 +85,6 @@ var (
 
 		{{.joinWorkerCommand}}
 		`)))
-)
 
 // initOptions defines all the init options exposed via flags by kubeadm init.
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options

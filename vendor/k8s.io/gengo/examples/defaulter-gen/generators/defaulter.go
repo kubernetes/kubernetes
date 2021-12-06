@@ -66,8 +66,11 @@ var typeZeroValue = map[string]interface{}{
 
 // These are the comment tags that carry parameters for defaulter generation.
 const tagName = "k8s:defaulter-gen"
-const inputTagName = "k8s:defaulter-gen-input"
-const defaultTagName = "default"
+
+const (
+	inputTagName   = "k8s:defaulter-gen-input"
+	defaultTagName = "default"
+)
 
 func extractDefaultTag(comments []string) []string {
 	return types.ExtractCommentTags("+", comments)[defaultTagName]
@@ -657,7 +660,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		}
 	}
 	if len(parent.children) == 0 && len(parent.call) == 0 {
-		//klog.V(6).Infof("decided type %s needs no generation", t.Name)
+		// klog.V(6).Infof("decided type %s needs no generation", t.Name)
 		return nil
 	}
 	return parent

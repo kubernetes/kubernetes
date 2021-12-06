@@ -73,7 +73,7 @@ func main(cmd *cobra.Command, args []string) {
 	)
 
 	// Clear the umask so we can set any mode bits we want.
-	umask(0000)
+	umask(0o000)
 
 	// NOTE: the ordering of execution of the various command line
 	// flags is intentional and allows a single command to:
@@ -89,22 +89,22 @@ func main(cmd *cobra.Command, args []string) {
 		errs = append(errs, err)
 	}
 
-	err = readWriteNewFile(newFilePath0644, 0644)
+	err = readWriteNewFile(newFilePath0644, 0o644)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	err = readWriteNewFile(newFilePath0666, 0666)
+	err = readWriteNewFile(newFilePath0666, 0o666)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	err = readWriteNewFile(newFilePath0660, 0660)
+	err = readWriteNewFile(newFilePath0660, 0o660)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	err = readWriteNewFile(newFilePath0777, 0777)
+	err = readWriteNewFile(newFilePath0777, 0o777)
 	if err != nil {
 		errs = append(errs, err)
 	}

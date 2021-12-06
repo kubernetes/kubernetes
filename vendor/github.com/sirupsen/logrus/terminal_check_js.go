@@ -1,3 +1,4 @@
+//go:build js
 // +build js
 
 package logrus

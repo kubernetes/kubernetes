@@ -56,11 +56,9 @@ const (
 	DefaultDiscoveryTimeout = 5 * time.Minute
 )
 
-var (
-	// DefaultAuditPolicyLogMaxAge is defined as a var so its address can be taken
-	// It is the number of days to store audit logs
-	DefaultAuditPolicyLogMaxAge = int32(2)
-)
+// DefaultAuditPolicyLogMaxAge is defined as a var so its address can be taken
+// It is the number of days to store audit logs
+var DefaultAuditPolicyLogMaxAge = int32(2)
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
@@ -181,7 +179,6 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 // Usages and Groups. Token is NOT defaulted with a random one in the API defaulting
 // layer, but set to a random value later at runtime if not set before.
 func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
-
 	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
 		obj.BootstrapTokens = []BootstrapToken{{}}
 	}

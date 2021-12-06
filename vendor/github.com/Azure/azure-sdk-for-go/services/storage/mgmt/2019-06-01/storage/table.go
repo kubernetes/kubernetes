@@ -8,11 +8,12 @@ package storage
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // TableClient is the the Azure Storage Management API.
@@ -51,19 +52,34 @@ func (client TableClient) Create(ctx context.Context, resourceGroupName string, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: tableName,
-			Constraints: []validation.Constraint{{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: tableName,
+			Constraints: []validation.Constraint{
+				{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "tableName", Name: validation.MinLength, Rule: 3, Chain: nil},
-				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil}}}}); err != nil {
+				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.TableClient", "Create", err.Error())
 	}
 
@@ -149,19 +165,34 @@ func (client TableClient) Delete(ctx context.Context, resourceGroupName string, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: tableName,
-			Constraints: []validation.Constraint{{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: tableName,
+			Constraints: []validation.Constraint{
+				{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "tableName", Name: validation.MinLength, Rule: 3, Chain: nil},
-				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil}}}}); err != nil {
+				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.TableClient", "Delete", err.Error())
 	}
 
@@ -246,19 +277,34 @@ func (client TableClient) Get(ctx context.Context, resourceGroupName string, acc
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: tableName,
-			Constraints: []validation.Constraint{{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: tableName,
+			Constraints: []validation.Constraint{
+				{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "tableName", Name: validation.MinLength, Rule: 3, Chain: nil},
-				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil}}}}); err != nil {
+				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.TableClient", "Get", err.Error())
 	}
 
@@ -342,15 +388,26 @@ func (client TableClient) List(ctx context.Context, resourceGroupName string, ac
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.TableClient", "List", err.Error())
 	}
 
@@ -477,19 +534,34 @@ func (client TableClient) Update(ctx context.Context, resourceGroupName string, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
-		{TargetValue: accountName,
-			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
-				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
-		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: tableName,
-			Constraints: []validation.Constraint{{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: accountName,
+			Constraints: []validation.Constraint{
+				{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil},
+			},
+		},
+		{
+			TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: tableName,
+			Constraints: []validation.Constraint{
+				{Target: "tableName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "tableName", Name: validation.MinLength, Rule: 3, Chain: nil},
-				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil}}}}); err != nil {
+				{Target: "tableName", Name: validation.Pattern, Rule: `^[A-Za-z][A-Za-z0-9]{2,62}$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("storage.TableClient", "Update", err.Error())
 	}
 

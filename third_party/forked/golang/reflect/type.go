@@ -1,11 +1,10 @@
-//This package is copied from Go library reflect/type.go.
-//The struct tag library provides no way to extract the list of struct tags, only
-//a specific tag
+// This package is copied from Go library reflect/type.go.
+// The struct tag library provides no way to extract the list of struct tags, only
+// a specific tag
 package reflect
 
 import (
 	"fmt"
-
 	"strconv"
 	"strings"
 )

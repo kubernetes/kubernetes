@@ -206,13 +206,13 @@ func (l *Logger) rotate() error {
 // openNew opens a new log file for writing, moving any old log file out of the
 // way.  This methods assumes the file has already been closed.
 func (l *Logger) openNew() error {
-	err := os.MkdirAll(l.dir(), 0744)
+	err := os.MkdirAll(l.dir(), 0o744)
 	if err != nil {
 		return fmt.Errorf("can't make directories for new logfile: %s", err)
 	}
 
 	name := l.filename()
-	mode := os.FileMode(0644)
+	mode := os.FileMode(0o644)
 	info, err := os_Stat(name)
 	if err == nil {
 		// Copy the mode off the old logfile.
@@ -277,7 +277,7 @@ func (l *Logger) openExistingOrNew(writeLen int) error {
 		return l.rotate()
 	}
 
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		// if we fail to open the old log file for some reason, just ignore
 		// it and open a new log file.
@@ -376,7 +376,7 @@ func (l *Logger) millRunOnce() error {
 // millRun runs in a goroutine to manage post-rotation compression and removal
 // of old log files.
 func (l *Logger) millRun() {
-	for _ = range l.millCh {
+	for range l.millCh {
 		// what am I going to do, log this?
 		_ = l.millRunOnce()
 	}

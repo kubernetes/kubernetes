@@ -223,7 +223,7 @@ func TestNestedDriverDir(t *testing.T) {
 	// test add testDriverName
 	testDriverName := "testDriverName"
 	testDriverPath := filepath.Join(pluginDir, testDriverName)
-	fs.MkdirAll(testDriverPath, 0777)
+	fs.MkdirAll(testDriverPath, 0o777)
 	watcher.TriggerEvent(fsnotify.Create, testDriverPath)
 	// Assert
 	assert.Equal(t, 3, len(watcher.watches)) // 2 from initial setup, 1 from new watch.
@@ -234,7 +234,7 @@ func TestNestedDriverDir(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		subdirName := "subdirName"
 		subdirPath := filepath.Join(basePath, subdirName)
-		fs.MkdirAll(subdirPath, 0777)
+		fs.MkdirAll(subdirPath, 0o777)
 		watcher.TriggerEvent(fsnotify.Create, subdirPath)
 		// Assert
 		assert.Equal(t, 4+i, len(watcher.watches)) // 3 + newly added
@@ -291,7 +291,7 @@ func TestProberError(t *testing.T) {
 // Installs a mock driver (an empty file) in the mock fs.
 func installDriver(driverName string, fs utilfs.Filesystem) {
 	driverPath := filepath.Join(pluginDir, driverName)
-	fs.MkdirAll(driverPath, 0777)
+	fs.MkdirAll(driverPath, 0o777)
 	fs.Create(filepath.Join(driverPath, driverName))
 }
 

@@ -192,7 +192,8 @@ func TestBuiltNamedCertificates(t *testing.T) {
 						names: []string{"b.test.com", "test.com"},
 					},
 					explicitNames: []string{"dev.test.com", "test.com"},
-				}},
+				},
+			},
 			expected: map[string]int{
 				"test.com":     0,
 				"*.test.com":   0,

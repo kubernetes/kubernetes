@@ -40,8 +40,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	attachExample = templates.Examples(i18n.T(`
+var attachExample = templates.Examples(i18n.T(`
 		# Get output from running pod mypod; use the 'kubectl.kubernetes.io/default-container' annotation
 		# for selecting the container to be attached or the first container in the pod will be chosen
 		kubectl attach mypod
@@ -56,7 +55,6 @@ var (
 		# Get output from the first pod of a replica set named nginx
 		kubectl attach rs/nginx
 		`))
-)
 
 const (
 	defaultPodAttachTimeout = 60 * time.Second

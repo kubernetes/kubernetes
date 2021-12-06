@@ -240,7 +240,8 @@ func (eqr *EntityQueryResult) NextResults(options *TableOptions) (*EntityQueryRe
 // SetPermissions sets up table ACL permissions
 // See https://docs.microsoft.com/rest/api/storageservices/fileservices/Set-Table-ACL
 func (t *Table) SetPermissions(tap []TableAccessPolicy, timeout uint, options *TableOptions) error {
-	params := url.Values{"comp": {"acl"},
+	params := url.Values{
+		"comp":    {"acl"},
 		"timeout": {strconv.Itoa(int(timeout))},
 	}
 
@@ -278,7 +279,8 @@ func generateTableACLPayload(policies []TableAccessPolicy) (io.Reader, int, erro
 // GetPermissions gets the table ACL permissions
 // See https://docs.microsoft.com/rest/api/storageservices/fileservices/get-table-acl
 func (t *Table) GetPermissions(timeout int, options *TableOptions) ([]TableAccessPolicy, error) {
-	params := url.Values{"comp": {"acl"},
+	params := url.Values{
+		"comp":    {"acl"},
 		"timeout": {strconv.Itoa(int(timeout))},
 	}
 

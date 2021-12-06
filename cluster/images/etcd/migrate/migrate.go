@@ -86,8 +86,8 @@ func copyBinaries() {
 // migrate opens or initializes the etcd data directory, configures the migrator, and starts the migration.
 func migrate(name string, port uint64, peerListenUrls string, peerAdvertiseUrls string, clientListenUrls string,
 	binPath string, dataDirPath string, etcdDataPrefix string, ttlKeysDirectory string,
-	initialCluster string, target *EtcdVersionPair, bundledVersions SupportedVersions, etcdServerArgs string) {
-
+	initialCluster string, target *EtcdVersionPair, bundledVersions SupportedVersions, etcdServerArgs string,
+) {
 	dataDir, err := OpenOrCreateDataDirectory(dataDirPath)
 	if err != nil {
 		klog.Fatalf("Error opening or creating data directory %s: %v", dataDirPath, err)

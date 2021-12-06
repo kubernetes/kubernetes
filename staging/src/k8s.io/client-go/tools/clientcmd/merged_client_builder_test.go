@@ -38,12 +38,15 @@ func (c *testClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	}
 	return *c.rawconfig, nil
 }
+
 func (c *testClientConfig) ClientConfig() (*restclient.Config, error) {
 	return c.config, c.err
 }
+
 func (c *testClientConfig) Namespace() (string, bool, error) {
 	return c.namespace, c.namespaceSpecified, c.err
 }
+
 func (c *testClientConfig) ConfigAccess() ConfigAccess {
 	return nil
 }

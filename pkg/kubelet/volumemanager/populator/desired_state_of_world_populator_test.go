@@ -17,10 +17,9 @@ limitations under the License.
 package populator
 
 import (
+	"fmt"
 	"testing"
 	"time"
-
-	"fmt"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -146,7 +145,6 @@ func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 			"Could not found pod volume %v in the list of actual state of world volumes to mount.",
 			expectedOuterVolumeName)
 	}
-
 }
 
 func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T) {
@@ -223,7 +221,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	dswp, fakePodState, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -275,7 +273,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	fakeASW := dswp.actualStateOfWorld
 	podName := util.GetUniquePodName(pod)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -337,7 +335,7 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 	dswp, fakePodState, pod, expectedVolumeName, pv := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -633,7 +631,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
 
-	//let the pod be terminated
+	// let the pod be terminated
 	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
@@ -642,7 +640,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	fakePodManager.DeletePod(pod)
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
-	//pod is added to fakePodManager but pod state knows the pod is removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
+	// pod is added to fakePodManager but pod state knows the pod is removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
 	dswp.findAndRemoveDeletedPods()
 	if dswp.pods.processedPods[podName] {
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
@@ -711,8 +709,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+	_, volumeSpec, _, err := dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -757,8 +754,7 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+	_, volumeSpec, _, err := dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -803,8 +799,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+	_, volumeSpec, _, err := dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -849,8 +844,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+	_, volumeSpec, _, err := dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec != nil || err == nil {
@@ -895,8 +889,7 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+	_, volumeSpec, _, err := dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec != nil || err == nil {
@@ -1308,7 +1301,8 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		desiredStateOfWorld:       fakesDSW,
 		actualStateOfWorld:        fakeASW,
 		pods: processedPods{
-			processedPods: make(map[types.UniquePodName]bool)},
+			processedPods: make(map[types.UniquePodName]bool),
+		},
 		kubeContainerRuntime:     fakeRuntime,
 		keepTerminatedPodVolumes: false,
 		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),

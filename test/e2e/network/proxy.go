@@ -238,7 +238,6 @@ var _ = common.SIGDescribe("Proxy", func() {
 						defer wg.Done()
 						// this runs the test case
 						body, status, d, err := doProxy(f, path, i)
-
 						if err != nil {
 							if serr, ok := err.(*apierrors.StatusError); ok {
 								recordError(fmt.Sprintf("%v (%v; %v): path %v gave status error: %+v",
@@ -283,7 +282,6 @@ var _ = common.SIGDescribe("Proxy", func() {
 			response MUST be returned for each endpoint.
 		*/
 		framework.ConformanceIt("A set of valid responses are returned for both pod and service ProxyWithPath", func() {
-
 			ns := f.Namespace.Name
 			msg := "foo"
 			testSvcName := "test-service"
@@ -294,7 +292,8 @@ var _ = common.SIGDescribe("Proxy", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "agnhost",
 					Labels: map[string]string{
-						"test": "response"},
+						"test": "response",
+					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -307,7 +306,8 @@ var _ = common.SIGDescribe("Proxy", func() {
 						}},
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
-				}}, metav1.CreateOptions{})
+				},
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 
 			err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodStatus(f, "test=response"))
@@ -329,7 +329,8 @@ var _ = common.SIGDescribe("Proxy", func() {
 					Selector: map[string]string{
 						"test": "response",
 					},
-				}}, metav1.CreateOptions{})
+				},
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create the service")
 
 			transportCfg, err := f.ClientConfig().TransportConfig()
@@ -369,7 +370,6 @@ var _ = common.SIGDescribe("Proxy", func() {
 		})
 
 		ginkgo.It("A set of valid responses are returned for both pod and service Proxy", func() {
-
 			ns := f.Namespace.Name
 			msg := "foo"
 			testSvcName := "e2e-proxy-test-service"
@@ -380,7 +380,8 @@ var _ = common.SIGDescribe("Proxy", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "agnhost",
 					Labels: map[string]string{
-						"e2e-test": "proxy-endpoints"},
+						"e2e-test": "proxy-endpoints",
+					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -393,7 +394,8 @@ var _ = common.SIGDescribe("Proxy", func() {
 						}},
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
-				}}, metav1.CreateOptions{})
+				},
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 
 			err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodStatus(f, "e2e-test=proxy-endpoints"))
@@ -415,7 +417,8 @@ var _ = common.SIGDescribe("Proxy", func() {
 					Selector: map[string]string{
 						"e2e-test": "proxy-endpoints",
 					},
-				}}, metav1.CreateOptions{})
+				},
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create the service")
 
 			transportCfg, err := f.ClientConfig().TransportConfig()
@@ -484,8 +487,8 @@ func checkPodStatus(f *framework.Framework, label string) func() (bool, error) {
 		var err error
 
 		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: label})
-
+			LabelSelector: label,
+		})
 		if err != nil {
 			return false, err
 		}

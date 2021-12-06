@@ -1313,7 +1313,6 @@ func TestReconcilePublicIPRemoveService(t *testing.T) {
 		t.Errorf("Unexpected error: %q", err)
 	}
 	validatePublicIP(t, pip, &svc, false)
-
 }
 
 func TestReconcilePublicIPWithInternalService(t *testing.T) {
@@ -1364,8 +1363,10 @@ func TestReconcilePublicIPWithExternalAndInternalSwitch(t *testing.T) {
 	validatePublicIP(t, pip, &svc, true)
 }
 
-const networkInterfacesIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkInterfaces/%s"
-const primaryIPConfigIDTemplate = "%s/ipConfigurations/ipconfig"
+const (
+	networkInterfacesIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkInterfaces/%s"
+	primaryIPConfigIDTemplate   = "%s/ipConfigurations/ipconfig"
+)
 
 // returns the full identifier of Network Interface.
 func getNetworkInterfaceID(subscriptionID string, resourceGroupName, nicName string) string {
@@ -1383,9 +1384,11 @@ func getPrimaryIPConfigID(nicID string) string {
 		nicID)
 }
 
-const TestResourceNameFormat = "%s-%d"
-const TestVMResourceBaseName = "vm"
-const TestASResourceBaseName = "as"
+const (
+	TestResourceNameFormat = "%s-%d"
+	TestVMResourceBaseName = "vm"
+	TestASResourceBaseName = "as"
+)
 
 func getTestResourceName(resourceBaseName string, index int) string {
 	return fmt.Sprintf(TestResourceNameFormat, resourceBaseName, index)

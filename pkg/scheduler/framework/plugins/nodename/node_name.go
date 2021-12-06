@@ -28,8 +28,10 @@ import (
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
 type NodeName struct{}
 
-var _ framework.FilterPlugin = &NodeName{}
-var _ framework.EnqueueExtensions = &NodeName{}
+var (
+	_ framework.FilterPlugin      = &NodeName{}
+	_ framework.EnqueueExtensions = &NodeName{}
+)
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

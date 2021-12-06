@@ -935,7 +935,6 @@ func (p *importer) rawByte() byte {
 	p.data = p.data[r:]
 	p.read += r
 	return b
-
 }
 
 // ----------------------------------------------------------------------------
@@ -978,8 +977,10 @@ const (
 	aliasTag
 )
 
-var predeclOnce sync.Once
-var predecl []types.Type // initialized lazily
+var (
+	predeclOnce sync.Once
+	predecl     []types.Type // initialized lazily
+)
 
 func predeclared() []types.Type {
 	predeclOnce.Do(func() {

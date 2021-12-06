@@ -194,9 +194,7 @@ func (ns *NameStrategy) removePrefixAndSuffix(s string) string {
 	return s[b:e]
 }
 
-var (
-	importPathNameSanitizer = strings.NewReplacer("-", "_", ".", "")
-)
+var importPathNameSanitizer = strings.NewReplacer("-", "_", ".", "")
 
 // filters out unwanted directory names and sanitizes remaining names.
 func (ns *NameStrategy) filterDirs(path string) []string {

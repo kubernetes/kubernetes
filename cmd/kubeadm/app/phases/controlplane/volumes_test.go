@@ -32,7 +32,7 @@ import (
 func TestGetEtcdCertVolumes(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	k8sCertificatesDir := "/etc/kubernetes/pki"
-	var tests = []struct {
+	tests := []struct {
 		name, ca, cert, key string
 		vol                 []v1.Volume
 		volMount            []v1.VolumeMount
@@ -474,7 +474,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		MountPath: "/etc/kubernetes/scheduler.conf",
 		ReadOnly:  true,
 	}
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		cfg      *kubeadmapi.ClusterConfiguration
 		vol      map[string]map[string]v1.Volume

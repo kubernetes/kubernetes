@@ -175,6 +175,7 @@ var aPod = `
   }
 }
 `
+
 var aRC = `
 {
   "kind": "ReplicationController",
@@ -208,6 +209,7 @@ var aRC = `
   }
 }
 `
+
 var aService = `
 {
   "kind": "Service",
@@ -232,6 +234,7 @@ var aService = `
   }
 }
 `
+
 var aNode = `
 {
   "kind": "Node",
@@ -659,7 +662,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 					}
 				}
 			}
-
 		}()
 	}
 }
@@ -886,7 +888,6 @@ func TestImpersonateIsForbidden(t *testing.T) {
 			}
 		}()
 	}
-
 }
 
 func TestImpersonateWithUID(t *testing.T) {
@@ -1055,7 +1056,7 @@ func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authori
 	f.Close()
 	defer os.Remove(f.Name())
 
-	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0o700); err != nil {
 		t.Fatalf("unexpected error writing policyfile: %v", err)
 	}
 
@@ -1165,7 +1166,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-
 		{"POST", timeoutPath("pods", ns.Name, ""), "foo", aPod, integration.Code201},
 		{"GET", path("pods", ns.Name, ""), "foo", "", integration.Code200},
 		{"GET", path("pods", ns.Name, "a"), "foo", "", integration.Code200},
@@ -1231,7 +1231,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 					}
 				}
 			}
-
 		}()
 	}
 }

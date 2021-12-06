@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // SnapshotsClient is the compute Client
@@ -49,17 +50,32 @@ func (client SnapshotsClient) CreateOrUpdate(ctx context.Context, resourceGroupN
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: snapshot,
-			Constraints: []validation.Constraint{{Target: "snapshot.SnapshotProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData.ImageReference", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData.ImageReference.ID", Name: validation.Null, Rule: true, Chain: nil}}},
-						{Target: "snapshot.SnapshotProperties.CreationData.GalleryImageReference", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData.GalleryImageReference.ID", Name: validation.Null, Rule: true, Chain: nil}}},
-					}},
-					{Target: "snapshot.SnapshotProperties.EncryptionSettingsCollection", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.EncryptionSettingsCollection.Enabled", Name: validation.Null, Rule: true, Chain: nil}}},
-				}}}}}); err != nil {
+		{
+			TargetValue: snapshot,
+			Constraints: []validation.Constraint{{
+				Target: "snapshot.SnapshotProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "snapshot.SnapshotProperties.CreationData", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{
+							{
+								Target: "snapshot.SnapshotProperties.CreationData.ImageReference", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData.ImageReference.ID", Name: validation.Null, Rule: true, Chain: nil}},
+							},
+							{
+								Target: "snapshot.SnapshotProperties.CreationData.GalleryImageReference", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData.GalleryImageReference.ID", Name: validation.Null, Rule: true, Chain: nil}},
+							},
+						},
+					},
+					{
+						Target: "snapshot.SnapshotProperties.EncryptionSettingsCollection", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.EncryptionSettingsCollection.Enabled", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.SnapshotsClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -302,8 +318,11 @@ func (client SnapshotsClient) GrantAccess(ctx context.Context, resourceGroupName
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: grantAccessData,
-			Constraints: []validation.Constraint{{Target: "grantAccessData.DurationInSeconds", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: grantAccessData,
+			Constraints: []validation.Constraint{{Target: "grantAccessData.DurationInSeconds", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.SnapshotsClient", "GrantAccess", err.Error())
 	}
 

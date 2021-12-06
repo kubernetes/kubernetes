@@ -260,5 +260,4 @@ func (w *walker) shouldTraverse(dir string, fi os.FileInfo) bool {
 		}
 		path = parent
 	}
-
 }

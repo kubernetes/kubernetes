@@ -58,18 +58,21 @@ func (fd *File) allocEnums(n int) []Enum {
 	fd.allEnums = fd.allEnums[:total+n]
 	return es
 }
+
 func (fd *File) allocMessages(n int) []Message {
 	total := len(fd.allMessages)
 	ms := fd.allMessages[total : total+n]
 	fd.allMessages = fd.allMessages[:total+n]
 	return ms
 }
+
 func (fd *File) allocExtensions(n int) []Extension {
 	total := len(fd.allExtensions)
 	xs := fd.allExtensions[total : total+n]
 	fd.allExtensions = fd.allExtensions[:total+n]
 	return xs
 }
+
 func (fd *File) allocServices(n int) []Service {
 	total := len(fd.allServices)
 	xs := fd.allServices[total : total+n]
@@ -453,6 +456,7 @@ var nameBuilderPool = sync.Pool{
 func getBuilder() *strs.Builder {
 	return nameBuilderPool.Get().(*strs.Builder)
 }
+
 func putBuilder(b *strs.Builder) {
 	nameBuilderPool.Put(b)
 }

@@ -12,12 +12,11 @@ package antlr
 // not cause bloating of the {@link DFA} created for the lexer.</p>
 
 type LexerActionExecutor struct {
-	lexerActions     []LexerAction
-	cachedHash       int
+	lexerActions []LexerAction
+	cachedHash   int
 }
 
 func NewLexerActionExecutor(lexerActions []LexerAction) *LexerActionExecutor {
-
 	if lexerActions == nil {
 		lexerActions = make([]LexerAction, 0)
 	}

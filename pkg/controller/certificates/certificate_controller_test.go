@@ -32,7 +32,6 @@ import (
 // TODO flesh this out to cover things like not being able to find the csr in the cache, not
 // auto-approving, etc.
 func TestCertificateController(t *testing.T) {
-
 	csr := &certificates.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-csr",
@@ -81,5 +80,4 @@ func TestCertificateController(t *testing.T) {
 		a.GetSubresource() != "approval" {
 		t.Errorf("unexpected action: %#v", a)
 	}
-
 }

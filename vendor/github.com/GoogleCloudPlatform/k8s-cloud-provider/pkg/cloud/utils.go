@@ -41,17 +41,17 @@ type ResourceID struct {
 func (r *ResourceID) Equal(other *ResourceID) bool {
 	switch {
 	case r == nil && other == nil:
-	  return true
+		return true
 	case r == nil || other == nil:
-	  return false
+		return false
 	case r.ProjectID != other.ProjectID || r.Resource != other.Resource:
-	  return false
+		return false
 	case r.Key != nil && other.Key != nil:
-	  return *r.Key == *other.Key
+		return *r.Key == *other.Key
 	case r.Key == nil && other.Key == nil:
-	  return true
+		return true
 	default:
-	  return false
+		return false
 	}
 }
 
@@ -201,7 +201,6 @@ func SelfLink(ver meta.Version, project, resource string, key *meta.Key) string 
 	}
 
 	return fmt.Sprintf("%s/%s", prefix, RelativeResourceName(project, resource, key))
-
 }
 
 // aggregatedListKey return the aggregated list key based on the resource key.

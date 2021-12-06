@@ -139,7 +139,6 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		if config.ClientConfig != nil {
 			if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {
 				return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", config.MaxRequestsInFlight, config.MaxMutatingRequestsInFlight)
-
 			}
 			config.FlowControl = utilflowcontrol.New(
 				config.SharedInformerFactory,

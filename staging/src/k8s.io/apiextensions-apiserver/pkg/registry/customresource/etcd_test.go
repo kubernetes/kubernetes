@@ -235,7 +235,6 @@ func TestGenerationNumber(t *testing.T) {
 	if storedCR.GetGeneration() != 2 {
 		t.Fatalf("Unexpected generation, spec: %v", storedCR.GetGeneration())
 	}
-
 }
 
 func TestCategories(t *testing.T) {

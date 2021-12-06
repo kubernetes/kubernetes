@@ -113,7 +113,7 @@ func RunE2ETests(t *testing.T) {
 	if framework.TestContext.ReportDir != "" {
 		// TODO: we should probably only be trying to create this directory once
 		// rather than once-per-Ginkgo-node.
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
+		if err := os.MkdirAll(framework.TestContext.ReportDir, 0o755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
@@ -300,7 +300,7 @@ func logClusterImageSources() {
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
 	filePath := filepath.Join(framework.TestContext.ReportDir, "images.json")
-	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
+	if err := ioutil.WriteFile(filePath, outputBytes, 0o644); err != nil {
 		framework.Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
 }

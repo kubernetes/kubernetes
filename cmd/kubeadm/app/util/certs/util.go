@@ -168,7 +168,6 @@ type CertTestCase struct {
 
 // GetSparseCertTestCases produces a series of cert configurations and their intended outcomes.
 func GetSparseCertTestCases(t *testing.T) []CertTestCase {
-
 	caCert, caKey := CreateCACert(t)
 	fpCACert, fpCAKey := CreateCACert(t)
 	etcdCACert, etcdCAKey := CreateCACert(t)

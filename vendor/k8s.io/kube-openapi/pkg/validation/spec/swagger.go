@@ -91,8 +91,10 @@ type SchemaOrBool struct {
 	Schema *Schema
 }
 
-var jsTrue = []byte("true")
-var jsFalse = []byte("false")
+var (
+	jsTrue  = []byte("true")
+	jsFalse = []byte("false")
+)
 
 // MarshalJSON convert this object to JSON
 func (s SchemaOrBool) MarshalJSON() ([]byte, error) {

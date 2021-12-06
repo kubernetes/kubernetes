@@ -4,17 +4,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
-var (
-	// ErrNoValidProvidersFoundInChain Is returned when there are no valid
-	// providers in the ChainProvider.
-	//
-	// This has been deprecated. For verbose error messaging set
-	// aws.Config.CredentialsChainVerboseErrors to true.
-	ErrNoValidProvidersFoundInChain = awserr.New("NoCredentialProviders",
-		`no valid providers in chain. Deprecated.
+// ErrNoValidProvidersFoundInChain Is returned when there are no valid
+// providers in the ChainProvider.
+//
+// This has been deprecated. For verbose error messaging set
+// aws.Config.CredentialsChainVerboseErrors to true.
+var ErrNoValidProvidersFoundInChain = awserr.New("NoCredentialProviders",
+	`no valid providers in chain. Deprecated.
 	For verbose messaging see aws.Config.CredentialsChainVerboseErrors`,
-		nil)
-)
+	nil)
 
 // A ChainProvider will search for a provider which returns credentials
 // and cache that provider until Retrieve is called again.

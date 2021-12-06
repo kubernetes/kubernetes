@@ -88,7 +88,6 @@ func (p VirtualApp) PowerOff(ctx context.Context, force bool) (*Task, error) {
 	}
 
 	return NewTask(p.c, res.Returnval), nil
-
 }
 
 func (p VirtualApp) Suspend(ctx context.Context) (*Task, error) {

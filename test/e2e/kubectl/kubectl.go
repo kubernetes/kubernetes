@@ -481,7 +481,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ExpectNoError(err)
 			defer framework.TryKill(proxyCmd)
 
-			//proxyLogs.Reset()
+			// proxyLogs.Reset()
 			host := fmt.Sprintf("--server=http://127.0.0.1:%d", port)
 			ginkgo.By("Running kubectl via kubectl proxy using " + host)
 			output := framework.NewKubectlCommand(
@@ -715,7 +715,7 @@ users:
 - name: kubeconfig-user
   user:
     tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-`), os.FileMode(0755)))
+`), os.FileMode(0o755)))
 			framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
 			framework.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
 
@@ -725,13 +725,13 @@ apiVersion: v1
 metadata:
   name: "configmap with namespace and invalid name"
   namespace: configmap-namespace
-`), os.FileMode(0755)))
+`), os.FileMode(0o755)))
 			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), []byte(`
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: "configmap without namespace and invalid name"
-`), os.FileMode(0755)))
+`), os.FileMode(0o755)))
 			framework.Logf("copying configmap manifests to the %s pod", simplePodName)
 			framework.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
 			framework.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
@@ -1152,7 +1152,8 @@ metadata:
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
 				{"Pod Template:"},
 				{"Image:", agnhostImage},
-				{"Events:"}}
+				{"Events:"},
+			}
 			checkKubectlOutputWithRetry(ns, requiredStrings, "describe", "rc", "agnhost-primary")
 
 			// Service
@@ -1168,7 +1169,8 @@ metadata:
 				{"IP:"},
 				{"Port:", "<unset>", "6379/TCP"},
 				{"Endpoints:"},
-				{"Session Affinity:", "None"}}
+				{"Session Affinity:", "None"},
+			}
 			checkOutput(output, requiredStrings)
 
 			// Node
@@ -1192,7 +1194,8 @@ metadata:
 				{"Container Runtime Version:"},
 				{"Kubelet Version:"},
 				{"Kube-Proxy Version:"},
-				{"Pods:"}}
+				{"Pods:"},
+			}
 			checkOutput(output, requiredStrings)
 
 			// Namespace
@@ -1201,7 +1204,8 @@ metadata:
 				{"Name:", ns},
 				{"Labels:"},
 				{"Annotations:"},
-				{"Status:", "Active"}}
+				{"Status:", "Active"},
+			}
 			checkOutput(output, requiredStrings)
 
 			// Quota and limitrange are skipped for now.
@@ -2088,7 +2092,6 @@ func validateReplicationControllerConfiguration(rc v1.ReplicationController) {
 // For example, if you send "kitten.jpg", this function verifies that the image jpg = kitten.jpg
 // in the container's json field.
 func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) error {
-
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c clientset.Interface, podID string) error {
 		framework.Logf("validating pod %s", podID)
@@ -2104,7 +2107,6 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 			Suffix("data.json").
 			Do(context.TODO()).
 			Raw()
-
 		if err != nil {
 			if ctx.Err() != nil {
 				framework.Failf("Failed to retrieve data from container: %v", err)
@@ -2195,7 +2197,7 @@ func validateController(c clientset.Interface, containerImage string, replicas i
 
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "spec" "containers")}}{{range .spec.containers}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
-	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) // testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < framework.PodStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := framework.RunKubectlOrDie(ns, "get", "pods", "-o", "template", getPodsTemplate, "-l", testname)

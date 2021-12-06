@@ -96,7 +96,7 @@ func (f *stableMetricFinder) Visit(node ast.Node) (w ast.Visitor) {
 }
 
 func isMetricOps(name string) bool {
-	var found = false
+	found := false
 	for _, optsName := range metricsOptionStructuresNames {
 		if name != optsName {
 			found = true

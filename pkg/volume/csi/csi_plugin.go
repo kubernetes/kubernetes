@@ -79,8 +79,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 var _ volume.VolumePlugin = &csiPlugin{}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
-type RegistrationHandler struct {
-}
+type RegistrationHandler struct{}
 
 // TODO (verult) consider using a struct instead of global variables
 // csiDrivers map keep track of all registered CSI drivers on the node and their
@@ -215,7 +214,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		}
 	}
 
-	var migratedPlugins = map[string](func() bool){
+	migratedPlugins := map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 		},
@@ -364,8 +363,8 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 func (p *csiPlugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
-	_ volume.VolumeOptions) (volume.Mounter, error) {
-
+	_ volume.VolumeOptions) (volume.Mounter, error,
+) {
 	volSrc, pvSrc, err := getSourceFromSpec(spec)
 	if err != nil {
 		return nil, err
@@ -438,7 +437,7 @@ func (p *csiPlugin) NewMounter(
 	dir := mounter.GetPath()
 	dataDir := filepath.Dir(dir) // dropoff /mount at end
 
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return nil, errors.New(log("failed to create dir %#v:  %v", dataDir, err))
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
@@ -550,7 +549,7 @@ func (p *csiPlugin) constructVolSourceSpec(volSpecName, driverName string) *volu
 	return volume.NewSpecFromVolume(vol)
 }
 
-//constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
+// constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
 func (p *csiPlugin) constructPVSourceSpec(volSpecName, driverName, volumeHandle string) *volume.Spec {
 	fsMode := api.PersistentVolumeFilesystem
 	pv := &api.PersistentVolume{
@@ -696,7 +695,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	// Save volume info in pod dir
 	dataDir := getVolumeDeviceDataDir(spec.Name(), p.host)
 
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return nil, errors.New(log("failed to create data dir %s:  %v", dataDir, err))
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))

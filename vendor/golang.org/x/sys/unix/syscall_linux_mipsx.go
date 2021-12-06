@@ -146,8 +146,10 @@ func mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int6
 	return mmap2(addr, length, prot, flags, fd, page)
 }
 
-const rlimInf32 = ^uint32(0)
-const rlimInf64 = ^uint64(0)
+const (
+	rlimInf32 = ^uint32(0)
+	rlimInf64 = ^uint64(0)
+)
 
 type rlimit32 struct {
 	Cur uint32

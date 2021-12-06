@@ -42,9 +42,11 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-var _ admission.Interface = &persistentVolumeClaimResize{}
-var _ admission.ValidationInterface = &persistentVolumeClaimResize{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&persistentVolumeClaimResize{})
+var (
+	_ admission.Interface           = &persistentVolumeClaimResize{}
+	_ admission.ValidationInterface = &persistentVolumeClaimResize{}
+	_                               = genericadmissioninitializer.WantsExternalKubeInformerFactory(&persistentVolumeClaimResize{})
+)
 
 type persistentVolumeClaimResize struct {
 	*admission.Handler

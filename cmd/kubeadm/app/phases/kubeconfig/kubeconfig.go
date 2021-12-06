@@ -107,7 +107,6 @@ func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadm
 // createKubeConfigFiles creates all the requested kubeconfig files.
 // If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
 func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kubeConfigFileNames ...string) error {
-
 	// gets the KubeConfigSpecs, actualized for the current InitConfiguration
 	specs, err := getKubeConfigSpecs(cfg)
 	if err != nil {
@@ -159,7 +158,6 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 
 // buildKubeConfigFromSpec creates a kubeconfig object for the given kubeConfigSpec
 func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string, notAfter *time.Time) (*clientcmdapi.Config, error) {
-
 	// If this kubeconfig should use token
 	if spec.TokenAuth != nil {
 		// create a kubeconfig with a token
@@ -283,7 +281,6 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 
 // WriteKubeConfigWithClientCert writes a kubeconfig file - with a client certificate as authentication info  - to the given writer.
 func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName string, organizations []string, notAfter *time.Time) error {
-
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
@@ -312,7 +309,6 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 
 // WriteKubeConfigWithToken writes a kubeconfig file - with a token as client authentication info - to the given writer.
 func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName, token string, notAfter *time.Time) error {
-
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
@@ -340,7 +336,6 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 
 // writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec and writes it to the given writer.
 func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string, notAfter *time.Time) error {
-
 	// builds the KubeConfig object
 	config, err := buildKubeConfigFromSpec(spec, clustername, notAfter)
 	if err != nil {

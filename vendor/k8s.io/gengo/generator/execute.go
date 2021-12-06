@@ -217,7 +217,7 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 	klog.V(2).Infof("Processing package %q, disk location %q", p.Name(), path)
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)
-	os.MkdirAll(path, 0755)
+	os.MkdirAll(path, 0o755)
 	files := map[string]*File{}
 	for _, g := range p.Generators(packageContext) {
 		// Filter out types the *generator* doesn't care about.

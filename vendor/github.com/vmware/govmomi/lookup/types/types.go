@@ -39,8 +39,7 @@ func init() {
 	types.Add("lookup:CreateRequestType", reflect.TypeOf((*CreateRequestType)(nil)).Elem())
 }
 
-type CreateResponse struct {
-}
+type CreateResponse struct{}
 
 type Delete DeleteRequestType
 
@@ -57,8 +56,7 @@ func init() {
 	types.Add("lookup:DeleteRequestType", reflect.TypeOf((*DeleteRequestType)(nil)).Elem())
 }
 
-type DeleteResponse struct {
-}
+type DeleteResponse struct{}
 
 type Get GetRequestType
 
@@ -408,5 +406,4 @@ func init() {
 	types.Add("lookup:SetRequestType", reflect.TypeOf((*SetRequestType)(nil)).Elem())
 }
 
-type SetResponse struct {
-}
+type SetResponse struct{}

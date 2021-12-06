@@ -379,8 +379,8 @@ func deps(c *generator.Context, pkgs []*protobufPackage) map[string][]string {
 // given a set of pkg->[]deps, return the order that ensures all deps are processed before the things that depend on them
 func importOrder(deps map[string][]string) ([]string, error) {
 	// add all nodes and edges
-	var remainingNodes = map[string]struct{}{}
-	var graph = map[edge]struct{}{}
+	remainingNodes := map[string]struct{}{}
+	graph := map[edge]struct{}{}
 	for to, froms := range deps {
 		remainingNodes[to] = struct{}{}
 		for _, from := range froms {

@@ -24,12 +24,10 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	setLong = templates.LongDesc(i18n.T(`
+var setLong = templates.LongDesc(i18n.T(`
 		Configure application resources.
 
 		These commands help you make changes to existing application resources.`))
-)
 
 // NewCmdSet returns an initialized Command instance for 'set' sub command
 func NewCmdSet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

@@ -8,11 +8,12 @@ package containerregistry
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // WebhooksClient is the client for the Webhooks methods of the Containerregistry service.
@@ -49,22 +50,40 @@ func (client WebhooksClient) Create(ctx context.Context, resourceGroupName strin
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookName,
-			Constraints: []validation.Constraint{{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookName,
+			Constraints: []validation.Constraint{
+				{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "webhookName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookCreateParameters,
-			Constraints: []validation.Constraint{{Target: "webhookCreateParameters.Location", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "webhookCreateParameters.WebhookPropertiesCreateParameters", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "webhookCreateParameters.WebhookPropertiesCreateParameters.ServiceURI", Name: validation.Null, Rule: true, Chain: nil},
+				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookCreateParameters,
+			Constraints: []validation.Constraint{
+				{Target: "webhookCreateParameters.Location", Name: validation.Null, Rule: true, Chain: nil},
+				{
+					Target: "webhookCreateParameters.WebhookPropertiesCreateParameters", Name: validation.Null, Rule: false,
+					Chain: []validation.Constraint{
+						{Target: "webhookCreateParameters.WebhookPropertiesCreateParameters.ServiceURI", Name: validation.Null, Rule: true, Chain: nil},
 						{Target: "webhookCreateParameters.WebhookPropertiesCreateParameters.Actions", Name: validation.Null, Rule: true, Chain: nil},
-					}}}}}); err != nil {
+					},
+				},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "Create", err.Error())
 	}
 
@@ -151,16 +170,27 @@ func (client WebhooksClient) Delete(ctx context.Context, resourceGroupName strin
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookName,
-			Constraints: []validation.Constraint{{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookName,
+			Constraints: []validation.Constraint{
+				{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "webhookName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "Delete", err.Error())
 	}
 
@@ -244,16 +274,27 @@ func (client WebhooksClient) Get(ctx context.Context, resourceGroupName string, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookName,
-			Constraints: []validation.Constraint{{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookName,
+			Constraints: []validation.Constraint{
+				{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "webhookName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "Get", err.Error())
 	}
 
@@ -336,16 +377,27 @@ func (client WebhooksClient) GetCallbackConfig(ctx context.Context, resourceGrou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookName,
-			Constraints: []validation.Constraint{{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookName,
+			Constraints: []validation.Constraint{
+				{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "webhookName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "GetCallbackConfig", err.Error())
 	}
 
@@ -427,12 +479,19 @@ func (client WebhooksClient) List(ctx context.Context, resourceGroupName string,
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "List", err.Error())
 	}
 
@@ -556,16 +615,27 @@ func (client WebhooksClient) ListEvents(ctx context.Context, resourceGroupName s
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookName,
-			Constraints: []validation.Constraint{{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookName,
+			Constraints: []validation.Constraint{
+				{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "webhookName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "ListEvents", err.Error())
 	}
 
@@ -690,16 +760,27 @@ func (client WebhooksClient) Ping(ctx context.Context, resourceGroupName string,
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookName,
-			Constraints: []validation.Constraint{{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookName,
+			Constraints: []validation.Constraint{
+				{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "webhookName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "Ping", err.Error())
 	}
 
@@ -783,16 +864,27 @@ func (client WebhooksClient) Update(ctx context.Context, resourceGroupName strin
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: webhookName,
-			Constraints: []validation.Constraint{{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: webhookName,
+			Constraints: []validation.Constraint{
+				{Target: "webhookName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "webhookName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "webhookName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.WebhooksClient", "Update", err.Error())
 	}
 

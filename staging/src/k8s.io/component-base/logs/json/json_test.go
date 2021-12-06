@@ -34,7 +34,7 @@ func TestZapLoggerInfo(t *testing.T) {
 	timeNow = func() time.Time {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
-	var testDataInfo = []struct {
+	testDataInfo := []struct {
 		msg        string
 		format     string
 		keysValues []interface{}

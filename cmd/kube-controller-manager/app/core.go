@@ -310,24 +310,23 @@ func startAttachDetachController(ctx context.Context, controllerContext Controll
 		return nil, true, err
 	}
 
-	attachDetachController, attachDetachControllerErr :=
-		attachdetach.NewAttachDetachController(
-			controllerContext.ClientBuilder.ClientOrDie("attachdetach-controller"),
-			controllerContext.InformerFactory.Core().V1().Pods(),
-			controllerContext.InformerFactory.Core().V1().Nodes(),
-			controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
-			controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
-			csiNodeInformer,
-			csiDriverInformer,
-			controllerContext.InformerFactory.Storage().V1().VolumeAttachments(),
-			controllerContext.Cloud,
-			plugins,
-			GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
-			controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
-			controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
-			attachdetach.DefaultTimerConfig,
-			filteredDialOptions,
-		)
+	attachDetachController, attachDetachControllerErr := attachdetach.NewAttachDetachController(
+		controllerContext.ClientBuilder.ClientOrDie("attachdetach-controller"),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Core().V1().Nodes(),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
+		csiNodeInformer,
+		csiDriverInformer,
+		controllerContext.InformerFactory.Storage().V1().VolumeAttachments(),
+		controllerContext.Cloud,
+		plugins,
+		GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
+		controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
+		attachdetach.DefaultTimerConfig,
+		filteredDialOptions,
+	)
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
@@ -460,7 +459,6 @@ func startNamespaceController(ctx context.Context, controllerContext ControllerC
 }
 
 func startModifiedNamespaceController(ctx context.Context, controllerContext ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (controller.Interface, bool, error) {
-
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
 		return nil, true, err
@@ -599,7 +597,6 @@ func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
 // for --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 respectively. If value not provided,
 // then it will return default IPv4 and IPv6 cidr mask sizes.
 func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, clusterCIDRs []*net.IPNet) ([]int, error) {
-
 	sortedSizes := func(maskSizeIPv4, maskSizeIPv6 int) []int {
 		nodeMaskCIDRs := make([]int, len(clusterCIDRs))
 
@@ -622,7 +619,6 @@ func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, cl
 		// if --node-cidr-mask-size then fail, user must configure the correct dual-stack mask sizes (or use default)
 		if cfg.NodeCIDRMaskSize != 0 {
 			return nil, errors.New("usage of --node-cidr-mask-size is not allowed with dual-stack clusters")
-
 		}
 
 		if cfg.NodeCIDRMaskSizeIPv4 != 0 {

@@ -134,8 +134,10 @@ func (w ByteWriter) Write(inputNodes []*yaml.RNode) error {
 			{Kind: yaml.ScalarNode, Value: w.WrappingAPIVersion},
 			{Kind: yaml.ScalarNode, Value: "kind"},
 			{Kind: yaml.ScalarNode, Value: w.WrappingKind},
-			{Kind: yaml.ScalarNode, Value: "items"}, items,
-		}}
+			{Kind: yaml.ScalarNode, Value: "items"},
+			items,
+		},
+	}
 	if w.FunctionConfig != nil {
 		list.Content = append(list.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "functionConfig"},
@@ -148,7 +150,8 @@ func (w ByteWriter) Write(inputNodes []*yaml.RNode) error {
 	}
 	doc := &yaml.Node{
 		Kind:    yaml.DocumentNode,
-		Content: []*yaml.Node{list}}
+		Content: []*yaml.Node{list},
+	}
 	for i := range nodes {
 		items.Content = append(items.Content, nodes[i].YNode())
 	}

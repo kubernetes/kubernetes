@@ -30,7 +30,8 @@ func NewGlobalMacro(function string, argCount int, expander MacroExpander) Macro
 	return &macro{
 		function: function,
 		argCount: argCount,
-		expander: expander}
+		expander: expander,
+	}
 }
 
 // NewReceiverMacro creates a Macro for a receiver function matching the specified arg count.
@@ -39,7 +40,8 @@ func NewReceiverMacro(function string, argCount int, expander MacroExpander) Mac
 		function:      function,
 		argCount:      argCount,
 		expander:      expander,
-		receiverStyle: true}
+		receiverStyle: true,
+	}
 }
 
 // NewGlobalVarArgMacro creates a Macro for a global function with a variable arg count.
@@ -47,7 +49,8 @@ func NewGlobalVarArgMacro(function string, expander MacroExpander) Macro {
 	return &macro{
 		function:    function,
 		expander:    expander,
-		varArgStyle: true}
+		varArgStyle: true,
+	}
 }
 
 // NewReceiverVarArgMacro creates a Macro for a receiver function matching a variable arg
@@ -57,7 +60,8 @@ func NewReceiverVarArgMacro(function string, expander MacroExpander) Macro {
 		function:      function,
 		expander:      expander,
 		receiverStyle: true,
-		varArgStyle:   true}
+		varArgStyle:   true,
+	}
 }
 
 // Macro interface for describing the function signature to match and the MacroExpander to apply.
@@ -288,7 +292,8 @@ func makeQuantifier(kind quantifierKind, eh ExprHelper, target *exprpb.Expr, arg
 		location := eh.OffsetLocation(args[0].GetId())
 		return nil, &common.Error{
 			Message:  "argument must be a simple name",
-			Location: location}
+			Location: location,
+		}
 	}
 	accuIdent := func() *exprpb.Expr {
 		return eh.Ident(AccumulatorName)

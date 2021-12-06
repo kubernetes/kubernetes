@@ -33,7 +33,6 @@ import (
 // TODO(neolit123): The returned error here is currently ignored everywhere and a klog warning is thrown instead.
 // We don't want to turn this into an actual error yet. Eventually this can be controlled with an optional CLI flag.
 func VerifyUnmarshalStrict(bytes []byte, gvk schema.GroupVersionKind) error {
-
 	var (
 		iface interface{}
 		err   error

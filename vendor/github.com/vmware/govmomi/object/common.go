@@ -29,9 +29,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-var (
-	ErrNotSupported = errors.New("product/version specific feature not supported by target")
-)
+var ErrNotSupported = errors.New("product/version specific feature not supported by target")
 
 // Common contains the fields and functions common to all objects.
 type Common struct {

@@ -27,9 +27,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-var (
-	ErrKeyNameNotFound = errors.New("key name not found")
-)
+var ErrKeyNameNotFound = errors.New("key name not found")
 
 type CustomFieldsManager struct {
 	Common

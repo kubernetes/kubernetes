@@ -62,7 +62,7 @@ var (
 	// HNS 10.3 allows for VXLAN ports
 	VxlanPortVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 10, Minor: 3}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 
-	//HNS 9.5 through 10.0(not included), 10.5 through 11.0(not included), 11.11 through 12.0(not included), 12.1 through 13.0(not included), 13.1+ allows for Network L4Proxy Policy support
+	// HNS 9.5 through 10.0(not included), 10.5 through 11.0(not included), 11.11 through 12.0(not included), 12.1 through 13.0(not included), 13.1+ allows for Network L4Proxy Policy support
 	L4ProxyPolicyVersion = VersionRanges{
 		VersionRange{MinVersion: Version{Major: 9, Minor: 5}, MaxVersion: Version{Major: 9, Minor: math.MaxInt32}},
 		VersionRange{MinVersion: Version{Major: 10, Minor: 5}, MaxVersion: Version{Major: 10, Minor: math.MaxInt32}},
@@ -71,10 +71,10 @@ var (
 		VersionRange{MinVersion: Version{Major: 13, Minor: 1}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
 	}
 
-	//HNS 13.2 allows for L4WfpProxy Policy support
+	// HNS 13.2 allows for L4WfpProxy Policy support
 	L4WfpProxyPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 13, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 
-	//HNS 14.0 allows for TierAcl Policy support
+	// HNS 14.0 allows for TierAcl Policy support
 	TierAclPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 14, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 )
 

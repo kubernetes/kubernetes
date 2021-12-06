@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VirtualNetworkTapsClient is the network Client
@@ -49,33 +50,73 @@ func (client VirtualNetworkTapsClient) CreateOrUpdate(ctx context.Context, resou
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration", Name: validation.Null, Rule: false,
-									Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
-										Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false, Chain: nil}}},
-									}},
-								}},
-							}},
-						}},
-					}},
-					{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat", Name: validation.Null, Rule: false,
-									Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration", Name: validation.Null, Rule: false,
-										Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
-											Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false, Chain: nil}}},
-										}},
-									}},
-								}},
-							}},
-						}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.VirtualNetworkTapPropertiesFormat", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{
+										Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{
+												Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{
+														Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration", Name: validation.Null, Rule: false,
+														Chain: []validation.Constraint{
+															{
+																Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
+																Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationNetworkInterfaceIPConfiguration.InterfaceIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false, Chain: nil}},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{
+										Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{
+												Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{
+														Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration", Name: validation.Null, Rule: false,
+														Chain: []validation.Constraint{
+															{
+																Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat", Name: validation.Null, Rule: false,
+																Chain: []validation.Constraint{{Target: "parameters.VirtualNetworkTapPropertiesFormat.DestinationLoadBalancerFrontEndIPConfiguration.FrontendIPConfigurationPropertiesFormat.PublicIPAddress.PublicIPAddressPropertiesFormat.IPConfiguration.IPConfigurationPropertiesFormat.PublicIPAddress", Name: validation.Null, Rule: false, Chain: nil}},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.VirtualNetworkTapsClient", "CreateOrUpdate", err.Error())
 	}
 

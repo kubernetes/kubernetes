@@ -40,11 +40,9 @@ const (
 
 // New creates a new reference for the given string
 func New(jsonReferenceString string) (Ref, error) {
-
 	var r Ref
 	err := r.parse(jsonReferenceString)
 	return r, err
-
 }
 
 // MustCreateRef parses the ref string and panics when it's invalid.
@@ -81,7 +79,6 @@ func (r *Ref) GetPointer() *jsonpointer.Pointer {
 
 // String returns the best version of the url for this reference
 func (r *Ref) String() string {
-
 	if r.referenceURL != nil {
 		return r.referenceURL.String()
 	}
@@ -108,7 +105,6 @@ func (r *Ref) IsCanonical() bool {
 
 // "Constructor", parses the given string JSON reference
 func (r *Ref) parse(jsonReferenceString string) error {
-
 	parsed, err := url.Parse(jsonReferenceString)
 	if err != nil {
 		return err

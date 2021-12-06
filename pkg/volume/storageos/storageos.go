@@ -47,10 +47,12 @@ type storageosPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &storageosPlugin{}
-var _ volume.PersistentVolumePlugin = &storageosPlugin{}
-var _ volume.DeletableVolumePlugin = &storageosPlugin{}
-var _ volume.ProvisionableVolumePlugin = &storageosPlugin{}
+var (
+	_ volume.VolumePlugin              = &storageosPlugin{}
+	_ volume.PersistentVolumePlugin    = &storageosPlugin{}
+	_ volume.DeletableVolumePlugin     = &storageosPlugin{}
+	_ volume.ProvisionableVolumePlugin = &storageosPlugin{}
+)
 
 const (
 	storageosPluginName = "kubernetes.io/storageos"
@@ -104,7 +106,6 @@ func (plugin *storageosPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 }
 
 func (plugin *storageosPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-
 	apiCfg, err := getAPICfg(spec, pod, plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err
@@ -114,7 +115,6 @@ func (plugin *storageosPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 }
 
 func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, apiCfg *storageosAPIConfig, manager storageosManager, mounter mount.Interface, exec utilexec.Interface) (volume.Mounter, error) {
-
 	volName, volNamespace, fsType, readOnly, err := getVolumeInfoFromSpec(spec)
 	if err != nil {
 		return nil, err
@@ -146,7 +146,6 @@ func (plugin *storageosPlugin) NewUnmounter(pvName string, podUID types.UID) (vo
 }
 
 func (plugin *storageosPlugin) newUnmounterInternal(pvName string, podUID types.UID, manager storageosManager, mounter mount.Interface, exec utilexec.Interface) (volume.Unmounter, error) {
-
 	// Parse volume namespace & name from mountpoint if mounted
 	volNamespace, volName, err := getVolumeInfo(pvName, podUID, plugin.host)
 	if err != nil {
@@ -198,7 +197,6 @@ func (plugin *storageosPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, er
 }
 
 func (plugin *storageosPlugin) newDeleterInternal(spec *volume.Spec, apiCfg *storageosAPIConfig, manager storageosManager) (volume.Deleter, error) {
-
 	return &storageosDeleter{
 		storageosMounter: &storageosMounter{
 			storageos: &storageos{
@@ -387,7 +385,7 @@ func (b *storageosMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		return nil
 	}
 
-	if err = os.MkdirAll(dir, 0750); err != nil {
+	if err = os.MkdirAll(dir, 0o750); err != nil {
 		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		return err
 	}
@@ -745,7 +743,6 @@ func parsePVSecret(namespace, secretName string, kubeClient clientset.Interface)
 
 // Parse API configuration from parameters or secret
 func parseAPIConfig(params map[string]string) (*storageosAPIConfig, error) {
-
 	if len(params) == 0 {
 		return nil, fmt.Errorf("empty API config")
 	}

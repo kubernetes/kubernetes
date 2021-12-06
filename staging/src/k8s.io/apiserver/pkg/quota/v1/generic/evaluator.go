@@ -81,12 +81,14 @@ func (p *protectedLister) List(selector labels.Selector) (ret []runtime.Object, 
 	}
 	return p.delegate.List(selector)
 }
+
 func (p *protectedLister) Get(name string) (runtime.Object, error) {
 	if !p.hasSynced() {
 		return nil, p.notReadyErr
 	}
 	return p.delegate.Get(name)
 }
+
 func (p *protectedLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 	return &protectedNamespaceLister{p.hasSynced, p.notReadyErr, p.delegate.ByNamespace(namespace)}
 }
@@ -104,6 +106,7 @@ func (p *protectedNamespaceLister) List(selector labels.Selector) (ret []runtime
 	}
 	return p.delegate.List(selector)
 }
+
 func (p *protectedNamespaceLister) Get(name string) (runtime.Object, error) {
 	if !p.hasSynced() {
 		return nil, p.notReadyErr
@@ -173,7 +176,8 @@ func getScopeSelectorsFromQuota(quota *corev1.ResourceQuota) []corev1.ScopedReso
 	for _, scope := range quota.Spec.Scopes {
 		selectors = append(selectors, corev1.ScopedResourceSelectorRequirement{
 			ScopeName: scope,
-			Operator:  corev1.ScopeSelectorOpExists})
+			Operator:  corev1.ScopeSelectorOpExists,
+		})
 	}
 	if quota.Spec.ScopeSelector != nil {
 		selectors = append(selectors, quota.Spec.ScopeSelector.MatchExpressions...)
@@ -305,7 +309,6 @@ var _ quota.Evaluator = &objectCountEvaluator{}
 func NewObjectCountEvaluator(
 	groupResource schema.GroupResource, listFuncByNamespace ListFuncByNamespace,
 	alias corev1.ResourceName) quota.Evaluator {
-
 	resourceNames := []corev1.ResourceName{ObjectCountQuotaResourceNameFor(groupResource)}
 	if len(alias) > 0 {
 		resourceNames = append(resourceNames, alias)

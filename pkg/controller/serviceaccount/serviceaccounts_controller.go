@@ -182,6 +182,7 @@ func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) boo
 
 	return true
 }
+
 func (c *ServiceAccountsController) syncNamespace(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {

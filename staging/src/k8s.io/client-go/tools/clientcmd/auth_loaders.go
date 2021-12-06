@@ -59,7 +59,7 @@ func (a *PromptingAuthLoader) LoadAuth(path string) (*clientauth.Info, error) {
 		if err != nil {
 			return &auth, err
 		}
-		err = ioutil.WriteFile(path, data, 0600)
+		err = ioutil.WriteFile(path, data, 0o600)
 		return &auth, err
 	}
 	authPtr, err := clientauth.LoadFromFile(path)

@@ -204,7 +204,8 @@ func (p *Markdown) getRef(refid string) (ref *reference, found bool) {
 				title:    []byte(r.Title),
 				noteID:   0,
 				hasBlock: false,
-				text:     []byte(r.Text)}, true
+				text:     []byte(r.Text),
+			}, true
 		}
 	}
 	// refs are case insensitive

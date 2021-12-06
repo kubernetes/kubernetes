@@ -152,7 +152,6 @@ type ContainerInfo struct {
 // ContainerInfo and its encode-then-decode version.  Eq() is used to compare
 // two ContainerInfo accepting small difference (<10ms) of Time fields.
 func (ci *ContainerInfo) Eq(b *ContainerInfo) bool {
-
 	// If both ci and b are nil, then Eq() returns true
 	if ci == nil {
 		return b == nil

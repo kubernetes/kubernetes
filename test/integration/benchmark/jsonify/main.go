@@ -87,7 +87,7 @@ func run() error {
 	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(os.Args[1], formatted.Bytes(), 0664)
+	return ioutil.WriteFile(os.Args[1], formatted.Bytes(), 0o664)
 }
 
 func appendIfMeasured(items []DataItem, benchmark *benchparse.Benchmark, metricType int, metricName string, unit string, value float64) []DataItem {
@@ -98,7 +98,10 @@ func appendIfMeasured(items []DataItem, benchmark *benchparse.Benchmark, metricT
 		Unit: unit,
 		Labels: map[string]string{
 			"benchmark":  benchmark.Name,
-			"metricName": metricName},
+			"metricName": metricName,
+		},
 		Data: map[string]float64{
-			"value": value}})
+			"value": value,
+		},
+	})
 }

@@ -595,7 +595,7 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 }
 
 func TestListResourceVersion0(t *testing.T) {
-	var testcases = []struct {
+	testcases := []struct {
 		name              string
 		watchCacheEnabled bool
 	}{

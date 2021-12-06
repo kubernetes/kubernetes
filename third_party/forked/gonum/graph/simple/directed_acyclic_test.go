@@ -11,8 +11,10 @@ import (
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 )
 
-var _ graph.Graph = &DirectedAcyclicGraph{}
-var _ graph.Directed = &DirectedAcyclicGraph{}
+var (
+	_ graph.Graph    = &DirectedAcyclicGraph{}
+	_ graph.Directed = &DirectedAcyclicGraph{}
+)
 
 // Tests Issue #27
 func TestAcyclicEdgeOvercounting(t *testing.T) {

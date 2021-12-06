@@ -10,10 +10,8 @@ import (
 	"github.com/gophercloud/gophercloud"
 )
 
-var (
-	// ErrPageNotAvailable is returned from a Pager when a next or previous page is requested, but does not exist.
-	ErrPageNotAvailable = errors.New("The requested page does not exist.")
-)
+// ErrPageNotAvailable is returned from a Pager when a next or previous page is requested, but does not exist.
+var ErrPageNotAvailable = errors.New("The requested page does not exist.")
 
 // Page must be satisfied by the result type of any resource collection.
 // It allows clients to interact with the resource uniformly, regardless of whether or not or how it's paginated.

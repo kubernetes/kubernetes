@@ -203,7 +203,6 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By("Verifying the LimitRange was deleted")
 		err = wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
 			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-
 			if err != nil {
 				framework.Logf("Unable to retrieve LimitRanges: %v", err)
 				return false, nil
@@ -228,7 +227,6 @@ var _ = SIGDescribe("LimitRange", func() {
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	})
-
 })
 
 func equalResourceRequirement(expected v1.ResourceRequirements, actual v1.ResourceRequirements) error {

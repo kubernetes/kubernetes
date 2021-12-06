@@ -119,7 +119,6 @@ func TestWithHTTP2(t *testing.T) {
 		//nolint:staticcheck // SA1019
 		w.(http.CloseNotifier).CloseNotify()
 		w.(http.Flusher).Flush()
-
 	}))
 	handler = chain(handler)
 	handler = chain(handler)
@@ -283,12 +282,14 @@ func (fw *fakeResponseWriterDecorator) Flush() {
 	}
 	fw.ResponseWriter.(http.Flusher).Flush()
 }
+
 func (fw *fakeResponseWriterDecorator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if fw.counter != nil {
 		fw.counter.HijackInvoked++
 	}
 	return fw.ResponseWriter.(http.Hijacker).Hijack()
 }
+
 func (fw *fakeResponseWriterDecorator) CloseNotify() <-chan bool {
 	if fw.counter != nil {
 		fw.counter.CloseNotifyInvoked++

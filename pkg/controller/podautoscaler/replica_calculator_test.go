@@ -422,6 +422,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	assert.Equal(t, tc.metric.expectedUtilization, outUtilization, "utilization should be as expected")
 	assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 }
+
 func makePodMetricLevels(containerMetric ...int64) [][]int64 {
 	metrics := make([][]int64, len(containerMetric))
 	for i := 0; i < len(containerMetric); i++ {
@@ -432,6 +433,7 @@ func makePodMetricLevels(containerMetric ...int64) [][]int64 {
 	}
 	return metrics
 }
+
 func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas: 1,
@@ -1103,7 +1105,7 @@ func TestReplicaCalcScaleDownContainerIgnoresFailedPods(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   [][]int64{{1000, 100}, {1000, 300}, {1000, 500}, {1000, 250}, {1000, 250}}, //TODO: Test is broken
+			levels:   [][]int64{{1000, 100}, {1000, 300}, {1000, 500}, {1000, 250}, {1000, 250}}, // TODO: Test is broken
 
 			targetUtilization:   50,
 			expectedUtilization: 28,
@@ -1502,7 +1504,6 @@ func TestReplicaCalcDuringRollingUpdateWithMaxSurgeCM(t *testing.T) {
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
 func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
-
 	startPods := int32(10)
 	// 150 mCPU per pod.
 	totalUsedCPUOfAllPods := int64(startPods * 150)

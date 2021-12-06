@@ -366,7 +366,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjs(activePods))
 
-	//record age of metrics for met thresholds that we are using for evictions.
+	// record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
 		timeObserved := observations[t.Signal].time
 		if !timeObserved.IsZero() {
@@ -423,7 +423,6 @@ func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Sign
 		if err := nodeReclaimFunc(); err != nil {
 			klog.InfoS("Eviction manager: unexpected error when attempting to reduce resource pressure", "resourceName", resourceToReclaim, "err", err)
 		}
-
 	}
 	if len(nodeReclaimFuncs) > 0 {
 		summary, err := m.summaryProvider.Get(true)

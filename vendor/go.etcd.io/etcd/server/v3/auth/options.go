@@ -38,10 +38,8 @@ var knownOptions = map[string]bool{
 	optTTL:        true,
 }
 
-var (
-	// DefaultTTL will be used when a 'ttl' is not specified
-	DefaultTTL = 5 * time.Minute
-)
+// DefaultTTL will be used when a 'ttl' is not specified
+var DefaultTTL = 5 * time.Minute
 
 type jwtOptions struct {
 	SignMethod jwt.SigningMethod

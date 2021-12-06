@@ -60,7 +60,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
-	var tests = []struct {
+	tests := []struct {
 		cfg           *kubeadmapi.ClusterConfiguration
 		expectedError bool
 	}{
@@ -127,7 +127,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	}
 
 	patchesPath := filepath.Join(tmpdir, "patch-files")
-	err := os.MkdirAll(patchesPath, 0777)
+	err := os.MkdirAll(patchesPath, 0o777)
 	if err != nil {
 		t.Fatalf("Couldn't create %s", patchesPath)
 	}
@@ -138,7 +138,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	    patched: "true"
 	`)
 
-	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.Etcd+".yaml"), []byte(patchString), 0644)
+	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.Etcd+".yaml"), []byte(patchString), 0o644)
 	if err != nil {
 		t.Fatalf("WriteFile returned unexpected error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 }
 
 func TestGetEtcdCommand(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name             string
 		advertiseAddress string
 		nodeName         string

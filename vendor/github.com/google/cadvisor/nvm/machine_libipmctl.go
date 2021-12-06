@@ -20,6 +20,7 @@ package nvm
 // #cgo pkg-config: libipmctl
 // #include <nvm_management.h>
 import "C"
+
 import (
 	"fmt"
 	"sync"

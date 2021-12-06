@@ -668,7 +668,6 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 
 	// Act
 	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
-
 	// Assert
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1402,9 +1401,11 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 					},
 				},
 			},
-			expectedElements: []string{"Node Affinity", "Required Terms", "Term 0",
+			expectedElements: []string{
+				"Node Affinity", "Required Terms", "Term 0",
 				"foo in [val1, val2]",
-				"foo exists"},
+				"foo exists",
+			},
 		},
 		{
 			name:   "test15",
@@ -1461,9 +1462,11 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 					},
 				},
 			},
-			expectedElements: []string{"Node Affinity", "Required Terms", "Term 0",
+			expectedElements: []string{
+				"Node Affinity", "Required Terms", "Term 0",
 				"foo in [val1, val2]",
-				"foo exists"},
+				"foo exists",
+			},
 		},
 		{
 			name:   "test17",
@@ -2178,7 +2181,6 @@ func TestDescribeDeployment(t *testing.T) {
 					t.Errorf("expected to find \"%s\" in:\n %s", expect, out)
 				}
 			}
-
 		})
 	}
 }
@@ -3798,7 +3800,6 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 }
 
 func TestDescribeEvents(t *testing.T) {
-
 	events := &corev1.EventList{
 		Items: []corev1.Event{
 			{
@@ -4786,8 +4787,8 @@ Events:              <none>` + "\n"
 	if out != expectedOut {
 		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
-
 }
+
 func getHugePageResourceList(pageSize, value string) corev1.ResourceList {
 	res := corev1.ResourceList{}
 	if pageSize != "" && value != "" {
@@ -4885,7 +4886,8 @@ func TestDescribeNode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedOut := []string{"Unschedulable", "true", "holder",
+	expectedOut := []string{
+		"Unschedulable", "true", "holder",
 		`Allocated resources:
   (Total limits may be over 100 percent, i.e., overcommitted.)
   Resource           Requests     Limits
@@ -4894,7 +4896,8 @@ func TestDescribeNode(t *testing.T) {
   memory             1Gi (8%)     2Gi (16%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
-  hugepages-2Mi      512Mi (25%)  512Mi (25%)`}
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
+	}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)

@@ -136,7 +136,7 @@ func (node *ContainerNode) Flag() types.FlagType {
 	return node.flag
 }
 
-//sort.Interface
+// sort.Interface
 
 func (node *ContainerNode) Len() int {
 	return len(node.subjectAndContainerNodes)

@@ -28,9 +28,7 @@ import (
 	"github.com/moby/spdystream/spdy"
 )
 
-var (
-	ErrUnreadPartialData = errors.New("unread partial data")
-)
+var ErrUnreadPartialData = errors.New("unread partial data")
 
 type Stream struct {
 	streamId  spdy.StreamId

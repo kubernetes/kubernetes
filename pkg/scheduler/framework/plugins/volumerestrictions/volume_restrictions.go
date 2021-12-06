@@ -40,9 +40,11 @@ type VolumeRestrictions struct {
 	enableReadWriteOncePod bool
 }
 
-var _ framework.PreFilterPlugin = &VolumeRestrictions{}
-var _ framework.FilterPlugin = &VolumeRestrictions{}
-var _ framework.EnqueueExtensions = &VolumeRestrictions{}
+var (
+	_ framework.PreFilterPlugin   = &VolumeRestrictions{}
+	_ framework.FilterPlugin      = &VolumeRestrictions{}
+	_ framework.EnqueueExtensions = &VolumeRestrictions{}
+)
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.VolumeRestrictions

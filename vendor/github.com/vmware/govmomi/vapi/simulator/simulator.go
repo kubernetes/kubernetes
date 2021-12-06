@@ -196,7 +196,6 @@ func (s *handler) ok(w http.ResponseWriter, val ...interface{}) {
 	}{
 		val[0],
 	})
-
 	if err != nil {
 		log.Panic(err)
 	}
@@ -213,7 +212,6 @@ func (s *handler) fail(w http.ResponseWriter, kind string) {
 	}{
 		Type: kind,
 	})
-
 	if err != nil {
 		log.Panic(err)
 	}

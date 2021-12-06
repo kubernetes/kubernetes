@@ -27,6 +27,7 @@ import (
 // and hostnames as unique identifiers allows us to do more in place updates
 // should attributes such as topology, conditions, or targetRef change.
 type endpointHash string
+
 type endpointHashObj struct {
 	Addresses []string
 	Hostname  string

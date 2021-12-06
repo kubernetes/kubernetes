@@ -51,7 +51,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
-		defaultMode := int32(0400)
+		defaultMode := int32(0o400)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
@@ -62,7 +62,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance]", func() {
-		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		defaultMode := int32(0o440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
 	})
@@ -83,7 +83,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly] [NodeConformance]", func() {
-		mode := int32(0400)
+		mode := int32(0o400)
 		doProjectedSecretE2EWithMapping(f, &mode)
 	})
 
@@ -178,7 +178,8 @@ var _ = SIGDescribe("Projected secret", func() {
 						Args: []string{
 							"mounttest",
 							"--file_content=/etc/projected-secret-volume/data-1",
-							"--file_mode=/etc/projected-secret-volume/data-1"},
+							"--file_mode=/etc/projected-secret-volume/data-1",
+						},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -405,9 +406,9 @@ var _ = SIGDescribe("Projected secret", func() {
 		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-secret-volumes/delete/data-1"))
 	})
 
-	//The secret is in pending during volume creation until the secret objects are available
-	//or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timeout exception unless it is marked optional.
-	//Slow (~5 mins)
+	// The secret is in pending during volume creation until the secret objects are available
+	// or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timeout exception unless it is marked optional.
+	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/projected-secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
@@ -415,9 +416,9 @@ var _ = SIGDescribe("Projected secret", func() {
 		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 
-	//Secret object defined for the pod, If a key is specified which is not present in the secret,
+	// Secret object defined for the pod, If a key is specified which is not present in the secret,
 	// the volume setup will error unless it is marked optional, during the pod creation.
-	//Slow (~5 mins)
+	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to the key in the secret object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
@@ -471,7 +472,8 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/projected-secret-volume/data-1",
-						"--file_mode=/etc/projected-secret-volume/data-1"},
+						"--file_mode=/etc/projected-secret-volume/data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -485,7 +487,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 	}
 
 	if defaultMode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.DefaultMode = defaultMode
+		// pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.DefaultMode = defaultMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
 	}
 
@@ -555,7 +557,8 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/projected-secret-volume/new-path-data-1",
-						"--file_mode=/etc/projected-secret-volume/new-path-data-1"},
+						"--file_mode=/etc/projected-secret-volume/new-path-data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -569,7 +572,7 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 	}
 
 	if mode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Mode = mode
+		// pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Mode = mode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = mode
 	}
 

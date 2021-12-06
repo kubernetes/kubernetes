@@ -121,11 +121,10 @@ func getOptions(spec *volume.Spec) (map[string]string, error) {
 }
 
 func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, error) {
-
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+			if err := os.MkdirAll(deviceMountPath, 0o750); err != nil {
 				return false, err
 			}
 			notMnt = true

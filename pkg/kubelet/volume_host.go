@@ -57,8 +57,8 @@ func NewInitializedVolumePluginMgr(
 	configMapManager configmap.Manager,
 	tokenManager *token.Manager,
 	plugins []volume.VolumePlugin,
-	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
-
+	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error,
+) {
 	// Initialize csiDriverLister before calling InitPlugins
 	var informerFactory informers.SharedInformerFactory
 	var csiDriverLister storagelisters.CSIDriverLister

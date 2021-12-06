@@ -146,8 +146,10 @@ type Config struct {
 	// Version string
 }
 
-var _ fmt.Stringer = new(Config)
-var _ fmt.GoStringer = new(Config)
+var (
+	_ fmt.Stringer   = new(Config)
+	_ fmt.GoStringer = new(Config)
+)
 
 type sanitizedConfig *Config
 
@@ -156,6 +158,7 @@ type sanitizedAuthConfigPersister struct{ AuthProviderConfigPersister }
 func (sanitizedAuthConfigPersister) GoString() string {
 	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
 }
+
 func (sanitizedAuthConfigPersister) String() string {
 	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
 }
@@ -165,6 +168,7 @@ type sanitizedObject struct{ runtime.Object }
 func (sanitizedObject) GoString() string {
 	return "runtime.Object(--- REDACTED ---)"
 }
+
 func (sanitizedObject) String() string {
 	return "runtime.Object(--- REDACTED ---)"
 }
@@ -245,8 +249,10 @@ type TLSClientConfig struct {
 	NextProtos []string
 }
 
-var _ fmt.Stringer = TLSClientConfig{}
-var _ fmt.GoStringer = TLSClientConfig{}
+var (
+	_ fmt.Stringer   = TLSClientConfig{}
+	_ fmt.GoStringer = TLSClientConfig{}
+)
 
 type sanitizedTLSClientConfig TLSClientConfig
 

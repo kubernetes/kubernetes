@@ -79,12 +79,15 @@ func (op OpResponse) Txn() *TxnResponse    { return op.txn }
 func (resp *PutResponse) OpResponse() OpResponse {
 	return OpResponse{put: resp}
 }
+
 func (resp *GetResponse) OpResponse() OpResponse {
 	return OpResponse{get: resp}
 }
+
 func (resp *DeleteResponse) OpResponse() OpResponse {
 	return OpResponse{del: resp}
 }
+
 func (resp *TxnResponse) OpResponse() OpResponse {
 	return OpResponse{txn: resp}
 }

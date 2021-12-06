@@ -34,20 +34,17 @@ const (
 	kubeadmConfigClusterConfigurationConfigMapKey = "ClusterConfiguration"
 )
 
-var (
-	kubeadmConfigConfigMapResource = &authv1.ResourceAttributes{
-		Namespace: kubeSystemNamespace,
-		Name:      kubeadmConfigName,
-		Resource:  "configmaps",
-		Verb:      "get",
-	}
-)
+var kubeadmConfigConfigMapResource = &authv1.ResourceAttributes{
+	Namespace: kubeSystemNamespace,
+	Name:      kubeadmConfigName,
+	Resource:  "configmaps",
+	Verb:      "get",
+}
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm creates the cluster-info ConfigMap, that it is properly configured
 // and that all the related RBAC rules are in place
 var _ = Describe("kubeadm-config ConfigMap", func() {
-
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubeadm-config")
 

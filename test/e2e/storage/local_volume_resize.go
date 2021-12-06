@@ -123,9 +123,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			pvcConditions := testVol.pvc.Status.Conditions
 			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 		})
-
 	})
-
 })
 
 func UpdatePVSize(pv *v1.PersistentVolume, size resource.Quantity, c clientset.Interface) (*v1.PersistentVolume, error) {

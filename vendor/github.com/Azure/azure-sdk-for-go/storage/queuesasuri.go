@@ -107,7 +107,6 @@ func (q *Queue) GetSASURI(options QueueSASOptions) (string, error) {
 }
 
 func queueSASStringToSign(signedVersion, canonicalizedResource, signedStart, signedExpiry, signedIP, signedPermissions, protocols, signedIdentifier string) (string, error) {
-
 	if signedVersion >= "2015-02-21" {
 		canonicalizedResource = "/queue" + canonicalizedResource
 	}
@@ -123,7 +122,6 @@ func queueSASStringToSign(signedVersion, canonicalizedResource, signedStart, sig
 			signedIP,
 			protocols,
 			signedVersion), nil
-
 	}
 
 	// reference: http://msdn.microsoft.com/en-us/library/azure/dn140255.aspx

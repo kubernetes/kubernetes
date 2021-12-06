@@ -1155,13 +1155,14 @@ func isRegionalCluster() bool {
 func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 	klog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
 
-	args := []string{"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+	args := []string{
+		"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 		"--enable-autoscaling",
 		"--min-nodes=" + strconv.Itoa(minCount),
 		"--max-nodes=" + strconv.Itoa(maxCount),
-		"--node-pool=" + nodePool}
+		"--node-pool=" + nodePool,
+	}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
-
 	if err != nil {
 		klog.Errorf("Failed config update result: %s", output)
 		return fmt.Errorf("Failed to enable autoscaling: %v", err)
@@ -1181,11 +1182,12 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	klog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
-	args := []string{"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+	args := []string{
+		"container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 		"--no-enable-autoscaling",
-		"--node-pool=" + nodePool}
+		"--node-pool=" + nodePool,
+	}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
-
 	if err != nil {
 		klog.Errorf("Failed config update result: %s", output)
 		return fmt.Errorf("Failed to disable autoscaling: %v", err)
@@ -1204,20 +1206,24 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 }
 
 func addNodePool(name string, machineType string, numNodes int) {
-	args := []string{"container", "node-pools", "create", name, "--quiet",
+	args := []string{
+		"container", "node-pools", "create", name, "--quiet",
 		"--machine-type=" + machineType,
 		"--num-nodes=" + strconv.Itoa(numNodes),
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
+	}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	klog.Infof("Creating node-pool %s: %s", name, output)
 	framework.ExpectNoError(err, string(output))
 }
 
 func addGpuNodePool(name string, gpuType string, gpuCount int, numNodes int) {
-	args := []string{"beta", "container", "node-pools", "create", name, "--quiet",
+	args := []string{
+		"beta", "container", "node-pools", "create", name, "--quiet",
 		"--accelerator", "type=" + gpuType + ",count=" + strconv.Itoa(gpuCount),
 		"--num-nodes=" + strconv.Itoa(numNodes),
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
+	}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	klog.Infof("Creating node-pool %s: %s", name, output)
 	framework.ExpectNoError(err, string(output))
@@ -1225,8 +1231,10 @@ func addGpuNodePool(name string, gpuType string, gpuCount int, numNodes int) {
 
 func deleteNodePool(name string) {
 	klog.Infof("Deleting node pool %s", name)
-	args := []string{"container", "node-pools", "delete", name, "--quiet",
-		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
+	args := []string{
+		"container", "node-pools", "delete", name, "--quiet",
+		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
+	}
 	err := wait.ExponentialBackoff(
 		wait.Backoff{Duration: 1 * time.Minute, Factor: float64(3), Steps: 3},
 		func() (bool, error) {
@@ -1262,9 +1270,11 @@ func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 // multiple migs all containing initialNodeCount nodes.
 func getPoolInitialSize(poolName string) int {
 	// get initial node count
-	args := []string{"container", "node-pools", "describe", poolName, "--quiet",
+	args := []string{
+		"container", "node-pools", "describe", poolName, "--quiet",
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
-		"--format=value(initialNodeCount)"}
+		"--format=value(initialNodeCount)",
+	}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	klog.Infof("Node-pool initial size: %s", output)
 	framework.ExpectNoError(err, string(output))
@@ -1274,9 +1284,11 @@ func getPoolInitialSize(poolName string) int {
 	framework.ExpectNoError(err)
 
 	// get number of node pools
-	args = []string{"container", "node-pools", "describe", poolName, "--quiet",
+	args = []string{
+		"container", "node-pools", "describe", poolName, "--quiet",
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
-		"--format=value(instanceGroupUrls)"}
+		"--format=value(instanceGroupUrls)",
+	}
 	output, err = execCmd(getGcloudCommand(args)...).CombinedOutput()
 	framework.ExpectNoError(err, string(output))
 	nodeGroupCount := len(strings.Split(string(output), ";"))

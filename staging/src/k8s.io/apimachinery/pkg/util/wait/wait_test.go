@@ -233,7 +233,6 @@ func TestJitterUntilNegativeFactor(t *testing.T) {
 	if now.Add(3 * time.Second).Before(time.Now()) {
 		t.Errorf("JitterUntil did not returned after predefined period with negative jitter factor when the stop chan was closed inside the func")
 	}
-
 }
 
 func TestExponentialBackoff(t *testing.T) {

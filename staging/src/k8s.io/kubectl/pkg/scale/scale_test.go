@@ -130,7 +130,6 @@ func TestReplicationControllerScale(t *testing.T) {
 	count := uint(3)
 	name := "foo-v1"
 	err := scaler.Scale("default", name, count, nil, nil, nil, rcgvr, false)
-
 	if err != nil {
 		t.Fatalf("unexpected error occurred = %v while scaling the resource", err)
 	}
@@ -637,7 +636,7 @@ func TestGenericScale(t *testing.T) {
 			resName:      "abc",
 			scaleGetter:  scaleClient,
 		},
-		//scenario 2: a resource name cannot be empty
+		// scenario 2: a resource name cannot be empty
 		{
 			name:         "a resource name cannot be empty",
 			precondition: &ScalePrecondition{10, ""},

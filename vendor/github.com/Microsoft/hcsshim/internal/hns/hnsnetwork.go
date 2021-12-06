@@ -3,8 +3,9 @@ package hns
 import (
 	"encoding/json"
 	"errors"
-	"github.com/sirupsen/logrus"
 	"net"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Subnet is assoicated with a network and represents a list

@@ -36,9 +36,7 @@ const (
 	volumeName         = "test-volume"
 )
 
-var (
-	image = imageutils.GetE2EImage(imageutils.Pause)
-)
+var image = imageutils.GetE2EImage(imageutils.Pause)
 
 var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 	f := framework.NewDefaultFramework("windows-volumes")
@@ -61,9 +59,7 @@ var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 	})
 
 	ginkgo.Context("check volume mount permissions", func() {
-
 		ginkgo.It("container should have readOnly permissions on emptyDir", func() {
-
 			ginkgo.By("creating a container with readOnly permissions on emptyDir volume")
 			doReadOnlyTest(f, emptyDirSource, emptyDirVolumePath)
 
@@ -72,16 +68,13 @@ var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 		})
 
 		ginkgo.It("container should have readOnly permissions on hostMapPath", func() {
-
 			ginkgo.By("creating a container with readOnly permissions on hostMap volume")
 			doReadOnlyTest(f, hostMapSource, hostMapPath)
 
 			ginkgo.By("creating two containers, one with readOnly permissions the other with read-write permissions on hostMap volume")
 			doReadWriteReadOnlyTest(f, hostMapSource, hostMapPath)
 		})
-
 	})
-
 })
 
 func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath string) {

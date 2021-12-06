@@ -19,7 +19,7 @@ package modes
 import "testing"
 
 func TestIsValidAuthorizationMode(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		authzMode string
 		expected  bool
 	}{

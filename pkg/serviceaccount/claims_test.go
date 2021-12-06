@@ -401,12 +401,14 @@ func (f fakeGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccoun
 	}
 	return f.serviceAccount, nil
 }
+
 func (f fakeGetter) GetPod(namespace, name string) (*v1.Pod, error) {
 	if f.pod == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pods"}, name)
 	}
 	return f.pod, nil
 }
+
 func (f fakeGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 	if f.secret == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "secrets"}, name)

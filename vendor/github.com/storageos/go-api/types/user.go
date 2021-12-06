@@ -28,7 +28,6 @@ func (u *User) MarshalJSON() ([]byte, error) {
 		Password: u.Password,
 		Role:     u.Role,
 	})
-
 }
 
 func (u *User) UnmarshalJSON(data []byte) error {
@@ -75,5 +74,4 @@ func (u UserCreateOptions) MarshalJSON() ([]byte, error) {
 		Password: u.Password,
 		Role:     u.Role,
 	})
-
 }

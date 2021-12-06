@@ -18,8 +18,10 @@ import (
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 )
 
-type CompareTarget int
-type CompareResult int
+type (
+	CompareTarget int
+	CompareResult int
+)
 
 const (
 	CompareVersion CompareTarget = iota

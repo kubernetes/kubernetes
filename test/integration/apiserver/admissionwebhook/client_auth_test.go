@@ -59,7 +59,6 @@ func TestWebhookClientAuthWithoutAggregatorRouting(t *testing.T) {
 }
 
 func testWebhookClientAuth(t *testing.T, enableAggregatorRouting bool) {
-
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
 		t.Fatal("Failed to append Cert from PEM")
@@ -72,7 +71,6 @@ func testWebhookClientAuth(t *testing.T, enableAggregatorRouting bool) {
 	recorder := &clientAuthRecorder{}
 	webhookServer := httptest.NewUnstartedServer(newClientAuthWebhookHandler(t, recorder))
 	webhookServer.TLS = &tls.Config{
-
 		RootCAs:      roots,
 		Certificates: []tls.Certificate{cert},
 	}
@@ -106,7 +104,7 @@ users:
 - name: "*"
   user:
     token: "fallback"
-`), os.FileMode(0755)); err != nil {
+`), os.FileMode(0o755)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,7 +128,7 @@ plugins:
     apiVersion: apiserver.config.k8s.io/v1alpha1
     kind: WebhookAdmission
     kubeConfigFile: "`+kubeConfigFile.Name()+`"
-`), os.FileMode(0755)); err != nil {
+`), os.FileMode(0o755)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -209,7 +207,6 @@ plugins:
 	}); err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 type clientAuthRecorder struct {

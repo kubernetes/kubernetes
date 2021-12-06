@@ -62,9 +62,11 @@ type DynamicFileCAContent struct {
 	queue workqueue.RateLimitingInterface
 }
 
-var _ Notifier = &DynamicFileCAContent{}
-var _ CAContentProvider = &DynamicFileCAContent{}
-var _ ControllerRunner = &DynamicFileCAContent{}
+var (
+	_ Notifier          = &DynamicFileCAContent{}
+	_ CAContentProvider = &DynamicFileCAContent{}
+	_ ControllerRunner  = &DynamicFileCAContent{}
+)
 
 type caBundleAndVerifier struct {
 	caBundle      []byte

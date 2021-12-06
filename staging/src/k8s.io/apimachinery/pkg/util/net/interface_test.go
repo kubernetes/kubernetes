@@ -33,36 +33,43 @@ eth3	0000FE0A	00000000	0001	0	0	0	0080FFFF	0	0	0
 docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0                                                                            
 virbr0	007AA8C0	00000000	0001	0	0	0	00FFFFFF	0	0	0
 `
+
 const gatewaylast = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT  
 docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0                                                                            
 virbr0	007AA8C0	00000000	0001	0	0	0	00FFFFFF	0	0	0                                                                                                                     
 eth3	0000FE0A	00000000	0001	0	0	0	0080FFFF	0	0	0       
 eth3	00000000	0100FE0A	0003	0	0	1024	00000000	0	0	0                                                                 
 `
+
 const gatewaymiddle = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT                                                                                                                     
 eth3	0000FE0A	00000000	0001	0	0	0	0080FFFF	0	0	0                                                                      
 docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0       
 eth3	00000000	0100FE0A	0003	0	0	1024	00000000	0	0	0                                                                         
 virbr0	007AA8C0	00000000	0001	0	0	0	00FFFFFF	0	0	0
 `
+
 const noInternetConnection = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT                                                       
 docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0                                                                            
 virbr0	007AA8C0	00000000	0001	0	0	0	00FFFFFF	0	0	0            
 `
+
 const nothing = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT                                                            
 `
+
 const badDestination = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT                                                       
 eth3	00000000	0100FE0A	0003	0	0	1024	00000000	0	0	0                                                                   
 eth3	0000FE0AA1	00000000	0001	0	0	0	0080FFFF	0	0	0                                                                      
 docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0                                                                            
 virbr0	007AA8C0	00000000	0001	0	0	0	00FFFFFF	0	0	0
 `
+
 const badGateway = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
 eth3	00000000	0100FE0AA1	0003	0	0	1024	00000000	0	0	0                                                                   
 eth3	0000FE0A	00000000	0001	0	0	0	0080FFFF	0	0	0                                                                      
 docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0                                                                            
 virbr0	007AA8C0	00000000	0001	0	0	0	00FFFFFF	0	0	0
 `
+
 const route_Invalidhex = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
 eth3	00000000	0100FE0AA	0003	0	0	1024	00000000	0	0	0                                                                   
 eth3	0000FE0A	00000000	0001	0	0	0	0080FFFF	0	0	0                                                                      
@@ -74,24 +81,32 @@ const v6gatewayfirst = `00000000000000000000000000000000 00 00000000000000000000
 20010002000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000000 00000000 00000001 eth3
 00000000000000000000000000000000 60 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000000 00000000 00200200       lo
 `
+
 const v6gatewaylast = `20010002000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000000 00000000 00000001 eth3
 00000000000000000000000000000000 60 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000000 00000000 00200200       lo
 00000000000000000000000000000000 00 00000000000000000000000000000000 00 20010001000000000000000000000001 00000064 00000000 00000000 00000003 eth3
 `
+
 const v6gatewaymiddle = `20010002000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000000 00000000 00000001 eth3
 00000000000000000000000000000000 00 00000000000000000000000000000000 00 20010001000000000000000000000001 00000064 00000000 00000000 00000003 eth3
 00000000000000000000000000000000 60 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000000 00000000 00200200       lo
 `
+
 const v6noDefaultRoutes = `00000000000000000000000000000000 60 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000000 00000000 00200200       lo
 20010001000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000000 00000000 00000001  docker0
 20010002000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000000 00000000 00000001   eth3
 fe800000000000000000000000000000 40 00000000000000000000000000000000 00 00000000000000000000000000000000 00000100 00000000 00000000 00000001   eth3
 `
-const v6nothing = ``
-const v6badDestination = `2001000200000000 7a 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000000 00000000 00200200       lo
+
+const (
+	v6nothing        = ``
+	v6badDestination = `2001000200000000 7a 00000000000000000000000000000000 00 00000000000000000000000000000000 00000400 00000000 00000000 00200200       lo
 `
+)
+
 const v6badGateway = `00000000000000000000000000000000 00 00000000000000000000000000000000 00 200100010000000000000000000000000012 00000064 00000000 00000000 00000003 eth3
 `
+
 const v6route_Invalidhex = `000000000000000000000000000000000 00 00000000000000000000000000000000 00 fe80000000000000021fcafffea0ec00 00000064 00000000 00000000 00000003 enp1s0f0
 
 `
@@ -110,7 +125,8 @@ func makeIntf(index int, name string, flags net.Flags) net.Interface {
 		MTU:          1500,
 		Name:         name,
 		HardwareAddr: mac,
-		Flags:        flags}
+		Flags:        flags,
+	}
 }
 
 var (
@@ -265,6 +281,7 @@ type addrStruct struct{ val string }
 func (a addrStruct) Network() string {
 	return a.val
 }
+
 func (a addrStruct) String() string {
 	return a.val
 }
@@ -310,46 +327,50 @@ func TestAddrs(t *testing.T) {
 }
 
 // Has a valid IPv4 address (IPv6 is LLA)
-type validNetworkInterface struct {
-}
+type validNetworkInterface struct{}
 
 func (_ validNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &upIntf, nil
 }
+
 func (_ validNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{
-		addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}, addrStruct{val: "10.254.71.145/17"}}
+		addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}, addrStruct{val: "10.254.71.145/17"},
+	}
 	return ifat, nil
 }
+
 func (_ validNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf}, nil
 }
 
 // Both IPv4 and IPv6 addresses (expecting IPv4 to be used)
-type v4v6NetworkInterface struct {
-}
+type v4v6NetworkInterface struct{}
 
 func (_ v4v6NetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &upIntf, nil
 }
+
 func (_ v4v6NetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{
-		addrStruct{val: "2001::10/64"}, addrStruct{val: "10.254.71.145/17"}}
+		addrStruct{val: "2001::10/64"}, addrStruct{val: "10.254.71.145/17"},
+	}
 	return ifat, nil
 }
+
 func (_ v4v6NetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf}, nil
 }
 
 // Interface with only IPv6 address
-type ipv6NetworkInterface struct {
-}
+type ipv6NetworkInterface struct{}
 
 func (_ ipv6NetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &upIntf, nil
 }
+
 func (_ ipv6NetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{addrStruct{val: "2001::200/64"}}
@@ -361,103 +382,111 @@ func (_ ipv6NetworkInterface) Interfaces() ([]net.Interface, error) {
 }
 
 // Only with link local addresses
-type networkInterfaceWithOnlyLinkLocals struct {
-}
+type networkInterfaceWithOnlyLinkLocals struct{}
 
 func (_ networkInterfaceWithOnlyLinkLocals) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &upIntf, nil
 }
+
 func (_ networkInterfaceWithOnlyLinkLocals) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{addrStruct{val: "169.254.162.166/16"}, addrStruct{val: "fe80::200/10"}}
 	return ifat, nil
 }
+
 func (_ networkInterfaceWithOnlyLinkLocals) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf}, nil
 }
 
 // Unable to get interface(s)
-type failGettingNetworkInterface struct {
-}
+type failGettingNetworkInterface struct{}
 
 func (_ failGettingNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return nil, fmt.Errorf("unable get Interface")
 }
+
 func (_ failGettingNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	return nil, nil
 }
+
 func (_ failGettingNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return nil, fmt.Errorf("mock failed getting all interfaces")
 }
 
 // No interfaces
-type noNetworkInterface struct {
-}
+type noNetworkInterface struct{}
 
 func (_ noNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return nil, fmt.Errorf("no such network interface")
 }
+
 func (_ noNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	return nil, nil
 }
+
 func (_ noNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{}, nil
 }
 
 // Interface is down
-type downNetworkInterface struct {
-}
+type downNetworkInterface struct{}
 
 func (_ downNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &downIntf, nil
 }
+
 func (_ downNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{
-		addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}, addrStruct{val: "10.254.71.145/17"}}
+		addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}, addrStruct{val: "10.254.71.145/17"},
+	}
 	return ifat, nil
 }
+
 func (_ downNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{downIntf}, nil
 }
 
 // Loopback interface
-type loopbackNetworkInterface struct {
-}
+type loopbackNetworkInterface struct{}
 
 func (_ loopbackNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &loopbackIntf, nil
 }
+
 func (_ loopbackNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{
-		addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"}}
+		addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"},
+	}
 	return ifat, nil
 }
+
 func (_ loopbackNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{loopbackIntf}, nil
 }
 
 // Point to point interface
-type p2pNetworkInterface struct {
-}
+type p2pNetworkInterface struct{}
 
 func (_ p2pNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &p2pIntf, nil
 }
+
 func (_ p2pNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{
-		addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"}}
+		addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"},
+	}
 	return ifat, nil
 }
+
 func (_ p2pNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{p2pIntf}, nil
 }
 
 // Interface with link locals and loopback interface with global addresses
-type linkLocalLoopbackNetworkInterface struct {
-}
+type linkLocalLoopbackNetworkInterface struct{}
 
 func (_ linkLocalLoopbackNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	if intfName == LoopbackInterfaceName {
@@ -465,23 +494,28 @@ func (_ linkLocalLoopbackNetworkInterface) InterfaceByName(intfName string) (*ne
 	}
 	return &upIntf, nil
 }
+
 func (_ linkLocalLoopbackNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{addrStruct{val: "169.254.162.166/16"}, addrStruct{val: "fe80::200/10"}}
 	if intf.Name == LoopbackInterfaceName {
-		ifat = []net.Addr{addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"},
+		ifat = []net.Addr{
+			addrStruct{val: "::1/128"},
+			addrStruct{val: "127.0.0.1/8"},
 			// global addresses on loopback interface
-			addrStruct{val: "10.1.1.1/32"}, addrStruct{val: "fd00:1:1::1/128"}}
+			addrStruct{val: "10.1.1.1/32"},
+			addrStruct{val: "fd00:1:1::1/128"},
+		}
 	}
 	return ifat, nil
 }
+
 func (_ linkLocalLoopbackNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf, loopbackIntf}, nil
 }
 
 // Interface and loopback interface with global addresses
-type globalsNetworkInterface struct {
-}
+type globalsNetworkInterface struct{}
 
 func (_ globalsNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	if intfName == LoopbackInterfaceName {
@@ -489,62 +523,75 @@ func (_ globalsNetworkInterface) InterfaceByName(intfName string) (*net.Interfac
 	}
 	return &upIntf, nil
 }
+
 func (_ globalsNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
-	ifat = []net.Addr{addrStruct{val: "169.254.162.166/16"}, addrStruct{val: "fe80::200/10"},
-		addrStruct{val: "192.168.1.1/31"}, addrStruct{val: "fd00::200/127"}}
+	ifat = []net.Addr{
+		addrStruct{val: "169.254.162.166/16"},
+		addrStruct{val: "fe80::200/10"},
+		addrStruct{val: "192.168.1.1/31"},
+		addrStruct{val: "fd00::200/127"},
+	}
 	if intf.Name == LoopbackInterfaceName {
-		ifat = []net.Addr{addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"},
+		ifat = []net.Addr{
+			addrStruct{val: "::1/128"},
+			addrStruct{val: "127.0.0.1/8"},
 			// global addresses on loopback interface
-			addrStruct{val: "10.1.1.1/32"}, addrStruct{val: "fd00:1:1::1/128"}}
+			addrStruct{val: "10.1.1.1/32"},
+			addrStruct{val: "fd00:1:1::1/128"},
+		}
 	}
 	return ifat, nil
 }
+
 func (_ globalsNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf, loopbackIntf}, nil
 }
 
 // Unable to get IP addresses for interface
-type networkInterfaceFailGetAddrs struct {
-}
+type networkInterfaceFailGetAddrs struct{}
 
 func (_ networkInterfaceFailGetAddrs) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &upIntf, nil
 }
+
 func (_ networkInterfaceFailGetAddrs) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	return nil, fmt.Errorf("unable to get Addrs")
 }
+
 func (_ networkInterfaceFailGetAddrs) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf}, nil
 }
 
 // No addresses for interface
-type networkInterfaceWithNoAddrs struct {
-}
+type networkInterfaceWithNoAddrs struct{}
 
 func (_ networkInterfaceWithNoAddrs) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &upIntf, nil
 }
+
 func (_ networkInterfaceWithNoAddrs) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	ifat := []net.Addr{}
 	return ifat, nil
 }
+
 func (_ networkInterfaceWithNoAddrs) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf}, nil
 }
 
 // Invalid addresses for interface
-type networkInterfaceWithInvalidAddr struct {
-}
+type networkInterfaceWithInvalidAddr struct{}
 
 func (_ networkInterfaceWithInvalidAddr) InterfaceByName(intfName string) (*net.Interface, error) {
 	return &upIntf, nil
 }
+
 func (_ networkInterfaceWithInvalidAddr) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	var ifat []net.Addr
 	ifat = []net.Addr{addrStruct{val: "10.20.30.40.50/24"}}
 	return ifat, nil
 }
+
 func (_ networkInterfaceWithInvalidAddr) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf}, nil
 }

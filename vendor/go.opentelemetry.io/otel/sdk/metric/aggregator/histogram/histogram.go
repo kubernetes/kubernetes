@@ -97,10 +97,12 @@ var defaultInt64ExplicitBoundaries = func(bounds []float64) (asint []float64) {
 	return
 }(defaultFloat64ExplicitBoundaries)
 
-var _ export.Aggregator = &Aggregator{}
-var _ aggregation.Sum = &Aggregator{}
-var _ aggregation.Count = &Aggregator{}
-var _ aggregation.Histogram = &Aggregator{}
+var (
+	_ export.Aggregator     = &Aggregator{}
+	_ aggregation.Sum       = &Aggregator{}
+	_ aggregation.Count     = &Aggregator{}
+	_ aggregation.Histogram = &Aggregator{}
+)
 
 // New returns a new aggregator for computing Histograms.
 //

@@ -267,7 +267,8 @@ func TestDryRunPreemption(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registeredPlugins := append([]st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			},
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			var objs []runtime.Object

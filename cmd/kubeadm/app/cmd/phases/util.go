@@ -25,7 +25,6 @@ import (
 // SetKubernetesVersion gets the current Kubeadm version and sets it as KubeadmVersion in the config,
 // unless it's already set to a value different from the default.
 func SetKubernetesVersion(cfg *kubeadmapiv1.ClusterConfiguration) {
-
 	if cfg.KubernetesVersion != kubeadmapiv1.DefaultKubernetesVersion && cfg.KubernetesVersion != "" {
 		return
 	}

@@ -21,8 +21,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-type rawMap map[attribute.Key]attribute.Value
-type keySet map[attribute.Key]struct{}
+type (
+	rawMap map[attribute.Key]attribute.Value
+	keySet map[attribute.Key]struct{}
+)
 
 // Map is an immutable storage for correlations.
 type Map struct {

@@ -35,7 +35,6 @@ You can also use "git clone http://localhost:8000 my-repo-name" to rename that r
 
 func hello(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "I am a fake git server")
-
 }
 
 // When doing `git clone localhost:8000`, you will clone an empty git repo named "8000" on local.

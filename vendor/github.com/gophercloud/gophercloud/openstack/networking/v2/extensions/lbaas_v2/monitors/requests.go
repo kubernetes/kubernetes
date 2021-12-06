@@ -76,9 +76,7 @@ const (
 	TypeHTTPS = "HTTPS"
 )
 
-var (
-	errDelayMustGETimeout = fmt.Errorf("Delay must be greater than or equal to timeout")
-)
+var errDelayMustGETimeout = fmt.Errorf("Delay must be greater than or equal to timeout")
 
 // CreateOptsBuilder allows extensions to add additional parameters to the
 // List request.

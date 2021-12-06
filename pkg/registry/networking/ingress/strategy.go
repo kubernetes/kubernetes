@@ -83,7 +83,6 @@ func (ingressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	if !apiequality.Semantic.DeepEqual(oldIngress.Spec, newIngress.Spec) {
 		newIngress.Generation = oldIngress.Generation + 1
 	}
-
 }
 
 // Validate validates ingresses on create.

@@ -107,5 +107,4 @@ func (c RoleModifier) Update(in RuleOwner) (RuleOwner, error) {
 		return nil, err
 	}
 	return RoleRuleOwner{Role: ret}, err
-
 }

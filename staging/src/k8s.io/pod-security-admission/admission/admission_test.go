@@ -492,7 +492,7 @@ func TestValidateNamespace(t *testing.T) {
 					Labels: tc.newLabels,
 				},
 			}
-			var operation = admissionv1.Create
+			operation := admissionv1.Create
 			var oldObject runtime.Object
 			if tc.oldLabels != nil {
 				operation = admissionv1.Update
@@ -1051,6 +1051,7 @@ func (r *FakeRecorder) RecordEvaluation(decision metrics.Decision, policy api.Le
 func (r *FakeRecorder) RecordExemption(attrs api.Attributes) {
 	r.exemptions = append(r.exemptions, MetricsRecord{ObjectName: attrs.GetName()})
 }
+
 func (r *FakeRecorder) RecordError(_ bool, attrs api.Attributes) {
 	r.errors = append(r.errors, MetricsRecord{ObjectName: attrs.GetName()})
 }

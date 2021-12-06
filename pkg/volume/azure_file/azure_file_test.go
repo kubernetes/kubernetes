@@ -236,6 +236,7 @@ type fakeAzureSvc struct{}
 func (s *fakeAzureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secretName string) (string, string, error) {
 	return "name", "key", nil
 }
+
 func (s *fakeAzureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accountName, accountKey string) (string, error) {
 	return "secret", nil
 }
@@ -358,7 +359,6 @@ func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
 				err, resultNs, resultName)
 		}
 	}
-
 }
 
 func TestAppendDefaultMountOptions(t *testing.T) {
@@ -370,7 +370,8 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		{
 			options: []string{"dir_mode=0777"},
 			fsGroup: nil,
-			expected: []string{"dir_mode=0777",
+			expected: []string{
+				"dir_mode=0777",
 				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", vers, defaultVers),
 				fmt.Sprintf("%s=%s", actimeo, defaultActimeo),
@@ -380,7 +381,8 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		{
 			options: []string{"file_mode=0777"},
 			fsGroup: to.Int64Ptr(0),
-			expected: []string{"file_mode=0777",
+			expected: []string{
+				"file_mode=0777",
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
 				fmt.Sprintf("%s=%s", vers, defaultVers),
 				fmt.Sprintf("%s=0", gid),
@@ -391,7 +393,8 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		{
 			options: []string{"vers=2.1"},
 			fsGroup: to.Int64Ptr(1000),
-			expected: []string{"vers=2.1",
+			expected: []string{
+				"vers=2.1",
 				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
 				fmt.Sprintf("%s=1000", gid),
@@ -401,8 +404,9 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{""},
-			expected: []string{"", fmt.Sprintf("%s=%s",
-				fileMode, defaultFileMode),
+			expected: []string{
+				"", fmt.Sprintf("%s=%s",
+					fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
 				fmt.Sprintf("%s=%s", vers, defaultVers),
 				fmt.Sprintf("%s=%s", actimeo, defaultActimeo),
@@ -411,7 +415,8 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{"file_mode=0777", "dir_mode=0777"},
-			expected: []string{"file_mode=0777", "dir_mode=0777",
+			expected: []string{
+				"file_mode=0777", "dir_mode=0777",
 				fmt.Sprintf("%s=%s", vers, defaultVers),
 				fmt.Sprintf("%s=%s", actimeo, defaultActimeo),
 				mfsymlinks,
@@ -420,7 +425,8 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		{
 			options: []string{"gid=2000"},
 			fsGroup: to.Int64Ptr(1000),
-			expected: []string{"gid=2000",
+			expected: []string{
+				"gid=2000",
 				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
 				"vers=3.0",

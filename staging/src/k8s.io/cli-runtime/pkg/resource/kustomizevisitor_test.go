@@ -17,10 +17,11 @@ limitations under the License.
 package resource
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
-	"testing"
 )
 
 const (

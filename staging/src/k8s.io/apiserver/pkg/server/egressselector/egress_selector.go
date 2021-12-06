@@ -331,7 +331,6 @@ func connectionToDialerCreator(c apiserver.Connection) (*dialerCreator, error) {
 	default:
 		return nil, fmt.Errorf("unrecognized service connection protocol %q", c.ProxyProtocol)
 	}
-
 }
 
 // NewEgressSelector configures lookup mechanism for Lookup.

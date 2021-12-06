@@ -321,7 +321,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	delete(params, "requests")
 	delete(params, "limits")
 
-	var createdObjects = []*RunObject{}
+	createdObjects := []*RunObject{}
 	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, o.NewOverrider(&corev1.Pod{}))
 	if err != nil {
 		return err

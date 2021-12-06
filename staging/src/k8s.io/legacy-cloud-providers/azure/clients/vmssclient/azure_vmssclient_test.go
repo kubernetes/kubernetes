@@ -785,6 +785,7 @@ func TestDeleteInstancesWaitError(t *testing.T) {
 	assert.NotNil(t, rerr)
 	assert.Equal(t, vmssDeleteInstancesErr, rerr)
 }
+
 func TestDeleteInstancesAsync(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

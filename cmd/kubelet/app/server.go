@@ -403,7 +403,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	mounter := mount.New(s.ExperimentalMounterPath)
 	subpather := subpath.New(mounter)
 	hu := hostutil.NewHostUtil()
-	var pluginRunner = exec.New()
+	pluginRunner := exec.New()
 
 	var dockerOptions *kubelet.DockerOptions
 	if s.ContainerRuntime == kubetypes.DockerContainerRuntime {
@@ -434,7 +434,8 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       plugins,
 		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
-		TLSOptions:          tlsOptions}, nil
+		TLSOptions:          tlsOptions,
+	}, nil
 }
 
 // Run runs the specified KubeletServer with the given Dependencies. This should never exit.

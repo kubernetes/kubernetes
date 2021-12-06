@@ -156,7 +156,6 @@ func TestEndpointUpdates(t *testing.T) {
 	if resVersion != endpoints.ObjectMeta.ResourceVersion {
 		t.Fatalf("endpoints resource version does not match, expected %s received %s", resVersion, endpoints.ObjectMeta.ResourceVersion)
 	}
-
 }
 
 // TestEndpointWithTerminatingPod tests that terminating pods are NOT included in Endpoints.
@@ -348,5 +347,4 @@ func newService(namespace, name string) *v1.Service {
 			},
 		},
 	}
-
 }

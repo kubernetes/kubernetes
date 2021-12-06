@@ -1590,7 +1590,6 @@ func (r *raft) restore(s pb.Snapshot) bool {
 		Tracker:   r.prs,
 		LastIndex: r.raftLog.lastIndex(),
 	}, cs)
-
 	if err != nil {
 		// This should never happen. Either there's a bug in our config change
 		// handling or the client corrupted the conf change.
@@ -1627,7 +1626,6 @@ func (r *raft) applyConfChange(cc pb.ConfChangeV2) pb.ConfState {
 		}
 		return changer.Simple(cc.Changes...)
 	}()
-
 	if err != nil {
 		// TODO(tbg): return the error to the caller.
 		panic(err)

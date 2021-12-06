@@ -244,6 +244,7 @@ func TestStripPathShortcuts(t *testing.T) {
 		}
 	}
 }
+
 func TestIsDestRelative(t *testing.T) {
 	tests := []struct {
 		base     string
@@ -387,7 +388,7 @@ func TestTarUntar(t *testing.T) {
 
 	for _, file := range files {
 		completePath := dir + file.name
-		if err := os.MkdirAll(filepath.Dir(completePath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(completePath), 0o755); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if file.fileType == RegularFile {
@@ -463,7 +464,7 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 	}()
 
 	completePath := dir + "foo"
-	if err := os.MkdirAll(filepath.Dir(completePath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(completePath), 0o755); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	createTmpFile(t, completePath, "sample data")
@@ -523,7 +524,7 @@ func TestTarDestinationName(t *testing.T) {
 	// ensure files exist on disk
 	for _, file := range files {
 		completePath := dir + "/" + file.name
-		if err := os.MkdirAll(filepath.Dir(completePath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(completePath), 0o755); err != nil {
 			t.Errorf("unexpected error: %v", err)
 			t.FailNow()
 		}
@@ -564,7 +565,7 @@ func TestBadTar(t *testing.T) {
 	// More or less cribbed from https://golang.org/pkg/archive/tar/#example__minimal
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	var files = []struct {
+	files := []struct {
 		name string
 		body string
 	}{
@@ -573,7 +574,7 @@ func TestBadTar(t *testing.T) {
 	for _, file := range files {
 		hdr := &tar.Header{
 			Name: file.name,
-			Mode: 0600,
+			Mode: 0o600,
 			Size: int64(len(file.body)),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
@@ -662,9 +663,9 @@ func TestCopyToPod(t *testing.T) {
 		opts.Complete(tf, cmd)
 		t.Run(name, func(t *testing.T) {
 			err = opts.Run([]string{test.src, fmt.Sprintf("pod-ns/pod-name:%s", test.dest)})
-			//If error is NotFound error , it indicates that the
-			//request has been sent correctly.
-			//Treat this as no error.
+			// If error is NotFound error , it indicates that the
+			// request has been sent correctly.
+			// Treat this as no error.
 			if test.expectedErr && errors.IsNotFound(err) {
 				t.Errorf("expected error but didn't get one")
 			}
@@ -888,7 +889,7 @@ func TestUntar(t *testing.T) {
 		if f.linkTarget == "" {
 			hdr := &tar.Header{
 				Name: f.path,
-				Mode: 0666,
+				Mode: 0o666,
 				Size: int64(len(f.path)),
 			}
 			require.NoError(t, tw.WriteHeader(hdr), f.path)
@@ -899,7 +900,7 @@ func TestUntar(t *testing.T) {
 		} else {
 			hdr := &tar.Header{
 				Name:     f.path,
-				Mode:     int64(0777 | os.ModeSymlink),
+				Mode:     int64(0o777 | os.ModeSymlink),
 				Typeflag: tar.TypeSymlink,
 				Linkname: f.linkTarget,
 			}
@@ -951,7 +952,7 @@ func TestUntar_SingleFile(t *testing.T) {
 	)
 	hdr := &tar.Header{
 		Name: srcName,
-		Mode: 0666,
+		Mode: 0o666,
 		Size: int64(len(content)),
 	}
 	require.NoError(t, tw.WriteHeader(hdr))

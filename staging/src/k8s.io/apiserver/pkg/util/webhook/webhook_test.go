@@ -437,7 +437,6 @@ func TestTLSConfig(t *testing.T) {
 					},
 				},
 			})
-
 			if err != nil {
 				t.Errorf("%s: %v", tt.test, err)
 				return
@@ -518,7 +517,7 @@ func TestRequestTimeout(t *testing.T) {
 	}
 	defer os.Remove(configFile)
 
-	var requestTimeout = 10 * time.Millisecond
+	requestTimeout := 10 * time.Millisecond
 
 	wh, err := newGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout, nil)
 	if err != nil {
@@ -571,7 +570,6 @@ func TestWithExponentialBackoff(t *testing.T) {
 
 	// Create and start a simple HTTPS server
 	server, err := newTestServer(clientCert, clientKey, caCert, ebHandler)
-
 	if err != nil {
 		t.Errorf("failed to create server: %v", err)
 		return
@@ -598,7 +596,6 @@ func TestWithExponentialBackoff(t *testing.T) {
 			},
 		},
 	})
-
 	if err != nil {
 		t.Errorf("failed to create the client config file: %v", err)
 		return
@@ -607,7 +604,6 @@ func TestWithExponentialBackoff(t *testing.T) {
 	defer os.Remove(configFile)
 
 	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
-
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)
 	}
@@ -637,7 +633,6 @@ func TestWithExponentialBackoff(t *testing.T) {
 
 func bootstrapTestDir(t *testing.T) string {
 	dir, err := ioutil.TempDir("", "")
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -651,7 +646,7 @@ func bootstrapTestDir(t *testing.T) string {
 
 	// Write the certificate files to disk or fail
 	for fileName, fileData := range files {
-		if err := ioutil.WriteFile(filepath.Join(dir, fileName), fileData, 0400); err != nil {
+		if err := ioutil.WriteFile(filepath.Join(dir, fileName), fileData, 0o400); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -661,7 +656,6 @@ func bootstrapTestDir(t *testing.T) string {
 
 func newKubeConfigFile(config v1.Config) (string, error) {
 	configFile, err := ioutil.TempFile("", "")
-
 	if err != nil {
 		return "", fmt.Errorf("unable to create the Kubernetes client config file: %v", err)
 	}
@@ -678,7 +672,6 @@ func newTestServer(clientCert, clientKey, caCert []byte, handler func(http.Respo
 
 	if clientCert != nil {
 		cert, err := tls.X509KeyPair(clientCert, clientKey)
-
 		if err != nil {
 			return nil, err
 		}

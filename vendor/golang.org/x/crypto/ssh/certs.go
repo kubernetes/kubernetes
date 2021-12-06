@@ -240,7 +240,8 @@ func NewCertSigner(cert *Certificate, signer Signer) (Signer, error) {
 
 	if algorithmSigner, ok := signer.(AlgorithmSigner); ok {
 		return &algorithmOpenSSHCertSigner{
-			&openSSHCertSigner{cert, signer}, algorithmSigner}, nil
+			&openSSHCertSigner{cert, signer}, algorithmSigner,
+		}, nil
 	} else {
 		return &openSSHCertSigner{cert, signer}, nil
 	}

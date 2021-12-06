@@ -142,7 +142,8 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		windowsPodWithSELinux.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{Level: "s0:c24,c9"}
 		windowsPodWithSELinux.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
 			SELinuxOptions: &v1.SELinuxOptions{Level: "s0:c24,c9"},
-			WindowsOptions: &v1.WindowsSecurityContextOptions{RunAsUserName: &containerUserName}}
+			WindowsOptions: &v1.WindowsSecurityContextOptions{RunAsUserName: &containerUserName},
+		}
 		windowsPodWithSELinux.Spec.Tolerations = []v1.Toleration{{Key: "os", Value: "Windows"}}
 		windowsPodWithSELinux, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
 			windowsPodWithSELinux, metav1.CreateOptions{})

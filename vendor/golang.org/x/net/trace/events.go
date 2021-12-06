@@ -299,7 +299,6 @@ func (el *eventLog) delta(t time.Time) (time.Duration, bool) {
 	}
 	prev := el.events[len(el.events)-1].When
 	return t.Sub(prev), prev.Day() != t.Day()
-
 }
 
 func (el *eventLog) Printf(format string, a ...interface{}) {
@@ -416,8 +415,10 @@ func freeEventLog(el *eventLog) {
 	}
 }
 
-var eventsTmplCache *template.Template
-var eventsTmplOnce sync.Once
+var (
+	eventsTmplCache *template.Template
+	eventsTmplOnce  sync.Once
+)
 
 func eventsTmpl() *template.Template {
 	eventsTmplOnce.Do(func() {

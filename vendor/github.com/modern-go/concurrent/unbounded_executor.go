@@ -3,11 +3,11 @@ package concurrent
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"runtime"
 	"runtime/debug"
 	"sync"
 	"time"
-	"reflect"
 )
 
 // HandlePanic logs goroutine panic by default

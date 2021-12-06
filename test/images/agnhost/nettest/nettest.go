@@ -200,10 +200,8 @@ func (s *State) appendSuccessfulSend(toHostname string) {
 	s.Sent[toHostname]++
 }
 
-var (
-	// Our one and only state object
-	state State
-)
+// Our one and only state object
+var state State
 
 func main(cmd *cobra.Command, args []string) {
 	if service == "" {
@@ -314,7 +312,7 @@ func contactOthers(state *State) {
 	}
 }
 
-//getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
+// getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
 func getWebserverEndpoints(client clientset.Interface) sets.String {
 	endpoints, err := client.CoreV1().Endpoints(namespace).Get(context.TODO(), service, v1.GetOptions{})
 	eps := sets.String{}

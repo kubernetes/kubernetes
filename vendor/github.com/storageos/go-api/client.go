@@ -343,10 +343,10 @@ func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response
 		ctx = context.Background()
 	}
 
-	var failedAddresses = map[string]struct{}{}
+	failedAddresses := map[string]struct{}{}
 
 	c.addressLock.Lock()
-	var addresses = make([]string, len(c.addresses))
+	addresses := make([]string, len(c.addresses))
 	copy(addresses, c.addresses)
 	c.addressLock.Unlock()
 
@@ -411,7 +411,6 @@ func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response
 					failedAddresses[address] = struct{}{}
 					shouldretry = true
 				}
-
 			}
 		}
 
@@ -451,7 +450,7 @@ func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response
 }
 
 func (c *Client) getAPIPath(path string, query url.Values, unversioned bool) string {
-	var apiPath = strings.TrimLeft(path, "/")
+	apiPath := strings.TrimLeft(path, "/")
 
 	if !unversioned {
 		apiPath = fmt.Sprintf("/%s/%s", c.requestedAPIVersion, apiPath)

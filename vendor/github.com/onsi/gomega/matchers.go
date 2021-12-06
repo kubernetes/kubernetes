@@ -7,51 +7,51 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-//Equal uses reflect.DeepEqual to compare actual with expected.  Equal is strict about
-//types when performing comparisons.
-//It is an error for both actual and expected to be nil.  Use BeNil() instead.
+// Equal uses reflect.DeepEqual to compare actual with expected.  Equal is strict about
+// types when performing comparisons.
+// It is an error for both actual and expected to be nil.  Use BeNil() instead.
 func Equal(expected interface{}) types.GomegaMatcher {
 	return &matchers.EqualMatcher{
 		Expected: expected,
 	}
 }
 
-//BeEquivalentTo is more lax than Equal, allowing equality between different types.
-//This is done by converting actual to have the type of expected before
-//attempting equality with reflect.DeepEqual.
-//It is an error for actual and expected to be nil.  Use BeNil() instead.
+// BeEquivalentTo is more lax than Equal, allowing equality between different types.
+// This is done by converting actual to have the type of expected before
+// attempting equality with reflect.DeepEqual.
+// It is an error for actual and expected to be nil.  Use BeNil() instead.
 func BeEquivalentTo(expected interface{}) types.GomegaMatcher {
 	return &matchers.BeEquivalentToMatcher{
 		Expected: expected,
 	}
 }
 
-//BeIdenticalTo uses the == operator to compare actual with expected.
-//BeIdenticalTo is strict about types when performing comparisons.
-//It is an error for both actual and expected to be nil.  Use BeNil() instead.
+// BeIdenticalTo uses the == operator to compare actual with expected.
+// BeIdenticalTo is strict about types when performing comparisons.
+// It is an error for both actual and expected to be nil.  Use BeNil() instead.
 func BeIdenticalTo(expected interface{}) types.GomegaMatcher {
 	return &matchers.BeIdenticalToMatcher{
 		Expected: expected,
 	}
 }
 
-//BeNil succeeds if actual is nil
+// BeNil succeeds if actual is nil
 func BeNil() types.GomegaMatcher {
 	return &matchers.BeNilMatcher{}
 }
 
-//BeTrue succeeds if actual is true
+// BeTrue succeeds if actual is true
 func BeTrue() types.GomegaMatcher {
 	return &matchers.BeTrueMatcher{}
 }
 
-//BeFalse succeeds if actual is false
+// BeFalse succeeds if actual is false
 func BeFalse() types.GomegaMatcher {
 	return &matchers.BeFalseMatcher{}
 }
 
-//HaveOccurred succeeds if actual is a non-nil error
-//The typical Go error checking pattern looks like:
+// HaveOccurred succeeds if actual is a non-nil error
+// The typical Go error checking pattern looks like:
 //    err := SomethingThatMightFail()
 //    Expect(err).ShouldNot(HaveOccurred())
 func HaveOccurred() types.GomegaMatcher {
@@ -165,9 +165,9 @@ func BeSent(arg interface{}) types.GomegaMatcher {
 	}
 }
 
-//MatchRegexp succeeds if actual is a string or stringer that matches the
-//passed-in regexp.  Optional arguments can be provided to construct a regexp
-//via fmt.Sprintf().
+// MatchRegexp succeeds if actual is a string or stringer that matches the
+// passed-in regexp.  Optional arguments can be provided to construct a regexp
+// via fmt.Sprintf().
 func MatchRegexp(regexp string, args ...interface{}) types.GomegaMatcher {
 	return &matchers.MatchRegexpMatcher{
 		Regexp: regexp,
@@ -175,9 +175,9 @@ func MatchRegexp(regexp string, args ...interface{}) types.GomegaMatcher {
 	}
 }
 
-//ContainSubstring succeeds if actual is a string or stringer that contains the
-//passed-in substring.  Optional arguments can be provided to construct the substring
-//via fmt.Sprintf().
+// ContainSubstring succeeds if actual is a string or stringer that contains the
+// passed-in substring.  Optional arguments can be provided to construct the substring
+// via fmt.Sprintf().
 func ContainSubstring(substr string, args ...interface{}) types.GomegaMatcher {
 	return &matchers.ContainSubstringMatcher{
 		Substr: substr,
@@ -185,9 +185,9 @@ func ContainSubstring(substr string, args ...interface{}) types.GomegaMatcher {
 	}
 }
 
-//HavePrefix succeeds if actual is a string or stringer that contains the
-//passed-in string as a prefix.  Optional arguments can be provided to construct
-//via fmt.Sprintf().
+// HavePrefix succeeds if actual is a string or stringer that contains the
+// passed-in string as a prefix.  Optional arguments can be provided to construct
+// via fmt.Sprintf().
 func HavePrefix(prefix string, args ...interface{}) types.GomegaMatcher {
 	return &matchers.HavePrefixMatcher{
 		Prefix: prefix,
@@ -195,9 +195,9 @@ func HavePrefix(prefix string, args ...interface{}) types.GomegaMatcher {
 	}
 }
 
-//HaveSuffix succeeds if actual is a string or stringer that contains the
-//passed-in string as a suffix.  Optional arguments can be provided to construct
-//via fmt.Sprintf().
+// HaveSuffix succeeds if actual is a string or stringer that contains the
+// passed-in string as a suffix.  Optional arguments can be provided to construct
+// via fmt.Sprintf().
 func HaveSuffix(suffix string, args ...interface{}) types.GomegaMatcher {
 	return &matchers.HaveSuffixMatcher{
 		Suffix: suffix,
@@ -205,53 +205,53 @@ func HaveSuffix(suffix string, args ...interface{}) types.GomegaMatcher {
 	}
 }
 
-//MatchJSON succeeds if actual is a string or stringer of JSON that matches
-//the expected JSON.  The JSONs are decoded and the resulting objects are compared via
-//reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
+// MatchJSON succeeds if actual is a string or stringer of JSON that matches
+// the expected JSON.  The JSONs are decoded and the resulting objects are compared via
+// reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
 func MatchJSON(json interface{}) types.GomegaMatcher {
 	return &matchers.MatchJSONMatcher{
 		JSONToMatch: json,
 	}
 }
 
-//MatchXML succeeds if actual is a string or stringer of XML that matches
-//the expected XML.  The XMLs are decoded and the resulting objects are compared via
-//reflect.DeepEqual so things like whitespaces shouldn't matter.
+// MatchXML succeeds if actual is a string or stringer of XML that matches
+// the expected XML.  The XMLs are decoded and the resulting objects are compared via
+// reflect.DeepEqual so things like whitespaces shouldn't matter.
 func MatchXML(xml interface{}) types.GomegaMatcher {
 	return &matchers.MatchXMLMatcher{
 		XMLToMatch: xml,
 	}
 }
 
-//MatchYAML succeeds if actual is a string or stringer of YAML that matches
-//the expected YAML.  The YAML's are decoded and the resulting objects are compared via
-//reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
+// MatchYAML succeeds if actual is a string or stringer of YAML that matches
+// the expected YAML.  The YAML's are decoded and the resulting objects are compared via
+// reflect.DeepEqual so things like key-ordering and whitespace shouldn't matter.
 func MatchYAML(yaml interface{}) types.GomegaMatcher {
 	return &matchers.MatchYAMLMatcher{
 		YAMLToMatch: yaml,
 	}
 }
 
-//BeEmpty succeeds if actual is empty.  Actual must be of type string, array, map, chan, or slice.
+// BeEmpty succeeds if actual is empty.  Actual must be of type string, array, map, chan, or slice.
 func BeEmpty() types.GomegaMatcher {
 	return &matchers.BeEmptyMatcher{}
 }
 
-//HaveLen succeeds if actual has the passed-in length.  Actual must be of type string, array, map, chan, or slice.
+// HaveLen succeeds if actual has the passed-in length.  Actual must be of type string, array, map, chan, or slice.
 func HaveLen(count int) types.GomegaMatcher {
 	return &matchers.HaveLenMatcher{
 		Count: count,
 	}
 }
 
-//HaveCap succeeds if actual has the passed-in capacity.  Actual must be of type array, chan, or slice.
+// HaveCap succeeds if actual has the passed-in capacity.  Actual must be of type array, chan, or slice.
 func HaveCap(count int) types.GomegaMatcher {
 	return &matchers.HaveCapMatcher{
 		Count: count,
 	}
 }
 
-//BeZero succeeds if actual is the zero value for its type or if actual is nil.
+// BeZero succeeds if actual is the zero value for its type or if actual is nil.
 func BeZero() types.GomegaMatcher {
 	return &matchers.BeZeroMatcher{}
 }
@@ -320,9 +320,9 @@ func ContainElements(elements ...interface{}) types.GomegaMatcher {
 	}
 }
 
-//HaveKey succeeds if actual is a map with the passed in key.
-//By default HaveKey uses Equal() to perform the match, however a
-//matcher can be passed in instead:
+// HaveKey succeeds if actual is a map with the passed in key.
+// By default HaveKey uses Equal() to perform the match, however a
+// matcher can be passed in instead:
 //    Expect(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKey(MatchRegexp(`.+Foo$`)))
 func HaveKey(key interface{}) types.GomegaMatcher {
 	return &matchers.HaveKeyMatcher{
@@ -330,9 +330,9 @@ func HaveKey(key interface{}) types.GomegaMatcher {
 	}
 }
 
-//HaveKeyWithValue succeeds if actual is a map with the passed in key and value.
-//By default HaveKeyWithValue uses Equal() to perform the match, however a
-//matcher can be passed in instead:
+// HaveKeyWithValue succeeds if actual is a map with the passed in key and value.
+// By default HaveKeyWithValue uses Equal() to perform the match, however a
+// matcher can be passed in instead:
 //    Expect(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKeyWithValue("Foo", "Bar"))
 //    Expect(map[string]string{"Foo": "Bar", "BazFoo": "Duck"}).Should(HaveKeyWithValue(MatchRegexp(`.+Foo$`), "Bar"))
 func HaveKeyWithValue(key interface{}, value interface{}) types.GomegaMatcher {
@@ -360,8 +360,8 @@ func BeNumerically(comparator string, compareTo ...interface{}) types.GomegaMatc
 	}
 }
 
-//BeTemporally compares time.Time's like BeNumerically
-//Actual and expected must be time.Time. The comparators are the same as for BeNumerically
+// BeTemporally compares time.Time's like BeNumerically
+// Actual and expected must be time.Time. The comparators are the same as for BeNumerically
 //    Expect(time.Now()).Should(BeTemporally(">", time.Time{}))
 //    Expect(time.Now()).Should(BeTemporally("~", time.Now(), time.Second))
 func BeTemporally(comparator string, compareTo time.Time, threshold ...time.Duration) types.GomegaMatcher {
@@ -372,8 +372,8 @@ func BeTemporally(comparator string, compareTo time.Time, threshold ...time.Dura
 	}
 }
 
-//BeAssignableToTypeOf succeeds if actual is assignable to the type of expected.
-//It will return an error when one of the values is nil.
+// BeAssignableToTypeOf succeeds if actual is assignable to the type of expected.
+// It will return an error when one of the values is nil.
 //    Expect(0).Should(BeAssignableToTypeOf(0))         // Same values
 //    Expect(5).Should(BeAssignableToTypeOf(-1))        // different values same type
 //    Expect("foo").Should(BeAssignableToTypeOf("bar")) // different values same type
@@ -384,8 +384,8 @@ func BeAssignableToTypeOf(expected interface{}) types.GomegaMatcher {
 	}
 }
 
-//Panic succeeds if actual is a function that, when invoked, panics.
-//Actual must be a function that takes no arguments and returns no results.
+// Panic succeeds if actual is a function that, when invoked, panics.
+// Actual must be a function that takes no arguments and returns no results.
 func Panic() types.GomegaMatcher {
 	return &matchers.PanicMatcher{}
 }
@@ -400,27 +400,27 @@ func PanicWith(expected interface{}) types.GomegaMatcher {
 	return &matchers.PanicMatcher{Expected: expected}
 }
 
-//BeAnExistingFile succeeds if a file exists.
-//Actual must be a string representing the abs path to the file being checked.
+// BeAnExistingFile succeeds if a file exists.
+// Actual must be a string representing the abs path to the file being checked.
 func BeAnExistingFile() types.GomegaMatcher {
 	return &matchers.BeAnExistingFileMatcher{}
 }
 
-//BeARegularFile succeeds if a file exists and is a regular file.
-//Actual must be a string representing the abs path to the file being checked.
+// BeARegularFile succeeds if a file exists and is a regular file.
+// Actual must be a string representing the abs path to the file being checked.
 func BeARegularFile() types.GomegaMatcher {
 	return &matchers.BeARegularFileMatcher{}
 }
 
-//BeADirectory succeeds if a file exists and is a directory.
-//Actual must be a string representing the abs path to the file being checked.
+// BeADirectory succeeds if a file exists and is a directory.
+// Actual must be a string representing the abs path to the file being checked.
 func BeADirectory() types.GomegaMatcher {
 	return &matchers.BeADirectoryMatcher{}
 }
 
-//HaveHTTPStatus succeeds if the Status or StatusCode field of an HTTP response matches.
-//Actual must be either a *http.Response or *httptest.ResponseRecorder.
-//Expected must be either an int or a string.
+// HaveHTTPStatus succeeds if the Status or StatusCode field of an HTTP response matches.
+// Actual must be either a *http.Response or *httptest.ResponseRecorder.
+// Expected must be either an int or a string.
 //  Expect(resp).Should(HaveHTTPStatus(http.StatusOK))   // asserts that resp.StatusCode == 200
 //  Expect(resp).Should(HaveHTTPStatus("404 Not Found")) // asserts that resp.Status == "404 Not Found"
 func HaveHTTPStatus(expected interface{}) types.GomegaMatcher {
@@ -436,7 +436,7 @@ func And(ms ...types.GomegaMatcher) types.GomegaMatcher {
 	return &matchers.AndMatcher{Matchers: ms}
 }
 
-//SatisfyAll is an alias for And().
+// SatisfyAll is an alias for And().
 //  Expect("hi").Should(SatisfyAll(HaveLen(2), Equal("hi")))
 func SatisfyAll(matchers ...types.GomegaMatcher) types.GomegaMatcher {
 	return And(matchers...)
@@ -451,7 +451,7 @@ func Or(ms ...types.GomegaMatcher) types.GomegaMatcher {
 	return &matchers.OrMatcher{Matchers: ms}
 }
 
-//SatisfyAny is an alias for Or().
+// SatisfyAny is an alias for Or().
 //  Expect("hi").SatisfyAny(Or(HaveLen(3), HaveLen(2))
 func SatisfyAny(matchers ...types.GomegaMatcher) types.GomegaMatcher {
 	return Or(matchers...)

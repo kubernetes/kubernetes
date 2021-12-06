@@ -174,7 +174,6 @@ type AsyncSingleRunner interface {
 	// multiple observations so the same implementation can be
 	// used for batch runners.)
 	Run(ctx context.Context, single AsyncImpl, capture func([]attribute.KeyValue, ...Observation))
-
 	AsyncRunner
 }
 
@@ -184,13 +183,14 @@ type AsyncBatchRunner interface {
 	// Run accepts a function for capturing observations of
 	// multiple instruments.
 	Run(ctx context.Context, capture func([]attribute.KeyValue, ...Observation))
-
 	AsyncRunner
 }
 
-var _ AsyncSingleRunner = (*Int64ObserverFunc)(nil)
-var _ AsyncSingleRunner = (*Float64ObserverFunc)(nil)
-var _ AsyncBatchRunner = (*BatchObserverFunc)(nil)
+var (
+	_ AsyncSingleRunner = (*Int64ObserverFunc)(nil)
+	_ AsyncSingleRunner = (*Float64ObserverFunc)(nil)
+	_ AsyncBatchRunner  = (*BatchObserverFunc)(nil)
+)
 
 // newInt64AsyncRunner returns a single-observer callback for integer Observer instruments.
 func newInt64AsyncRunner(c Int64ObserverFunc) AsyncSingleRunner {

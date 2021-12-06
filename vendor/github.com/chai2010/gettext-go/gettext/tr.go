@@ -33,7 +33,7 @@ func newMoTranslator(name string, data []byte) (*translator, error) {
 	if err != nil {
 		return nil, err
 	}
-	var tr = &translator{
+	tr := &translator{
 		MessageMap: make(map[string]mo.Message),
 	}
 	for _, v := range f.Messages {
@@ -60,7 +60,7 @@ func newPoTranslator(name string, data []byte) (*translator, error) {
 	if err != nil {
 		return nil, err
 	}
-	var tr = &translator{
+	tr := &translator{
 		MessageMap: make(map[string]mo.Message),
 	}
 	for _, v := range f.Messages {

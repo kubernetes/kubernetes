@@ -9,14 +9,12 @@ import (
 
 func merge(cur, patch *lazyNode, mergeMerge bool) *lazyNode {
 	curDoc, err := cur.intoDoc()
-
 	if err != nil {
 		pruneNulls(patch)
 		return patch
 	}
 
 	patchDoc, err := patch.intoDoc()
-
 	if err != nil {
 		return patch
 	}
@@ -91,9 +89,11 @@ func pruneAryNulls(ary *partialArray) *partialArray {
 	return ary
 }
 
-var ErrBadJSONDoc = fmt.Errorf("Invalid JSON Document")
-var ErrBadJSONPatch = fmt.Errorf("Invalid JSON Patch")
-var errBadMergeTypes = fmt.Errorf("Mismatched JSON Documents")
+var (
+	ErrBadJSONDoc    = fmt.Errorf("Invalid JSON Document")
+	ErrBadJSONPatch  = fmt.Errorf("Invalid JSON Patch")
+	errBadMergeTypes = fmt.Errorf("Mismatched JSON Documents")
+)
 
 // MergeMergePatches merges two merge patches together, such that
 // applying this resulting merged merge patch to a document yields the same

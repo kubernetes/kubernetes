@@ -21,11 +21,10 @@ package winkernel
 
 import (
 	"encoding/json"
-
-	"github.com/Microsoft/hcsshim/hcn"
-
 	"strings"
 	"testing"
+
+	"github.com/Microsoft/hcsshim/hcn"
 )
 
 const (
@@ -49,6 +48,7 @@ func TestGetNetworkByName(t *testing.T) {
 	testGetNetworkByName(t, hnsV1)
 	testGetNetworkByName(t, hnsV2)
 }
+
 func TestGetEndpointByID(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -56,6 +56,7 @@ func TestGetEndpointByID(t *testing.T) {
 	testGetEndpointByID(t, hnsV1)
 	testGetEndpointByID(t, hnsV2)
 }
+
 func TestGetEndpointByIpAddress(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -63,6 +64,7 @@ func TestGetEndpointByIpAddress(t *testing.T) {
 	testGetEndpointByIpAddress(t, hnsV1)
 	testGetEndpointByIpAddress(t, hnsV2)
 }
+
 func TestCreateEndpointLocal(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -70,6 +72,7 @@ func TestCreateEndpointLocal(t *testing.T) {
 	testCreateEndpointLocal(t, hnsV1)
 	testCreateEndpointLocal(t, hnsV2)
 }
+
 func TestCreateEndpointRemotePA(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -77,6 +80,7 @@ func TestCreateEndpointRemotePA(t *testing.T) {
 	testCreateEndpointRemote(t, hnsV1, epPaAddress)
 	testCreateEndpointRemote(t, hnsV2, epPaAddress)
 }
+
 func TestCreateEndpointRemoteNoPA(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -84,6 +88,7 @@ func TestCreateEndpointRemoteNoPA(t *testing.T) {
 	testCreateEndpointRemote(t, hnsV1, "")
 	testCreateEndpointRemote(t, hnsV2, "")
 }
+
 func TestDeleteEndpoint(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -91,6 +96,7 @@ func TestDeleteEndpoint(t *testing.T) {
 	testDeleteEndpoint(t, hnsV1)
 	testDeleteEndpoint(t, hnsV2)
 }
+
 func TestGetLoadBalancerExisting(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -98,6 +104,7 @@ func TestGetLoadBalancerExisting(t *testing.T) {
 	testGetLoadBalancerExisting(t, hnsV1)
 	testGetLoadBalancerExisting(t, hnsV2)
 }
+
 func TestGetLoadBalancerNew(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -105,6 +112,7 @@ func TestGetLoadBalancerNew(t *testing.T) {
 	testGetLoadBalancerNew(t, hnsV1)
 	testGetLoadBalancerNew(t, hnsV2)
 }
+
 func TestDeleteLoadBalancer(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
@@ -112,6 +120,7 @@ func TestDeleteLoadBalancer(t *testing.T) {
 	testDeleteLoadBalancer(t, hnsV1)
 	testDeleteLoadBalancer(t, hnsV2)
 }
+
 func testGetNetworkByName(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
@@ -128,6 +137,7 @@ func testGetNetworkByName(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
@@ -165,6 +175,7 @@ func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
@@ -204,6 +215,7 @@ func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func testCreateEndpointLocal(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
@@ -240,6 +252,7 @@ func testCreateEndpointLocal(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func testCreateEndpointRemote(t *testing.T, hns HostNetworkService, providerAddress string) {
 	Network := mustTestNetwork(t)
 
@@ -280,6 +293,7 @@ func testCreateEndpointRemote(t *testing.T, hns HostNetworkService, providerAddr
 		t.Error(err)
 	}
 }
+
 func testDeleteEndpoint(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
@@ -375,6 +389,7 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
@@ -423,6 +438,7 @@ func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func testDeleteLoadBalancer(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
@@ -475,6 +491,7 @@ func testDeleteLoadBalancer(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 	network, err := createTestNetwork()
 	if err != nil {
@@ -485,6 +502,7 @@ func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 	}
 	return network
 }
+
 func createTestNetwork() (*hcn.HostComputeNetwork, error) {
 	network := &hcn.HostComputeNetwork{
 		Type: NETWORK_TYPE_OVERLAY,

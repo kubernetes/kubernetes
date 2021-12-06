@@ -263,7 +263,6 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				framework.Failf("different allocatable resources expected %v got %v", cntDevs, cntDevs2)
 			}
 		})
-
 	})
 })
 
@@ -306,8 +305,8 @@ func rewriteCheckpointAsV1(dir, name string) error {
 
 	// TODO: why `checkpointManager.CreateCheckpoint(name, cpV1)` doesn't seem to work?
 	ckPath := filepath.Join(dir, name)
-	ioutil.WriteFile(filepath.Join("/tmp", name), blob, 0600)
-	return ioutil.WriteFile(ckPath, blob, 0600)
+	ioutil.WriteFile(filepath.Join("/tmp", name), blob, 0o600)
+	return ioutil.WriteFile(ckPath, blob, 0o600)
 }
 
 func convertPodDeviceEntriesToV1(entries []checkpoint.PodDevicesEntry) []checkpoint.PodDevicesEntryV1 {

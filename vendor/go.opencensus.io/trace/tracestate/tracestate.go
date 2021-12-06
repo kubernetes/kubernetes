@@ -34,8 +34,10 @@ const (
 	valueFormat            = `[\x20-\x2b\x2d-\x3c\x3e-\x7e]{0,255}[\x21-\x2b\x2d-\x3c\x3e-\x7e]`
 )
 
-var keyValidationRegExp = regexp.MustCompile(`^(` + keyFormat + `)$`)
-var valueValidationRegExp = regexp.MustCompile(`^(` + valueFormat + `)$`)
+var (
+	keyValidationRegExp   = regexp.MustCompile(`^(` + keyFormat + `)$`)
+	valueValidationRegExp = regexp.MustCompile(`^(` + valueFormat + `)$`)
+)
 
 // Tracestate represents tracing-system specific context in a list of key-value pairs. Tracestate allows different
 // vendors propagate additional information and inter-operate with their legacy Id formats.

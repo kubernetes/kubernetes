@@ -902,8 +902,10 @@ func isEndOfLink(char byte) bool {
 	return isspace(char) || char == '<'
 }
 
-var validUris = [][]byte{[]byte("http://"), []byte("https://"), []byte("ftp://"), []byte("mailto://")}
-var validPaths = [][]byte{[]byte("/"), []byte("./"), []byte("../")}
+var (
+	validUris  = [][]byte{[]byte("http://"), []byte("https://"), []byte("ftp://"), []byte("mailto://")}
+	validPaths = [][]byte{[]byte("/"), []byte("./"), []byte("../")}
+)
 
 func isSafeLink(link []byte) bool {
 	for _, path := range validPaths {
@@ -984,7 +986,6 @@ func tagLength(data []byte) (autolink autolinkType, end int) {
 			} else {
 				i++
 			}
-
 		}
 
 		if i >= len(data) {

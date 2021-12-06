@@ -118,7 +118,6 @@ func testLeaseGarbageCollected(t *testing.T, client kubernetes.Interface, lease 
 		}); err != nil {
 			t.Fatalf("Failed to see the expired lease garbage collected: %v", err)
 		}
-
 	}
 }
 

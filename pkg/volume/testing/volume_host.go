@@ -47,7 +47,6 @@ import (
 
 type FakeVolumeHost interface {
 	VolumeHost
-
 	GetPluginMgr() *VolumePluginMgr
 }
 
@@ -72,8 +71,10 @@ type fakeVolumeHost struct {
 	filteredDialOptions    *proxyutil.FilteredDialOptions
 }
 
-var _ VolumeHost = &fakeVolumeHost{}
-var _ FakeVolumeHost = &fakeVolumeHost{}
+var (
+	_ VolumeHost     = &fakeVolumeHost{}
+	_ FakeVolumeHost = &fakeVolumeHost{}
+)
 
 func NewFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil, nil)
@@ -250,8 +251,10 @@ type fakeAttachDetachVolumeHost struct {
 	fakeVolumeHost
 }
 
-var _ AttachDetachVolumeHost = &fakeAttachDetachVolumeHost{}
-var _ FakeVolumeHost = &fakeAttachDetachVolumeHost{}
+var (
+	_ AttachDetachVolumeHost = &fakeAttachDetachVolumeHost{}
+	_ FakeVolumeHost         = &fakeAttachDetachVolumeHost{}
+)
 
 func NewFakeAttachDetachVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
 	return newFakeAttachDetachVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister, volumeAttachLister)
@@ -302,8 +305,10 @@ type fakeKubeletVolumeHost struct {
 	fakeVolumeHost
 }
 
-var _ KubeletVolumeHost = &fakeKubeletVolumeHost{}
-var _ FakeVolumeHost = &fakeKubeletVolumeHost{}
+var (
+	_ KubeletVolumeHost = &fakeKubeletVolumeHost{}
+	_ FakeVolumeHost    = &fakeKubeletVolumeHost{}
+)
 
 func NewFakeKubeletVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
 	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil, nil)

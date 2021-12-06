@@ -19,24 +19,25 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 
-	"errors"
-	"os"
-
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
-const success = "\033[0;32mSUCESS\033[0m"
-const failed = "\033[0;31mFAILED\033[0m"
-const notConfigured = "\033[0;34mNOT CONFIGURED\033[0m"
-const skipped = "\033[0;34mSKIPPED\033[0m"
+const (
+	success       = "\033[0;32mSUCESS\033[0m"
+	failed        = "\033[0;31mFAILED\033[0m"
+	notConfigured = "\033[0;34mNOT CONFIGURED\033[0m"
+	skipped       = "\033[0;34mSKIPPED\033[0m"
+)
 
 var checkFlag = flag.String(
 	"check", "all", "what to check for conformance.  One or more of all,container-runtime,daemons,dns,firewall,kernel")
@@ -119,8 +120,10 @@ func containerRuntime() error {
 	return printSuccess("Container Runtime Check: %s", success)
 }
 
-const kubeletClusterDNSRegexStr = `\/kubelet.*--cluster-dns=(\S+) `
-const kubeletClusterDomainRegexStr = `\/kubelet.*--cluster-domain=(\S+)`
+const (
+	kubeletClusterDNSRegexStr    = `\/kubelet.*--cluster-dns=(\S+) `
+	kubeletClusterDomainRegexStr = `\/kubelet.*--cluster-domain=(\S+)`
+)
 
 // dns checks that cluster dns has been properly configured and can resolve the kubernetes.default service
 func dns() error {
@@ -192,8 +195,10 @@ func kernel() error {
 	return printSuccess("Kernel Command Line %s", success)
 }
 
-const iptablesInputRegexStr = `Chain INPUT \(policy DROP\)`
-const iptablesForwardRegexStr = `Chain FORWARD \(policy DROP\)`
+const (
+	iptablesInputRegexStr   = `Chain INPUT \(policy DROP\)`
+	iptablesForwardRegexStr = `Chain FORWARD \(policy DROP\)`
+)
 
 // firewall checks that iptables does not have common firewall rules setup that would disrupt traffic
 func firewall() error {

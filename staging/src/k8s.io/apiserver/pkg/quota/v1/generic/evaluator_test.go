@@ -26,7 +26,6 @@ import (
 )
 
 func TestCachedHasSynced(t *testing.T) {
-
 	called := 0
 	result := false
 	cachedFunc := cachedHasSynced(func() bool {
@@ -66,7 +65,6 @@ func TestCachedHasSynced(t *testing.T) {
 }
 
 func TestProtectedLister(t *testing.T) {
-
 	hasSynced := false
 	notReadyErr := errors.New("not ready")
 	fake := &fakeLister{}
@@ -122,10 +120,12 @@ func (f *fakeLister) List(selector labels.Selector) (ret []runtime.Object, err e
 	f.called++
 	return nil, errFakeLister
 }
+
 func (f *fakeLister) Get(name string) (runtime.Object, error) {
 	f.called++
 	return nil, errFakeLister
 }
+
 func (f *fakeLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 	panic("not implemented")
 }

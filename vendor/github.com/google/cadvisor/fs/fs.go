@@ -486,7 +486,7 @@ func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 
 		wordLength := len(words)
 		offset := 3
-		var stats = make([]uint64, wordLength-offset)
+		stats := make([]uint64, wordLength-offset)
 		if len(stats) < 11 {
 			return nil, fmt.Errorf("could not parse all 11 columns of /proc/diskstats")
 		}

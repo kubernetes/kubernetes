@@ -134,7 +134,6 @@ func parseSoftIRQStat(line string) (SoftIRQStat, uint64, error) {
 		&softIRQStat.Block, &softIRQStat.BlockIoPoll,
 		&softIRQStat.Tasklet, &softIRQStat.Sched,
 		&softIRQStat.Hrtimer, &softIRQStat.Rcu)
-
 	if err != nil {
 		return SoftIRQStat{}, 0, fmt.Errorf("couldn't parse %q (softirq): %w", line, err)
 	}

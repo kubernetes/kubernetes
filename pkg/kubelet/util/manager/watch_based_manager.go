@@ -37,10 +37,12 @@ import (
 	"k8s.io/utils/clock"
 )
 
-type listObjectFunc func(string, metav1.ListOptions) (runtime.Object, error)
-type watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
-type newObjectFunc func() runtime.Object
-type isImmutableFunc func(runtime.Object) bool
+type (
+	listObjectFunc  func(string, metav1.ListOptions) (runtime.Object, error)
+	watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
+	newObjectFunc   func() runtime.Object
+	isImmutableFunc func(runtime.Object) bool
+)
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
@@ -179,7 +181,6 @@ func NewObjectCache(
 	groupResource schema.GroupResource,
 	clock clock.Clock,
 	maxIdleTime time.Duration) Store {
-
 	if maxIdleTime < minIdleTime {
 		maxIdleTime = minIdleTime
 	}
@@ -353,7 +354,6 @@ func NewWatchBasedManager(
 	groupResource schema.GroupResource,
 	resyncInterval time.Duration,
 	getReferencedObjects func(*v1.Pod) sets.String) Manager {
-
 	// If a configmap/secret is used as a volume, the volumeManager will visit the objectCacheItem every resyncInterval cycle,
 	// We just want to stop the objectCacheItem referenced by environment variables,
 	// So, maxIdleTime is set to an integer multiple of resyncInterval,

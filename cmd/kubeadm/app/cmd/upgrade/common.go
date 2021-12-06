@@ -294,7 +294,6 @@ func getWaiter(dryRun bool, client clientset.Interface, timeout time.Duration) a
 
 // InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.
 func InteractivelyConfirmUpgrade(question string) error {
-
 	fmt.Printf("[upgrade/confirm] %s [y/N]: ", question)
 
 	scanner := bufio.NewScanner(os.Stdin)

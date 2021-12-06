@@ -32,17 +32,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/framer"
 )
 
-var (
-	// protoEncodingPrefix serves as a magic number for an encoded protobuf message on this serializer. All
-	// proto messages serialized by this schema will be preceded by the bytes 0x6b 0x38 0x73, with the fourth
-	// byte being reserved for the encoding style. The only encoding style defined is 0x00, which means that
-	// the rest of the byte stream is a message of type k8s.io.kubernetes.pkg.runtime.Unknown (proto2).
-	//
-	// See k8s.io/apimachinery/pkg/runtime/generated.proto for details of the runtime.Unknown message.
-	//
-	// This encoding scheme is experimental, and is subject to change at any time.
-	protoEncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
-)
+// protoEncodingPrefix serves as a magic number for an encoded protobuf message on this serializer. All
+// proto messages serialized by this schema will be preceded by the bytes 0x6b 0x38 0x73, with the fourth
+// byte being reserved for the encoding style. The only encoding style defined is 0x00, which means that
+// the rest of the byte stream is a message of type k8s.io.kubernetes.pkg.runtime.Unknown (proto2).
+//
+// See k8s.io/apimachinery/pkg/runtime/generated.proto for details of the runtime.Unknown message.
+//
+// This encoding scheme is experimental, and is subject to change at any time.
+var protoEncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
 
 type errNotMarshalable struct {
 	t reflect.Type
@@ -85,8 +83,10 @@ type Serializer struct {
 	typer   runtime.ObjectTyper
 }
 
-var _ runtime.Serializer = &Serializer{}
-var _ recognizer.RecognizingDecoder = &Serializer{}
+var (
+	_ runtime.Serializer            = &Serializer{}
+	_ recognizer.RecognizingDecoder = &Serializer{}
+)
 
 const serializerIdentifier runtime.Identifier = "protobuf"
 

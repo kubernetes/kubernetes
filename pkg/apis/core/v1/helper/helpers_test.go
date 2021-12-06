@@ -719,7 +719,6 @@ func TestHugePageUnitSizeFromByteSize(t *testing.T) {
 }
 
 func TestLoadBalancerStatusEqual(t *testing.T) {
-
 	testCases := []struct {
 		left      *v1.LoadBalancerStatus
 		right     *v1.LoadBalancerStatus

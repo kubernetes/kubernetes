@@ -442,7 +442,6 @@ func TestEvictionIngorePDB(t *testing.T) {
 			if tc.expectedDeleteCount != ms.deleteCount {
 				t.Errorf("expected delete count=%v, got %v; name %v", tc.expectedDeleteCount, ms.deleteCount, pod.Name)
 			}
-
 		})
 	}
 }

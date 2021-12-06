@@ -85,7 +85,8 @@ func TestIsConnectionRefused(t *testing.T) {
 			&url.Error{Err: &net.OpError{Err: syscall.ECONNREFUSED}},
 			true,
 		},
-		{&url.Error{Err: &net.OpError{Err: &os.SyscallError{Err: syscall.ECONNREFUSED}}},
+		{
+			&url.Error{Err: &net.OpError{Err: &os.SyscallError{Err: syscall.ECONNREFUSED}}},
 			true,
 		},
 	}

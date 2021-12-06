@@ -101,7 +101,7 @@ func logResults(allResults []*Results) {
 	}
 	if resultsLogFile != "" {
 		klog.Infof("Logging results to %s", resultsLogFile)
-		if err := ioutil.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
+		if err := ioutil.WriteFile(resultsLogFile, jStr, os.FileMode(0o644)); err != nil {
 			klog.Errorf("Error logging results to %s: %v", resultsLogFile, err)
 		}
 	}

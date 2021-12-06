@@ -128,7 +128,7 @@ func (e *Specs) SkipMeasurements() {
 	}
 }
 
-//sort.Interface
+// sort.Interface
 
 func (e *Specs) Len() int {
 	return len(e.specs)

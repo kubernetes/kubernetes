@@ -250,7 +250,6 @@ func InvalidType(name, in, typeName string, value interface{}) *Validation {
 		Value:   value,
 		message: message,
 	}
-
 }
 
 // DuplicateItems error for when an array contains duplicates

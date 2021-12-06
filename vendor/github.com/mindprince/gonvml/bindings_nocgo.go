@@ -1,3 +1,4 @@
+//go:build !cgo
 // +build !cgo
 
 package gonvml
@@ -33,8 +34,7 @@ func DeviceCount() (uint, error) {
 
 // Device is the handle for the device.
 // This handle is obtained by calling DeviceHandleByIndex().
-type Device struct {
-}
+type Device struct{}
 
 // DeviceHandleByIndex returns the device handle for a particular index.
 // The indices range from 0 to DeviceCount()-1. The order in which NVML

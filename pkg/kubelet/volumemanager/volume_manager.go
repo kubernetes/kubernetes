@@ -183,7 +183,6 @@ func NewVolumeManager(
 	checkNodeCapabilitiesBeforeMount bool,
 	keepTerminatedPodVolumes bool,
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler) VolumeManager {
-
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
@@ -415,13 +414,10 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
-
 	if err != nil {
-		unmountedVolumes :=
-			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
+		unmountedVolumes := vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
 		// Also get unattached volumes for error message
-		unattachedVolumes :=
-			vm.getUnattachedVolumes(expectedVolumes)
+		unattachedVolumes := vm.getUnattachedVolumes(expectedVolumes)
 
 		if len(unmountedVolumes) == 0 {
 			return nil
@@ -452,7 +448,6 @@ func (vm *volumeManager) WaitForUnmount(pod *v1.Pod) error {
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
 		vm.verifyVolumesUnmountedFunc(uniquePodName))
-
 	if err != nil {
 		var mountedVolumes []string
 		for _, v := range vm.actualStateOfWorld.GetMountedVolumesForPod(uniquePodName) {

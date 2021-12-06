@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -220,7 +221,7 @@ func NewFakeNsenter(rootfsPath string) (*NSEnter, error) {
 	}
 
 	usr := filepath.Join(rootfsPath, "usr")
-	if err := os.Mkdir(usr, 0755); err != nil {
+	if err := os.Mkdir(usr, 0o755); err != nil {
 		return nil, err
 	}
 	usrbin := filepath.Join(usr, "bin")
@@ -254,5 +255,7 @@ func (fakeExec) CommandContext(ctx context.Context, cmd string, args ...string) 
 	return nil
 }
 
-var _ exec.Interface = fakeExec{}
-var _ exec.Interface = &NSEnter{}
+var (
+	_ exec.Interface = fakeExec{}
+	_ exec.Interface = &NSEnter{}
+)

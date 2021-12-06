@@ -41,8 +41,7 @@ func TestNew(t *testing.T) {
 	})
 }
 
-type successServerMock struct {
-}
+type successServerMock struct{}
 
 func (s successServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
 	return &grpchealth.HealthCheckResponse{
@@ -56,8 +55,7 @@ func (s successServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream grpche
 	})
 }
 
-type errorTimeoutServerMock struct {
-}
+type errorTimeoutServerMock struct{}
 
 func (e errorTimeoutServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
 	time.Sleep(time.Second * 4)
@@ -73,8 +71,7 @@ func (e errorTimeoutServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream g
 	})
 }
 
-type errorNotServeServerMock struct {
-}
+type errorNotServeServerMock struct{}
 
 func (e errorNotServeServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
 	return &grpchealth.HealthCheckResponse{
@@ -147,7 +144,6 @@ func TestGrpcProber_Probe(t *testing.T) {
 		assert.Equal(t, probe.Failure, p)
 		assert.Equal(t, nil, err)
 		assert.Equal(t, "timeout: health rpc did not complete within 2s", o)
-
 	})
 	t.Run("Should: not return error because check was success", func(t *testing.T) {
 		s := New()

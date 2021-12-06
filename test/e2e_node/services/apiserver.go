@@ -81,7 +81,7 @@ func (a *APIServer) Start() error {
 		return fmt.Errorf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
-	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0o666); err != nil {
 		return fmt.Errorf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 	o.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
@@ -143,5 +143,5 @@ func getAPIServerHealthCheckURL() string {
 
 func generateTokenFile(tokenFilePath string) error {
 	tokenFile := fmt.Sprintf("%s,kubelet,uid,system:masters\n", framework.TestContext.BearerToken)
-	return ioutil.WriteFile(tokenFilePath, []byte(tokenFile), 0644)
+	return ioutil.WriteFile(tokenFilePath, []byte(tokenFile), 0o644)
 }

@@ -111,5 +111,6 @@ func GetLinuxLabel() *v1.SELinuxOptions {
 		return nil
 	}
 	return &v1.SELinuxOptions{
-		Level: "s0:c0,c1"}
+		Level: "s0:c0,c1",
+	}
 }

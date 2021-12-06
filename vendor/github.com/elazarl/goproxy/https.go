@@ -116,7 +116,6 @@ func (proxy *ProxyHttpServer) handleHttps(w http.ResponseWriter, r *http.Request
 				wg.Wait()
 				proxyClient.Close()
 				targetSiteCon.Close()
-
 			}()
 		}
 
@@ -178,7 +177,7 @@ func (proxy *ProxyHttpServer) handleHttps(w http.ResponseWriter, r *http.Request
 			}
 		}
 		go func() {
-			//TODO: cache connections to the remote website
+			// TODO: cache connections to the remote website
 			rawClientTls := tls.Server(proxyClient, tlsConfig)
 			if err := rawClientTls.Handshake(); err != nil {
 				ctx.Warnf("Cannot handshake client %v %v", r.Host, err)
@@ -188,7 +187,7 @@ func (proxy *ProxyHttpServer) handleHttps(w http.ResponseWriter, r *http.Request
 			clientTlsReader := bufio.NewReader(rawClientTls)
 			for !isEof(clientTlsReader) {
 				req, err := http.ReadRequest(clientTlsReader)
-				var ctx = &ProxyCtx{Req: req, Session: atomic.AddInt64(&proxy.sess, 1), proxy: proxy, UserData: ctx.UserData}
+				ctx := &ProxyCtx{Req: req, Session: atomic.AddInt64(&proxy.sess, 1), proxy: proxy, UserData: ctx.UserData}
 				if err != nil && err != io.EOF {
 					return
 				}

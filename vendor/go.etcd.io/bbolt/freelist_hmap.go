@@ -105,7 +105,7 @@ func (f *freelist) mergeWithExistingSpan(pid pgid) {
 	newSize := uint64(1)
 
 	if mergeWithPrev {
-		//merge with previous span
+		// merge with previous span
 		start := prev + 1 - pgid(preSize)
 		f.delSpan(start, preSize)
 

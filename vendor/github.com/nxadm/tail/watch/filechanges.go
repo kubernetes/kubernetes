@@ -8,7 +8,8 @@ type FileChanges struct {
 
 func NewFileChanges() *FileChanges {
 	return &FileChanges{
-		make(chan bool, 1), make(chan bool, 1), make(chan bool, 1)}
+		make(chan bool, 1), make(chan bool, 1), make(chan bool, 1),
+	}
 }
 
 func (fc *FileChanges) NotifyModified() {

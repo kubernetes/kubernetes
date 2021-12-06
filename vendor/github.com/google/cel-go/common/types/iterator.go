@@ -22,10 +22,8 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 )
 
-var (
-	// IteratorType singleton.
-	IteratorType = NewTypeValue("iterator", traits.IteratorType)
-)
+// IteratorType singleton.
+var IteratorType = NewTypeValue("iterator", traits.IteratorType)
 
 // baseIterator is the basis for list, map, and object iterators.
 //

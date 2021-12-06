@@ -18,15 +18,13 @@ package storage
 
 import (
 	"context"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
-
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"encoding/json"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -124,7 +122,6 @@ func testVolumeProvisioning(c clientset.Interface, t *framework.TimeoutContext, 
 				framework.ExpectNoError(err, "checkGCEPD")
 				err = verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
 				framework.ExpectNoError(err, "verifyZonesInPV")
-
 			},
 		},
 		{
@@ -291,7 +288,6 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	lineCount := len(strings.Split(strings.TrimSpace(logs), "\n"))
 	expectedLineCount := 2
 	framework.ExpectEqual(lineCount, expectedLineCount, "Line count of the written file should be %d.", expectedLineCount)
-
 }
 
 func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string) (removeTaint func()) {
@@ -588,7 +584,6 @@ func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool)
 	}
 
 	return fmt.Errorf("Zones in StorageClass are %v, but zones in PV are %v", zones, pvZones)
-
 }
 
 func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZone bool) {

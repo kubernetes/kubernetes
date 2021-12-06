@@ -62,7 +62,7 @@ const (
 	TimeoutOnSetupVolumeName = "timeout-setup-volume"
 	// FailOnSetupVolumeName will cause setup call to fail
 	FailOnSetupVolumeName = "fail-setup-volume"
-	//TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
+	// TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
 	TimeoutAndFailOnSetupVolumeName = "timeout-and-fail-setup-volume"
 	// SuccessAndTimeoutSetupVolumeName will cause first mount operation to succeed but subsequent attempts to timeout
 	SuccessAndTimeoutSetupVolumeName = "success-and-timeout-setup-volume-name"
@@ -197,15 +197,17 @@ type FakeVolumePlugin struct {
 	BlockVolumeUnmappers []*FakeVolume
 }
 
-var _ VolumePlugin = &FakeVolumePlugin{}
-var _ BlockVolumePlugin = &FakeVolumePlugin{}
-var _ RecyclableVolumePlugin = &FakeVolumePlugin{}
-var _ DeletableVolumePlugin = &FakeVolumePlugin{}
-var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
-var _ AttachableVolumePlugin = &FakeVolumePlugin{}
-var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
-var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
-var _ NodeExpandableVolumePlugin = &FakeVolumePlugin{}
+var (
+	_ VolumePlugin                 = &FakeVolumePlugin{}
+	_ BlockVolumePlugin            = &FakeVolumePlugin{}
+	_ RecyclableVolumePlugin       = &FakeVolumePlugin{}
+	_ DeletableVolumePlugin        = &FakeVolumePlugin{}
+	_ ProvisionableVolumePlugin    = &FakeVolumePlugin{}
+	_ AttachableVolumePlugin       = &FakeVolumePlugin{}
+	_ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
+	_ DeviceMountableVolumePlugin  = &FakeVolumePlugin{}
+	_ NodeExpandableVolumePlugin   = &FakeVolumePlugin{}
+)
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	if list != nil {
@@ -570,8 +572,10 @@ func (f *FakeDeviceMountableVolumePlugin) GetDeviceMountRefs(deviceMountPath str
 	return f.Plugin.GetDeviceMountRefs(deviceMountPath)
 }
 
-var _ VolumePlugin = &FakeDeviceMountableVolumePlugin{}
-var _ DeviceMountableVolumePlugin = &FakeDeviceMountableVolumePlugin{}
+var (
+	_ VolumePlugin                = &FakeDeviceMountableVolumePlugin{}
+	_ DeviceMountableVolumePlugin = &FakeDeviceMountableVolumePlugin{}
+)
 
 // FakeAttachableVolumePlugin implements an attachable plugin based on FakeDeviceMountableVolumePlugin.
 type FakeAttachableVolumePlugin struct {
@@ -590,11 +594,12 @@ func (f *FakeAttachableVolumePlugin) CanAttach(spec *Spec) (bool, error) {
 	return true, nil
 }
 
-var _ VolumePlugin = &FakeAttachableVolumePlugin{}
-var _ AttachableVolumePlugin = &FakeAttachableVolumePlugin{}
+var (
+	_ VolumePlugin           = &FakeAttachableVolumePlugin{}
+	_ AttachableVolumePlugin = &FakeAttachableVolumePlugin{}
+)
 
-type FakeFileVolumePlugin struct {
-}
+type FakeFileVolumePlugin struct{}
 
 func (plugin *FakeFileVolumePlugin) Init(host VolumeHost) error {
 	return nil
@@ -753,7 +758,7 @@ func (fv *FakeVolume) GetSetUpCallCount() int {
 }
 
 func (fv *FakeVolume) SetUpAt(dir string, mounterArgs MounterArgs) error {
-	return os.MkdirAll(dir, 0750)
+	return os.MkdirAll(dir, 0o750)
 }
 
 func (fv *FakeVolume) GetPath() string {
@@ -1185,7 +1190,7 @@ func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []
 
 var _ volumepathhandler.BlockVolumePathHandler = &FakeVolumePathHandler{}
 
-//NewDeviceHandler Create a new IoHandler implementation
+// NewDeviceHandler Create a new IoHandler implementation
 func NewBlockVolumePathHandler() volumepathhandler.BlockVolumePathHandler {
 	return &FakeVolumePathHandler{}
 }

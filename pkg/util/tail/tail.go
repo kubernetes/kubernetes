@@ -28,10 +28,8 @@ const (
 	blockSize = 1024
 )
 
-var (
-	// eol is the end-of-line sign in the log.
-	eol = []byte{'\n'}
-)
+// eol is the end-of-line sign in the log.
+var eol = []byte{'\n'}
 
 // ReadAtMost reads at most max bytes from the end of the file identified by path or
 // returns an error. It returns true if the file was longer than max. It will

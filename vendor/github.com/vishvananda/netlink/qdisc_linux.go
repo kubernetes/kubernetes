@@ -157,7 +157,6 @@ func (h *Handle) qdiscModify(cmd, flags int, qdisc Qdisc) error {
 }
 
 func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
-
 	req.AddData(nl.NewRtAttr(nl.TCA_KIND, nl.ZeroTerminated(qdisc.Type())))
 
 	options := nl.NewRtAttr(nl.TCA_OPTIONS, nil)
@@ -459,7 +458,7 @@ func parseHtbData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 			htb.DirectPkts = opt.DirectPkts
 		case nl.TCA_HTB_DIRECT_QLEN:
 			// TODO
-			//htb.DirectQlen = native.uint32(datum.Value)
+			// htb.DirectQlen = native.uint32(datum.Value)
 		}
 	}
 	return nil
@@ -469,7 +468,6 @@ func parseFqCodelData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 	native = nl.NativeEndian()
 	fqCodel := qdisc.(*FqCodel)
 	for _, datum := range data {
-
 		switch datum.Attr.Type {
 		case nl.TCA_FQ_CODEL_TARGET:
 			fqCodel.Target = native.Uint32(datum.Value)

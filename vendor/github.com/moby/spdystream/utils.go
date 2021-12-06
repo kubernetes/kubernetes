@@ -21,9 +21,7 @@ import (
 	"os"
 )
 
-var (
-	DEBUG = os.Getenv("DEBUG")
-)
+var DEBUG = os.Getenv("DEBUG")
 
 func debugMessage(fmt string, args ...interface{}) {
 	if DEBUG != "" {

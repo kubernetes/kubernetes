@@ -96,7 +96,7 @@ func NamespacedContext(ctx netcontext.Context, namespace string) netcontext.Cont
 
 // SetTestEnv sets the env variables for testing background ticket in Flex.
 func SetTestEnv() func() {
-	var environ = []struct {
+	environ := []struct {
 		key, value string
 	}{
 		{"GAE_LONG_APP_ID", "my-app-id"},

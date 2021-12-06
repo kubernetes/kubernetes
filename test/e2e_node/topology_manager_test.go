@@ -870,7 +870,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	var err error
 
-	var policies = []string{
+	policies := []string{
 		topologymanager.PolicySingleNumaNode,
 		topologymanager.PolicyRestricted,
 		topologymanager.PolicyBestEffort,

@@ -382,7 +382,7 @@ func Display(node *yaml.Node) string {
 // Marshal creates a yaml version of a structure in our preferred style
 func Marshal(in *yaml.Node) []byte {
 	clearStyle(in)
-	//bytes, _ := yaml.Marshal(&yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{in}})
+	// bytes, _ := yaml.Marshal(&yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{in}})
 	bytes, _ := yaml.Marshal(in)
 
 	return bytes

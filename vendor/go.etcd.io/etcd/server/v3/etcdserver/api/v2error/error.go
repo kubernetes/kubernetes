@@ -27,7 +27,7 @@ import (
 var errors = map[int]string{
 	// command related errors
 	EcodeKeyNotFound:      "Key not found",
-	EcodeTestFailed:       "Compare failed", //test and set
+	EcodeTestFailed:       "Compare failed", // test and set
 	EcodeNotFile:          "Not a file",
 	ecodeNoMorePeer:       "Reached the max number of peers in the cluster",
 	EcodeNotDir:           "Not a directory",

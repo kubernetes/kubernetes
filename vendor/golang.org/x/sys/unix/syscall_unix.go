@@ -330,7 +330,7 @@ func SetsockoptByte(fd, level, opt int, value byte) (err error) {
 }
 
 func SetsockoptInt(fd, level, opt int, value int) (err error) {
-	var n = int32(value)
+	n := int32(value)
 	return setsockopt(fd, level, opt, unsafe.Pointer(&n), 4)
 }
 

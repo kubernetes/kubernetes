@@ -24,7 +24,6 @@ func (base baseState) Exit() error {
 }
 
 func (base baseState) Handle(b byte) (s state, e error) {
-
 	switch {
 	case b == CSI_ENTRY:
 		return base.parser.csiEntry, nil

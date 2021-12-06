@@ -61,7 +61,6 @@ func TestAddAndGet(t *testing.T) {
 	if value.(string) != testObj.val {
 		t.Errorf("Expected to get cached value: %#v, but got: %s", testObj.val, value.(string))
 	}
-
 }
 
 func TestExpirationBasic(t *testing.T) {

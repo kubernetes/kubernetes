@@ -28,13 +28,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
-var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
-var sshKey = flag.String("ssh-key", "", "Path to ssh private key.")
-var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
+var (
+	sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
+	sshEnv     = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
+	sshKey     = flag.String("ssh-key", "", "Path to ssh private key.")
+	sshUser    = flag.String("ssh-user", "", "Use predefined user for ssh.")
+)
 
-var sshOptionsMap map[string]string
-var sshDefaultKeyMap map[string]string
+var (
+	sshOptionsMap    map[string]string
+	sshDefaultKeyMap map[string]string
+)
 
 func init() {
 	usr, err := user.Current()

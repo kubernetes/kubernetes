@@ -17,14 +17,14 @@ limitations under the License.
 package stats
 
 import (
-	"k8s.io/client-go/tools/record"
 	"time"
+
+	"k8s.io/client-go/tools/record"
 )
 
 // ResourceAnalyzer provides statistics on node resource consumption
 type ResourceAnalyzer interface {
 	Start()
-
 	fsResourceAnalyzerInterface
 	SummaryProvider
 }

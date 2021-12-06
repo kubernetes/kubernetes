@@ -1000,7 +1000,6 @@ type Resolver interface {
 	loadExports(ctx context.Context, pkg *pkg, includeTest bool) (string, []string, error)
 	// scoreImportPath returns the relevance for an import path.
 	scoreImportPath(ctx context.Context, path string) float64
-
 	ClearForNewScan()
 }
 
@@ -1082,7 +1081,6 @@ func addExternalCandidates(pass *pass, refs references, filename string) error {
 			defer wg.Done()
 
 			found, err := findImport(ctx, pass, found[pkgName], pkgName, symbols, filename)
-
 			if err != nil {
 				firstErrOnce.Do(func() {
 					firstErr = err

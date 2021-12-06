@@ -465,9 +465,11 @@ type byPos []ast.Node
 func (sl byPos) Len() int {
 	return len(sl)
 }
+
 func (sl byPos) Less(i, j int) bool {
 	return sl[i].Pos() < sl[j].Pos()
 }
+
 func (sl byPos) Swap(i, j int) {
 	sl[i], sl[j] = sl[j], sl[i]
 }

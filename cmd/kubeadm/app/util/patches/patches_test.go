@@ -121,7 +121,6 @@ func TestCreatePatchSet(t *testing.T) {
 		data             string
 	}{
 		{
-
 			name:       "valid: YAML patches are separated and converted to JSON",
 			targetName: "etcd",
 			patchType:  types.StrategicMergePatchType,
@@ -241,7 +240,7 @@ func TestGetPatchSetsForPath(t *testing.T) {
 
 			for _, file := range tc.filesToWrite {
 				filePath := filepath.Join(tempDir, file)
-				err := ioutil.WriteFile(filePath, []byte(tc.patchData), 0644)
+				err := ioutil.WriteFile(filePath, []byte(tc.patchData), 0o644)
 				if err != nil {
 					t.Fatalf("could not write temporary file %q", filePath)
 				}
@@ -369,7 +368,7 @@ func TestGetPatchManagerForPath(t *testing.T) {
 
 			for _, file := range tc.files {
 				filePath := filepath.Join(tempDir, file.name)
-				err := ioutil.WriteFile(filePath, []byte(file.data), 0644)
+				err := ioutil.WriteFile(filePath, []byte(file.data), 0o644)
 				if err != nil {
 					t.Fatalf("could not write temporary file %q", filePath)
 				}

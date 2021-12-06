@@ -25,9 +25,7 @@ import (
 	"strings"
 )
 
-var (
-	ErrNoCGO = fmt.Errorf("go-systemd built with CGO disabled")
-)
+var ErrNoCGO = fmt.Errorf("go-systemd built with CGO disabled")
 
 // GetRunningSlice attempts to retrieve the name of the systemd slice in which
 // the current process is running.

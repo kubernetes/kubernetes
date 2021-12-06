@@ -156,7 +156,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
-		if err := ioutil.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+		if err := ioutil.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0o644); err != nil {
 			return result, err
 		}
 		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
@@ -169,7 +169,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
-		if err := ioutil.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+		if err := ioutil.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0o644); err != nil {
 			return result, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
@@ -196,7 +196,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		t.Fatalf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
-	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0o666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 	s.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()

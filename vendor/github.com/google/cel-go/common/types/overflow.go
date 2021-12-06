@@ -19,9 +19,7 @@ import (
 	"time"
 )
 
-var (
-	doubleTwoTo64 = math.Ldexp(1.0, 64)
-)
+var doubleTwoTo64 = math.Ldexp(1.0, 64)
 
 // addInt64Checked performs addition with overflow detection of two int64 values.
 //

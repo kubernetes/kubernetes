@@ -44,8 +44,10 @@ type azureDiskUnmounter struct {
 	plugin *azureDataDiskPlugin
 }
 
-var _ volume.Unmounter = &azureDiskUnmounter{}
-var _ volume.Mounter = &azureDiskMounter{}
+var (
+	_ volume.Unmounter = &azureDiskUnmounter{}
+	_ volume.Mounter   = &azureDiskMounter{}
+)
 
 func (m *azureDiskMounter) GetAttributes() volume.Attributes {
 	readOnly := false
@@ -77,7 +79,6 @@ func (m *azureDiskMounter) GetPath() string {
 func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
 	volumeSource, _, err := getVolumeSource(m.spec)
-
 	if err != nil {
 		klog.Infof("azureDisk - mounter failed to get volume source for spec %s", m.spec.Name())
 		return err
@@ -107,7 +108,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 
 	if runtime.GOOS != "windows" {
 		// in windows, we will use mklink to mount, will MkdirAll in Mount func
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			klog.Errorf("azureDisk - mkdir failed on disk %s on dir: %s (%v)", diskName, dir, err)
 			return err
 		}
@@ -126,7 +127,6 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	klog.V(4).Infof("azureDisk - Attempting to mount %s on %s", diskName, dir)
 	isManagedDisk := (*volumeSource.Kind == v1.AzureManagedDisk)
 	globalPDPath, err := makeGlobalPDPath(m.plugin.host, volumeSource.DataDiskURI, isManagedDisk)
-
 	if err != nil {
 		return err
 	}

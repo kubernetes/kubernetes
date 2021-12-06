@@ -55,9 +55,11 @@ type claimDefaulterPlugin struct {
 	lister storagev1listers.StorageClassLister
 }
 
-var _ admission.Interface = &claimDefaulterPlugin{}
-var _ admission.MutationInterface = &claimDefaulterPlugin{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&claimDefaulterPlugin{})
+var (
+	_ admission.Interface         = &claimDefaulterPlugin{}
+	_ admission.MutationInterface = &claimDefaulterPlugin{}
+	_                             = genericadmissioninitializer.WantsExternalKubeInformerFactory(&claimDefaulterPlugin{})
+)
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *claimDefaulterPlugin {

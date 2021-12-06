@@ -75,8 +75,10 @@ func init() {
 	}
 }
 
-var statusOK = status.New(codes.OK, "")
-var logger = grpclog.Component("core")
+var (
+	statusOK = status.New(codes.OK, "")
+	logger   = grpclog.Component("core")
+)
 
 type methodHandler func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor UnaryServerInterceptor) (interface{}, error)
 

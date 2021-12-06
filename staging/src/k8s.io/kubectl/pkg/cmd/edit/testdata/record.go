@@ -71,7 +71,6 @@ func main() {
 	var currentStep *EditStep
 
 	fmt.Println(http.ListenAndServe(":8081", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-
 		// Record non-discovery things
 		record := false
 		switch segments := strings.Split(strings.Trim(req.URL.Path, "/"), "/"); segments[0] {
@@ -94,14 +93,14 @@ func main() {
 				panic("cannot post input with step already in progress")
 			}
 			filename := fmt.Sprintf("%d.original", len(tc.Steps))
-			checkErr(ioutil.WriteFile(filename, body, os.FileMode(0755)))
+			checkErr(ioutil.WriteFile(filename, body, os.FileMode(0o755)))
 			currentStep = &EditStep{StepType: "edit", Input: filename}
 		case m == "POST" && p == "/callback/out":
 			if currentStep == nil || currentStep.StepType != "edit" {
 				panic("cannot post output without posting input first")
 			}
 			filename := fmt.Sprintf("%d.edited", len(tc.Steps))
-			checkErr(ioutil.WriteFile(filename, body, os.FileMode(0755)))
+			checkErr(ioutil.WriteFile(filename, body, os.FileMode(0o755)))
 			currentStep.Output = filename
 			tc.Steps = append(tc.Steps, *currentStep)
 			currentStep = nil
@@ -134,8 +133,8 @@ func main() {
 			if record {
 				infile := fmt.Sprintf("%d.request", len(tc.Steps))
 				outfile := fmt.Sprintf("%d.response", len(tc.Steps))
-				checkErr(ioutil.WriteFile(infile, tryIndent(body), os.FileMode(0755)))
-				checkErr(ioutil.WriteFile(outfile, tryIndent(bodyOut), os.FileMode(0755)))
+				checkErr(ioutil.WriteFile(infile, tryIndent(body), os.FileMode(0o755)))
+				checkErr(ioutil.WriteFile(outfile, tryIndent(bodyOut), os.FileMode(0o755)))
 				tc.Steps = append(tc.Steps, EditStep{
 					StepType:           "request",
 					Input:              infile,
@@ -150,7 +149,7 @@ func main() {
 
 		tcData, err := yaml.Marshal(tc)
 		checkErr(err)
-		checkErr(ioutil.WriteFile("test.yaml", tcData, os.FileMode(0755)))
+		checkErr(ioutil.WriteFile("test.yaml", tcData, os.FileMode(0o755)))
 	})))
 }
 

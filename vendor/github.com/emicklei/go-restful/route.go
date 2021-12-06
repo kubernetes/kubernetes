@@ -47,7 +47,7 @@ type Route struct {
 	// marks a route as deprecated
 	Deprecated bool
 
-	//Overrides the container.contentEncodingEnabled
+	// Overrides the container.contentEncodingEnabled
 	contentEncodingEnabled *bool
 }
 
@@ -112,7 +112,6 @@ func (r Route) matchesAccept(mimeTypesWithQuality string) bool {
 
 // Return whether this Route can consume content with a type specified by mimeTypes (can be empty).
 func (r Route) matchesContentType(mimeTypes string) bool {
-
 	if len(r.Consumes) == 0 {
 		// did not specify what it can consume ;  any media type (“*/*”) is assumed
 		return true

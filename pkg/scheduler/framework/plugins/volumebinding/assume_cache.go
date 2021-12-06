@@ -346,7 +346,6 @@ func (c *assumeCache) Restore(objName string) {
 // PVAssumeCache is a AssumeCache for PersistentVolume objects
 type PVAssumeCache interface {
 	AssumeCache
-
 	GetPV(pvName string) (*v1.PersistentVolume, error)
 	GetAPIPV(pvName string) (*v1.PersistentVolume, error)
 	ListPVs(storageClassName string) []*v1.PersistentVolume

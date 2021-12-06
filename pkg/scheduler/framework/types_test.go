@@ -660,14 +660,14 @@ func TestNodeInfoAddPod(t *testing.T) {
 		},
 		Requested: &Resource{
 			MilliCPU:         2300,
-			Memory:           209716700, //1500 + 200MB in initContainers
+			Memory:           209716700, // 1500 + 200MB in initContainers
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
 		NonZeroRequested: &Resource{
 			MilliCPU:         2300,
-			Memory:           419431900, //200MB(initContainers) + 200MB(default memory value) + 1500 specified in requests/overhead
+			Memory:           419431900, // 200MB(initContainers) + 200MB(default memory value) + 1500 specified in requests/overhead
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),

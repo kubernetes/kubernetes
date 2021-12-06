@@ -83,7 +83,7 @@ func NewMaintenance(c *Client) Maintenance {
 				return nil, nil, fmt.Errorf("failed to dial endpoint %s with maintenance client: %v", endpoint, err)
 			}
 
-			//get token with established connection
+			// get token with established connection
 			dctx := c.ctx
 			cancel := func() {}
 			if c.cfg.DialTimeout > 0 {
@@ -191,7 +191,6 @@ func (m *maintenance) Status(ctx context.Context, endpoint string) (*StatusRespo
 func (m *maintenance) HashKV(ctx context.Context, endpoint string, rev int64) (*HashKVResponse, error) {
 	remote, cancel, err := m.dial(endpoint)
 	if err != nil {
-
 		return nil, toErr(ctx, err)
 	}
 	defer cancel()

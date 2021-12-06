@@ -136,6 +136,7 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 		}
 	}
 }
+
 func TestStatefulPodControlCreatePodPVCDeleting(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
@@ -234,7 +235,6 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 		t.Errorf("Pod create failed: got %d events, but want 2", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
 		t.Errorf("Found unexpected non-normal event %s", events[0])
-
 	} else if !strings.Contains(events[1], v1.EventTypeWarning) {
 		t.Errorf("Found unexpected non-warning event %s", events[1])
 	}
@@ -437,7 +437,6 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
 		}
 		return true, update.GetObject(), nil
-
 	})
 	pod.Labels[apps.StatefulSetPodNameLabel] = "goo-0"
 	if err := control.UpdateStatefulPod(set, pod); err != nil {

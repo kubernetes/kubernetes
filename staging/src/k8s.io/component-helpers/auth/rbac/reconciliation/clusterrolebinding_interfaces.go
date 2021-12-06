@@ -103,7 +103,6 @@ func (c ClusterRoleBindingClientAdapter) Update(in RoleBinding) (RoleBinding, er
 		return nil, err
 	}
 	return ClusterRoleBindingAdapter{ClusterRoleBinding: ret}, err
-
 }
 
 func (c ClusterRoleBindingClientAdapter) Delete(namespace, name string, uid types.UID) error {

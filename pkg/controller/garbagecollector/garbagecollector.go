@@ -79,8 +79,10 @@ type GarbageCollector struct {
 	workerLock sync.RWMutex
 }
 
-var _ controller.Interface = (*GarbageCollector)(nil)
-var _ controller.Debuggable = (*GarbageCollector)(nil)
+var (
+	_ controller.Interface  = (*GarbageCollector)(nil)
+	_ controller.Debuggable = (*GarbageCollector)(nil)
+)
 
 // NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
@@ -91,7 +93,6 @@ func NewGarbageCollector(
 	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
-
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -362,8 +363,8 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context) bool {
 // If isDangling looks up the referenced object at the API server, it also
 // returns its latest state.
 func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.OwnerReference, item *node) (
-	dangling bool, owner *metav1.PartialObjectMetadata, err error) {
-
+	dangling bool, owner *metav1.PartialObjectMetadata, err error,
+) {
 	// check for recorded absent cluster-scoped parent
 	absentOwnerCacheKey := objectReference{OwnerReference: ownerReferenceCoordinates(reference)}
 	if gc.absentOwnerCache.Has(absentOwnerCacheKey) {

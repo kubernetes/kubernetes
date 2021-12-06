@@ -259,7 +259,6 @@ func (impl Implementation) Dlasr(side blas.Side, pivot lapack.Pivot, direct lapa
 					a[i*lda+j] = stmp*tmp2 + ctmp*tmp
 					a[i*lda+n-1] = ctmp*tmp2 - stmp*tmp
 				}
-
 			}
 		}
 		return

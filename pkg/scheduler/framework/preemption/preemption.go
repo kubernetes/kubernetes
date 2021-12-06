@@ -124,7 +124,6 @@ type Evaluator struct {
 }
 
 func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj, i.e., factory.go#MakeDefaultErrorFunc().
@@ -408,7 +407,7 @@ func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) str
 	// There are more than one node with minimum number PDB violating pods. Find
 	// the one with minimum highest priority victim.
 	minHighestPriority := int32(math.MaxInt32)
-	var minNodes2 = make([]string, lenNodes1)
+	minNodes2 := make([]string, lenNodes1)
 	lenNodes2 := 0
 	for i := 0; i < lenNodes1; i++ {
 		node := minNodes1[i]

@@ -119,8 +119,10 @@ type nonCSILimits struct {
 	randomVolumeIDPrefix string
 }
 
-var _ framework.FilterPlugin = &nonCSILimits{}
-var _ framework.EnqueueExtensions = &nonCSILimits{}
+var (
+	_ framework.FilterPlugin      = &nonCSILimits{}
+	_ framework.EnqueueExtensions = &nonCSILimits{}
+)
 
 // newNonCSILimitsWithInformerFactory returns a plugin with filter name and informer factory.
 func newNonCSILimitsWithInformerFactory(

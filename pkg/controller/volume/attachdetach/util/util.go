@@ -245,8 +245,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 			continue
 		}
 
-		attachableVolumePlugin, err :=
-			volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+		attachableVolumePlugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
 			klog.V(10).Infof(
 				"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",

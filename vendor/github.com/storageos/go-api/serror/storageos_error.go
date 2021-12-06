@@ -11,7 +11,6 @@ type StorageOSError interface {
 	// Encoding/decoding methods to help errors traverse API boundaries
 	json.Marshaler
 	json.Unmarshaler
-
 	Err() error               // Returns the underlying error that caused this event
 	String() string           // A short string representing the error (for logging etc)
 	Help() string             // A larger string that should provide informative debug instruction to users

@@ -25,8 +25,7 @@ import (
 
 // UnstructuredObjectTyper provides a runtime.ObjectTyper implementation for
 // runtime.Unstructured object based on discovery information.
-type UnstructuredObjectTyper struct {
-}
+type UnstructuredObjectTyper struct{}
 
 // NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
 // unstructured objects based on discovery information. It accepts a list of fallback typers

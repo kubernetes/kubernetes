@@ -427,8 +427,10 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
 				podInformer.Informer().GetStore().Add(&v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
-						DeletionTimestamp: pod.deletionTimeStamp},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
+						DeletionTimestamp: pod.deletionTimeStamp,
+					},
 					Status: v1.PodStatus{Phase: pod.phase},
 					Spec:   v1.PodSpec{NodeName: pod.nodeName},
 				})

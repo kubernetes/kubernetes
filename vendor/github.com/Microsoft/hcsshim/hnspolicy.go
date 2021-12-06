@@ -40,9 +40,11 @@ type PaPolicy = hns.PaPolicy
 
 type OutboundNatPolicy = hns.OutboundNatPolicy
 
-type ActionType = hns.ActionType
-type DirectionType = hns.DirectionType
-type RuleType = hns.RuleType
+type (
+	ActionType    = hns.ActionType
+	DirectionType = hns.DirectionType
+	RuleType      = hns.RuleType
+)
 
 const (
 	Allow = hns.Allow

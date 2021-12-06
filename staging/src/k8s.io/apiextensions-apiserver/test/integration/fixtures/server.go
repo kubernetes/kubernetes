@@ -71,7 +71,8 @@ users:
 		"--authentication-kubeconfig", fakeKubeConfig.Name(),
 		"--authorization-kubeconfig", fakeKubeConfig.Name(),
 		"--kubeconfig", fakeKubeConfig.Name(),
-		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"},
+		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook",
+	},
 		flags...,
 	), nil)
 	if err != nil {

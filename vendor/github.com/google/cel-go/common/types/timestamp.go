@@ -53,14 +53,12 @@ const (
 	maxUnixTime int64 = 253402300799
 )
 
-var (
-	// TimestampType singleton.
-	TimestampType = NewTypeValue("google.protobuf.Timestamp",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.ReceiverType,
-		traits.SubtractorType)
-)
+// TimestampType singleton.
+var TimestampType = NewTypeValue("google.protobuf.Timestamp",
+	traits.AdderType,
+	traits.ComparerType,
+	traits.ReceiverType,
+	traits.SubtractorType)
 
 // Add implements traits.Adder.Add.
 func (t Timestamp) Add(other ref.Val) ref.Val {
@@ -199,7 +197,8 @@ var (
 		overloads.TimeGetHours:        timestampGetHours,
 		overloads.TimeGetMinutes:      timestampGetMinutes,
 		overloads.TimeGetSeconds:      timestampGetSeconds,
-		overloads.TimeGetMilliseconds: timestampGetMilliseconds}
+		overloads.TimeGetMilliseconds: timestampGetMilliseconds,
+	}
 
 	timestampOneArgOverloads = map[string]func(time.Time, ref.Val) ref.Val{
 		overloads.TimeGetFullYear:     timestampGetFullYearWithTz,
@@ -211,7 +210,8 @@ var (
 		overloads.TimeGetHours:        timestampGetHoursWithTz,
 		overloads.TimeGetMinutes:      timestampGetMinutesWithTz,
 		overloads.TimeGetSeconds:      timestampGetSecondsWithTz,
-		overloads.TimeGetMilliseconds: timestampGetMillisecondsWithTz}
+		overloads.TimeGetMilliseconds: timestampGetMillisecondsWithTz,
+	}
 )
 
 type timestampVisitor func(time.Time) ref.Val
@@ -219,32 +219,41 @@ type timestampVisitor func(time.Time) ref.Val
 func timestampGetFullYear(t time.Time) ref.Val {
 	return Int(t.Year())
 }
+
 func timestampGetMonth(t time.Time) ref.Val {
 	// CEL spec indicates that the month should be 0-based, but the Time value
 	// for Month() is 1-based.
 	return Int(t.Month() - 1)
 }
+
 func timestampGetDayOfYear(t time.Time) ref.Val {
 	return Int(t.YearDay() - 1)
 }
+
 func timestampGetDayOfMonthZeroBased(t time.Time) ref.Val {
 	return Int(t.Day() - 1)
 }
+
 func timestampGetDayOfMonthOneBased(t time.Time) ref.Val {
 	return Int(t.Day())
 }
+
 func timestampGetDayOfWeek(t time.Time) ref.Val {
 	return Int(t.Weekday())
 }
+
 func timestampGetHours(t time.Time) ref.Val {
 	return Int(t.Hour())
 }
+
 func timestampGetMinutes(t time.Time) ref.Val {
 	return Int(t.Minute())
 }
+
 func timestampGetSeconds(t time.Time) ref.Val {
 	return Int(t.Second())
 }
+
 func timestampGetMilliseconds(t time.Time) ref.Val {
 	return Int(t.Nanosecond() / 1000000)
 }
@@ -252,30 +261,39 @@ func timestampGetMilliseconds(t time.Time) ref.Val {
 func timestampGetFullYearWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetFullYear)(t)
 }
+
 func timestampGetMonthWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetMonth)(t)
 }
+
 func timestampGetDayOfYearWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetDayOfYear)(t)
 }
+
 func timestampGetDayOfMonthZeroBasedWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetDayOfMonthZeroBased)(t)
 }
+
 func timestampGetDayOfMonthOneBasedWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetDayOfMonthOneBased)(t)
 }
+
 func timestampGetDayOfWeekWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetDayOfWeek)(t)
 }
+
 func timestampGetHoursWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetHours)(t)
 }
+
 func timestampGetMinutesWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetMinutes)(t)
 }
+
 func timestampGetSecondsWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetSeconds)(t)
 }
+
 func timestampGetMillisecondsWithTz(t time.Time, tz ref.Val) ref.Val {
 	return timeZone(tz, timestampGetMilliseconds)(t)
 }

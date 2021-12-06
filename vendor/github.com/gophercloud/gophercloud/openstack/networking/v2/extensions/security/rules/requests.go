@@ -43,9 +43,11 @@ func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	})
 }
 
-type RuleDirection string
-type RuleProtocol string
-type RuleEtherType string
+type (
+	RuleDirection string
+	RuleProtocol  string
+	RuleEtherType string
+)
 
 // Constants useful for CreateOpts
 const (

@@ -63,10 +63,10 @@ func canReadFile(path string) bool {
 // If the certificate file already exists, it will be overwritten.
 // The parent directory of the certPath will be created as needed with file mode 0755.
 func WriteCert(certPath string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
+	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0o755)); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(certPath, data, os.FileMode(0644))
+	return ioutil.WriteFile(certPath, data, os.FileMode(0o644))
 }
 
 // NewPool returns an x509.CertPool containing the certificates in the given PEM-encoded file.

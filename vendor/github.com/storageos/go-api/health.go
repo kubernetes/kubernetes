@@ -9,10 +9,8 @@ import (
 	"github.com/storageos/go-api/types"
 )
 
-var (
-	// HealthAPIPrefix is a partial path to the HTTP endpoint.
-	HealthAPIPrefix = "health"
-)
+// HealthAPIPrefix is a partial path to the HTTP endpoint.
+var HealthAPIPrefix = "health"
 
 func (c *Client) ClusterHealth(ctx context.Context) ([]*types.ClusterHealthNode, error) {
 	status := []*types.ClusterHealthNode{}
@@ -32,7 +30,6 @@ func (c *Client) ClusterHealth(ctx context.Context) ([]*types.ClusterHealthNode,
 
 // CPHealth returns the health of the control plane server at a given url.
 func (c *Client) CPHealth(ctx context.Context, hostname string) (*types.CPHealthStatus, error) {
-
 	url := fmt.Sprintf("http://%s:%s/v1/%s", hostname, DefaultPort, HealthAPIPrefix)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -62,7 +59,6 @@ func (c *Client) CPHealth(ctx context.Context, hostname string) (*types.CPHealth
 
 // DPHealth returns the health of the data plane server at a given url.
 func (c *Client) DPHealth(ctx context.Context, hostname string) (*types.DPHealthStatus, error) {
-
 	url := fmt.Sprintf("http://%s:%s/v1/%s", hostname, DataplaneHealthPort, HealthAPIPrefix)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

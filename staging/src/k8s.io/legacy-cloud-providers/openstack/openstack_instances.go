@@ -102,13 +102,11 @@ func (i *Instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v
 // and other local methods cannot be used here
 func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	instanceID, err := instanceIDFromProviderID(providerID)
-
 	if err != nil {
 		return []v1.NodeAddress{}, err
 	}
 
 	server, err := servers.Get(i.compute, instanceID).Extract()
-
 	if err != nil {
 		return []v1.NodeAddress{}, err
 	}
@@ -190,13 +188,11 @@ func (i *Instances) InstanceID(ctx context.Context, name types.NodeName) (string
 // and other local methods cannot be used here
 func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	instanceID, err := instanceIDFromProviderID(providerID)
-
 	if err != nil {
 		return "", err
 	}
 
 	server, err := servers.Get(i.compute, instanceID).Extract()
-
 	if err != nil {
 		return "", err
 	}
@@ -207,7 +203,6 @@ func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID str
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	srv, err := getServerByName(i.compute, name)
-
 	if err != nil {
 		return "", err
 	}
@@ -234,7 +229,7 @@ func srvInstanceType(srv *servers.Server) (string, error) {
 // See cloudprovider.GetInstanceProviderID and Instances.InstanceID.
 func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
 	// If Instances.InstanceID or cloudprovider.GetInstanceProviderID is changed, the regexp should be changed too.
-	var providerIDRegexp = regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
+	providerIDRegexp := regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
 
 	matches := providerIDRegexp.FindStringSubmatch(providerID)
 	if len(matches) != 2 {

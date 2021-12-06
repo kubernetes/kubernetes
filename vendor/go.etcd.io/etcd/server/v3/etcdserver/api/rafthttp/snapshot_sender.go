@@ -32,10 +32,8 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	// timeout for reading snapshot response body
-	snapResponseReadTimeout = 5 * time.Second
-)
+// timeout for reading snapshot response body
+var snapResponseReadTimeout = 5 * time.Second
 
 type snapshotSender struct {
 	from, to types.ID

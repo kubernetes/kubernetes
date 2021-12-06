@@ -36,8 +36,8 @@ type cacheRoundTripper struct {
 // corresponding requests.
 func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
 	d := diskv.New(diskv.Options{
-		PathPerm: os.FileMode(0750),
-		FilePerm: os.FileMode(0660),
+		PathPerm: os.FileMode(0o750),
+		FilePerm: os.FileMode(0o660),
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})

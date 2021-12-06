@@ -80,8 +80,8 @@ func (c *Client) PendingOperationList() (*api.PendingOperationListResponse, erro
 }
 
 func (c *Client) PendingOperationDetails(
-	id string) (*api.PendingOperationDetails, error) {
-
+	id string) (*api.PendingOperationDetails, error,
+) {
 	req, err := http.NewRequest("GET", c.host+"/operations/pending/"+id, nil)
 	if err != nil {
 		return nil, err
@@ -112,7 +112,6 @@ func (c *Client) PendingOperationDetails(
 
 func (c *Client) PendingOperationCleanUp(
 	request *api.PendingOperationsCleanRequest) error {
-
 	buffer, err := json.Marshal(request)
 	if err != nil {
 		return err

@@ -44,8 +44,7 @@ import (
 	"k8s.io/kubectl/pkg/util/term"
 )
 
-var (
-	execExample = templates.Examples(i18n.T(`
+var execExample = templates.Examples(i18n.T(`
 		# Get output from running the 'date' command from pod mypod, using the first container by default
 		kubectl exec mypod -- date
 
@@ -69,7 +68,6 @@ var (
 		# Get output from running 'date' command from the first pod of the service myservice, using the first container by default
 		kubectl exec svc/myservice -- date
 		`))
-)
 
 const (
 	defaultPodExecTimeout = 60 * time.Second

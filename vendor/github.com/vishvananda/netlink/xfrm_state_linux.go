@@ -108,7 +108,6 @@ func (h *Handle) XfrmStateUpdate(state *XfrmState) error {
 }
 
 func (h *Handle) xfrmStateAddOrUpdate(state *XfrmState, nlProto int) error {
-
 	// A state with spi 0 can't be deleted so don't allow it to be set
 	if state.Spi == 0 {
 		return fmt.Errorf("Spi must be set when adding xfrm state.")

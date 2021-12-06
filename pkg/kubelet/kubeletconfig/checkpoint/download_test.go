@@ -52,14 +52,16 @@ func TestNewRemoteConfigSource(t *testing.T) {
 					Namespace:        "namespace",
 					UID:              "uid",
 					KubeletConfigKey: "kubelet",
-				}},
+				},
+			},
 			expect: &remoteConfigMap{&apiv1.NodeConfigSource{
 				ConfigMap: &apiv1.ConfigMapNodeConfigSource{
 					Name:             "name",
 					Namespace:        "namespace",
 					UID:              "uid",
 					KubeletConfigKey: "kubelet",
-				}}},
+				},
+			}},
 			err: "",
 		},
 	}
@@ -125,7 +127,8 @@ func TestRemoteConfigMapDownload(t *testing.T) {
 			Namespace:       "namespace",
 			UID:             "uid",
 			ResourceVersion: "1",
-		}}
+		},
+	}
 
 	source := &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
 		Name:             "name",

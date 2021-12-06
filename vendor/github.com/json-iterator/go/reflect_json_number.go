@@ -2,9 +2,10 @@ package jsoniter
 
 import (
 	"encoding/json"
-	"github.com/modern-go/reflect2"
 	"strconv"
 	"unsafe"
+
+	"github.com/modern-go/reflect2"
 )
 
 type Number string
@@ -32,8 +33,10 @@ func CastJsonNumber(val interface{}) (string, bool) {
 	return "", false
 }
 
-var jsonNumberType = reflect2.TypeOfPtr((*json.Number)(nil)).Elem()
-var jsoniterNumberType = reflect2.TypeOfPtr((*Number)(nil)).Elem()
+var (
+	jsonNumberType     = reflect2.TypeOfPtr((*json.Number)(nil)).Elem()
+	jsoniterNumberType = reflect2.TypeOfPtr((*Number)(nil)).Elem()
+)
 
 func createDecoderOfJsonNumber(ctx *ctx, typ reflect2.Type) ValDecoder {
 	if typ.AssignableTo(jsonNumberType) {
@@ -55,8 +58,7 @@ func createEncoderOfJsonNumber(ctx *ctx, typ reflect2.Type) ValEncoder {
 	return nil
 }
 
-type jsonNumberCodec struct {
-}
+type jsonNumberCodec struct{}
 
 func (codec *jsonNumberCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	switch iter.WhatIsNext() {
@@ -83,8 +85,7 @@ func (codec *jsonNumberCodec) IsEmpty(ptr unsafe.Pointer) bool {
 	return len(*((*json.Number)(ptr))) == 0
 }
 
-type jsoniterNumberCodec struct {
-}
+type jsoniterNumberCodec struct{}
 
 func (codec *jsoniterNumberCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 	switch iter.WhatIsNext() {

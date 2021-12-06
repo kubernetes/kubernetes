@@ -124,7 +124,6 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 		pw.mu.Unlock()
 
 		pickResult, err := p.Pick(info)
-
 		if err != nil {
 			if err == balancer.ErrNoSubConnAvailable {
 				continue

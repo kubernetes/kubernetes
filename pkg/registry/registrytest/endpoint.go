@@ -50,6 +50,7 @@ func (e *EndpointRegistry) List(ctx context.Context, options *metainternalversio
 func (e *EndpointRegistry) New() runtime.Object {
 	return &api.Endpoints{}
 }
+
 func (e *EndpointRegistry) NewList() runtime.Object {
 	return &api.EndpointsList{}
 }

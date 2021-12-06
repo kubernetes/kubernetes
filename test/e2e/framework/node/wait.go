@@ -107,7 +107,6 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 		return fmt.Errorf("Not running system Pods: %v", missingPodsPerNode)
 	}
 	return nil
-
 }
 
 // WaitConditionToBe returns whether node "name's" condition state matches wantTrue
@@ -245,7 +244,6 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 						node.Spec.Taints,
 						nonblockingTaints,
 					)
-
 				}
 				if len(nodesNotReadyYet) > allowedNotReadyNodes {
 					ready := len(allNodes.Items) - len(nodesNotReadyYet)

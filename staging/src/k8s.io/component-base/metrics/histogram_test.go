@@ -28,7 +28,7 @@ import (
 
 func TestHistogram(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		HistogramOpts
 		registryVersion     *semver.Version
@@ -116,7 +116,7 @@ func TestHistogram(t *testing.T) {
 
 func TestHistogramVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
-	var tests = []struct {
+	tests := []struct {
 		desc string
 		HistogramOpts
 		labels              []string
@@ -215,7 +215,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 		Name:      "metric_allowlist_test",
 		Subsystem: "subsystem",
 	}
-	var tests = []struct {
+	tests := []struct {
 		desc               string
 		labelValues        [][]string
 		expectMetricValues map[string]int

@@ -360,8 +360,7 @@ func (impl Implementation) Dlaqr04(wantt, wantz bool, n, ilo, ihi int, h []float
 			for i := kbot; i > max(ks, ktop+1); i -= 2 {
 				ss := math.Abs(h[i*ldh+i-1]) + math.Abs(h[(i-1)*ldh+i-2])
 				aa := wilk1*ss + h[i*ldh+i]
-				_, _, _, _, wr[i-1], wi[i-1], wr[i], wi[i], _, _ =
-					impl.Dlanv2(aa, ss, wilk2*ss, aa)
+				_, _, _, _, wr[i-1], wi[i-1], wr[i], wi[i], _, _ = impl.Dlanv2(aa, ss, wilk2*ss, aa)
 			}
 			if ks == ktop {
 				wr[ks+1] = h[(ks+1)*ldh+ks+1]
@@ -393,8 +392,7 @@ func (impl Implementation) Dlaqr04(wantt, wantz bool, n, ilo, ihi int, h []float
 					bb := h[(kbot-1)*ldh+kbot]
 					cc := h[kbot*ldh+kbot-1]
 					dd := h[kbot*ldh+kbot]
-					_, _, _, _, wr[kbot-1], wi[kbot-1], wr[kbot], wi[kbot], _, _ =
-						impl.Dlanv2(aa, bb, cc, dd)
+					_, _, _, _, wr[kbot-1], wi[kbot-1], wr[kbot], wi[kbot], _, _ = impl.Dlanv2(aa, bb, cc, dd)
 					ks = kbot - 1
 				}
 			}

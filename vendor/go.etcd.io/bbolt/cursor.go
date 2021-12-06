@@ -46,7 +46,6 @@ func (c *Cursor) First() (key []byte, value []byte) {
 		return k, nil
 	}
 	return k, v
-
 }
 
 // Last moves the cursor to the last item in the bucket and returns its key and value.
@@ -166,7 +165,7 @@ func (c *Cursor) seek(seek []byte) (key []byte, value []byte, flags uint32) {
 func (c *Cursor) first() {
 	for {
 		// Exit when we hit a leaf page.
-		var ref = &c.stack[len(c.stack)-1]
+		ref := &c.stack[len(c.stack)-1]
 		if ref.isLeaf() {
 			break
 		}
@@ -201,7 +200,7 @@ func (c *Cursor) last() {
 		}
 		p, n := c.bucket.pageNode(pgid)
 
-		var nextRef = elemRef{page: p, node: n}
+		nextRef := elemRef{page: p, node: n}
 		nextRef.index = nextRef.count() - 1
 		c.stack = append(c.stack, nextRef)
 	}
@@ -360,7 +359,7 @@ func (c *Cursor) node() *node {
 	}
 
 	// Start from root and traverse down the hierarchy.
-	var n = c.stack[0].node
+	n := c.stack[0].node
 	if n == nil {
 		n = c.bucket.node(c.stack[0].page.id, nil)
 	}

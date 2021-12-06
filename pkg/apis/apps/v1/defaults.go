@@ -140,6 +140,7 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
 }
+
 func SetDefaults_ReplicaSet(obj *appsv1.ReplicaSet) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)

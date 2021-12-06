@@ -74,7 +74,7 @@ resources:
 // 2. Secrets are decrypted on read
 // when EncryptionConfiguration is passed to KubeAPI server.
 func TestSecretsShouldBeTransformed(t *testing.T) {
-	var testCases = []struct {
+	testCases := []struct {
 		transformerConfigContent string
 		transformerPrefix        string
 		unSealFunc               unSealSecret
@@ -132,8 +132,8 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 }
 
 func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
-
+	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error,
+) {
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block cipher: %v", err)
@@ -150,8 +150,8 @@ func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
 }
 
 func unSealWithCBCTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
-
+	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error,
+) {
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
 	if err != nil {
 		return nil, err

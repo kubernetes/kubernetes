@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
 	"net"
 	"net/url"
 	"os"
@@ -68,11 +67,15 @@ const (
 	CleanUpDummyVMRoutineInterval = 5
 )
 
-var cleanUpRoutineInitialized = false
-var datastoreFolderIDMap = make(map[string]map[string]string)
+var (
+	cleanUpRoutineInitialized = false
+	datastoreFolderIDMap      = make(map[string]map[string]string)
+)
 
-var cleanUpRoutineInitLock sync.Mutex
-var cleanUpDummyVMLock sync.RWMutex
+var (
+	cleanUpRoutineInitLock sync.Mutex
+	cleanUpDummyVMLock     sync.RWMutex
+)
 
 // Error Messages
 const (
@@ -88,10 +91,12 @@ var (
 	ErrNoZoneTagInVC   = errors.New(NoZoneTagInVCErrMsg)
 )
 
-var _ cloudprovider.Interface = (*VSphere)(nil)
-var _ cloudprovider.Instances = (*VSphere)(nil)
-var _ cloudprovider.Zones = (*VSphere)(nil)
-var _ cloudprovider.PVLabeler = (*VSphere)(nil)
+var (
+	_ cloudprovider.Interface = (*VSphere)(nil)
+	_ cloudprovider.Instances = (*VSphere)(nil)
+	_ cloudprovider.Zones     = (*VSphere)(nil)
+	_ cloudprovider.PVLabeler = (*VSphere)(nil)
+)
 
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
@@ -306,7 +311,6 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		DeleteFunc: vs.NodeDeleted,
 	})
 	klog.V(4).Infof("Node informers in vSphere cloud provider initialized")
-
 }
 
 // Creates new worker node interface and returns
@@ -812,7 +816,6 @@ func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID 
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
-
 	instanceIDInternal := func() (string, error) {
 		if vs.hostName == convertToString(nodeName) {
 			return vs.vmUUID, nil
@@ -1118,7 +1121,6 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		// Segregates nodes per VC and DC
 		// Creates go routines per VC-DC to find whether disks are attached to the nodes.
 		disksAreAttach := func(ctx context.Context, nodeVolumes map[k8stypes.NodeName][]string, attached map[string]map[string]bool, retry bool) ([]k8stypes.NodeName, error) {
-
 			var wg sync.WaitGroup
 			var localAttachedMaps []map[string]map[string]bool
 			var nodesToRetry []k8stypes.NodeName
@@ -1849,7 +1851,6 @@ func (vs *VSphere) GetZoneToHosts(ctx context.Context, vsi *VSphereInstance) (ma
 	zoneToHosts := make(map[cloudprovider.Zone][]vmwaretypes.ManagedObjectReference)
 
 	getHostsInTagCategory := func(ctx context.Context, tagCategoryName string) (map[vmwaretypes.ManagedObjectReference]string, error) {
-
 		hostToTag := make(map[vmwaretypes.ManagedObjectReference]string)
 		err := withTagsClient(ctx, vsi.conn, func(c *rest.Client) error {
 			// Look whether the zone/region tag is defined in VC

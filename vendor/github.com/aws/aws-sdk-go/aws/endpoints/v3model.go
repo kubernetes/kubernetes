@@ -136,6 +136,7 @@ func serviceList(ss services) []string {
 	}
 	return list
 }
+
 func endpointList(es endpoints) []string {
 	list := make([]string, 0, len(es))
 	for k := range es {

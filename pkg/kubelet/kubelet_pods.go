@@ -345,7 +345,7 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
 	}
 
-	return ioutil.WriteFile(fileName, hostsFileContent, 0644)
+	return ioutil.WriteFile(fileName, hostsFileContent, 0o644)
 }
 
 // nodeHostsFileContent reads the content of node's hosts file.
@@ -505,7 +505,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	// be mounted as volumes using Docker for Windows.
 	if len(container.TerminationMessagePath) != 0 && supportsSingleFileMapping {
 		p := kl.getPodContainerDir(pod.UID, container.Name)
-		if err := os.MkdirAll(p, 0750); err != nil {
+		if err := os.MkdirAll(p, 0o750); err != nil {
 			klog.ErrorS(err, "Error on creating dir", "path", p)
 		} else {
 			opts.PodContainerDir = p
@@ -699,9 +699,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	//     b.  If a source is defined for an environment variable, resolve the source
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
-	var (
-		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
-	)
+
+	mappingFunc := expansion.MappingFuncFor(tmpEnv, serviceEnv)
+
 	for _, envVar := range container.Env {
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {
@@ -863,13 +863,13 @@ func (kl *Kubelet) killPod(pod *v1.Pod, p kubecontainer.Pod, gracePeriodOverride
 // makePodDataDirs creates the dirs for the pod datas.
 func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	uid := pod.UID
-	if err := os.MkdirAll(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(kl.getPodDir(uid), 0o750); err != nil && !os.IsExist(err) {
 		return err
 	}
-	if err := os.MkdirAll(kl.getPodVolumesDir(uid), 0750); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(kl.getPodVolumesDir(uid), 0o750); err != nil && !os.IsExist(err) {
 		return err
 	}
-	if err := os.MkdirAll(kl.getPodPluginsDir(uid), 0750); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(kl.getPodPluginsDir(uid), 0o750); err != nil && !os.IsExist(err) {
 		return err
 	}
 	return nil

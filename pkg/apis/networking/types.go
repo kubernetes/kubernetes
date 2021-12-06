@@ -431,7 +431,7 @@ type IngressRule struct {
 // mixing different types of rules in a single Ingress is disallowed, so exactly
 // one of the following must be set.
 type IngressRuleValue struct {
-	//TODO:
+	// TODO:
 	// 1. Consider renaming this resource and the associated rules so they
 	// aren't tied to Ingress. They can be used to route intra-cluster traffic.
 	// 2. Consider adding fields for ingress-type specific global options

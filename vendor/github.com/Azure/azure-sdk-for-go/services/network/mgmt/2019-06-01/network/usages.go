@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // UsagesClient is the network Client
@@ -46,8 +47,11 @@ func (client UsagesClient) List(ctx context.Context, location string) (result Us
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: location,
-			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._ ]+$`, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._ ]+$`, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.UsagesClient", "List", err.Error())
 	}
 

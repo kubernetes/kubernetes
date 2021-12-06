@@ -29,25 +29,18 @@ var ATNStateInitialNumTransitions = 4
 
 type ATNState interface {
 	GetEpsilonOnlyTransitions() bool
-
 	GetRuleIndex() int
 	SetRuleIndex(int)
-
 	GetNextTokenWithinRule() *IntervalSet
 	SetNextTokenWithinRule(*IntervalSet)
-
 	GetATN() *ATN
 	SetATN(*ATN)
-
 	GetStateType() int
-
 	GetStateNumber() int
 	SetStateNumber(int)
-
 	GetTransitions() []Transition
 	SetTransitions([]Transition)
 	AddTransition(Transition, int)
-
 	String() string
 	hash() int
 }
@@ -83,6 +76,7 @@ func (as *BaseATNState) GetRuleIndex() int {
 func (as *BaseATNState) SetRuleIndex(v int) {
 	as.ruleIndex = v
 }
+
 func (as *BaseATNState) GetEpsilonOnlyTransitions() bool {
 	return as.epsilonOnlyTransitions
 }
@@ -172,10 +166,8 @@ func NewBasicState() *BasicState {
 
 type DecisionState interface {
 	ATNState
-
 	getDecision() int
 	setDecision(int)
-
 	getNonGreedy() bool
 	setNonGreedy(bool)
 }
@@ -208,7 +200,6 @@ func (s *BaseDecisionState) setNonGreedy(b bool) {
 
 type BlockStartState interface {
 	DecisionState
-
 	getEndState() *BlockEndState
 	setEndState(*BlockEndState)
 }

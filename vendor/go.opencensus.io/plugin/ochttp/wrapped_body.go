@@ -22,9 +22,7 @@ import (
 // Body and only implements the same combination of additional
 // interfaces as the original.
 func wrappedBody(wrapper io.ReadCloser, body io.ReadCloser) io.ReadCloser {
-	var (
-		wr, i0 = body.(io.Writer)
-	)
+	wr, i0 := body.(io.Writer)
 	switch {
 	case !i0:
 		return struct {

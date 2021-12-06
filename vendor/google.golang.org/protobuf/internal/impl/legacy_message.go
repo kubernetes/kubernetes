@@ -92,6 +92,7 @@ var legacyMessageDescCache sync.Map // map[reflect.Type]protoreflect.MessageDesc
 func LegacyLoadMessageDesc(t reflect.Type) pref.MessageDescriptor {
 	return legacyLoadMessageDesc(t, "")
 }
+
 func legacyLoadMessageDesc(t reflect.Type, name pref.FullName) pref.MessageDescriptor {
 	// Fast-path: check if a MessageDescriptor is cached for this concrete type.
 	if mi, ok := legacyMessageDescCache.Load(t); ok {
@@ -172,6 +173,7 @@ func aberrantLoadMessageDesc(t reflect.Type, name pref.FullName) pref.MessageDes
 	}
 	return aberrantLoadMessageDescReentrant(t, name)
 }
+
 func aberrantLoadMessageDescReentrant(t reflect.Type, name pref.FullName) pref.MessageDescriptor {
 	// Fast-path: check if an MessageDescriptor is cached for this concrete type.
 	if md, ok := aberrantMessageDescCache[t]; ok {
@@ -469,12 +471,15 @@ func (mt aberrantMessageType) New() pref.Message {
 	}
 	return aberrantMessage{reflect.Zero(mt.t)}
 }
+
 func (mt aberrantMessageType) Zero() pref.Message {
 	return aberrantMessage{reflect.Zero(mt.t)}
 }
+
 func (mt aberrantMessageType) GoType() reflect.Type {
 	return mt.t
 }
+
 func (mt aberrantMessageType) Descriptor() pref.MessageDescriptor {
 	return LegacyLoadMessageDesc(mt.t)
 }
@@ -506,60 +511,76 @@ func (m aberrantMessage) ProtoReflect() pref.Message {
 func (m aberrantMessage) Descriptor() pref.MessageDescriptor {
 	return LegacyLoadMessageDesc(m.v.Type())
 }
+
 func (m aberrantMessage) Type() pref.MessageType {
 	return aberrantMessageType{m.v.Type()}
 }
+
 func (m aberrantMessage) New() pref.Message {
 	if m.v.Type().Kind() == reflect.Ptr {
 		return aberrantMessage{reflect.New(m.v.Type().Elem())}
 	}
 	return aberrantMessage{reflect.Zero(m.v.Type())}
 }
+
 func (m aberrantMessage) Interface() pref.ProtoMessage {
 	return m
 }
+
 func (m aberrantMessage) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
 	return
 }
+
 func (m aberrantMessage) Has(pref.FieldDescriptor) bool {
 	return false
 }
+
 func (m aberrantMessage) Clear(pref.FieldDescriptor) {
 	panic("invalid Message.Clear on " + string(m.Descriptor().FullName()))
 }
+
 func (m aberrantMessage) Get(fd pref.FieldDescriptor) pref.Value {
 	if fd.Default().IsValid() {
 		return fd.Default()
 	}
 	panic("invalid Message.Get on " + string(m.Descriptor().FullName()))
 }
+
 func (m aberrantMessage) Set(pref.FieldDescriptor, pref.Value) {
 	panic("invalid Message.Set on " + string(m.Descriptor().FullName()))
 }
+
 func (m aberrantMessage) Mutable(pref.FieldDescriptor) pref.Value {
 	panic("invalid Message.Mutable on " + string(m.Descriptor().FullName()))
 }
+
 func (m aberrantMessage) NewField(pref.FieldDescriptor) pref.Value {
 	panic("invalid Message.NewField on " + string(m.Descriptor().FullName()))
 }
+
 func (m aberrantMessage) WhichOneof(pref.OneofDescriptor) pref.FieldDescriptor {
 	panic("invalid Message.WhichOneof descriptor on " + string(m.Descriptor().FullName()))
 }
+
 func (m aberrantMessage) GetUnknown() pref.RawFields {
 	return nil
 }
+
 func (m aberrantMessage) SetUnknown(pref.RawFields) {
 	// SetUnknown discards its input on messages which don't support unknown field storage.
 }
+
 func (m aberrantMessage) IsValid() bool {
 	if m.v.Kind() == reflect.Ptr {
 		return !m.v.IsNil()
 	}
 	return false
 }
+
 func (m aberrantMessage) ProtoMethods() *piface.Methods {
 	return aberrantProtoMethods
 }
+
 func (m aberrantMessage) protoUnwrap() interface{} {
 	return m.v.Interface()
 }

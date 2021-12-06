@@ -49,7 +49,6 @@ const (
 
 // NestedPendingOperations defines the supported set of operations.
 type NestedPendingOperations interface {
-
 	// Run adds the concatenation of volumeName, podName, and nodeName to the list
 	// of running operations and spawns a new go routine to run
 	// generatedOperations.
@@ -192,12 +191,12 @@ func (grm *nestedPendingOperations) Run(
 
 	return nil
 }
+
 func (grm *nestedPendingOperations) IsOperationSafeToRetry(
 	volumeName v1.UniqueVolumeName,
 	podName volumetypes.UniquePodName,
 	nodeName types.NodeName,
 	operationName string) bool {
-
 	grm.lock.RLock()
 	defer grm.lock.RUnlock()
 
@@ -224,7 +223,6 @@ func (grm *nestedPendingOperations) IsOperationPending(
 	volumeName v1.UniqueVolumeName,
 	podName volumetypes.UniquePodName,
 	nodeName types.NodeName) bool {
-
 	grm.lock.RLock()
 	defer grm.lock.RUnlock()
 
@@ -238,7 +236,6 @@ func (grm *nestedPendingOperations) IsOperationPending(
 
 // This is an internal function and caller should acquire and release the lock
 func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, int) {
-
 	// If volumeName is empty, operation can be executed concurrently
 	if key.volumeName == EmptyUniqueVolumeName {
 		return false, -1

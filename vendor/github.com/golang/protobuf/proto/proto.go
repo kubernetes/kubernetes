@@ -114,6 +114,7 @@ func (e *RequiredNotSetError) Error() string {
 	}
 	return "proto: required field not set"
 }
+
 func (e *RequiredNotSetError) RequiredNotSet() bool {
 	return true
 }

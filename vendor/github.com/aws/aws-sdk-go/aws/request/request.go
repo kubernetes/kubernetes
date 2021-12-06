@@ -116,7 +116,6 @@ type Operation struct {
 // payload will be deserialized to.
 func New(cfg aws.Config, clientInfo metadata.ClientInfo, handlers Handlers,
 	retryer Retryer, operation *Operation, params interface{}, data interface{}) *Request {
-
 	if retryer == nil {
 		retryer = noOpRetryer{}
 	}
@@ -559,7 +558,6 @@ func (r *Request) prepareRetry() error {
 	if err := r.Error; err != nil {
 		return awserr.New(ErrCodeSerialization,
 			"failed to prepare body for retry", err)
-
 	}
 
 	// Closing response body to ensure that no response body is leaked

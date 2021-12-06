@@ -139,13 +139,13 @@ func LoadData(data []byte) (*File, error) {
 		}
 
 		if len(msgIdData) == 0 {
-			var msg = Message{
+			msg := Message{
 				MsgId:  string(msgIdData),
 				MsgStr: string(msgStrData),
 			}
 			file.MimeHeader.fromMessage(&msg)
 		} else {
-			var msg = Message{
+			msg := Message{
 				MsgId:  string(msgIdData),
 				MsgStr: string(msgStrData),
 			}
@@ -168,7 +168,7 @@ func LoadData(data []byte) (*File, error) {
 
 // Save saves a mo file.
 func (f *File) Save(name string) error {
-	return ioutil.WriteFile(name, f.Data(), 0666)
+	return ioutil.WriteFile(name, f.Data(), 0o666)
 }
 
 // Save returns a mo file format data.

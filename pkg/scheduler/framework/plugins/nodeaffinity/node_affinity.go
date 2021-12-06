@@ -37,11 +37,13 @@ type NodeAffinity struct {
 	addedPrefSchedTerms *nodeaffinity.PreferredSchedulingTerms
 }
 
-var _ framework.PreFilterPlugin = &NodeAffinity{}
-var _ framework.FilterPlugin = &NodeAffinity{}
-var _ framework.PreScorePlugin = &NodeAffinity{}
-var _ framework.ScorePlugin = &NodeAffinity{}
-var _ framework.EnqueueExtensions = &NodeAffinity{}
+var (
+	_ framework.PreFilterPlugin   = &NodeAffinity{}
+	_ framework.FilterPlugin      = &NodeAffinity{}
+	_ framework.PreScorePlugin    = &NodeAffinity{}
+	_ framework.ScorePlugin       = &NodeAffinity{}
+	_ framework.EnqueueExtensions = &NodeAffinity{}
+)
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

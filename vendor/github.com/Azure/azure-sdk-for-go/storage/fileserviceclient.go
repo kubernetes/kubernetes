@@ -317,8 +317,8 @@ func (f FileServiceClient) setResourceHeaders(path string, comp compType, res re
 	return resp.Header, checkRespCode(resp, []int{http.StatusOK})
 }
 
-//checkForStorageEmulator determines if the client is setup for use with
-//Azure Storage Emulator, and returns a relevant error
+// checkForStorageEmulator determines if the client is setup for use with
+// Azure Storage Emulator, and returns a relevant error
 func (f FileServiceClient) checkForStorageEmulator() error {
 	if f.client.accountName == StorageEmulatorAccountName {
 		return fmt.Errorf("Error: File service is not currently supported by Azure Storage Emulator")

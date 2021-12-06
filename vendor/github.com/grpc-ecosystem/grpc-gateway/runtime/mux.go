@@ -181,7 +181,7 @@ func NewServeMux(opts ...ServeMuxOption) *ServeMux {
 // Handle associates "h" to the pair of HTTP method and path pattern.
 func (s *ServeMux) Handle(meth string, pat Pattern, h HandlerFunc) {
 	if s.lastMatchWins {
-		s.handlers[meth] = append([]handler{handler{pat: pat, h: h}}, s.handlers[meth]...)
+		s.handlers[meth] = append([]handler{{pat: pat, h: h}}, s.handlers[meth]...)
 	} else {
 		s.handlers[meth] = append(s.handlers[meth], handler{pat: pat, h: h})
 	}

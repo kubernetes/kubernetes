@@ -18,10 +18,11 @@ package portworx
 
 import (
 	"fmt"
+	"os"
+
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
-	"os"
 
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	v1 "k8s.io/api/core/v1"
@@ -49,11 +50,13 @@ type portworxVolumePlugin struct {
 	util *portworxVolumeUtil
 }
 
-var _ volume.VolumePlugin = &portworxVolumePlugin{}
-var _ volume.PersistentVolumePlugin = &portworxVolumePlugin{}
-var _ volume.DeletableVolumePlugin = &portworxVolumePlugin{}
-var _ volume.ProvisionableVolumePlugin = &portworxVolumePlugin{}
-var _ volume.ExpandableVolumePlugin = &portworxVolumePlugin{}
+var (
+	_ volume.VolumePlugin              = &portworxVolumePlugin{}
+	_ volume.PersistentVolumePlugin    = &portworxVolumePlugin{}
+	_ volume.DeletableVolumePlugin     = &portworxVolumePlugin{}
+	_ volume.ProvisionableVolumePlugin = &portworxVolumePlugin{}
+	_ volume.ExpandableVolumePlugin    = &portworxVolumePlugin{}
+)
 
 const (
 	portworxVolumePluginName = "kubernetes.io/portworx-volume"
@@ -138,7 +141,8 @@ func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
-		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+	}, nil
 }
 
 func (plugin *portworxVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -155,7 +159,8 @@ func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID 
 			mounter:         mounter,
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *portworxVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -173,7 +178,8 @@ func (plugin *portworxVolumePlugin) newDeleterInternal(spec *volume.Spec, manage
 			volumeID: spec.PersistentVolume.Spec.PortworxVolume.VolumeID,
 			manager:  manager,
 			plugin:   plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 func (plugin *portworxVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
@@ -326,7 +332,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 
 	klog.V(4).Infof("Portworx Volume %s attached", b.volumeID)
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
 

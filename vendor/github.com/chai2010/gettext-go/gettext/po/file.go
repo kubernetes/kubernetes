@@ -51,7 +51,7 @@ func LoadData(data []byte) (*File, error) {
 
 // Save saves a po file.
 func (f *File) Save(name string) error {
-	return ioutil.WriteFile(name, []byte(f.String()), 0666)
+	return ioutil.WriteFile(name, []byte(f.String()), 0o666)
 }
 
 // Save returns a po file format data.

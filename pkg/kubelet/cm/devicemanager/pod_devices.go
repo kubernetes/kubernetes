@@ -34,12 +34,14 @@ type deviceAllocateInfo struct {
 	allocResp *pluginapi.ContainerAllocateResponse
 }
 
-type resourceAllocateInfo map[string]deviceAllocateInfo // Keyed by resourceName.
-type containerDevices map[string]resourceAllocateInfo   // Keyed by containerName.
-type podDevices struct {
-	sync.RWMutex
-	devs map[string]containerDevices // Keyed by podUID.
-}
+type (
+	resourceAllocateInfo map[string]deviceAllocateInfo   // Keyed by resourceName.
+	containerDevices     map[string]resourceAllocateInfo // Keyed by containerName.
+	podDevices           struct {
+		sync.RWMutex
+		devs map[string]containerDevices // Keyed by podUID.
+	}
+)
 
 // NewPodDevices is a function that returns object of podDevices type with its own guard
 // RWMutex and a map where key is a pod UID and value contains
@@ -202,7 +204,8 @@ func (pdev *podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 					ContainerName: conName,
 					ResourceName:  resource,
 					DeviceIDs:     devices.deviceIds,
-					AllocResp:     allocResp})
+					AllocResp:     allocResp,
+				})
 			}
 		}
 	}

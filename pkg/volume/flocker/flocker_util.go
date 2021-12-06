@@ -49,7 +49,6 @@ func (util *flockerUtil) DeleteVolume(d *flockerVolumeDeleter) error {
 }
 
 func (util *flockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID string, volumeSizeGiB int, labels map[string]string, err error) {
-
 	if c.flockerClient == nil {
 		c.flockerClient, err = c.plugin.newFlockerClient("")
 		if err != nil {

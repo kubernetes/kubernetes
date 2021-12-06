@@ -517,7 +517,8 @@ func TestLabelResourceVersion(t *testing.T) {
 						Header:     cmdtesting.DefaultHeader(),
 						Body: ioutil.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"}}`,
-						))}, nil
+						)),
+					}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -537,7 +538,8 @@ func TestLabelResourceVersion(t *testing.T) {
 						Header:     cmdtesting.DefaultHeader(),
 						Body: ioutil.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"}}`,
-						))}, nil
+						)),
+					}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil

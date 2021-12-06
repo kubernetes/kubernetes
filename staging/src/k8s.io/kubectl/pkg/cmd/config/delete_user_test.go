@@ -28,7 +28,7 @@ import (
 )
 
 func TestDeleteUserComplete(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name string
 		args []string
 		err  string
@@ -81,7 +81,7 @@ func TestDeleteUserComplete(t *testing.T) {
 }
 
 func TestDeleteUserValidate(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name   string
 		user   string
 		config clientcmdapi.Config
@@ -138,7 +138,7 @@ func TestDeleteUserValidate(t *testing.T) {
 }
 
 func TestDeleteUserRun(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name          string
 		user          string
 		config        clientcmdapi.Config

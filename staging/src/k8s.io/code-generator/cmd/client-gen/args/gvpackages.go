@@ -119,7 +119,7 @@ func NewGroupVersionsBuilder(groups *[]types.GroupVersions) *groupVersionsBuilde
 }
 
 func (p *groupVersionsBuilder) update() error {
-	var seenGroups = make(map[types.Group]*types.GroupVersions)
+	seenGroups := make(map[types.Group]*types.GroupVersions)
 	for _, v := range p.groups {
 		pth, gvString := util.ParsePathGroupVersion(v)
 		gv, err := types.ToGroupVersion(gvString)

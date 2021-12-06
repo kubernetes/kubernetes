@@ -52,9 +52,11 @@ type classDefaulterPlugin struct {
 	lister networkingv1listers.IngressClassLister
 }
 
-var _ admission.Interface = &classDefaulterPlugin{}
-var _ admission.MutationInterface = &classDefaulterPlugin{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&classDefaulterPlugin{})
+var (
+	_ admission.Interface         = &classDefaulterPlugin{}
+	_ admission.MutationInterface = &classDefaulterPlugin{}
+	_                             = genericadmissioninitializer.WantsExternalKubeInformerFactory(&classDefaulterPlugin{})
+)
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *classDefaulterPlugin {

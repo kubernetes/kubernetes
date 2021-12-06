@@ -49,7 +49,6 @@ func (c *Client) NodeList(opts types.ListOptions) ([]*types.Node, error) {
 
 // Node returns a node by its reference.
 func (c *Client) Node(ref string) (*types.Node, error) {
-
 	resp, err := c.do("GET", NodeAPIPrefix+"/"+ref, doOptions{})
 	if err != nil {
 		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {

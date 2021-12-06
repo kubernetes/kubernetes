@@ -493,7 +493,7 @@ func setupBinaryFile(data []byte) func(*testing.T, *ConfigMapOptions) func() {
 		files := configMapOptions.FileSources
 		for i, file := range files {
 			f := tmp + "/" + file
-			ioutil.WriteFile(f, data, 0644)
+			ioutil.WriteFile(f, data, 0o644)
 			configMapOptions.FileSources[i] = f
 		}
 		return func() {

@@ -10,36 +10,26 @@ type ATNConfigSet interface {
 	hash() int
 	Add(ATNConfig, *DoubleDict) bool
 	AddAll([]ATNConfig) bool
-
 	GetStates() *Set
 	GetPredicates() []SemanticContext
 	GetItems() []ATNConfig
-
 	OptimizeConfigs(interpreter *BaseATNSimulator)
-
 	Equals(other interface{}) bool
-
 	Length() int
 	IsEmpty() bool
 	Contains(ATNConfig) bool
 	ContainsFast(ATNConfig) bool
 	Clear()
 	String() string
-
 	HasSemanticContext() bool
 	SetHasSemanticContext(v bool)
-
 	ReadOnly() bool
 	SetReadOnly(bool)
-
 	GetConflictingAlts() *BitSet
 	SetConflictingAlts(*BitSet)
-
 	FullContext() bool
-
 	GetUniqueAlt() int
 	SetUniqueAlt(int)
-
 	GetDipsIntoOuterContext() bool
 	SetDipsIntoOuterContext(bool)
 }
@@ -93,9 +83,9 @@ type BaseATNConfigSet struct {
 
 func NewBaseATNConfigSet(fullCtx bool) *BaseATNConfigSet {
 	return &BaseATNConfigSet{
-		cachedHash: -1,
-		configLookup:     NewSet(nil, equalATNConfigs),
-		fullCtx:          fullCtx,
+		cachedHash:   -1,
+		configLookup: NewSet(nil, equalATNConfigs),
+		fullCtx:      fullCtx,
 	}
 }
 
@@ -372,8 +362,8 @@ func equalATNConfigs(a, b interface{}) bool {
 		return true
 	}
 
-	var ai, ok = a.(ATNConfig)
-	var bi, ok1 = b.(ATNConfig)
+	ai, ok := a.(ATNConfig)
+	bi, ok1 := b.(ATNConfig)
 
 	if !ok || !ok1 {
 		return false

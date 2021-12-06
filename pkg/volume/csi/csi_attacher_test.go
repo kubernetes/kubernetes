@@ -504,7 +504,6 @@ func TestAttacherWaitForAttach(t *testing.T) {
 			name:   "successful attach",
 			driver: "attachable",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
@@ -517,7 +516,6 @@ func TestAttacherWaitForAttach(t *testing.T) {
 		{
 			name: "failed attach with vol source",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
@@ -587,7 +585,6 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 		{
 			name: "successful attach with PV",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
@@ -600,7 +597,6 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 		{
 			name: "failed attach with volSrc",
 			makeAttachment: func() *storage.VolumeAttachment {
-
 				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
@@ -1292,7 +1288,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			if tc.populateDeviceMountPath {
 				// We need to create the deviceMountPath before we Mount,
 				// so that we can correctly create the file without errors.
-				err := os.MkdirAll(tc.deviceMountPath, 0750)
+				err := os.MkdirAll(tc.deviceMountPath, 0o750)
 				if err != nil {
 					t.Errorf("error attempting to create the directory")
 				}
@@ -1300,7 +1296,7 @@ func TestAttacherMountDevice(t *testing.T) {
 				if err != nil {
 					t.Errorf("error attempting to populate file on parent path: %v", err)
 				}
-				err = os.Chmod(parent, 0555)
+				err = os.Chmod(parent, 0o555)
 				if err != nil {
 					t.Errorf("error attempting to modify directory permissions: %v", err)
 				}
@@ -1312,7 +1308,6 @@ func TestAttacherMountDevice(t *testing.T) {
 				tc.devicePath,
 				tc.deviceMountPath,
 				volume.DeviceMounterArgs{FsGroup: tc.fsGroup})
-
 			// Verify
 			if err != nil {
 				if !tc.shouldFail {
@@ -1329,7 +1324,7 @@ func TestAttacherMountDevice(t *testing.T) {
 					if os.IsNotExist(err) {
 						t.Errorf("expecting file to exist after err received: %v", err)
 					}
-					err = os.Chmod(parent, 0777)
+					err = os.Chmod(parent, 0o777)
 					if err != nil {
 						t.Errorf("failed to modify permissions after test: %v", err)
 					}
@@ -1647,14 +1642,14 @@ func TestAttacherUnmountDevice(t *testing.T) {
 
 			// Make JSON for this object
 			if tc.deviceMountPath != "" {
-				if err := os.MkdirAll(tc.deviceMountPath, 0755); err != nil {
+				if err := os.MkdirAll(tc.deviceMountPath, 0o755); err != nil {
 					t.Fatalf("error creating directory %s: %s", tc.deviceMountPath, err)
 				}
 			}
 			dir := filepath.Dir(tc.deviceMountPath)
 			if tc.jsonFile != "" {
 				dataPath := filepath.Join(dir, volDataFileName)
-				if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
+				if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0o644); err != nil {
 					t.Fatalf("error creating %s: %s", dataPath, err)
 				}
 			}

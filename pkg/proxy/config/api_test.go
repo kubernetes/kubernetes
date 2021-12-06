@@ -34,13 +34,16 @@ import (
 func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	service1v1 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
-		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}}}
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}},
+	}
 	service1v2 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
-		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 20}}}}
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 20}}},
+	}
 	service2 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s2"},
-		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 30}}}}
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 30}}},
+	}
 
 	// Setup fake api client.
 	client := fake.NewSimpleClientset()

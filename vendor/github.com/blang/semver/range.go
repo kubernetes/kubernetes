@@ -188,7 +188,6 @@ func buildVersionRange(opStr, vStr string) (*versionRange, error) {
 		v: v,
 		c: c,
 	}, nil
-
 }
 
 // inArray checks if a byte is contained in an array of bytes

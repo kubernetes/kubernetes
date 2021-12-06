@@ -98,5 +98,4 @@ func NormalizePathURL(basePath, rawPath string) (string, error) {
 	}
 	u.Scheme = "file"
 	return u.String(), nil
-
 }

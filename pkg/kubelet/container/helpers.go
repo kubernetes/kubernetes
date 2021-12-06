@@ -143,7 +143,6 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 
 // ExpandContainerVolumeMounts expands the subpath of the given VolumeMount by replacing variable references with the values of given EnvVar.
 func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, error) {
-
 	envmap := envVarsToMap(envs)
 	missingKeys := sets.NewString()
 	expanded := expansion.Expand(mount.SubPathExpr, func(key string) string {
@@ -213,14 +212,12 @@ func (irecorder *innerEventRecorder) Eventf(object runtime.Object, eventtype, re
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
 		irecorder.recorder.Eventf(ref, eventtype, reason, messageFmt, args...)
 	}
-
 }
 
 func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
 		irecorder.recorder.AnnotatedEventf(ref, annotations, eventtype, reason, messageFmt, args...)
 	}
-
 }
 
 // IsHostNetworkPod returns whether the host networking requested for the given Pod.

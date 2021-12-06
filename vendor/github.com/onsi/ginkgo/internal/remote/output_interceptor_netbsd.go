@@ -1,9 +1,10 @@
+//go:build netbsd
 // +build netbsd
 
 package remote
 
 import (
-        "golang.org/x/sys/unix"
+	"golang.org/x/sys/unix"
 )
 
 func interceptorDupx(oldfd int, newfd int) {

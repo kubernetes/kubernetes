@@ -134,7 +134,6 @@ func TestGetMetricsDriverNotSupportStats(t *testing.T) {
 			t.Fatalf("for %s, expected nil metrics, but got: %v", tc.name, metrics)
 		}
 	}
-
 }
 
 func getRawVolumeInfo() *csipbv1.NodeGetVolumeStatsResponse {

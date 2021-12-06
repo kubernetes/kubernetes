@@ -45,7 +45,6 @@ type IntervalSet struct {
 }
 
 func NewIntervalSet() *IntervalSet {
-
 	i := new(IntervalSet)
 
 	i.intervals = nil
@@ -211,7 +210,6 @@ func (i *IntervalSet) String() string {
 }
 
 func (i *IntervalSet) StringVerbose(literalNames []string, symbolicNames []string, elemsAreChar bool) string {
-
 	if i.intervals == nil {
 		return "{}"
 	} else if literalNames != nil || symbolicNames != nil {
@@ -246,7 +244,6 @@ func (i *IntervalSet) toCharString() string {
 }
 
 func (i *IntervalSet) toIndexString() string {
-
 	names := make([]string, 0)
 	for j := 0; j < len(i.intervals); j++ {
 		v := i.intervals[j]

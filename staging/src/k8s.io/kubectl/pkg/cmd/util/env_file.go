@@ -33,8 +33,8 @@ var utf8bom = []byte{0xEF, 0xBB, 0xBF}
 // processEnvFileLine returns a blank key if the line is empty or a comment.
 // The value will be retrieved from the environment if necessary.
 func processEnvFileLine(line []byte, filePath string,
-	currentLine int) (key, value string, err error) {
-
+	currentLine int) (key, value string, err error,
+) {
 	if !utf8.Valid(line) {
 		return ``, ``, fmt.Errorf("env file %s contains invalid utf8 bytes at line %d: %v",
 			filePath, currentLine+1, line)

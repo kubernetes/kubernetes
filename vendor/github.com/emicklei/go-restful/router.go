@@ -10,7 +10,6 @@ import "net/http"
 // RouteSelectors can optionally also implement the PathProcessor interface to also calculate the
 // path parameters after the route has been selected.
 type RouteSelector interface {
-
 	// SelectRoute finds a Route given the input HTTP Request and a list of WebServices.
 	// It returns a selected Route and its containing WebService or an error indicating
 	// a problem.

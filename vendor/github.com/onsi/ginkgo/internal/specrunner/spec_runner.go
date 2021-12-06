@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/onsi/ginkgo/internal/spec_iterator"
 
@@ -15,8 +16,6 @@ import (
 	Writer "github.com/onsi/ginkgo/internal/writer"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/ginkgo/types"
-
-	"time"
 )
 
 type SpecRunner struct {

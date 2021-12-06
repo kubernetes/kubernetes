@@ -14,7 +14,7 @@ func (p *domainManager) bindDomainTranslators(domain, path string, data []byte) 
 		p.deleteDomain(domain) // delete old domain
 	}
 	fs := newFileSystem(path, data)
-	for locale, _ := range fs.LocaleMap {
+	for locale := range fs.LocaleMap {
 		trMapKey := p.makeTrMapKey(domain, locale)
 		if data, err := fs.LoadMessagesFile(domain, locale, ".mo"); err == nil {
 			p.trTextMap[trMapKey], _ = newMoTranslator(
@@ -41,7 +41,7 @@ func (p *domainManager) deleteDomain(domain string) {
 	}
 	// delete all mo files
 	trMapKeyPrefix := p.makeTrMapKey(domain, "")
-	for k, _ := range p.trTextMap {
+	for k := range p.trTextMap {
 		if strings.HasPrefix(k, trMapKeyPrefix) {
 			delete(p.trTextMap, k)
 		}

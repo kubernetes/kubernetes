@@ -45,7 +45,7 @@ import (
 )
 
 func TestCollectDataWithSecret(t *testing.T) {
-	caseMappingMode := int32(0400)
+	caseMappingMode := int32(0o400)
 	cases := []struct {
 		name     string
 		mappings []v1.KeyToPath
@@ -63,10 +63,10 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"foo": {Data: []byte("foo"), Mode: 0644},
-				"bar": {Data: []byte("bar"), Mode: 0644},
+				"foo": {Data: []byte("foo"), Mode: 0o644},
+				"bar": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -84,9 +84,9 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -104,9 +104,9 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -124,9 +124,9 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -148,10 +148,10 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0644},
-				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0o644},
+				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -169,7 +169,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode:    0644,
+			mode:    0o644,
 			success: false,
 		},
 		{
@@ -192,7 +192,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
 				"foo.txt": {Data: []byte("foo"), Mode: caseMappingMode},
 				"bar.bin": {Data: []byte("bar"), Mode: caseMappingMode},
@@ -217,10 +217,10 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"foo.txt": {Data: []byte("foo"), Mode: 0644},
-				"bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"foo.txt": {Data: []byte("foo"), Mode: 0o644},
+				"bar.bin": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -238,7 +238,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode:     0644,
+			mode:     0o644,
 			optional: true,
 			payload:  map[string]util.FileProjection{},
 			success:  true,
@@ -247,7 +247,6 @@ func TestCollectDataWithSecret(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			testNamespace := "test_projected_namespace"
 			tc.secret.ObjectMeta = metav1.ObjectMeta{
 				Namespace: testNamespace,
@@ -263,7 +262,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 			client := fake.NewSimpleClientset(tc.secret)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
-			var myVolumeMounter = projectedVolumeMounter{
+			myVolumeMounter := projectedVolumeMounter{
 				projectedVolume: &projectedVolume{
 					sources: source.Sources,
 					podUID:  pod.UID,
@@ -296,7 +295,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 }
 
 func TestCollectDataWithConfigMap(t *testing.T) {
-	caseMappingMode := int32(0400)
+	caseMappingMode := int32(0o400)
 	cases := []struct {
 		name      string
 		mappings  []v1.KeyToPath
@@ -314,10 +313,10 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"foo": {Data: []byte("foo"), Mode: 0644},
-				"bar": {Data: []byte("bar"), Mode: 0644},
+				"foo": {Data: []byte("foo"), Mode: 0o644},
+				"bar": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -335,9 +334,9 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -355,9 +354,9 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -375,9 +374,9 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -399,10 +398,10 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0644},
-				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0o644},
+				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -420,7 +419,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode:    0644,
+			mode:    0o644,
 			success: false,
 		},
 		{
@@ -443,7 +442,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
 				"foo.txt": {Data: []byte("foo"), Mode: caseMappingMode},
 				"bar.bin": {Data: []byte("bar"), Mode: caseMappingMode},
@@ -468,10 +467,10 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"foo.txt": {Data: []byte("foo"), Mode: 0644},
-				"bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"foo.txt": {Data: []byte("foo"), Mode: 0o644},
+				"bar.bin": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -489,7 +488,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode:     0644,
+			mode:     0o644,
 			optional: true,
 			payload:  map[string]util.FileProjection{},
 			success:  true,
@@ -512,7 +511,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 			client := fake.NewSimpleClientset(tc.configMap)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
-			var myVolumeMounter = projectedVolumeMounter{
+			myVolumeMounter := projectedVolumeMounter{
 				projectedVolume: &projectedVolume{
 					sources: source.Sources,
 					podUID:  pod.UID,
@@ -561,7 +560,9 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			name: "annotation",
 			volumeFile: []v1.DownwardAPIVolumeFile{
 				{Path: "annotation", FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "metadata.annotations['a1']"}}},
+					FieldPath: "metadata.annotations['a1']",
+				}},
+			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -570,11 +571,12 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 						"a1": "value1",
 						"a2": "value2",
 					},
-					UID: testPodUID},
+					UID: testPodUID,
+				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"annotation": {Data: []byte("value1"), Mode: 0644},
+				"annotation": {Data: []byte("value1"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -582,7 +584,9 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			name: "annotation-error",
 			volumeFile: []v1.DownwardAPIVolumeFile{
 				{Path: "annotation", FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "metadata.annotations['']"}}},
+					FieldPath: "metadata.annotations['']",
+				}},
+			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
@@ -591,11 +595,12 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 						"a1": "value1",
 						"a2": "value2",
 					},
-					UID: testPodUID},
+					UID: testPodUID,
+				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"annotation": {Data: []byte("does-not-matter-because-this-test-case-will-fail-anyway"), Mode: 0644},
+				"annotation": {Data: []byte("does-not-matter-because-this-test-case-will-fail-anyway"), Mode: 0o644},
 			},
 			success: false,
 		},
@@ -603,19 +608,23 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			name: "labels",
 			volumeFile: []v1.DownwardAPIVolumeFile{
 				{Path: "labels", FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "metadata.labels"}}},
+					FieldPath: "metadata.labels",
+				}},
+			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: testNamespace,
 					Labels: map[string]string{
 						"key1": "value1",
-						"key2": "value2"},
-					UID: testPodUID},
+						"key2": "value2",
+					},
+					UID: testPodUID,
+				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"labels": {Data: []byte("key1=\"value1\"\nkey2=\"value2\""), Mode: 0644},
+				"labels": {Data: []byte("key1=\"value1\"\nkey2=\"value2\""), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -623,19 +632,23 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			name: "annotations",
 			volumeFile: []v1.DownwardAPIVolumeFile{
 				{Path: "annotations", FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "metadata.annotations"}}},
+					FieldPath: "metadata.annotations",
+				}},
+			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: testNamespace,
 					Annotations: map[string]string{
 						"a1": "value1",
-						"a2": "value2"},
-					UID: testPodUID},
+						"a2": "value2",
+					},
+					UID: testPodUID,
+				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"annotations": {Data: []byte("a1=\"value1\"\na2=\"value2\""), Mode: 0644},
+				"annotations": {Data: []byte("a1=\"value1\"\na2=\"value2\""), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -643,16 +656,19 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			name: "name",
 			volumeFile: []v1.DownwardAPIVolumeFile{
 				{Path: "name_file_name", FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "metadata.name"}}},
+					FieldPath: "metadata.name",
+				}},
+			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: testNamespace,
-					UID:       testPodUID},
+					UID:       testPodUID,
+				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"name_file_name": {Data: []byte(testPodName), Mode: 0644},
+				"name_file_name": {Data: []byte(testPodName), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -660,16 +676,19 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			name: "namespace",
 			volumeFile: []v1.DownwardAPIVolumeFile{
 				{Path: "namespace_file_name", FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace"}}},
+					FieldPath: "metadata.namespace",
+				}},
+			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testPodName,
 					Namespace: testNamespace,
-					UID:       testPodUID},
+					UID:       testPodUID,
+				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644},
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -683,7 +702,7 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			client := fake.NewSimpleClientset(tc.pod)
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
-			var myVolumeMounter = projectedVolumeMounter{
+			myVolumeMounter := projectedVolumeMounter{
 				projectedVolume: &projectedVolume{
 					sources: source.Sources,
 					podUID:  tc.pod.UID,
@@ -711,7 +730,6 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 				t.Errorf("%v: expected and actual payload do not match", tc.name)
 			}
 		})
-
 	}
 }
 
@@ -737,41 +755,41 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		{
 			name:        "good service account",
 			audience:    "https://example.com",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32Ptr(0o644),
 			path:        "token",
 			expiration:  &minute,
 
 			wantPayload: map[string]util.FileProjection{
-				"token": {Data: []byte("test_projected_namespace:foo:60:[https://example.com]"), Mode: 0644},
+				"token": {Data: []byte("test_projected_namespace:foo:60:[https://example.com]"), Mode: 0o644},
 			},
 		},
 		{
 			name:        "good service account other path",
 			audience:    "https://example.com",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32Ptr(0o644),
 			path:        "other-token",
 			expiration:  &minute,
 			wantPayload: map[string]util.FileProjection{
-				"other-token": {Data: []byte("test_projected_namespace:foo:60:[https://example.com]"), Mode: 0644},
+				"other-token": {Data: []byte("test_projected_namespace:foo:60:[https://example.com]"), Mode: 0o644},
 			},
 		},
 		{
 			name:        "good service account defaults audience",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32Ptr(0o644),
 			path:        "token",
 			expiration:  &minute,
 
 			wantPayload: map[string]util.FileProjection{
-				"token": {Data: []byte("test_projected_namespace:foo:60:[https://api]"), Mode: 0644},
+				"token": {Data: []byte("test_projected_namespace:foo:60:[https://api]"), Mode: 0o644},
 			},
 		},
 		{
 			name:        "good service account defaults expiration",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32Ptr(0o644),
 			path:        "token",
 
 			wantPayload: map[string]util.FileProjection{
-				"token": {Data: []byte("test_projected_namespace:foo:3600:[https://api]"), Mode: 0644},
+				"token": {Data: []byte("test_projected_namespace:foo:3600:[https://api]"), Mode: 0o644},
 			},
 		},
 		{
@@ -781,39 +799,39 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "fsUser != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32Ptr(0o644),
 			fsUser:      utilptr.Int64Ptr(1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
 					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
-					Mode:   0600,
+					Mode:   0o600,
 					FsUser: utilptr.Int64Ptr(1000),
 				},
 			},
 		},
 		{
 			name:        "fsGroup != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32Ptr(0o644),
 			fsGroup:     utilptr.Int64Ptr(1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
 					Data: []byte("test_projected_namespace:foo:3600:[https://api]"),
-					Mode: 0600,
+					Mode: 0o600,
 				},
 			},
 		},
 		{
 			name:        "fsUser != nil && fsGroup != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: utilptr.Int32Ptr(0o644),
 			fsGroup:     utilptr.Int64Ptr(1000),
 			fsUser:      utilptr.Int64Ptr(1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
 					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
-					Mode:   0600,
+					Mode:   0o600,
 					FsUser: utilptr.Int64Ptr(1000),
 				},
 			},
@@ -849,7 +867,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 			tempDir, host := newTestHost(t, client)
 			defer os.RemoveAll(tempDir)
 
-			var myVolumeMounter = projectedVolumeMounter{
+			myVolumeMounter := projectedVolumeMounter{
 				projectedVolume: &projectedVolume{
 					sources: source.Sources,
 					podUID:  pod.UID,
@@ -910,7 +928,7 @@ func TestPlugin(t *testing.T) {
 		testNamespace  = "test_projected_namespace"
 		testName       = "test_projected_name"
 
-		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0o644)
 		secret        = makeSecret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
@@ -971,7 +989,7 @@ func TestInvalidPathProjected(t *testing.T) {
 		testNamespace  = "test_projected_namespace"
 		testName       = "test_projected_name"
 
-		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0o644)
 		secret        = makeSecret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
@@ -1025,7 +1043,7 @@ func TestPluginReboot(t *testing.T) {
 		testNamespace  = "test_secret_namespace"
 		testName       = "test_secret_name"
 
-		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0o644)
 		secret        = makeSecret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
@@ -1079,7 +1097,7 @@ func TestPluginOptional(t *testing.T) {
 		testName       = "test_secret_name"
 		trueVal        = true
 
-		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0o644)
 		client        = fake.NewSimpleClientset()
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
@@ -1170,7 +1188,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 		testName       = "test_secret_name"
 		trueVal        = true
 
-		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = makeVolumeSpec(testVolumeName, testName, 0o644)
 		secret        = makeSecret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}

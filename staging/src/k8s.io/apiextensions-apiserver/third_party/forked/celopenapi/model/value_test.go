@@ -322,9 +322,9 @@ func TestMapValueIsSet(t *testing.T) {
 
 func TestObjectValueEqual(t *testing.T) {
 	objType := NewObjectType("Notice", map[string]*DeclField{
-		"name":     &DeclField{Name: "name", Type: StringType},
-		"priority": &DeclField{Name: "priority", Type: IntType},
-		"message":  &DeclField{Name: "message", Type: StringType, defaultValue: "<eom>"},
+		"name":     {Name: "name", Type: StringType},
+		"priority": {Name: "priority", Type: IntType},
+		"message":  {Name: "message", Type: StringType, defaultValue: "<eom>"},
 	})
 	name := NewField(1, "name")
 	name.Ref = testValue(t, 2, "alert")

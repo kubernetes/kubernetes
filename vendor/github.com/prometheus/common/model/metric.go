@@ -20,12 +20,10 @@ import (
 	"strings"
 )
 
-var (
-	// MetricNameRE is a regular expression matching valid metric
-	// names. Note that the IsValidMetricName function performs the same
-	// check but faster than a match with this regular expression.
-	MetricNameRE = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
-)
+// MetricNameRE is a regular expression matching valid metric
+// names. Note that the IsValidMetricName function performs the same
+// check but faster than a match with this regular expression.
+var MetricNameRE = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
 
 // A Metric is similar to a LabelSet, but the key difference is that a Metric is
 // a singleton and refers to one and only one stream of samples.

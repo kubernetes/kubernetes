@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"runtime"
-
 	"time"
 
 	"github.com/onsi/ginkgo/config"
@@ -14,7 +13,7 @@ type RunWatchAndBuildCommandFlags struct {
 	SkipPackage string
 	GoOpts      map[string]interface{}
 
-	//for run and watch commands
+	// for run and watch commands
 	NumCPU         int
 	NumCompilers   int
 	ParallelStream bool
@@ -23,21 +22,23 @@ type RunWatchAndBuildCommandFlags struct {
 	AutoNodes      bool
 	Timeout        time.Duration
 
-	//only for run command
+	// only for run command
 	KeepGoing       bool
 	UntilItFails    bool
 	RandomizeSuites bool
 
-	//only for watch command
+	// only for watch command
 	Depth       int
 	WatchRegExp string
 
 	FlagSet *flag.FlagSet
 }
 
-const runMode = 1
-const watchMode = 2
-const buildMode = 3
+const (
+	runMode   = 1
+	watchMode = 2
+	buildMode = 3
+)
 
 func NewRunCommandFlags(flagSet *flag.FlagSet) *RunWatchAndBuildCommandFlags {
 	c := &RunWatchAndBuildCommandFlags{

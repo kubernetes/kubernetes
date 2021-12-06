@@ -8,11 +8,12 @@ package containerservice
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // AgentPoolsClient is the the Container Service Client.
@@ -49,12 +50,19 @@ func (client AgentPoolsClient) CreateOrUpdate(ctx context.Context, resourceGroup
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.AgentPoolsClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -141,12 +149,19 @@ func (client AgentPoolsClient) Delete(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.AgentPoolsClient", "Delete", err.Error())
 	}
 
@@ -230,12 +245,19 @@ func (client AgentPoolsClient) Get(ctx context.Context, resourceGroupName string
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.AgentPoolsClient", "Get", err.Error())
 	}
 
@@ -317,12 +339,19 @@ func (client AgentPoolsClient) GetAvailableAgentPoolVersions(ctx context.Context
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.AgentPoolsClient", "GetAvailableAgentPoolVersions", err.Error())
 	}
 
@@ -405,12 +434,19 @@ func (client AgentPoolsClient) GetUpgradeProfile(ctx context.Context, resourceGr
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.AgentPoolsClient", "GetUpgradeProfile", err.Error())
 	}
 
@@ -493,12 +529,19 @@ func (client AgentPoolsClient) List(ctx context.Context, resourceGroupName strin
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: resourceName,
-			Constraints: []validation.Constraint{{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: resourceName,
+			Constraints: []validation.Constraint{
+				{Target: "resourceName", Name: validation.MaxLength, Rule: 63, Chain: nil},
 				{Target: "resourceName", Name: validation.MinLength, Rule: 1, Chain: nil},
-				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil}}}}); err != nil {
+				{Target: "resourceName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]$|^[a-zA-Z0-9][-_a-zA-Z0-9]{0,61}[a-zA-Z0-9]$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.AgentPoolsClient", "List", err.Error())
 	}
 

@@ -42,9 +42,7 @@ type defaultCertData struct {
 	cachedCert      *tls.Certificate
 }
 
-var (
-	defaultCert defaultCertData
-)
+var defaultCert defaultCertData
 
 // Source is a function that can be passed into crypto/tls.Config.GetClientCertificate.
 type Source func(*tls.CertificateRequestInfo) (*tls.Certificate, error)

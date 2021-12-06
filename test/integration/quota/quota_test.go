@@ -593,7 +593,6 @@ func testServiceForbidden(clientset clientset.Interface, namespace string, servi
 		}
 
 		return false, nil
-
 	})
 	if pollErr != nil {
 		t.Errorf("creating Service should return Forbidden due to resource quota limits but got: %v", pollErr)

@@ -17,10 +17,11 @@ limitations under the License.
 package userspace
 
 import (
+	"net"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
-	"net"
 )
 
 // LoadBalancer is an interface for distributing incoming requests to service endpoints.
@@ -32,6 +33,5 @@ type LoadBalancer interface {
 	DeleteService(service proxy.ServicePortName)
 	CleanupStaleStickySessions(service proxy.ServicePortName)
 	ServiceHasEndpoints(service proxy.ServicePortName) bool
-
 	proxyconfig.EndpointsHandler
 }

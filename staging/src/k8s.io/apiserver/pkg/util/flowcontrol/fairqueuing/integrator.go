@@ -31,7 +31,6 @@ import (
 // Integrator.
 type Integrator interface {
 	metrics.ChangeObserver
-
 	GetResults() IntegratorResults
 
 	// Return the results of integrating to now, and reset integration to start now
@@ -40,9 +39,9 @@ type Integrator interface {
 
 // IntegratorResults holds statistical abstracts of the integration
 type IntegratorResults struct {
-	Duration  float64 //seconds
-	Average   float64 //time-weighted
-	Deviation float64 //standard deviation: sqrt(avg((value-avg)^2))
+	Duration  float64 // seconds
+	Average   float64 // time-weighted
+	Deviation float64 // standard deviation: sqrt(avg((value-avg)^2))
 	Min, Max  float64
 }
 

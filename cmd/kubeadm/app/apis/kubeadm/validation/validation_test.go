@@ -31,7 +31,7 @@ import (
 )
 
 func TestValidateToken(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		token    string
 		expected bool
 	}{
@@ -54,7 +54,7 @@ func TestValidateToken(t *testing.T) {
 }
 
 func TestValidateValidateTokenUsages(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		u        []string
 		f        *field.Path
 		expected bool
@@ -76,7 +76,7 @@ func TestValidateValidateTokenUsages(t *testing.T) {
 }
 
 func TestValidateTokenGroups(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		u        []string
 		g        []string
 		f        *field.Path
@@ -99,7 +99,7 @@ func TestValidateTokenGroups(t *testing.T) {
 }
 
 func TestValidateNodeRegistrationOptions(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		nodeName       string
 		expectedErrors bool
 	}{
@@ -126,7 +126,7 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 }
 
 func TestValidateCertSANs(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		sans     []string
 		expected bool
 	}{
@@ -156,7 +156,7 @@ func TestValidateCertSANs(t *testing.T) {
 }
 
 func TestValidateIPFromString(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		ip       string
 		expected bool
@@ -185,7 +185,7 @@ func TestValidateIPFromString(t *testing.T) {
 }
 
 func TestValidateIPNetFromString(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		subnet   string
 		minaddrs int64
@@ -221,7 +221,7 @@ func TestValidateIPNetFromString(t *testing.T) {
 }
 
 func TestValidatePodSubnetNodeMask(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name        string
 		subnet      string
 		cmExtraArgs map[string]string
@@ -265,7 +265,7 @@ func TestValidatePodSubnetNodeMask(t *testing.T) {
 }
 
 func TestValidateServiceSubnetSize(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		subnet   string
 		expected bool
@@ -296,7 +296,7 @@ func TestValidateServiceSubnetSize(t *testing.T) {
 }
 
 func TestValidateHostPort(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		s        string
 		expected bool
@@ -366,7 +366,7 @@ func TestValidateHostPort(t *testing.T) {
 }
 
 func TestValidateAPIEndpoint(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		s        *kubeadmapi.APIEndpoint
 		expected bool
@@ -425,17 +425,20 @@ func TestValidateAPIEndpoint(t *testing.T) {
 	}
 }
 
-//TODO: Create a separated test for ValidateClusterConfiguration
+// TODO: Create a separated test for ValidateClusterConfiguration
 func TestValidateInitConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		s        *kubeadmapi.InitConfiguration
 		expected bool
 	}{
-		{"invalid missing InitConfiguration",
-			&kubeadmapi.InitConfiguration{}, false},
-		{"invalid missing token with IPv4 service subnet",
+		{
+			"invalid missing InitConfiguration",
+			&kubeadmapi.InitConfiguration{}, false,
+		},
+		{
+			"invalid missing token with IPv4 service subnet",
 			&kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
@@ -449,8 +452,10 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/cert/dir",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
-			}, false},
-		{"invalid missing token with IPv6 service subnet",
+			}, false,
+		},
+		{
+			"invalid missing token with IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
@@ -464,8 +469,10 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/cert/dir",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
-			}, false},
-		{"invalid missing node name",
+			}, false,
+		},
+		{
+			"invalid missing node name",
 			&kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
@@ -478,8 +485,10 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-			}, false},
-		{"valid InitConfiguration with incorrect IPv4 pod subnet",
+			}, false,
+		},
+		{
+			"valid InitConfiguration with incorrect IPv4 pod subnet",
 			&kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
@@ -494,8 +503,10 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/other/cert/dir",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
-			}, false},
-		{"valid InitConfiguration with IPv4 service subnet",
+			}, false,
+		},
+		{
+			"valid InitConfiguration with IPv4 service subnet",
 			&kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
@@ -515,8 +526,10 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/other/cert/dir",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
-			}, true},
-		{"valid InitConfiguration using IPv6 service subnet",
+			}, true,
+		},
+		{
+			"valid InitConfiguration using IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1:2:3::4",
@@ -535,7 +548,8 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/other/cert/dir",
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
-			}, true},
+			}, true,
+		},
 	}
 	for _, rt := range tests {
 		actual := ValidateInitConfiguration(rt.s)
@@ -551,7 +565,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 }
 
 func TestValidateJoinConfiguration(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		s        *kubeadmapi.JoinConfiguration
 		expected bool
 	}{
@@ -659,7 +673,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 }
 
 func TestValidateMixedArguments(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		args     []string
 		expected bool
 	}{
@@ -703,7 +717,7 @@ func TestValidateMixedArguments(t *testing.T) {
 
 func TestValidateFeatureGates(t *testing.T) {
 	type featureFlag map[string]bool
-	var tests = []struct {
+	tests := []struct {
 		featureGates featureFlag
 		expected     bool
 	}{
@@ -724,7 +738,7 @@ func TestValidateFeatureGates(t *testing.T) {
 }
 
 func TestValidateIgnorePreflightErrors(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		ignorePreflightErrorsFromCLI        []string
 		ignorePreflightErrorsFromConfigFile []string
 		expectedSet                         sets.String
@@ -805,7 +819,7 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 }
 
 func TestValidateDiscovery(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		d        *kubeadmapi.Discovery
 		expected bool
@@ -843,7 +857,7 @@ func TestValidateDiscovery(t *testing.T) {
 }
 
 func TestValidateDiscoveryBootstrapToken(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		btd      *kubeadmapi.BootstrapTokenDiscovery
 		expected bool
@@ -900,7 +914,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 }
 
 func TestValidateDiscoveryTokenAPIServer(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		apiServerEndpoint string
 		expected          bool
 	}{
@@ -932,7 +946,7 @@ func TestValidateDiscoveryKubeConfigPath(t *testing.T) {
 	}
 	defer os.Remove(tmpfile.Name())
 
-	var tests = []struct {
+	tests := []struct {
 		s        string
 		expected bool
 	}{
@@ -958,7 +972,7 @@ func TestValidateDiscoveryKubeConfigPath(t *testing.T) {
 }
 
 func TestValidateSocketPath(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name           string
 		criSocket      string
 		expectedErrors bool
@@ -980,7 +994,7 @@ func TestValidateSocketPath(t *testing.T) {
 }
 
 func TestValidateURLs(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name           string
 		urls           []string
 		requireHTTPS   bool
@@ -1027,7 +1041,7 @@ func TestValidateURLs(t *testing.T) {
 }
 
 func TestValidateEtcd(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name           string
 		etcd           *kubeadmapi.Etcd
 		expectedErrors bool

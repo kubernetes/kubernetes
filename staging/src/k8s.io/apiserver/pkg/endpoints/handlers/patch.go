@@ -664,7 +664,6 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		return updateObject, updateErr
 	}
 	result, err := finisher.FinishRequest(ctx, func() (runtime.Object, error) {
-
 		result, err := requestFunc()
 		// If the object wasn't committed to storage because it's serialized size was too large,
 		// it is safe to remove managedFields (which can be large) and try again.

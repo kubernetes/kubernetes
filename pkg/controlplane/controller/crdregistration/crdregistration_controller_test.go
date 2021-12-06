@@ -124,6 +124,7 @@ type fakeAPIServiceRegistration struct {
 func (a *fakeAPIServiceRegistration) AddAPIServiceToSync(in *apiregistration.APIService) {
 	a.added = append(a.added, in)
 }
+
 func (a *fakeAPIServiceRegistration) RemoveAPIServiceToSync(name string) {
 	a.removed = append(a.removed, name)
 }

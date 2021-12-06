@@ -151,7 +151,7 @@ func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	notMnt, err := attacher.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+			if err := os.MkdirAll(deviceMountPath, 0o750); err != nil {
 				return err
 			}
 			notMnt = true

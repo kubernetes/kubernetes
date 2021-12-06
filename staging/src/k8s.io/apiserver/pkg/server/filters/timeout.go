@@ -155,8 +155,10 @@ func newTimeoutWriter(w http.ResponseWriter) (timeoutWriter, http.ResponseWriter
 	return base, wrapped
 }
 
-var _ http.ResponseWriter = &baseTimeoutWriter{}
-var _ responsewriter.UserProvidedDecorator = &baseTimeoutWriter{}
+var (
+	_ http.ResponseWriter                  = &baseTimeoutWriter{}
+	_ responsewriter.UserProvidedDecorator = &baseTimeoutWriter{}
+)
 
 type baseTimeoutWriter struct {
 	w http.ResponseWriter

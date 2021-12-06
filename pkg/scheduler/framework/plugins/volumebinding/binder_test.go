@@ -335,7 +335,6 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 	for _, pv := range apiPVs {
 		env.reactor.AddVolume(pv)
 	}
-
 }
 
 func (env *testEnv) updateVolumes(t *testing.T, pvs []*v1.PersistentVolume, waitCache bool) {
@@ -533,8 +532,8 @@ func (env *testEnv) validateBind(
 	t *testing.T,
 	pod *v1.Pod,
 	expectedPVs []*v1.PersistentVolume,
-	expectedAPIPVs []*v1.PersistentVolume) {
-
+	expectedAPIPVs []*v1.PersistentVolume,
+) {
 	// Check pv cache
 	pvCache := env.internalBinder.pvCache
 	for _, pv := range expectedPVs {
@@ -560,8 +559,8 @@ func (env *testEnv) validateProvision(
 	t *testing.T,
 	pod *v1.Pod,
 	expectedPVCs []*v1.PersistentVolumeClaim,
-	expectedAPIPVCs []*v1.PersistentVolumeClaim) {
-
+	expectedAPIPVCs []*v1.PersistentVolumeClaim,
+) {
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range expectedPVCs {

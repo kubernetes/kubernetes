@@ -102,7 +102,6 @@ func TestUnsetUnexistConfig(t *testing.T) {
 		expectedErr: "current map key `foo` is invalid",
 	}
 	test.run(t)
-
 }
 
 func (test unsetConfigTest) run(t *testing.T) {

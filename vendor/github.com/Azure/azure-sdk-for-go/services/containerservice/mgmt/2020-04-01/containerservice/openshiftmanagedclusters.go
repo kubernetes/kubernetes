@@ -8,11 +8,12 @@ package containerservice
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // OpenShiftManagedClustersClient is the the Container Service Client.
@@ -50,14 +51,24 @@ func (client OpenShiftManagedClustersClient) CreateOrUpdate(ctx context.Context,
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.OpenShiftManagedClusterProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.OpenShiftManagedClusterProperties.OpenShiftVersion", Name: validation.Null, Rule: true, Chain: nil},
-					{Target: "parameters.OpenShiftManagedClusterProperties.MasterPoolProfile", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.OpenShiftManagedClusterProperties.MasterPoolProfile.Count", Name: validation.Null, Rule: true, Chain: nil}}},
-				}}}}}); err != nil {
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.OpenShiftManagedClusterProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{Target: "parameters.OpenShiftManagedClusterProperties.OpenShiftVersion", Name: validation.Null, Rule: true, Chain: nil},
+					{
+						Target: "parameters.OpenShiftManagedClusterProperties.MasterPoolProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.OpenShiftManagedClusterProperties.MasterPoolProfile.Count", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.OpenShiftManagedClustersClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -142,8 +153,11 @@ func (client OpenShiftManagedClustersClient) Delete(ctx context.Context, resourc
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.OpenShiftManagedClustersClient", "Delete", err.Error())
 	}
 
@@ -225,8 +239,11 @@ func (client OpenShiftManagedClustersClient) Get(ctx context.Context, resourceGr
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.OpenShiftManagedClustersClient", "Get", err.Error())
 	}
 
@@ -421,8 +438,11 @@ func (client OpenShiftManagedClustersClient) ListByResourceGroup(ctx context.Con
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.OpenShiftManagedClustersClient", "ListByResourceGroup", err.Error())
 	}
 
@@ -545,8 +565,11 @@ func (client OpenShiftManagedClustersClient) UpdateTags(ctx context.Context, res
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerservice.OpenShiftManagedClustersClient", "UpdateTags", err.Error())
 	}
 

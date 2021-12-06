@@ -212,7 +212,7 @@ func (tp *templatePart) expand(w *pairWriter, values map[string]string) {
 		w.Write(tp.raw)
 		return
 	}
-	var first = true
+	first := true
 	for _, term := range tp.terms {
 		value, exists := values[term.name]
 		if !exists {

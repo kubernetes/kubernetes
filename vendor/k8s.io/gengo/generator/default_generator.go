@@ -57,6 +57,4 @@ func (d DefaultGen) Init(c *Context, w io.Writer) error {
 	return err
 }
 
-var (
-	_ = Generator(DefaultGen{})
-)
+var _ = Generator(DefaultGen{})

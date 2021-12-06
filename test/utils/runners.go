@@ -182,7 +182,7 @@ type RCConfig struct {
 
 	ServiceAccountTokenProjections int
 
-	//Additional containers to run in the pod
+	// Additional containers to run in the pod
 	AdditionalContainers []v1.Container
 }
 

@@ -85,7 +85,6 @@ func (p *parser) begin() error {
 	}
 
 	err := p.addresses()
-
 	if err != nil {
 		return err
 	}

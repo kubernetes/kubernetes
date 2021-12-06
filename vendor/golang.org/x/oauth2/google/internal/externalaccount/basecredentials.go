@@ -86,7 +86,6 @@ func validateURL(input string, patterns []*regexp.Regexp, scheme string) bool {
 	toTest := parsed.Host
 
 	for _, pattern := range patterns {
-
 		if valid := pattern.MatchString(toTest); valid {
 			return true
 		}
@@ -205,7 +204,6 @@ func (ts tokenSource) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	subjectToken, err := credSource.subjectToken()
-
 	if err != nil {
 		return nil, err
 	}

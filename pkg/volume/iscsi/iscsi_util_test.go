@@ -114,7 +114,8 @@ func TestExtractTransportname(t *testing.T) {
 		"# BEGIN RECORD 2.0-873\n" +
 			"iface.iscsi_ifacename = default\n" +
 			"iface.initiatorname = <empty>\n" +
-			"# END RECORD"}
+			"# END RECORD",
+	}
 	transportName := extractTransportname(fakeIscsiadmOutput[0])
 	if transportName != "tcp" {
 		t.Errorf("extractTransportname: Could not extract correct iface.transport_name 'tcp', got %s", transportName)
@@ -134,8 +135,10 @@ func TestExtractTransportname(t *testing.T) {
 }
 
 func TestWaitForPathToExist(t *testing.T) {
-	devicePath := []string{"/dev/disk/by-path/ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0",
-		"/dev/disk/by-path/pci-*-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"}
+	devicePath := []string{
+		"/dev/disk/by-path/ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0",
+		"/dev/disk/by-path/pci-*-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0",
+	}
 	fpath := "/dev/disk/by-path/pci-0000:00:00.0-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"
 
 	exist := waitForPathToExistInternal(&devicePath[0], 1, "tcp", fakeOsStat, filepath.Glob)
@@ -189,14 +192,17 @@ func TestParseIscsiadmShow(t *testing.T) {
 
 	expectedIscsiadmOutput1 := map[string]string{
 		"iface.transport_name": "tcp",
-		"iface.mtu":            "0"}
+		"iface.mtu":            "0",
+	}
 
 	expectedIscsiadmOutput2 := map[string]string{
 		"iface.transport_name": "cxgb4i",
-		"iface.mtu":            "0"}
+		"iface.mtu":            "0",
+	}
 
 	expectedIscsiadmOutput3 := map[string]string{
-		"iface.mtu": "0"}
+		"iface.mtu": "0",
+	}
 
 	params, _ := parseIscsiadmShow(fakeIscsiadmOutput1)
 	if !reflect.DeepEqual(params, expectedIscsiadmOutput1) {
@@ -252,7 +258,8 @@ func TestClonedIface(t *testing.T) {
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
 			Iface:  TestIface,
-			plugin: plugin.(*iscsiPlugin)},
+			plugin: plugin.(*iscsiPlugin),
+		},
 		exec: fakeExec,
 	}
 	err := cloneIface(fakeMounter)
@@ -286,7 +293,8 @@ func TestClonedIfaceShowError(t *testing.T) {
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
 			Iface:  TestIface,
-			plugin: plugin.(*iscsiPlugin)},
+			plugin: plugin.(*iscsiPlugin),
+		},
 		exec: fakeExec,
 	}
 	err := cloneIface(fakeMounter)
@@ -296,7 +304,6 @@ func TestClonedIfaceShowError(t *testing.T) {
 	if fakeExec.CommandCalls != len(scripts) {
 		t.Errorf("expected 1 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
 	}
-
 }
 
 func TestClonedIfaceUpdateError(t *testing.T) {
@@ -337,7 +344,8 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
 			Iface:  TestIface,
-			plugin: plugin.(*iscsiPlugin)},
+			plugin: plugin.(*iscsiPlugin),
+		},
 		exec: fakeExec,
 	}
 	err := cloneIface(fakeMounter)
@@ -347,7 +355,6 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 	if fakeExec.CommandCalls != len(scripts) {
 		t.Errorf("expected 5 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
 	}
-
 }
 
 func TestGetVolCount(t *testing.T) {

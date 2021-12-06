@@ -131,15 +131,17 @@ func (t *Tester) setObjectMeta(obj runtime.Object, name string) {
 	meta.SetGeneration(1)
 }
 
-type AssignFunc func([]runtime.Object) []runtime.Object
-type EmitFunc func(runtime.Object, string) error
-type GetFunc func(context.Context, runtime.Object) (runtime.Object, error)
-type InitWatchFunc func()
-type InjectErrFunc func(err error)
-type IsErrorFunc func(err error) bool
-type CreateFunc func(context.Context, runtime.Object) error
-type SetRVFunc func(uint64)
-type UpdateFunc func(runtime.Object) runtime.Object
+type (
+	AssignFunc    func([]runtime.Object) []runtime.Object
+	EmitFunc      func(runtime.Object, string) error
+	GetFunc       func(context.Context, runtime.Object) (runtime.Object, error)
+	InitWatchFunc func()
+	InjectErrFunc func(err error)
+	IsErrorFunc   func(err error) bool
+	CreateFunc    func(context.Context, runtime.Object) error
+	SetRVFunc     func(uint64)
+	UpdateFunc    func(runtime.Object) runtime.Object
+)
 
 // Test creating an object.
 func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn GetFunc, invalid ...runtime.Object) {
@@ -825,7 +827,6 @@ func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn Create
 	if clusterName := t.getObjectMetaOrFail(updatedFoo).GetClusterName(); len(clusterName) != 0 {
 		t.Errorf("Unexpected clusterName update: expected empty, got %v", clusterName)
 	}
-
 }
 
 // =============================================================================
@@ -875,7 +876,6 @@ func (t *Tester) testDeleteNonExist(obj runtime.Object, opts metav1.DeleteOption
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
-
 }
 
 //  This test the fast-fail path. We test that the precondition gets verified

@@ -125,11 +125,9 @@ type StdLogger interface {
 	Print(...interface{})
 	Printf(string, ...interface{})
 	Println(...interface{})
-
 	Fatal(...interface{})
 	Fatalf(string, ...interface{})
 	Fatalln(...interface{})
-
 	Panic(...interface{})
 	Panicf(string, ...interface{})
 	Panicln(...interface{})
@@ -140,7 +138,6 @@ type FieldLogger interface {
 	WithField(key string, value interface{}) *Entry
 	WithFields(fields Fields) *Entry
 	WithError(err error) *Entry
-
 	Debugf(format string, args ...interface{})
 	Infof(format string, args ...interface{})
 	Printf(format string, args ...interface{})
@@ -149,7 +146,6 @@ type FieldLogger interface {
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
 	Panicf(format string, args ...interface{})
-
 	Debug(args ...interface{})
 	Info(args ...interface{})
 	Print(args ...interface{})
@@ -158,7 +154,6 @@ type FieldLogger interface {
 	Error(args ...interface{})
 	Fatal(args ...interface{})
 	Panic(args ...interface{})
-
 	Debugln(args ...interface{})
 	Infoln(args ...interface{})
 	Println(args ...interface{})

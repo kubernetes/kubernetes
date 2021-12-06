@@ -41,8 +41,10 @@ type VolumeZone struct {
 	scLister  storagelisters.StorageClassLister
 }
 
-var _ framework.FilterPlugin = &VolumeZone{}
-var _ framework.EnqueueExtensions = &VolumeZone{}
+var (
+	_ framework.FilterPlugin      = &VolumeZone{}
+	_ framework.EnqueueExtensions = &VolumeZone{}
+)
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

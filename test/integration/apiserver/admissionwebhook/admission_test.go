@@ -72,9 +72,7 @@ const (
 	validation = "validation"
 )
 
-var (
-	noSideEffects = admissionregistrationv1.SideEffectClassNone
-)
+var noSideEffects = admissionregistrationv1.SideEffectClassNone
 
 type testContext struct {
 	t *testing.T
@@ -229,6 +227,7 @@ func (h *holder) reset(t *testing.T) {
 		}
 	}
 }
+
 func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
 	// Special-case namespaces, since the object name shows up in request attributes
 	if len(namespace) == 0 && gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" {
@@ -416,11 +415,13 @@ func (w *warningHandler) reset() {
 	defer w.lock.Unlock()
 	w.warnings = map[string]bool{}
 }
+
 func (w *warningHandler) hasWarning(warning string) bool {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 	return w.warnings[warning]
 }
+
 func makeWarning(version string, phase string, converted bool) string {
 	return fmt.Sprintf("%v/%v/%v", version, phase, converted)
 }
@@ -1511,6 +1512,7 @@ func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResour
 func gvr(group, version, resource string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
 }
+
 func gvk(group, version, kind string) schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
 }

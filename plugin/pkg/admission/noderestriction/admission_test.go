@@ -241,14 +241,16 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace:        "bar",
 				UID:              "fooUID",
 				KubeletConfigKey: "kubelet",
-			}}}}
+			},
+		}}}
 		mynodeObjConfigB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
 			ConfigMap: &api.ConfigMapNodeConfigSource{
 				Name:             "qux",
 				Namespace:        "bar",
 				UID:              "quxUID",
 				KubeletConfigKey: "kubelet",
-			}}}}
+			},
+		}}}
 
 		mynodeObjTaintA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "A"}}}}
 		mynodeObjTaintB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "B"}}}}

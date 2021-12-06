@@ -50,7 +50,7 @@ type flockerVolume struct {
 	datasetName string
 	// dataset uuid
 	datasetUUID string
-	//pod           *v1.Pod
+	// pod           *v1.Pod
 	flockerClient flockerapi.Clientable
 	manager       volumeManager
 	plugin        *flockerPlugin
@@ -58,10 +58,12 @@ type flockerVolume struct {
 	volume.MetricsProvider
 }
 
-var _ volume.VolumePlugin = &flockerPlugin{}
-var _ volume.PersistentVolumePlugin = &flockerPlugin{}
-var _ volume.DeletableVolumePlugin = &flockerPlugin{}
-var _ volume.ProvisionableVolumePlugin = &flockerPlugin{}
+var (
+	_ volume.VolumePlugin              = &flockerPlugin{}
+	_ volume.PersistentVolumePlugin    = &flockerPlugin{}
+	_ volume.DeletableVolumePlugin     = &flockerPlugin{}
+	_ volume.ProvisionableVolumePlugin = &flockerPlugin{}
+)
 
 const (
 	flockerPluginName = "kubernetes.io/flocker"
@@ -161,7 +163,8 @@ func (p *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 			plugin:          p,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), p.host)),
 		},
-		readOnly: readOnly}, nil
+		readOnly: readOnly,
+	}, nil
 }
 
 func (p *flockerPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -193,7 +196,6 @@ func (p *flockerPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 }
 
 func (b *flockerVolume) GetDatasetUUID() (datasetUUID string, err error) {
-
 	// return UUID if set
 	if len(b.datasetUUID) > 0 {
 		return b.datasetUUID, nil
@@ -241,7 +243,6 @@ func (b *flockerVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 func (p *flockerPlugin) newFlockerClient(hostIP string) (*flockerapi.Client, error) {
 	host := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
 	port, err := env.GetEnvAsIntOrFallback("FLOCKER_CONTROL_SERVICE_PORT", defaultPort)
-
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +255,6 @@ func (p *flockerPlugin) newFlockerClient(hostIP string) (*flockerapi.Client, err
 }
 
 func (b *flockerVolumeMounter) newFlockerClient() (*flockerapi.Client, error) {
-
 	hostIP, err := b.plugin.host.GetHostIP()
 	if err != nil {
 		return nil, err
@@ -319,7 +319,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		return nil
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		return err
 	}
@@ -397,7 +397,6 @@ func (b *flockerVolumeMounter) updateDatasetPrimary(datasetUUID string, primaryU
 		case <-tickChan.C:
 		}
 	}
-
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.FlockerVolumeSource, bool, error) {
@@ -446,7 +445,8 @@ func (p *flockerPlugin) newDeleterInternal(spec *volume.Spec, manager volumeMana
 			datasetName: spec.PersistentVolume.Spec.Flocker.DatasetName,
 			datasetUUID: spec.PersistentVolume.Spec.Flocker.DatasetUUID,
 			manager:     manager,
-		}}, nil
+		},
+	}, nil
 }
 
 func (p *flockerPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {

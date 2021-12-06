@@ -521,7 +521,7 @@ var _ = SIGDescribe("Probing container", func() {
 	*/
 	ginkgo.It("should *not* be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]", func() {
 		// TODO(SergeyKanzhelev): it is unclear when feature gates are not working as expected.
-		//e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
+		// e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
 
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
@@ -547,7 +547,7 @@ var _ = SIGDescribe("Probing container", func() {
 	*/
 	ginkgo.It("should be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]", func() {
 		// TODO(SergeyKanzhelev): it is unclear when feature gates are not working as expected.
-		//e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
+		// e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.GRPCContainerProbe)
 
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
@@ -825,7 +825,7 @@ func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName st
 					Command: []string{
 						"/usr/local/bin/etcd",
 						"--listen-client-urls",
-						"http://0.0.0.0:2379", //should listen on all addresses
+						"http://0.0.0.0:2379", // should listen on all addresses
 						"--advertise-client-urls",
 						etcdURL,
 					},

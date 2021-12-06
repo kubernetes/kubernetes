@@ -22,19 +22,16 @@ package winkernel
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Microsoft/hcsshim/hcn"
 	"k8s.io/klog/v2"
-
-	"strings"
 )
 
 type hnsV2 struct{}
 
-var (
-	// LoadBalancerFlagsIPv6 enables IPV6.
-	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
-)
+// LoadBalancerFlagsIPv6 enables IPV6.
+var LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
 
 func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(name)
@@ -68,19 +65,21 @@ func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 		remoteSubnets: remoteSubnets,
 	}, nil
 }
+
 func (hns hnsV2) getEndpointByID(id string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcn.GetEndpointByID(id)
 	if err != nil {
 		return nil, err
 	}
-	return &endpointsInfo{ //TODO: fill out PA
+	return &endpointsInfo{ // TODO: fill out PA
 		ip:         hnsendpoint.IpConfigurations[0].IpAddress,
-		isLocal:    uint32(hnsendpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
+		isLocal:    uint32(hnsendpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, // TODO: Change isLocal to isRemote
 		macAddress: hnsendpoint.MacAddress,
 		hnsID:      hnsendpoint.Id,
 		hns:        hns,
 	}, nil
 }
+
 func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
@@ -104,7 +103,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 		if equal && strings.EqualFold(endpoint.HostComputeNetwork, hnsnetwork.Id) {
 			return &endpointsInfo{
 				ip:         ip,
-				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
+				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, // TODO: Change isLocal to isRemote
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
 				hns:        hns,
@@ -114,6 +113,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 
 	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
 }
+
 func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
@@ -167,10 +167,11 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		isLocal:         uint32(createdEndpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
 		macAddress:      createdEndpoint.MacAddress,
 		hnsID:           createdEndpoint.Id,
-		providerAddress: ep.providerAddress, //TODO get from createdEndpoint
+		providerAddress: ep.providerAddress, // TODO get from createdEndpoint
 		hns:             hns,
 	}, nil
 }
+
 func (hns hnsV2) deleteEndpoint(hnsID string) error {
 	hnsendpoint, err := hcn.GetEndpointByID(hnsID)
 	if err != nil {
@@ -182,6 +183,7 @@ func (hns hnsV2) deleteEndpoint(hnsID string) error {
 	}
 	return err
 }
+
 func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
 	plists, err := hcn.ListLoadBalancers()
 	if err != nil {
@@ -276,7 +278,6 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	}
 
 	lb, err := loadBalancer.Create()
-
 	if err != nil {
 		return nil, err
 	}
@@ -286,6 +287,7 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		hnsID: lb.Id,
 	}, err
 }
+
 func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
 	lb, err := hcn.GetLoadBalancerByID(hnsID)
 	if err != nil {

@@ -338,7 +338,6 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	resourceList = metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "v1")
-
 }
 
 // This test doesn't cover the apiregistration and apiextensions group, as they are installed by other apiservers.

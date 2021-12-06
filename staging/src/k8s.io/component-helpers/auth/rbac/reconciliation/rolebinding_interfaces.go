@@ -109,7 +109,6 @@ func (c RoleBindingClientAdapter) Update(in RoleBinding) (RoleBinding, error) {
 		return nil, err
 	}
 	return RoleBindingAdapter{RoleBinding: ret}, err
-
 }
 
 func (c RoleBindingClientAdapter) Delete(namespace, name string, uid types.UID) error {

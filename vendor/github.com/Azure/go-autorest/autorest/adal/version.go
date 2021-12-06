@@ -21,13 +21,11 @@ import (
 
 const number = "v1.0.0"
 
-var (
-	ua = fmt.Sprintf("Go/%s (%s-%s) go-autorest/adal/%s",
-		runtime.Version(),
-		runtime.GOARCH,
-		runtime.GOOS,
-		number,
-	)
+var ua = fmt.Sprintf("Go/%s (%s-%s) go-autorest/adal/%s",
+	runtime.Version(),
+	runtime.GOARCH,
+	runtime.GOOS,
+	number,
 )
 
 // UserAgent returns a string containing the Go version, system architecture and OS, and the adal version.

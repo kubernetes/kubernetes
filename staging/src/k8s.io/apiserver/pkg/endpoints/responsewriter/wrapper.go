@@ -122,9 +122,12 @@ func GetOriginal(w http.ResponseWriter) http.ResponseWriter {
 
 //nolint:staticcheck // SA1019
 var _ http.CloseNotifier = outerWithCloseNotifyAndFlush{}
-var _ http.Flusher = outerWithCloseNotifyAndFlush{}
-var _ http.ResponseWriter = outerWithCloseNotifyAndFlush{}
-var _ UserProvidedDecorator = outerWithCloseNotifyAndFlush{}
+
+var (
+	_ http.Flusher          = outerWithCloseNotifyAndFlush{}
+	_ http.ResponseWriter   = outerWithCloseNotifyAndFlush{}
+	_ UserProvidedDecorator = outerWithCloseNotifyAndFlush{}
+)
 
 // outerWithCloseNotifyAndFlush is the outer object that extends the
 // user provied decorator with http.CloseNotifier and http.Flusher only.
@@ -156,10 +159,13 @@ func (wr outerWithCloseNotifyAndFlush) Flush() {
 
 //lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 var _ http.CloseNotifier = outerWithCloseNotifyFlushAndHijack{}
-var _ http.Flusher = outerWithCloseNotifyFlushAndHijack{}
-var _ http.Hijacker = outerWithCloseNotifyFlushAndHijack{}
-var _ http.ResponseWriter = outerWithCloseNotifyFlushAndHijack{}
-var _ UserProvidedDecorator = outerWithCloseNotifyFlushAndHijack{}
+
+var (
+	_ http.Flusher          = outerWithCloseNotifyFlushAndHijack{}
+	_ http.Hijacker         = outerWithCloseNotifyFlushAndHijack{}
+	_ http.ResponseWriter   = outerWithCloseNotifyFlushAndHijack{}
+	_ UserProvidedDecorator = outerWithCloseNotifyFlushAndHijack{}
+)
 
 // outerWithCloseNotifyFlushAndHijack is the outer object that extends the
 // user-provided decorator with http.CloseNotifier, http.Flusher and http.Hijacker.

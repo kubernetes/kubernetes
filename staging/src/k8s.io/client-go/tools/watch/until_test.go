@@ -34,8 +34,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-type fakePod struct {
-}
+type fakePod struct{}
 
 func (obj *fakePod) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 func (obj *fakePod) DeepCopyObject() runtime.Object   { panic("DeepCopyObject not supported by fakePod") }

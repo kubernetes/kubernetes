@@ -39,6 +39,7 @@ import (
 func makeGVR(group, version, resource string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
 }
+
 func makeGVK(group, version, kind string) schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
 }

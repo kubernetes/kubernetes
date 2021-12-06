@@ -86,7 +86,7 @@ type MatchModifyFilter struct {
 var _ kio.Filter = &MatchModifyFilter{}
 
 func (f MatchModifyFilter) Filter(input []*yaml.RNode) ([]*yaml.RNode, error) {
-	var matches = input
+	matches := input
 	var err error
 	for _, filter := range f.MatchFilters {
 		matches, err = MatchFilter{Filters: filter}.Filter(matches)
@@ -157,7 +157,7 @@ const DefaultFilenamePattern = "%n_%k.yaml"
 
 func (f *FileSetter) Filter(input []*yaml.RNode) ([]*yaml.RNode, error) {
 	if f.Mode == "" {
-		f.Mode = fmt.Sprintf("%d", 0600)
+		f.Mode = fmt.Sprintf("%d", 0o600)
 	}
 	if f.FilenamePattern == "" {
 		f.FilenamePattern = DefaultFilenamePattern

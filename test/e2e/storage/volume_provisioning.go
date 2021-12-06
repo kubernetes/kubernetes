@@ -149,7 +149,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 	ginkgo.Describe("DynamicProvisioner [Slow] [Feature:StorageProvider]", func() {
 		ginkgo.It("should provision storage with different parameters", func() {
-
 			// This test checks that dynamic provisioning can provision a volume
 			// that can be used to persist data among pods.
 			tests := []testsuites.StorageClassTest{

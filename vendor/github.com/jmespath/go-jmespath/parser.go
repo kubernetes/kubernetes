@@ -362,7 +362,7 @@ func (p *Parser) nud(token token) (ASTNode, error) {
 		return ASTNode{nodeType: ASTProjection, children: []ASTNode{left, right}}, nil
 	case tLbracket:
 		tokenType := p.current()
-		//var right ASTNode
+		// var right ASTNode
 		if tokenType == tNumber || tokenType == tColon {
 			right, err := p.parseIndexExpression()
 			if err != nil {
@@ -496,6 +496,7 @@ func (p *Parser) projectIfSlice(left ASTNode, right ASTNode) (ASTNode, error) {
 	}
 	return indexExpr, nil
 }
+
 func (p *Parser) parseFilter(node ASTNode) (ASTNode, error) {
 	var right, condition ASTNode
 	var err error

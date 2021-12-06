@@ -50,7 +50,6 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 
 	for _, currAuthzHandler := range authzHandler {
 		decision, reason, err := currAuthzHandler.Authorize(ctx, a)
-
 		if err != nil {
 			errlist = append(errlist, err)
 		}

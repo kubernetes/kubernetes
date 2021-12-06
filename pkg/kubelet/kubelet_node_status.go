@@ -232,7 +232,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 	if existingNode.Labels == nil {
 		existingNode.Labels = make(map[string]string)
 	}
-	//Set default labels but make sure to not set labels with empty values
+	// Set default labels but make sure to not set labels with empty values
 	for _, label := range defaultLabels {
 		if _, hasInitialValue := initialNode.Labels[label]; !hasInitialValue {
 			continue
@@ -602,6 +602,7 @@ func (kl *Kubelet) setLastObservedNodeAddresses(addresses []v1.NodeAddress) {
 	defer kl.lastObservedNodeAddressesMux.Unlock()
 	kl.lastObservedNodeAddresses = addresses
 }
+
 func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 	kl.lastObservedNodeAddressesMux.RLock()
 	defer kl.lastObservedNodeAddressesMux.RUnlock()

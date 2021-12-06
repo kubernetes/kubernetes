@@ -82,7 +82,6 @@ func newWorker(
 	probeType probeType,
 	pod *v1.Pod,
 	container v1.Container) *worker {
-
 	w := &worker{
 		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
 		manualTriggerCh: make(chan struct{}, 1), // Buffer so prober_manager can do non-blocking calls to doProbe.

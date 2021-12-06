@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ExpressRouteCircuitPeeringsClient is the network Client
@@ -50,13 +51,22 @@ func (client ExpressRouteCircuitPeeringsClient) CreateOrUpdate(ctx context.Conte
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: peeringParameters,
-			Constraints: []validation.Constraint{{Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat.PeerASN", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat.PeerASN", Name: validation.InclusiveMaximum, Rule: int64(4294967295), Chain: nil},
-						{Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat.PeerASN", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: peeringParameters,
+			Constraints: []validation.Constraint{{
+				Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat.PeerASN", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat.PeerASN", Name: validation.InclusiveMaximum, Rule: int64(4294967295), Chain: nil},
+							{Target: "peeringParameters.ExpressRouteCircuitPeeringPropertiesFormat.PeerASN", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.ExpressRouteCircuitPeeringsClient", "CreateOrUpdate", err.Error())
 	}
 

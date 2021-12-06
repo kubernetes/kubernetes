@@ -107,8 +107,8 @@ func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
-	nodeStatusUpdateFrequency time.Duration) (*CloudNodeController, error) {
-
+	nodeStatusUpdateFrequency time.Duration) (*CloudNodeController, error,
+) {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
 	eventBroadcaster.StartStructuredLogging(0)
@@ -208,7 +208,6 @@ func (cnc *CloudNodeController) processNextWorkItem() bool {
 		cnc.workqueue.Forget(obj)
 		return nil
 	}(obj)
-
 	if err != nil {
 		utilruntime.HandleError(err)
 		return true
@@ -299,7 +298,6 @@ func (cnc *CloudNodeController) reconcileNodeLabels(nodeName string) error {
 			// Secondary label exists, but not consistent with the primary
 			// label. Need to reconcile.
 			labelsToUpdate[r.secondaryKey] = primaryValue
-
 		} else if !secondaryExists && r.ensureSecondaryExists {
 			// Apply secondary label based on primary label.
 			labelsToUpdate[r.secondaryKey] = primaryValue
@@ -473,7 +471,6 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 	node *v1.Node,
 	instanceMeta *cloudprovider.InstanceMetadata,
 ) ([]nodeModifier, error) {
-
 	var nodeModifiers []nodeModifier
 	if node.Spec.ProviderID == "" {
 		if providerID != "" {

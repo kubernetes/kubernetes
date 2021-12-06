@@ -156,7 +156,7 @@ func create(tag string, t time.Time, startup bool) (f *os.File, filename string,
 // If startup is true, existing files are opened for appending instead of truncated.
 func openOrCreate(name string, startup bool) (*os.File, error) {
 	if startup {
-		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o666)
 		return f, err
 	}
 	f, err := os.Create(name)

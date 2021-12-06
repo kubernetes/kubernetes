@@ -419,7 +419,6 @@ func TestNormalizeClusterIPs(t *testing.T) {
 			for idx, clusterIP := range tc.newService.Spec.ClusterIPs {
 				if clusterIP != tc.expectedClusterIPs[idx] {
 					t.Fatalf("expected clusterIP [%v] at index[%v] got [%v]", tc.expectedClusterIPs[idx], idx, tc.newService.Spec.ClusterIPs[idx])
-
 				}
 			}
 		})
@@ -1419,7 +1418,6 @@ func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
 
 			if createdSvc.Spec.ClusterIP == "" {
 				t.Errorf("expected ClusterIP to be set")
-
 			}
 			if tc.svc.Spec.ClusterIP != "" {
 				if want, got := tc.svc.Spec.ClusterIP, createdSvc.Spec.ClusterIP; want != got {
@@ -1467,39 +1465,45 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc:            svctest.MakeService("foo"),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1507,35 +1511,40 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1543,55 +1552,63 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1609,7 +1626,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetClusterIPs("10.0.0.1")),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1617,28 +1635,32 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1646,7 +1668,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1655,7 +1678,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1663,7 +1687,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1671,7 +1696,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1679,7 +1705,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1687,7 +1714,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1696,7 +1724,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1704,7 +1733,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1712,7 +1742,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1720,14 +1751,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1735,7 +1768,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1743,7 +1777,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1751,7 +1786,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1769,42 +1805,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1812,7 +1854,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1820,7 +1863,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1828,7 +1872,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1836,14 +1881,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1851,7 +1898,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1859,7 +1907,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1867,7 +1916,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1875,14 +1925,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1890,7 +1942,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1898,7 +1951,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1906,7 +1960,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1924,42 +1979,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1967,7 +2028,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1975,7 +2037,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1983,7 +2046,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -1991,14 +2055,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2006,7 +2072,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2014,7 +2081,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2022,7 +2090,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2030,14 +2099,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2045,7 +2116,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2053,7 +2125,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2061,7 +2134,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2081,7 +2155,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2090,28 +2165,32 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2120,7 +2199,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2130,7 +2210,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2138,7 +2219,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2146,7 +2228,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2154,7 +2237,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2163,7 +2247,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2173,7 +2258,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2181,7 +2267,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2189,7 +2276,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2197,14 +2285,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2212,7 +2302,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2220,7 +2311,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2228,7 +2320,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2249,7 +2342,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2259,7 +2353,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2269,7 +2364,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2279,7 +2375,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2289,7 +2386,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2299,7 +2397,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2310,7 +2409,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2321,7 +2421,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2330,7 +2431,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2339,7 +2441,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2349,7 +2452,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2360,7 +2464,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2371,7 +2476,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2382,7 +2488,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2393,7 +2500,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2403,7 +2511,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2414,7 +2523,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2425,7 +2535,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2436,7 +2547,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2462,46 +2574,53 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc:            svctest.MakeService("foo"),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2509,35 +2628,40 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2545,48 +2669,55 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2604,14 +2735,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetClusterIPs("2000::1")),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2619,21 +2752,24 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2641,7 +2777,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2649,7 +2786,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2658,7 +2796,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2666,7 +2805,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2674,7 +2814,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2682,7 +2823,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2690,7 +2832,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2699,7 +2842,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2707,7 +2851,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2715,14 +2860,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2730,7 +2877,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2738,7 +2886,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2746,7 +2895,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2764,42 +2914,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2807,7 +2963,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2815,7 +2972,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2823,7 +2981,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2831,14 +2990,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2846,7 +3007,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2854,7 +3016,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2862,7 +3025,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2870,14 +3034,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2885,7 +3051,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2893,7 +3060,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2901,7 +3069,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2919,42 +3088,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2962,7 +3137,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2970,7 +3146,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2978,7 +3155,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -2986,14 +3164,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3001,7 +3181,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3009,7 +3190,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3017,7 +3199,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3025,14 +3208,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3040,7 +3225,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3048,7 +3234,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3056,7 +3243,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3076,14 +3264,16 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3092,21 +3282,24 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3115,7 +3308,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3123,7 +3317,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3133,7 +3328,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3141,7 +3337,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3149,7 +3346,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3158,7 +3356,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3166,7 +3365,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3176,7 +3376,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3184,7 +3385,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3192,14 +3394,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3207,7 +3411,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3215,7 +3420,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3223,7 +3429,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3244,7 +3451,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3254,7 +3462,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3264,7 +3473,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3274,7 +3484,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3284,7 +3495,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3294,7 +3506,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3305,7 +3518,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3316,7 +3530,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3325,7 +3540,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3334,7 +3550,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3344,7 +3561,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3355,7 +3573,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3366,7 +3585,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3377,7 +3597,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3388,7 +3609,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3398,7 +3620,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3409,7 +3632,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3420,7 +3644,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3431,7 +3656,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3457,40 +3683,46 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc:            svctest.MakeService("foo"),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3498,7 +3730,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3506,28 +3739,32 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3535,7 +3772,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3543,7 +3781,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3551,7 +3790,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3559,14 +3799,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3574,7 +3816,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3582,7 +3825,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3590,7 +3834,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3609,7 +3854,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetClusterIPs("10.0.0.1")),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3617,28 +3863,32 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3646,7 +3896,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3655,7 +3906,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3663,7 +3915,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3671,7 +3924,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3679,7 +3933,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3687,7 +3942,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3696,7 +3952,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3704,7 +3961,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3713,7 +3971,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3721,7 +3980,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3729,7 +3989,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3738,7 +3999,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3746,7 +4008,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3755,7 +4018,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3774,14 +4038,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetClusterIPs("2000::1")),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3789,21 +4055,24 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3811,7 +4080,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3819,7 +4089,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3828,7 +4099,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3836,7 +4108,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3844,7 +4117,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3852,7 +4126,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3860,7 +4135,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3869,7 +4145,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3877,7 +4154,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3886,7 +4164,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3894,7 +4173,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3902,7 +4182,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3911,7 +4192,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3919,7 +4201,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3938,42 +4221,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3981,7 +4270,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3989,7 +4279,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -3997,7 +4288,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4005,7 +4297,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4013,7 +4306,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4022,7 +4316,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4030,7 +4325,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4039,7 +4335,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4047,7 +4344,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4055,7 +4353,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4064,7 +4363,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4072,7 +4372,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4081,7 +4382,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4099,42 +4401,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4142,7 +4450,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4150,7 +4459,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4158,7 +4468,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4166,7 +4477,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4174,7 +4486,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4182,7 +4495,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4191,7 +4505,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4199,7 +4514,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4208,7 +4524,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4216,7 +4533,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4224,7 +4542,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4233,7 +4552,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4241,7 +4561,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4262,7 +4583,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4271,7 +4593,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4280,21 +4603,24 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4303,7 +4629,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4313,7 +4640,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4323,7 +4651,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4331,7 +4660,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4339,7 +4669,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4348,7 +4679,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4358,7 +4690,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4368,7 +4701,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4378,7 +4712,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4388,7 +4723,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4397,7 +4733,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4407,7 +4744,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4417,7 +4755,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4427,7 +4766,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4450,7 +4790,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4460,7 +4801,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4470,7 +4812,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4480,7 +4823,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4490,7 +4834,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4500,7 +4845,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4511,7 +4857,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4522,7 +4869,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4531,7 +4879,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4540,7 +4889,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4550,7 +4900,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4561,7 +4912,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4572,7 +4924,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4583,7 +4936,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4594,7 +4948,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4604,7 +4959,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4615,7 +4971,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4626,7 +4983,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4637,7 +4995,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4663,40 +5022,46 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc:            svctest.MakeService("foo"),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4704,7 +5069,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4712,28 +5078,32 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4741,7 +5111,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4749,7 +5120,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4757,7 +5129,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4765,14 +5138,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4780,7 +5155,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4788,7 +5164,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4796,7 +5173,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4815,7 +5193,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetClusterIPs("10.0.0.1")),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4823,28 +5202,32 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4852,7 +5235,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4861,7 +5245,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4869,7 +5254,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4877,7 +5263,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4885,7 +5272,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4893,7 +5281,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4902,7 +5291,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4910,7 +5300,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4919,7 +5310,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4927,7 +5319,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4935,7 +5328,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4944,7 +5338,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4952,7 +5347,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4961,7 +5357,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4980,14 +5377,16 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetClusterIPs("2000::1")),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -4995,21 +5394,24 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5017,7 +5419,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5025,7 +5428,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5034,7 +5438,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5042,7 +5447,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5050,7 +5456,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5058,7 +5465,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5066,7 +5474,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5075,7 +5484,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5083,7 +5493,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5092,7 +5503,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5100,7 +5512,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5108,7 +5521,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5117,7 +5531,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5125,7 +5540,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5144,42 +5560,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5187,7 +5609,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5195,7 +5618,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5203,7 +5627,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5211,7 +5636,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5219,7 +5645,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5228,7 +5655,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5236,7 +5664,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5245,7 +5674,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5253,7 +5683,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5261,7 +5692,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5270,7 +5702,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5278,7 +5711,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5287,7 +5721,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5305,42 +5740,48 @@ func TestCreateInitIPFields(t *testing.T) {
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5348,7 +5789,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5356,7 +5798,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5364,7 +5807,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5372,7 +5816,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5380,7 +5825,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5388,7 +5834,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5397,7 +5844,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5405,7 +5853,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5414,7 +5863,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5422,7 +5872,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5430,7 +5881,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5439,7 +5891,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilies(api.IPv6Protocol)),
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5447,7 +5900,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5468,7 +5922,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5477,7 +5932,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5486,21 +5942,24 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
 						svctest.SetHeadless,
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5509,7 +5968,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5519,7 +5979,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5529,7 +5990,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5537,7 +5999,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5545,7 +6008,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5554,7 +6018,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5564,7 +6029,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5574,7 +6040,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5584,7 +6051,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5594,7 +6062,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5603,7 +6072,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5613,7 +6083,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5623,7 +6094,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5633,7 +6105,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "Headless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5656,7 +6129,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5666,7 +6140,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5676,7 +6151,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5686,7 +6162,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5696,7 +6173,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5706,7 +6184,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5717,7 +6196,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5728,7 +6208,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicySingleStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5737,7 +6218,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5746,7 +6228,8 @@ func TestCreateInitIPFields(t *testing.T) {
 						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
 					expectError: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5756,7 +6239,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5767,7 +6251,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5778,7 +6263,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5789,7 +6275,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5800,7 +6287,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5810,7 +6298,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5821,7 +6310,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5832,7 +6322,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5843,7 +6334,8 @@ func TestCreateInitIPFields(t *testing.T) {
 					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
 					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 					expectHeadless: true,
-				}, {
+				},
+				{
 					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
 					line: line(),
 					svc: svctest.MakeService("foo",
@@ -5861,7 +6353,6 @@ func TestCreateInitIPFields(t *testing.T) {
 
 	for _, otc := range testCases {
 		t.Run(otc.name, func(t *testing.T) {
-
 			// Do this in the outer loop for performance.
 			storage, _, server := newStorage(t, otc.clusterFamilies)
 			defer server.Terminate(t)
@@ -6714,11 +7205,11 @@ func TestDeleteDryRun(t *testing.T) {
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol),
 				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
-		}}
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			storage, _, server := newStorage(t, tc.svc.Spec.IPFamilies)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()

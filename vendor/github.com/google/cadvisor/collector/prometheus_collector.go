@@ -104,7 +104,6 @@ func (collector *PrometheusCollector) Name() string {
 }
 
 func (collector *PrometheusCollector) GetSpec() []v1.MetricSpec {
-
 	response, err := collector.httpClient.Get(collector.configFile.Endpoint.URL)
 	if err != nil {
 		return nil

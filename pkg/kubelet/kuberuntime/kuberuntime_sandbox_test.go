@@ -46,7 +46,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
 		// Check pod logs root directory is created.
 		assert.Equal(t, filepath.Join(podLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
-		assert.Equal(t, os.FileMode(0755), perm)
+		assert.Equal(t, os.FileMode(0o755), perm)
 		return nil
 	}
 	id, _, err := m.createPodSandbox(pod, 1)

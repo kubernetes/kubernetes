@@ -340,7 +340,7 @@ func SetupStorageClass(
 
 	var err error
 	var computedStorageClass *storagev1.StorageClass
-	var clearComputedStorageClass = func() {}
+	clearComputedStorageClass := func() {}
 	if class != nil {
 		computedStorageClass, err = client.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 		if err == nil {
@@ -893,7 +893,6 @@ func prepareSnapshotDataSourceForProvisioning(
 		framework.ExpectNoError(err)
 
 		clearComputedStorageClass()
-
 	}
 
 	return dataSourceRef, cleanupFunc

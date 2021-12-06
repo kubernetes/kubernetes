@@ -102,5 +102,4 @@ func (c ClusterRoleModifier) Update(in RuleOwner) (RuleOwner, error) {
 		return nil, err
 	}
 	return ClusterRoleRuleOwner{ClusterRole: ret}, err
-
 }

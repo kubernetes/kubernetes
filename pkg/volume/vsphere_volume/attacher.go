@@ -219,7 +219,7 @@ func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath s
 			if runtime.GOOS == "windows" {
 				dir = filepath.Dir(deviceMountPath)
 			}
-			if err := os.MkdirAll(dir, 0750); err != nil {
+			if err := os.MkdirAll(dir, 0o750); err != nil {
 				klog.Errorf("Failed to create directory at %#v. err: %s", dir, err)
 				return err
 			}
@@ -316,8 +316,8 @@ func setNodeVolume(
 	nodeVolumeMap map[types.NodeName]map[*volume.Spec]bool,
 	volumeSpec *volume.Spec,
 	nodeName types.NodeName,
-	check bool) {
-
+	check bool,
+) {
 	volumeMap := nodeVolumeMap[nodeName]
 	if volumeMap == nil {
 		volumeMap = make(map[*volume.Spec]bool)

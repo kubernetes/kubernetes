@@ -54,6 +54,7 @@ func TestLoopbackHostPortIPv4(t *testing.T) {
 		t.Fatalf("expected 443 as port, got %q", port)
 	}
 }
+
 func TestLoopbackHostPortIPv6(t *testing.T) {
 	ipv6, _, err := isIPv6LoopbackSupported()
 	if err != nil {

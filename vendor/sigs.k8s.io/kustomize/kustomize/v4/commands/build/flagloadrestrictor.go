@@ -32,8 +32,10 @@ func validateFlagLoadRestrictor() error {
 		return fmt.Errorf(
 			"illegal flag value --%s %s; legal values: %v",
 			flagLoadRestrictorName, theFlags.loadRestrictor,
-			[]string{types.LoadRestrictionsRootOnly.String(),
-				types.LoadRestrictionsNone.String()})
+			[]string{
+				types.LoadRestrictionsRootOnly.String(),
+				types.LoadRestrictionsNone.String(),
+			})
 	}
 }
 

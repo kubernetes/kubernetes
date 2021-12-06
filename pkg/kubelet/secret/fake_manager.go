@@ -20,8 +20,7 @@ import v1 "k8s.io/api/core/v1"
 
 // fakeManager implements Manager interface for testing purposes.
 // simple operations to apiserver.
-type fakeManager struct {
-}
+type fakeManager struct{}
 
 // NewFakeManager creates empty/fake secret manager
 func NewFakeManager() Manager {

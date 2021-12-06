@@ -95,7 +95,6 @@ func TestParseEndpoint(t *testing.T) {
 		require.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
 		assert.Equal(t, test.expectedAddr, addr)
 	}
-
 }
 
 func testPipe(t *testing.T, label string) {

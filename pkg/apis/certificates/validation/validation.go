@@ -142,32 +142,30 @@ func ValidateCertificateSigningRequestCreate(csr *certificates.CertificateSignin
 	return validateCertificateSigningRequest(csr, opts)
 }
 
-var (
-	allValidUsages = sets.NewString(
-		string(certificates.UsageSigning),
-		string(certificates.UsageDigitalSignature),
-		string(certificates.UsageContentCommitment),
-		string(certificates.UsageKeyEncipherment),
-		string(certificates.UsageKeyAgreement),
-		string(certificates.UsageDataEncipherment),
-		string(certificates.UsageCertSign),
-		string(certificates.UsageCRLSign),
-		string(certificates.UsageEncipherOnly),
-		string(certificates.UsageDecipherOnly),
-		string(certificates.UsageAny),
-		string(certificates.UsageServerAuth),
-		string(certificates.UsageClientAuth),
-		string(certificates.UsageCodeSigning),
-		string(certificates.UsageEmailProtection),
-		string(certificates.UsageSMIME),
-		string(certificates.UsageIPsecEndSystem),
-		string(certificates.UsageIPsecTunnel),
-		string(certificates.UsageIPsecUser),
-		string(certificates.UsageTimestamping),
-		string(certificates.UsageOCSPSigning),
-		string(certificates.UsageMicrosoftSGC),
-		string(certificates.UsageNetscapeSGC),
-	)
+var allValidUsages = sets.NewString(
+	string(certificates.UsageSigning),
+	string(certificates.UsageDigitalSignature),
+	string(certificates.UsageContentCommitment),
+	string(certificates.UsageKeyEncipherment),
+	string(certificates.UsageKeyAgreement),
+	string(certificates.UsageDataEncipherment),
+	string(certificates.UsageCertSign),
+	string(certificates.UsageCRLSign),
+	string(certificates.UsageEncipherOnly),
+	string(certificates.UsageDecipherOnly),
+	string(certificates.UsageAny),
+	string(certificates.UsageServerAuth),
+	string(certificates.UsageClientAuth),
+	string(certificates.UsageCodeSigning),
+	string(certificates.UsageEmailProtection),
+	string(certificates.UsageSMIME),
+	string(certificates.UsageIPsecEndSystem),
+	string(certificates.UsageIPsecTunnel),
+	string(certificates.UsageIPsecUser),
+	string(certificates.UsageTimestamping),
+	string(certificates.UsageOCSPSigning),
+	string(certificates.UsageMicrosoftSGC),
+	string(certificates.UsageNetscapeSGC),
 )
 
 func validateCertificateSigningRequest(csr *certificates.CertificateSigningRequest, opts certificateValidationOptions) field.ErrorList {
@@ -465,6 +463,7 @@ func allowDuplicateConditionTypes(oldCSR *certificates.CertificateSigningRequest
 		return false
 	}
 }
+
 func hasDuplicateConditionTypes(csr *certificates.CertificateSigningRequest) bool {
 	seen := map[certificates.RequestConditionType]bool{}
 	for _, c := range csr.Status.Conditions {
@@ -484,6 +483,7 @@ func allowEmptyConditionType(oldCSR *certificates.CertificateSigningRequest) boo
 		return false
 	}
 }
+
 func hasEmptyConditionType(csr *certificates.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
 		if len(c.Type) == 0 {

@@ -1484,7 +1484,6 @@ func TestQuantityValueSet(t *testing.T) {
 	q := QuantityValue{}
 
 	if err := q.Set("invalid"); err == nil {
-
 		t.Error("'invalid' did not trigger a parse error")
 	}
 

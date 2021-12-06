@@ -65,7 +65,7 @@ func WriteFile(node *RNode, path string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(path, []byte(out), 0600)
+	return ioutil.WriteFile(path, []byte(out), 0o600)
 }
 
 // UpdateFile reads the file at path, applies the filter to it, and write the result back.
@@ -101,7 +101,8 @@ func NewScalarRNode(value string) *RNode {
 		value: &yaml.Node{
 			Kind:  yaml.ScalarNode,
 			Value: value,
-		}}
+		},
+	}
 }
 
 // NewStringRNode returns a new Scalar *RNode containing the provided string.

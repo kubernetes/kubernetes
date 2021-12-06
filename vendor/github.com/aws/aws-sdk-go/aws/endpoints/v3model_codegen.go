@@ -1,3 +1,4 @@
+//go:build codegen
 // +build codegen
 
 package endpoints

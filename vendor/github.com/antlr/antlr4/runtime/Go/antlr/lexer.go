@@ -18,9 +18,7 @@ import (
 type Lexer interface {
 	TokenSource
 	Recognizer
-
 	Emit() Token
-
 	SetChannel(int)
 	PushMode(int)
 	PopMode() int
@@ -51,7 +49,6 @@ type BaseLexer struct {
 }
 
 func NewBaseLexer(input CharStream) *BaseLexer {
-
 	lexer := new(BaseLexer)
 
 	lexer.BaseRecognizer = NewBaseRecognizer()
@@ -342,7 +339,7 @@ func (b *BaseLexer) GetCharIndex() int {
 }
 
 // Return the text Matched so far for the current token or any text override.
-//Set the complete text of l token it wipes any previous changes to the text.
+// Set the complete text of l token it wipes any previous changes to the text.
 func (b *BaseLexer) GetText() string {
 	if b.text != "" {
 		return b.text

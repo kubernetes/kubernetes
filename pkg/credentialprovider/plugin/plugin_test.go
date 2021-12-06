@@ -20,11 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -300,7 +301,6 @@ func Test_ProvideParallel(t *testing.T) {
 				}(&wg)
 			}
 			wg.Wait()
-
 		})
 	}
 }

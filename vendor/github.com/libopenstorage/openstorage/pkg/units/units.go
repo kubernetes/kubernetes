@@ -35,45 +35,43 @@ const (
 	PB = TB * 1000
 )
 
-var (
-	unitMap = map[string]int64{
-		"B": 1,
-		"b": 1,
+var unitMap = map[string]int64{
+	"B": 1,
+	"b": 1,
 
-		"KB": KiB,
-		"kb": KiB,
-		"MB": MiB,
-		"mb": MiB,
-		"GB": GiB,
-		"gb": GiB,
-		"TB": TiB,
-		"tb": TiB,
-		"PB": PiB,
-		"pb": PiB,
+	"KB": KiB,
+	"kb": KiB,
+	"MB": MiB,
+	"mb": MiB,
+	"GB": GiB,
+	"gb": GiB,
+	"TB": TiB,
+	"tb": TiB,
+	"PB": PiB,
+	"pb": PiB,
 
-		"K": KiB,
-		"k": KiB,
-		"M": MiB,
-		"m": MiB,
-		"G": GiB,
-		"g": GiB,
-		"T": TiB,
-		"t": TiB,
-		"P": PiB,
-		"p": PiB,
+	"K": KiB,
+	"k": KiB,
+	"M": MiB,
+	"m": MiB,
+	"G": GiB,
+	"g": GiB,
+	"T": TiB,
+	"t": TiB,
+	"P": PiB,
+	"p": PiB,
 
-		"KiB": KiB,
-		"MiB": MiB,
-		"GiB": GiB,
-		"TiB": TiB,
-		"PiB": PiB,
+	"KiB": KiB,
+	"MiB": MiB,
+	"GiB": GiB,
+	"TiB": TiB,
+	"PiB": PiB,
 
-		"Mi": MiB,
-		"Gi": GiB,
-		"Ti": TiB,
-		"Pi": PiB,
-	}
-)
+	"Mi": MiB,
+	"Gi": GiB,
+	"Ti": TiB,
+	"Pi": PiB,
+}
 
 var unitPattern = regexp.MustCompile(
 	"([0-9]+)(.[0-9]+)*\\s*(B|b|K|k|M|m|G|g|T|t|P|p|KB|kb|KiB|MB|mb|MiB|Mi|GB|gb|GiB|Gi|TB|tb|TiB|Ti|PB|pb|PiB|Pi|)")

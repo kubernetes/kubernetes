@@ -70,7 +70,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 		"pod-doesnot-exist-novolume": {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return os.MkdirAll(filepath.Join(podDir, "not/a/volume"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "not/a/volume"), 0o750)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -88,7 +88,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			},
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name"), 0o750)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -98,7 +98,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 		"pod-doesnot-exist-with-volume": {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name"), 0o750)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -108,7 +108,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 		"pod-doesnot-exist-with-volume-subdir": {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name/subdir"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name/subdir"), 0o750)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -118,7 +118,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 		"pod-doesnot-exist-with-subpath": {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return os.MkdirAll(filepath.Join(podDir, "volume-subpaths/volume/container/index"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "volume-subpaths/volume/container/index"), 0o750)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -128,7 +128,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 		"pod-doesnot-exist-with-subpath-top": {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return os.MkdirAll(filepath.Join(podDir, "volume-subpaths"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "volume-subpaths"), 0o750)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -139,10 +139,10 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
 				volumePath := filepath.Join(podDir, "volumes/plugin/name")
-				if err := os.MkdirAll(volumePath, 0750); err != nil {
+				if err := os.MkdirAll(volumePath, 0o750); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(volumePath, "test.txt"), []byte("test1"), 0640)
+				return ioutil.WriteFile(filepath.Join(volumePath, "test.txt"), []byte("test1"), 0o640)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -153,10 +153,10 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
 				subPath := filepath.Join(podDir, "volume-subpaths/volume/container/index")
-				if err := os.MkdirAll(subPath, 0750); err != nil {
+				if err := os.MkdirAll(subPath, 0o750); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(subPath, "test.txt"), []byte("test1"), 0640)
+				return ioutil.WriteFile(filepath.Join(subPath, "test.txt"), []byte("test1"), 0o640)
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
@@ -191,7 +191,6 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 					t.Errorf("%s failed validation: %v", name, err)
 				}
 			}
-
 		})
 	}
 }
@@ -211,14 +210,14 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 		"noncsivolume-dir-exist-noplugins": {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir(poduid)
-				return os.MkdirAll(filepath.Join(podDir, "volumes/"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "volumes/"), 0o750)
 			},
 			expected: false,
 		},
 		"noncsivolume-dir-exist-nomount": {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir(poduid)
-				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name"), 0750)
+				return os.MkdirAll(filepath.Join(podDir, "volumes/plugin/name"), 0o750)
 			},
 			expected: false,
 		},
@@ -226,7 +225,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir(poduid)
 				volumePath := filepath.Join(podDir, "volumes/plugin/name")
-				if err := os.MkdirAll(volumePath, 0750); err != nil {
+				if err := os.MkdirAll(volumePath, 0o750); err != nil {
 					return err
 				}
 				fm := mount.NewFakeMounter(
@@ -242,7 +241,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir(poduid)
 				volumePath := filepath.Join(podDir, "volumes/plugin/name/mount")
-				if err := os.MkdirAll(volumePath, 0750); err != nil {
+				if err := os.MkdirAll(volumePath, 0o750); err != nil {
 					return err
 				}
 				fm := mount.NewFakeMounter(
@@ -258,7 +257,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir(poduid)
 				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/name")
-				return os.MkdirAll(volumePath, 0750)
+				return os.MkdirAll(volumePath, 0o750)
 			},
 			expected: false,
 		},
@@ -266,7 +265,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir(poduid)
 				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/name/mount")
-				return os.MkdirAll(volumePath, 0750)
+				return os.MkdirAll(volumePath, 0o750)
 			},
 			expected: false,
 		},
@@ -274,7 +273,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 			prepareFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir(poduid)
 				volumePath := filepath.Join(podDir, "volumes/kubernetes.io~csi/name/mount")
-				if err := os.MkdirAll(volumePath, 0750); err != nil {
+				if err := os.MkdirAll(volumePath, 0o750); err != nil {
 					return err
 				}
 				fm := mount.NewFakeMounter(

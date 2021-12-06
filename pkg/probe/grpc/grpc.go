@@ -37,8 +37,7 @@ type Prober interface {
 	Probe(host, service string, port int, timeout time.Duration) (probe.Result, string, error)
 }
 
-type grpcProber struct {
-}
+type grpcProber struct{}
 
 // New Prober for execute grpc probe
 func New() Prober {
@@ -55,7 +54,7 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration)
 	opts := []grpc.DialOption{
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
 		grpc.WithBlock(),
-		grpc.WithInsecure(), //credentials are currently not supported
+		grpc.WithInsecure(), // credentials are currently not supported
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -64,7 +63,6 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration)
 
 	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	conn, err := grpc.DialContext(ctx, addr, opts...)
-
 	if err != nil {
 		if err == context.DeadlineExceeded {
 			klog.V(4).ErrorS(err, "failed to connect grpc service due to timeout", "addr", addr, "service", service, "timeout", timeout)
@@ -84,7 +82,6 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration)
 	resp, err := client.Check(metadata.NewOutgoingContext(ctx, make(metadata.MD)), &grpchealth.HealthCheckRequest{
 		Service: service,
 	})
-
 	if err != nil {
 		stat, ok := status.FromError(err)
 		if ok {

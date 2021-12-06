@@ -800,7 +800,6 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 	if limit2.Items[0].Name != podFoo.Name {
 		t.Errorf("Expected list2.Items[0] to be %s but got %s", podFoo.Name, limit2.Items[0].Name)
 	}
-
 }
 
 func TestWatchDispatchBookmarkEvents(t *testing.T) {

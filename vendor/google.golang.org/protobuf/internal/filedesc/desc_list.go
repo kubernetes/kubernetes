@@ -303,9 +303,11 @@ func (p *SourceLocations) byKey(k pathKey) pref.SourceLocation {
 	}
 	return pref.SourceLocation{}
 }
+
 func (p *SourceLocations) ByPath(path pref.SourcePath) pref.SourceLocation {
 	return p.byKey(newPathKey(path))
 }
+
 func (p *SourceLocations) ByDescriptor(desc pref.Descriptor) pref.SourceLocation {
 	if p.File != nil && desc != nil && p.File != desc.ParentFile() {
 		return pref.SourceLocation{} // mismatching parent files
@@ -404,6 +406,7 @@ func (p *SourceLocations) ByDescriptor(desc pref.Descriptor) pref.SourceLocation
 		}
 	}
 }
+
 func (p *SourceLocations) lazyInit() *SourceLocations {
 	p.once.Do(func() {
 		if len(p.List) > 0 {

@@ -194,9 +194,9 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"kubernetesapi": &bintree{nil, map[string]*bintree{
-		"v1212": &bintree{nil, map[string]*bintree{
-			"swagger.json": &bintree{kubernetesapiV1212SwaggerJson, map[string]*bintree{}},
+	"kubernetesapi": {nil, map[string]*bintree{
+		"v1212": {nil, map[string]*bintree{
+			"swagger.json": {kubernetesapiV1212SwaggerJson, map[string]*bintree{}},
 		}},
 	}},
 }}

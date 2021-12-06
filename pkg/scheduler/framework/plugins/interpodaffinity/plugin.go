@@ -36,11 +36,13 @@ const (
 	Name = names.InterPodAffinity
 )
 
-var _ framework.PreFilterPlugin = &InterPodAffinity{}
-var _ framework.FilterPlugin = &InterPodAffinity{}
-var _ framework.PreScorePlugin = &InterPodAffinity{}
-var _ framework.ScorePlugin = &InterPodAffinity{}
-var _ framework.EnqueueExtensions = &InterPodAffinity{}
+var (
+	_ framework.PreFilterPlugin   = &InterPodAffinity{}
+	_ framework.FilterPlugin      = &InterPodAffinity{}
+	_ framework.PreScorePlugin    = &InterPodAffinity{}
+	_ framework.ScorePlugin       = &InterPodAffinity{}
+	_ framework.EnqueueExtensions = &InterPodAffinity{}
+)
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {

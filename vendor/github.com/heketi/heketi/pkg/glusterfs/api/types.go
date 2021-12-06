@@ -251,7 +251,7 @@ type ClusterFlags struct {
 
 type Cluster struct {
 	Volumes []VolumeInfoResponse `json:"volumes"`
-	//currently BlockVolumes will be used only for metrics
+	// currently BlockVolumes will be used only for metrics
 	BlockVolumes []BlockVolumeInfoResponse `json:"blockvolumes,omitempty"`
 	Nodes        []NodeInfoResponse        `json:"nodes"`
 	Id           string                    `json:"id"`
@@ -523,7 +523,6 @@ func ValidateTags(v interface{}) error {
 // Constructors
 
 func NewVolumeInfoResponse() *VolumeInfoResponse {
-
 	info := &VolumeInfoResponse{}
 	info.Mount.GlusterFS.Options = make(map[string]string)
 	info.Bricks = make([]BrickInfo, 0)
@@ -577,7 +576,6 @@ func (v *VolumeInfoResponse) String() string {
 }
 
 func NewBlockVolumeInfoResponse() *BlockVolumeInfoResponse {
-
 	info := &BlockVolumeInfoResponse{}
 	// Nothing to Construct now maybe for future
 

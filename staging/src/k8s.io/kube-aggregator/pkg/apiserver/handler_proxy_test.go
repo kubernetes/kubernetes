@@ -762,7 +762,6 @@ func TestGetContextForNewRequest(t *testing.T) {
 	if !strings.Contains(string(body), "context deadline exceeded") {
 		t.Error(string(body))
 	}
-
 }
 
 func TestNewRequestForProxyWithAuditID(t *testing.T) {
@@ -1046,10 +1045,10 @@ func getCertAndKeyPaths(t *testing.T) (string, string, string) {
 }
 
 func writeCerts(certFile, keyFile string, certContent, keyContent []byte, t *testing.T) {
-	if err := ioutil.WriteFile(certFile, certContent, 0600); err != nil {
+	if err := ioutil.WriteFile(certFile, certContent, 0o600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", certFile, err)
 	}
-	if err := ioutil.WriteFile(keyFile, keyContent, 0600); err != nil {
+	if err := ioutil.WriteFile(keyFile, keyContent, 0o600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
 	}
 }

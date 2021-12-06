@@ -1071,7 +1071,7 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	// When the only OwnerReference of the RS points to another type of API object such as statefulset
 	// with Controller=false, the deployment should add a second OwnerReference (ControllerRef) pointing to itself
 	// with Controller=true
-	var falseVar = false
+	falseVar := false
 	ownerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "apps/v1", Kind: "StatefulSet", Name: deploymentName, Controller: &falseVar}
 	testRSControllerRefPatch(t, tester, rs, &ownerReference, 2)
 

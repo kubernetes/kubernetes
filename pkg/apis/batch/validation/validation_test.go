@@ -1046,7 +1046,6 @@ func TestValidateCronJob(t *testing.T) {
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
-
 					Spec: batch.JobSpec{
 						Completions: &negative,
 						Template:    validPodTemplateSpec,

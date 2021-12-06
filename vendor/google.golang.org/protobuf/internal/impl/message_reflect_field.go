@@ -81,7 +81,6 @@ func fieldInfoForOneof(fd pref.FieldDescriptor, fs reflect.StructField, x export
 		// NOTE: The logic below intentionally assumes that oneof fields are
 		// well-formatted. That is, the oneof interface never contains a
 		// typed nil pointer to one of the wrapper structs.
-
 		fieldDesc: fd,
 		has: func(p pointer) bool {
 			if p.IsNil() {

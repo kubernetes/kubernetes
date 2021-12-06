@@ -515,7 +515,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	UploadFile := f.Name()
-	if err := os.Chmod(UploadFile, 0700); err != nil {
+	if err := os.Chmod(UploadFile, 0o700); err != nil {
 		result["error"] = "Unable to chmod file."
 		bytes, err := json.Marshal(result)
 		if err == nil {

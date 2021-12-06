@@ -257,7 +257,6 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	recorder := &invocationRecorder{counts: map[string]int{}}
 	webhookServer := httptest.NewUnstartedServer(newReinvokeWebhookHandler(recorder))
 	webhookServer.TLS = &tls.Config{
-
 		RootCAs:      roots,
 		Certificates: []tls.Certificate{cert},
 	}
@@ -454,7 +453,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 				}
 			}
 
-			stream, err := os.OpenFile(logFile.Name(), os.O_RDWR, 0600)
+			stream, err := os.OpenFile(logFile.Name(), os.O_RDWR, 0o600)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

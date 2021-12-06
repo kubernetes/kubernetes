@@ -2,9 +2,8 @@ package leafnodes
 
 import (
 	"math"
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/onsi/ginkgo/types"
 )

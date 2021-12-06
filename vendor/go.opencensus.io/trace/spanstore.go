@@ -35,7 +35,7 @@ var (
 type internalOnly struct{}
 
 func init() {
-	//TODO(#412): remove
+	// TODO(#412): remove
 	internal.Trace = &internalOnly{}
 }
 

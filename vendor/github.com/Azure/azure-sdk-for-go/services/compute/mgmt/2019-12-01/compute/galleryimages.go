@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // GalleryImagesClient is the compute Client
@@ -51,14 +52,23 @@ func (client GalleryImagesClient) CreateOrUpdate(ctx context.Context, resourceGr
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: galleryImage,
-			Constraints: []validation.Constraint{{Target: "galleryImage.GalleryImageProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "galleryImage.GalleryImageProperties.Identifier", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "galleryImage.GalleryImageProperties.Identifier.Publisher", Name: validation.Null, Rule: true, Chain: nil},
-						{Target: "galleryImage.GalleryImageProperties.Identifier.Offer", Name: validation.Null, Rule: true, Chain: nil},
-						{Target: "galleryImage.GalleryImageProperties.Identifier.Sku", Name: validation.Null, Rule: true, Chain: nil},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: galleryImage,
+			Constraints: []validation.Constraint{{
+				Target: "galleryImage.GalleryImageProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "galleryImage.GalleryImageProperties.Identifier", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{
+							{Target: "galleryImage.GalleryImageProperties.Identifier.Publisher", Name: validation.Null, Rule: true, Chain: nil},
+							{Target: "galleryImage.GalleryImageProperties.Identifier.Offer", Name: validation.Null, Rule: true, Chain: nil},
+							{Target: "galleryImage.GalleryImageProperties.Identifier.Sku", Name: validation.Null, Rule: true, Chain: nil},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.GalleryImagesClient", "CreateOrUpdate", err.Error())
 	}
 

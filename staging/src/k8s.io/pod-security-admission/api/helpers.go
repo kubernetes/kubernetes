@@ -57,9 +57,11 @@ func (v *Version) Older(other Version) bool {
 func (v *Version) Major() int {
 	return v.major
 }
+
 func (v *Version) Minor() int {
 	return v.minor
 }
+
 func (v *Version) Latest() bool {
 	return v.latest
 }

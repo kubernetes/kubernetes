@@ -47,9 +47,7 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
-var (
-	objectType = reflect.TypeOf(&v1.Pod{})
-)
+var objectType = reflect.TypeOf(&v1.Pod{})
 
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
 // the writes to cacheWatcher.result channel is blocked.
@@ -219,6 +217,7 @@ type testVersioner struct{}
 func (testVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
 	return meta.NewAccessor().SetResourceVersion(obj, strconv.FormatUint(resourceVersion, 10))
 }
+
 func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count *int64) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
@@ -229,9 +228,11 @@ func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, cont
 	listAccessor.SetRemainingItemCount(count)
 	return nil
 }
+
 func (testVersioner) PrepareObjectForStorage(obj runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
+
 func (testVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
@@ -243,6 +244,7 @@ func (testVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
 	}
 	return strconv.ParseUint(version, 10, 64)
 }
+
 func (testVersioner) ParseResourceVersion(resourceVersion string) (uint64, error) {
 	return strconv.ParseUint(resourceVersion, 10, 64)
 }
@@ -302,29 +304,37 @@ func (d *dummyStorage) Versioner() storage.Versioner { return nil }
 func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
 	return fmt.Errorf("unimplemented")
 }
+
 func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
+
 func (d *dummyStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
 	return newDummyWatch(), nil
 }
+
 func (d *dummyStorage) WatchList(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
 	return newDummyWatch(), nil
 }
+
 func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
 	return d.err
 }
+
 func (d *dummyStorage) GetToList(_ context.Context, _ string, _ storage.ListOptions, _ runtime.Object) error {
 	return d.err
 }
+
 func (d *dummyStorage) List(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
 	podList := listObj.(*example.PodList)
 	podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
 	return d.err
 }
+
 func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
+
 func (d *dummyStorage) Count(_ string) (int64, error) {
 	return 0, fmt.Errorf("unimplemented")
 }
@@ -591,7 +601,6 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("timed out waiting for watch to close")
 	}
-
 }
 
 func TestTimeBucketWatchersBasic(t *testing.T) {
@@ -759,7 +768,8 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 					Name:            fmt.Sprintf("pod-%d", i),
 					Namespace:       "ns",
 					ResourceVersion: fmt.Sprintf("%v", resourceVersion+uint64(i)),
-				}})
+				},
+			})
 			if err != nil {
 				errc <- fmt.Errorf("failed to add a pod: %v", err)
 				return
@@ -914,7 +924,8 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 			Name:            "pod-0",
 			Namespace:       "ns",
 			ResourceVersion: fmt.Sprintf("%v", resourceVersion),
-		}})
+		},
+	})
 	if err != nil {
 		t.Fatalf("failed to add a pod: %v", err)
 	}

@@ -46,13 +46,15 @@ type UpdateBalancerCall struct {
 	Hosts   []*v1.Node
 }
 
-var _ cloudprovider.Interface = (*Cloud)(nil)
-var _ cloudprovider.Instances = (*Cloud)(nil)
-var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
-var _ cloudprovider.Routes = (*Cloud)(nil)
-var _ cloudprovider.Zones = (*Cloud)(nil)
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
-var _ cloudprovider.Clusters = (*Cloud)(nil)
+var (
+	_ cloudprovider.Interface    = (*Cloud)(nil)
+	_ cloudprovider.Instances    = (*Cloud)(nil)
+	_ cloudprovider.LoadBalancer = (*Cloud)(nil)
+	_ cloudprovider.Routes       = (*Cloud)(nil)
+	_ cloudprovider.Zones        = (*Cloud)(nil)
+	_ cloudprovider.PVLabeler    = (*Cloud)(nil)
+	_ cloudprovider.Clusters     = (*Cloud)(nil)
+)
 
 // Cloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type Cloud struct {

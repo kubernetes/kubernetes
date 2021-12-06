@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
-
-	"go/build"
 
 	"github.com/onsi/ginkgo/ginkgo/nodot"
 )

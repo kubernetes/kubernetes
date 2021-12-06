@@ -539,9 +539,7 @@ func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claim
 	return nil
 }
 
-var (
-	versioner = etcd3.APIObjectVersioner{}
-)
+var versioner = etcd3.APIObjectVersioner{}
 
 // checkBindings runs through all the PVCs in the Pod and checks:
 // * if the PVC is fully bound

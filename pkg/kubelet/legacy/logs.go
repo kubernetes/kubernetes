@@ -48,6 +48,5 @@ type DockerLegacyService interface {
 	// supported by native CRI integration.
 	// TODO(resouer): remove this when deprecating unsupported log driver
 	IsCRISupportedLogDriver() (bool, error)
-
 	kuberuntime.LegacyLogProvider
 }

@@ -27,11 +27,9 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	getClustersExample = templates.Examples(`
+var getClustersExample = templates.Examples(`
 		# List the clusters that kubectl knows about
 		kubectl config get-clusters`)
-)
 
 // NewCmdConfigGetClusters creates a command object for the "get-clusters" action, which
 // lists all clusters defined in the kubeconfig.

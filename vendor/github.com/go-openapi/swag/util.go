@@ -38,7 +38,7 @@ var GoNamePrefixFunc func(string) string
 
 func init() {
 	// Taken from https://github.com/golang/lint/blob/3390df4df2787994aea98de825b964ac7944b817/lint.go#L732-L769
-	var configuredInitialisms = map[string]bool{
+	configuredInitialisms := map[string]bool{
 		"ACL":   true,
 		"API":   true,
 		"ASCII": true,
@@ -160,9 +160,11 @@ type byInitialism []string
 func (s byInitialism) Len() int {
 	return len(s)
 }
+
 func (s byInitialism) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
+
 func (s byInitialism) Less(i, j int) bool {
 	if len(s[i]) != len(s[j]) {
 		return len(s[i]) < len(s[j])

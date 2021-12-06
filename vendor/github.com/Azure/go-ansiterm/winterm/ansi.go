@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package winterm
@@ -63,7 +64,6 @@ type ansiCommand struct {
 }
 
 func newAnsiCommand(command []byte) *ansiCommand {
-
 	if isCharacterSelectionCmdChar(command[1]) {
 		// Is Character Set Selection commands
 		return &ansiCommand{

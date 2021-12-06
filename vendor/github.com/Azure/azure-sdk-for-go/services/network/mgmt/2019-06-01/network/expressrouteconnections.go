@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ExpressRouteConnectionsClient is the network Client
@@ -50,10 +51,17 @@ func (client ExpressRouteConnectionsClient) CreateOrUpdate(ctx context.Context, 
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: putExpressRouteConnectionParameters,
-			Constraints: []validation.Constraint{{Target: "putExpressRouteConnectionParameters.ExpressRouteConnectionProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "putExpressRouteConnectionParameters.ExpressRouteConnectionProperties.ExpressRouteCircuitPeering", Name: validation.Null, Rule: true, Chain: nil}}},
-				{Target: "putExpressRouteConnectionParameters.Name", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: putExpressRouteConnectionParameters,
+			Constraints: []validation.Constraint{
+				{
+					Target: "putExpressRouteConnectionParameters.ExpressRouteConnectionProperties", Name: validation.Null, Rule: false,
+					Chain: []validation.Constraint{{Target: "putExpressRouteConnectionParameters.ExpressRouteConnectionProperties.ExpressRouteCircuitPeering", Name: validation.Null, Rule: true, Chain: nil}},
+				},
+				{Target: "putExpressRouteConnectionParameters.Name", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.ExpressRouteConnectionsClient", "CreateOrUpdate", err.Error())
 	}
 

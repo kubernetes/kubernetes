@@ -83,7 +83,6 @@ type ServiceState struct {
 // controller.
 func (t *TriggerTimeTracker) ComputeEndpointLastChangeTriggerTime(
 	namespace string, service *v1.Service, pods []*v1.Pod) time.Time {
-
 	key := ServiceKey{Namespace: namespace, Name: service.Name}
 	// As there won't be any concurrent calls for the same key, we need to guard
 	// access only to the serviceStates map.

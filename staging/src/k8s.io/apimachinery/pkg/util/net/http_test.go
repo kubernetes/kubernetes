@@ -243,6 +243,7 @@ func (f *fakeTLSClientConfigHolder) TLSClientConfig() *tls.Config {
 	f.called = true
 	return nil
 }
+
 func (f *fakeTLSClientConfigHolder) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, nil
 }

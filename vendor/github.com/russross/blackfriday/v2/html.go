@@ -49,9 +49,7 @@ const (
 	TOC                                           // Generate a table of contents
 )
 
-var (
-	htmlTagRe = regexp.MustCompile("(?i)^" + htmlTag)
-)
+var htmlTagRe = regexp.MustCompile("(?i)^" + htmlTag)
 
 const (
 	htmlTag = "(?:" + openTag + "|" + closeTag + "|" + htmlComment + "|" +

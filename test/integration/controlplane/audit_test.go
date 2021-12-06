@@ -257,7 +257,8 @@ func runTestWithVersion(t *testing.T, version string) {
 			"--audit-policy-file", policyFile.Name(),
 			"--audit-log-version", version,
 			"--audit-log-mode", "blocking",
-			"--audit-log-path", logFile.Name()},
+			"--audit-log-path", logFile.Name(),
+		},
 		framework.SharedEtcd())
 	defer result.TearDownFn()
 
@@ -575,30 +576,26 @@ func configMapOperations(t *testing.T, kubeclient kubernetes.Interface, namespac
 }
 
 func tokenRequestOperations(t *testing.T, kubeClient kubernetes.Interface, namespace, name string) {
-	var (
-		treq = &authenticationv1.TokenRequest{
-			Spec: authenticationv1.TokenRequestSpec{
-				Audiences: []string{"api"},
-			},
-		}
-	)
+	treq := &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences: []string{"api"},
+		},
+	}
 	// create tokenRequest
 	_, err := kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, treq, metav1.CreateOptions{})
 	expectNoError(t, err, "failed to create audit-tokenRequest")
 }
 
 func scaleOperations(t *testing.T, kubeClient kubernetes.Interface, namespace, name string) {
-	var (
-		scale = &autoscalingv1.Scale{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "audit-deployment",
-				Namespace: namespace,
-			},
-			Spec: autoscalingv1.ScaleSpec{
-				Replicas: 2,
-			},
-		}
-	)
+	scale := &autoscalingv1.Scale{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "audit-deployment",
+			Namespace: namespace,
+		},
+		Spec: autoscalingv1.ScaleSpec{
+			Replicas: 2,
+		},
+	}
 
 	// update scale
 	_, err := kubeClient.AppsV1().Deployments(namespace).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})

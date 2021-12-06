@@ -227,7 +227,6 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
 	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
-
 		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)

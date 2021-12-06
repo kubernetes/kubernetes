@@ -36,7 +36,7 @@ import (
 // certificateReadWriter defines the behavior of a component that
 // read or write a certificate stored/embedded in a file
 type certificateReadWriter interface {
-	//Exists return true if the certificate exists
+	// Exists return true if the certificate exists
 	Exists() bool
 
 	// Read a certificate stored/embedded in a file

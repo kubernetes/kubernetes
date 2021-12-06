@@ -103,31 +103,42 @@ var _ admission.ValidationInterface = &alwaysValidatingDeny{}
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
-var testAPIGroup2 = "test.group2"
-var testInternalGroupVersion = schema.GroupVersion{Group: testAPIGroup, Version: runtime.APIVersionInternal}
-var testGroupVersion = schema.GroupVersion{Group: testAPIGroup, Version: "version"}
-var newGroupVersion = schema.GroupVersion{Group: testAPIGroup, Version: "version2"}
-var testGroup2Version = schema.GroupVersion{Group: testAPIGroup2, Version: "version"}
-var testInternalGroup2Version = schema.GroupVersion{Group: testAPIGroup2, Version: runtime.APIVersionInternal}
-var prefix = "apis"
 
-var grouplessGroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
-var grouplessInternalGroupVersion = schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
-var grouplessPrefix = "api"
+var (
+	testAPIGroup2             = "test.group2"
+	testInternalGroupVersion  = schema.GroupVersion{Group: testAPIGroup, Version: runtime.APIVersionInternal}
+	testGroupVersion          = schema.GroupVersion{Group: testAPIGroup, Version: "version"}
+	newGroupVersion           = schema.GroupVersion{Group: testAPIGroup, Version: "version2"}
+	testGroup2Version         = schema.GroupVersion{Group: testAPIGroup2, Version: "version"}
+	testInternalGroup2Version = schema.GroupVersion{Group: testAPIGroup2, Version: runtime.APIVersionInternal}
+	prefix                    = "apis"
+)
+
+var (
+	grouplessGroupVersion         = schema.GroupVersion{Group: "", Version: "v1"}
+	grouplessInternalGroupVersion = schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
+	grouplessPrefix               = "api"
+)
 
 var groupVersions = []schema.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
 
-var scheme = runtime.NewScheme()
-var codecs = serializer.NewCodecFactory(scheme)
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
 
-var codec = codecs.LegacyCodec(groupVersions...)
-var testCodec = codecs.LegacyCodec(testGroupVersion)
-var newCodec = codecs.LegacyCodec(newGroupVersion)
-var parameterCodec = runtime.NewParameterCodec(scheme)
+var (
+	codec          = codecs.LegacyCodec(groupVersions...)
+	testCodec      = codecs.LegacyCodec(testGroupVersion)
+	newCodec       = codecs.LegacyCodec(newGroupVersion)
+	parameterCodec = runtime.NewParameterCodec(scheme)
+)
 
-var accessor = meta.NewAccessor()
-var selfLinker runtime.SelfLinker = accessor
-var admissionControl admission.Interface
+var (
+	accessor                            = meta.NewAccessor()
+	selfLinker       runtime.SelfLinker = accessor
+	admissionControl admission.Interface
+)
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -948,7 +959,6 @@ func TestList(t *testing.T) {
 		field     string
 	}{
 		// Groupless API
-
 		// legacy namespace param is ignored
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple?namespace=",
@@ -1108,7 +1118,7 @@ func TestList(t *testing.T) {
 			namespace:   testCase.namespace,
 			expectedSet: testCase.selfLink,
 		}
-		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+		handler := handleInternal(storage, admissionControl, selfLinker, nil)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -1151,7 +1161,7 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 	storage["simple"] = &SimpleRESTStorage{expectedResourceNamespace: "default"}
 	storage["withoptions"] = GetWithOptionsRESTStorage{}
 
-	var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+	handler := handleInternal(storage, admissionControl, selfLinker, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1229,7 +1239,7 @@ func TestListCompression(t *testing.T) {
 			namespace:   testCase.namespace,
 			expectedSet: testCase.selfLink,
 		}
-		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+		handler := handleInternal(storage, admissionControl, selfLinker, nil)
 
 		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 
@@ -2533,7 +2543,6 @@ func TestGetWithOptionsRouteParams(t *testing.T) {
 }
 
 func TestGetWithOptions(t *testing.T) {
-
 	tests := []struct {
 		name         string
 		rootScoped   bool
@@ -2652,7 +2661,6 @@ func TestGetWithOptions(t *testing.T) {
 			opts, ok = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
 		} else {
 			opts, ok = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
-
 		}
 		if !ok {
 			t.Errorf("%s: Unexpected options object received: %#v", test.name, simpleStorage.optionsReceived)
@@ -2804,7 +2812,6 @@ func TestConnect(t *testing.T) {
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2842,7 +2849,6 @@ func TestConnectResponderObject(t *testing.T) {
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2883,7 +2889,6 @@ func TestConnectResponderError(t *testing.T) {
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2952,7 +2957,6 @@ func TestConnectWithOptions(t *testing.T) {
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect?param1=value1&param2=value2")
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3002,7 +3006,6 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect" + testPath + "?param1=value1&param2=value2")
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -4177,6 +4180,7 @@ type UnregisteredAPIObject struct {
 func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
+
 func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
 	if obj == nil {
 		return nil
@@ -4262,7 +4266,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	client := http.Client{}
 
 	simple := &genericapitesting.Simple{}
-	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
+	// using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
 	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

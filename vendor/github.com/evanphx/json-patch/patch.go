@@ -47,8 +47,10 @@ type Operation map[string]*json.RawMessage
 // Patch is an ordered collection of Operations.
 type Patch []Operation
 
-type partialDoc map[string]*lazyNode
-type partialArray []*lazyNode
+type (
+	partialDoc   map[string]*lazyNode
+	partialArray []*lazyNode
+)
 
 type container interface {
 	get(key string) (*lazyNode, error)
@@ -106,7 +108,6 @@ func (n *lazyNode) intoDoc() (*partialDoc, error) {
 	}
 
 	err := json.Unmarshal(*n.raw, &n.doc)
-
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,6 @@ func (n *lazyNode) intoAry() (*partialArray, error) {
 	}
 
 	err := json.Unmarshal(*n.raw, &n.ary)
-
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,6 @@ func (n *lazyNode) compact() []byte {
 	}
 
 	err := json.Compact(buf, *n.raw)
-
 	if err != nil {
 		return *n.raw
 	}
@@ -156,7 +155,6 @@ func (n *lazyNode) tryDoc() bool {
 	}
 
 	err := json.Unmarshal(*n.raw, &n.doc)
-
 	if err != nil {
 		return false
 	}
@@ -171,7 +169,6 @@ func (n *lazyNode) tryAry() bool {
 	}
 
 	err := json.Unmarshal(*n.raw, &n.ary)
-
 	if err != nil {
 		return false
 	}
@@ -252,7 +249,6 @@ func (o Operation) Kind() string {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
-
 		if err != nil {
 			return "unknown"
 		}
@@ -269,7 +265,6 @@ func (o Operation) Path() (string, error) {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
-
 		if err != nil {
 			return "unknown", err
 		}
@@ -286,7 +281,6 @@ func (o Operation) From() (string, error) {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
-
 		if err != nil {
 			return "unknown", err
 		}
@@ -311,7 +305,6 @@ func (o Operation) ValueInterface() (interface{}, error) {
 		var v interface{}
 
 		err := json.Unmarshal(*obj, &v)
-
 		if err != nil {
 			return nil, err
 		}
@@ -468,7 +461,6 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 
 func (d *partialArray) get(key string) (*lazyNode, error) {
 	idx, err := strconv.Atoi(key)
-
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +511,6 @@ func (d *partialArray) remove(key string) error {
 
 	*d = ary
 	return nil
-
 }
 
 func (p Patch) add(doc *container, op Operation) error {
@@ -767,7 +758,6 @@ func DecodePatch(buf []byte) (Patch, error) {
 	var p Patch
 
 	err := json.Unmarshal(buf, &p)
-
 	if err != nil {
 		return nil, err
 	}
@@ -796,7 +786,6 @@ func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
 	}
 
 	err := json.Unmarshal(doc, pd)
-
 	if err != nil {
 		return nil, err
 	}
@@ -842,9 +831,7 @@ func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
 // occurrence of the sequence '~1' to '/', and then transforming any
 // occurrence of the sequence '~0' to '~'.
 
-var (
-	rfc6901Decoder = strings.NewReplacer("~1", "/", "~0", "~")
-)
+var rfc6901Decoder = strings.NewReplacer("~1", "/", "~0", "~")
 
 func decodePatchKey(k string) string {
 	return rfc6901Decoder.Replace(k)

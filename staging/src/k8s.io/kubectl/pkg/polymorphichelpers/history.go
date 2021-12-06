@@ -82,7 +82,6 @@ func HistoryViewerFor(kind schema.GroupKind, c kubernetes.Interface) (HistoryVie
 
 	// Determine which HistoryViewer we need here
 	err := elem.Accept(visitor)
-
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving history for %q, %v", kind.String(), err)
 	}

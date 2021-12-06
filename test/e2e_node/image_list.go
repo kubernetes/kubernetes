@@ -117,8 +117,7 @@ type puller interface {
 	Name() string
 }
 
-type dockerPuller struct {
-}
+type dockerPuller struct{}
 
 func (dp *dockerPuller) Name() string {
 	return "docker"
@@ -286,7 +285,7 @@ func getSRIOVDevicePluginImage() (string, error) {
 	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
 
-//TODO generilize this function with above one
+// TODO generilize this function with above one
 // getKubeVirtDevicePluginImage returns the image of SRIOV device plugin.
 func getKubeVirtDevicePluginImage() (string, error) {
 	data, err := e2etestfiles.Read(KubeVirtDevicePluginDSYAML)

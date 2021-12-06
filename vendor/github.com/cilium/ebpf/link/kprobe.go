@@ -308,7 +308,7 @@ func tracefsProbe(typ probeType, symbol, path string, offset uint64, ret bool) (
 // if a probe with the same group and symbol already exists.
 func createTraceFSProbeEvent(typ probeType, group, symbol, path string, offset uint64, ret bool) error {
 	// Open the kprobe_events file in tracefs.
-	f, err := os.OpenFile(typ.EventsPath(), os.O_APPEND|os.O_WRONLY, 0666)
+	f, err := os.OpenFile(typ.EventsPath(), os.O_APPEND|os.O_WRONLY, 0o666)
 	if err != nil {
 		return fmt.Errorf("error opening '%s': %w", typ.EventsPath(), err)
 	}
@@ -363,7 +363,7 @@ func createTraceFSProbeEvent(typ probeType, group, symbol, path string, offset u
 // closeTraceFSProbeEvent removes the [k,u]probe with the given type, group and symbol
 // from <tracefs>/[k,u]probe_events.
 func closeTraceFSProbeEvent(typ probeType, group, symbol string) error {
-	f, err := os.OpenFile(typ.EventsPath(), os.O_APPEND|os.O_WRONLY, 0666)
+	f, err := os.OpenFile(typ.EventsPath(), os.O_APPEND|os.O_WRONLY, 0o666)
 	if err != nil {
 		return fmt.Errorf("error opening %s: %w", typ.EventsPath(), err)
 	}

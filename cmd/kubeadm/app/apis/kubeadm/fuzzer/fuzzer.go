@@ -77,7 +77,7 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "foo"
-	obj.CIImageRepository = "" //This fields doesn't exists in public API >> using default to get the roundtrip test pass
+	obj.CIImageRepository = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
 	obj.ClusterName = "bar"
 	obj.ImageRepository = "baz"
 	obj.KubernetesVersion = "qux"

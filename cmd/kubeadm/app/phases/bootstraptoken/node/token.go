@@ -36,7 +36,6 @@ func CreateNewTokens(client clientset.Interface, tokens []bootstraptokenv1.Boots
 
 // UpdateOrCreateTokens attempts to update a token with the given ID, or create if it does not already exist.
 func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens []bootstraptokenv1.BootstrapToken) error {
-
 	for _, token := range tokens {
 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)

@@ -153,7 +153,7 @@ func (f *FileManager) MakeDirectory(req *types.MakeDirectory) soap.HasFault {
 		mkdir = os.MkdirAll
 	}
 
-	err := mkdir(name, 0700)
+	err := mkdir(name, 0o700)
 	if err != nil {
 		fault = f.fault(req.Name, err, new(types.CannotCreateFile))
 		body.Fault_ = Fault(err.Error(), fault)

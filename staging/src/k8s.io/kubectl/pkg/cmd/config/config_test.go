@@ -36,11 +36,14 @@ import (
 func newRedFederalCowHammerConfig() clientcmdapi.Config {
 	return clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"red-user": {Token: "red-token"}},
+			"red-user": {Token: "red-token"},
+		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"cow-cluster": {Server: "http://cow.org:8080"}},
+			"cow-cluster": {Server: "http://cow.org:8080"},
+		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"}},
+			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"},
+		},
 		CurrentContext: "federal-context",
 	}
 }
@@ -264,7 +267,7 @@ func TestEmbedClientCert(t *testing.T) {
 	fakeCertFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeCertFile.Name())
 	fakeData := []byte("fake-data")
-	ioutil.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	ioutil.WriteFile(fakeCertFile.Name(), fakeData, 0o600)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientCertificateData = fakeData
@@ -283,7 +286,7 @@ func TestEmbedClientKey(t *testing.T) {
 	fakeKeyFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeKeyFile.Name())
 	fakeData := []byte("fake-data")
-	ioutil.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
+	ioutil.WriteFile(fakeKeyFile.Name(), fakeData, 0o600)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientKeyData = fakeData
@@ -641,7 +644,7 @@ func TestCADataClearsCA(t *testing.T) {
 	fakeCAFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeCAFile.Name())
 	fakeData := []byte("cadata")
-	ioutil.WriteFile(fakeCAFile.Name(), fakeData, 0600)
+	ioutil.WriteFile(fakeCAFile.Name(), fakeData, 0o600)
 
 	clusterInfoWithCAData := clientcmdapi.NewCluster()
 	clusterInfoWithCAData.CertificateAuthorityData = fakeData
@@ -842,13 +845,11 @@ func TestToBool(t *testing.T) {
 		}
 		if (err != nil) && (err.Error() != curr.err) {
 			t.Errorf("Expected %v, got %v", curr.err, err)
-
 		}
 		if b != curr.out {
 			t.Errorf("Expected %v, got %v", curr.out, b)
 		}
 	}
-
 }
 
 func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
@@ -905,6 +906,7 @@ func (test configCommandTest) run(t *testing.T) string {
 
 	return out
 }
+
 func testClearLocationOfOrigin(config *clientcmdapi.Config) {
 	for key, obj := range config.AuthInfos {
 		obj.LocationOfOrigin = ""
@@ -919,6 +921,7 @@ func testClearLocationOfOrigin(config *clientcmdapi.Config) {
 		config.Contexts[key] = obj
 	}
 }
+
 func testSetNilMapsToEmpties(curr reflect.Value) {
 	actualCurrValue := curr
 	if curr.Kind() == reflect.Ptr {
@@ -945,5 +948,4 @@ func testSetNilMapsToEmpties(curr reflect.Value) {
 		}
 
 	}
-
 }

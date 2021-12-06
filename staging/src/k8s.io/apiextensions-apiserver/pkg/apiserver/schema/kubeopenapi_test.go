@@ -34,7 +34,7 @@ func TestStructuralKubeOpenAPIRoundtrip(t *testing.T) {
 	f := fuzz.New()
 	seed := time.Now().UnixNano()
 	t.Logf("seed = %v", seed)
-	//seed = int64(1549012506261785182)
+	// seed = int64(1549012506261785182)
 	f.RandSource(rand.New(rand.NewSource(seed)))
 	f.Funcs(
 		func(s *JSON, c fuzz.Continue) {

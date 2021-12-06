@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 // Internal functions for libseccomp Go bindings

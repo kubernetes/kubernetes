@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -132,7 +133,6 @@ func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *CounterVec) DeprecatedVersion() *semver.Version {
 	return parseSemver(v.CounterOpts.DeprecatedVersion)
-
 }
 
 // initializeMetric invocation creates the actual underlying CounterVec. Until this method is called

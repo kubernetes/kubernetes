@@ -34,8 +34,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
-type pathOwnerAndPermissionsUpdaterFunc func(path string, uid, gid int64, perms uint32) error
-type pathOwnerUpdaterFunc func(path string, uid, gid int64) error
+type (
+	pathOwnerAndPermissionsUpdaterFunc func(path string, uid, gid int64, perms uint32) error
+	pathOwnerUpdaterFunc               func(path string, uid, gid int64) error
+)
 
 // RunComponentAsNonRoot updates the pod manifest and the hostVolume permissions to run as non root.
 func RunComponentAsNonRoot(componentName string, pod *v1.Pod, usersAndGroups *users.UsersAndGroups, cfg *kubeadmapi.ClusterConfiguration) error {
@@ -81,28 +83,28 @@ func RunComponentAsNonRoot(componentName string, pod *v1.Pod, usersAndGroups *us
 // runKubeAPIServerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-apiserver as non root.
 func runKubeAPIServerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalGroup *int64, updatePathOwnerAndPermissions pathOwnerAndPermissionsUpdaterFunc, cfg *kubeadmapi.ClusterConfiguration) error {
 	saPublicKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName)
-	if err := updatePathOwnerAndPermissions(saPublicKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(saPublicKeyFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	saPrivateKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName)
-	if err := updatePathOwnerAndPermissions(saPrivateKeyFile, 0, *supplementalGroup, 0640); err != nil {
+	if err := updatePathOwnerAndPermissions(saPrivateKeyFile, 0, *supplementalGroup, 0o640); err != nil {
 		return err
 	}
 	apiServerKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName)
-	if err := updatePathOwnerAndPermissions(apiServerKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(apiServerKeyFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	apiServerKubeletClientKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName)
-	if err := updatePathOwnerAndPermissions(apiServerKubeletClientKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(apiServerKubeletClientKeyFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	frontProxyClientKeyName := filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)
-	if err := updatePathOwnerAndPermissions(frontProxyClientKeyName, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(frontProxyClientKeyName, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	if cfg.Etcd.External == nil {
 		apiServerEtcdClientKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
-		if err := updatePathOwnerAndPermissions(apiServerEtcdClientKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
+		if err := updatePathOwnerAndPermissions(apiServerEtcdClientKeyFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 			return err
 		}
 	}
@@ -125,16 +127,16 @@ func runKubeAPIServerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalG
 // runKubeControllerManagerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-controller-manager as non root.
 func runKubeControllerManagerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, supplementalGroup *int64, updatePathOwnerAndPermissions pathOwnerAndPermissionsUpdaterFunc, cfg *kubeadmapi.ClusterConfiguration) error {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
-	if err := updatePathOwnerAndPermissions(kubeconfigFile, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(kubeconfigFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	saPrivateKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName)
-	if err := updatePathOwnerAndPermissions(saPrivateKeyFile, 0, *supplementalGroup, 0640); err != nil {
+	if err := updatePathOwnerAndPermissions(saPrivateKeyFile, 0, *supplementalGroup, 0o640); err != nil {
 		return err
 	}
 	if res, _ := certphase.UsingExternalCA(cfg); !res {
 		caKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
-		err := updatePathOwnerAndPermissions(caKeyFile, *runAsUser, *runAsGroup, 0600)
+		err := updatePathOwnerAndPermissions(caKeyFile, *runAsUser, *runAsGroup, 0o600)
 		if err != nil {
 			return err
 		}
@@ -155,7 +157,7 @@ func runKubeControllerManagerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup, suppl
 // runKubeSchedulerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-scheduler as non root.
 func runKubeSchedulerAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup *int64, updatePathOwnerAndPermissions pathOwnerAndPermissionsUpdaterFunc) error {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
-	if err := updatePathOwnerAndPermissions(kubeconfigFile, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(kubeconfigFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
@@ -176,11 +178,11 @@ func runEtcdAsNonRoot(pod *v1.Pod, runAsUser, runAsGroup *int64, updatePathOwner
 		return err
 	}
 	etcdServerKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName)
-	if err := updatePathOwnerAndPermissions(etcdServerKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(etcdServerKeyFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	etcdPeerKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName)
-	if err := updatePathOwnerAndPermissions(etcdPeerKeyFile, *runAsUser, *runAsGroup, 0600); err != nil {
+	if err := updatePathOwnerAndPermissions(etcdPeerKeyFile, *runAsUser, *runAsGroup, 0o600); err != nil {
 		return err
 	}
 	pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{

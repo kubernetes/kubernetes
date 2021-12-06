@@ -98,7 +98,7 @@ func Validate(m []Validation) error {
 }
 
 func validateStruct(x reflect.Value, v Constraint, name ...string) error {
-	//Get field name from target name which is in format a.b.c
+	// Get field name from target name which is in format a.b.c
 	s := strings.Split(v.Target, ".")
 	f := x.FieldByName(s[len(s)-1])
 	if isZero(f) {

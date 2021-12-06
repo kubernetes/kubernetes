@@ -207,7 +207,6 @@ func successfulModificationReactorFunc(action core.Action) (bool, runtime.Object
 
 // logDryRunAction logs the action that was recorded by the "catch-all" (*,*) reactor and tells the user what would have happened in an user-friendly way
 func logDryRunAction(action core.Action, w io.Writer, marshalFunc MarshalFunc) {
-
 	group := action.GetResource().Group
 	if len(group) == 0 {
 		group = "core"

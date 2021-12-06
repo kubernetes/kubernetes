@@ -137,8 +137,7 @@ type Printer interface {
 }
 
 // TextPrinter implements Printer interface for generic text output
-type TextPrinter struct {
-}
+type TextPrinter struct{}
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj that prints object
 func (tp *TextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {

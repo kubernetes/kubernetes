@@ -36,7 +36,6 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyConfiguration) {
-
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}

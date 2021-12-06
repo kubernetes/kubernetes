@@ -9,12 +9,13 @@ package containerregistry
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // The package's fully qualified name.
@@ -3128,6 +3129,7 @@ func unmarshalBasicRunRequest(body []byte) (BasicRunRequest, error) {
 		return rr, err
 	}
 }
+
 func unmarshalBasicRunRequestArray(body []byte) ([]BasicRunRequest, error) {
 	var rawMessages []*json.RawMessage
 	err := json.Unmarshal(body, &rawMessages)
@@ -4148,6 +4150,7 @@ func unmarshalBasicTaskStepProperties(body []byte) (BasicTaskStepProperties, err
 		return tsp, err
 	}
 }
+
 func unmarshalBasicTaskStepPropertiesArray(body []byte) ([]BasicTaskStepProperties, error) {
 	var rawMessages []*json.RawMessage
 	err := json.Unmarshal(body, &rawMessages)
@@ -4252,6 +4255,7 @@ func unmarshalBasicTaskStepUpdateParameters(body []byte) (BasicTaskStepUpdatePar
 		return tsup, err
 	}
 }
+
 func unmarshalBasicTaskStepUpdateParametersArray(body []byte) ([]BasicTaskStepUpdateParameters, error) {
 	var rawMessages []*json.RawMessage
 	err := json.Unmarshal(body, &rawMessages)

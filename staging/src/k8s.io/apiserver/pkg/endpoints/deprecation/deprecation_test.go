@@ -286,6 +286,7 @@ func TestWarningMessage(t *testing.T) {
 type fakeObject struct {
 	unstructured.Unstructured
 }
+
 type fakeDeprecatedObject struct {
 	unstructured.Unstructured
 	major int

@@ -173,7 +173,6 @@ func TestGenerate(t *testing.T) {
 				},
 			},
 		})
-
 		if err != nil {
 			t.Errorf("%s received error during generation %#v", k, err)
 			continue

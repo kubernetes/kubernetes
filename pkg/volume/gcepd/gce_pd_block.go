@@ -35,12 +35,14 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.BlockVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.ExpandableVolumePlugin = &gcePersistentDiskPlugin{}
+var (
+	_ volume.VolumePlugin              = &gcePersistentDiskPlugin{}
+	_ volume.PersistentVolumePlugin    = &gcePersistentDiskPlugin{}
+	_ volume.BlockVolumePlugin         = &gcePersistentDiskPlugin{}
+	_ volume.DeletableVolumePlugin     = &gcePersistentDiskPlugin{}
+	_ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
+	_ volume.ExpandableVolumePlugin    = &gcePersistentDiskPlugin{}
+)
 
 func (plugin *gcePersistentDiskPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(gcePersistentDiskPluginName)
@@ -143,7 +145,8 @@ func (plugin *gcePersistentDiskPlugin) newUnmapperInternal(volName string, podUI
 			pdName:  volName,
 			manager: manager,
 			plugin:  plugin,
-		}}, nil
+		},
+	}, nil
 }
 
 type gcePersistentDiskUnmapper struct {

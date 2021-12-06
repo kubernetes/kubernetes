@@ -9,12 +9,13 @@ package network
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // The package's fully qualified name.
@@ -13850,6 +13851,7 @@ func unmarshalBasicFirewallPolicyRule(body []byte) (BasicFirewallPolicyRule, err
 		return fpr, err
 	}
 }
+
 func unmarshalBasicFirewallPolicyRuleArray(body []byte) ([]BasicFirewallPolicyRule, error) {
 	var rawMessages []*json.RawMessage
 	err := json.Unmarshal(body, &rawMessages)
@@ -13944,6 +13946,7 @@ func unmarshalBasicFirewallPolicyRuleCondition(body []byte) (BasicFirewallPolicy
 		return fprc, err
 	}
 }
+
 func unmarshalBasicFirewallPolicyRuleConditionArray(body []byte) ([]BasicFirewallPolicyRuleCondition, error) {
 	var rawMessages []*json.RawMessage
 	err := json.Unmarshal(body, &rawMessages)

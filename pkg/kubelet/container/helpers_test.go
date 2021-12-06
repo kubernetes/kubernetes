@@ -322,7 +322,6 @@ func TestExpandVolumeMountsWithSubpath(t *testing.T) {
 			t.Errorf("%v: unexpected mountpath; expected %v, got %v", tc.name, e, a)
 		}
 	}
-
 }
 
 func TestGetContainerSpec(t *testing.T) {
@@ -678,14 +677,14 @@ func TestHashContainer(t *testing.T) {
 }
 
 func TestShouldRecordEvent(t *testing.T) {
-	var innerEventRecorder = &innerEventRecorder{
+	innerEventRecorder := &innerEventRecorder{
 		recorder: nil,
 	}
 
 	_, actual := innerEventRecorder.shouldRecordEvent(nil)
 	assert.Equal(t, false, actual)
 
-	var obj = &v1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"}
+	obj := &v1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"}
 
 	_, actual = innerEventRecorder.shouldRecordEvent(obj)
 	assert.Equal(t, true, actual)

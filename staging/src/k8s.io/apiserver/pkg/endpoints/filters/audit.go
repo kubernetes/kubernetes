@@ -182,8 +182,10 @@ func decorateResponseWriter(ctx context.Context, responseWriter http.ResponseWri
 	return responsewriter.WrapForHTTP1Or2(delegate)
 }
 
-var _ http.ResponseWriter = &auditResponseWriter{}
-var _ responsewriter.UserProvidedDecorator = &auditResponseWriter{}
+var (
+	_ http.ResponseWriter                  = &auditResponseWriter{}
+	_ responsewriter.UserProvidedDecorator = &auditResponseWriter{}
+)
 
 // auditResponseWriter intercepts WriteHeader, sets it in the event. If the sink is set, it will
 // create immediately an event (for long running requests).

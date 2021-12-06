@@ -35,7 +35,6 @@ type ZfsWatcher struct {
 // NewThinPoolWatcher returns a new ThinPoolWatcher for the given devicemapper
 // thin pool name and metadata device or an error.
 func NewZfsWatcher(filesystem string) (*ZfsWatcher, error) {
-
 	return &ZfsWatcher{
 		filesystem: filesystem,
 		lock:       &sync.RWMutex{},

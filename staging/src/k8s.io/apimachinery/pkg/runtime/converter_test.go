@@ -117,9 +117,11 @@ type UnknownLevel1 struct {
 	InlinedAA  `json:",inline"`
 	InlinedAAA `json:",inline"`
 }
+
 type InlinedAA struct {
 	AA int64 `json:"aa"`
 }
+
 type InlinedAAA struct {
 	AAA   int64         `json:"aaa"`
 	Child UnknownLevel2 `json:"child"`
@@ -130,9 +132,11 @@ type UnknownLevel2 struct {
 	InlinedBB  `json:",inline"`
 	InlinedBBB `json:",inline"`
 }
+
 type InlinedBB struct {
 	BB int64 `json:"bb"`
 }
+
 type InlinedBBB struct {
 	BBB   int64         `json:"bbb"`
 	Child UnknownLevel3 `json:"child"`
@@ -143,9 +147,11 @@ type UnknownLevel3 struct {
 	InlinedCC  `json:",inline"`
 	InlinedCCC `json:",inline"`
 }
+
 type InlinedCC struct {
 	CC int64 `json:"cc"`
 }
+
 type InlinedCCC struct {
 	CCC int64 `json:"ccc"`
 }
@@ -345,7 +351,7 @@ func TestRoundTrip(t *testing.T) {
 func TestUnknownFields(t *testing.T) {
 	// simples checks that basic unknown fields are found
 	// in fields, subfields and slices.
-	var simplesData = `{
+	simplesData := `{
 "ca": [
 	{
 		"aa": 1,
@@ -358,7 +364,7 @@ func TestUnknownFields(t *testing.T) {
 "unknown2": "foo"
 }`
 
-	var simplesErrs = []string{
+	simplesErrs := []string{
 		`unknown field "ca[0].unknown1"`,
 		`unknown field "unknown2"`,
 	}
@@ -375,7 +381,7 @@ func TestUnknownFields(t *testing.T) {
 	//
 	// The opposite for "aaa", which exists at the
 	// nested level but not at the root.
-	var sameNameDiffLevelData = `
+	sameNameDiffLevelData := `
 	{
 		"cc": "foo",
 		"aaa": 1,
@@ -386,7 +392,7 @@ func TestUnknownFields(t *testing.T) {
 
 		}
 }`
-	var sameNameDiffLevelErrs = []string{
+	sameNameDiffLevelErrs := []string{
 		`unknown field "aaa"`,
 		`unknown field "ul1.cc"`,
 	}
@@ -394,7 +400,7 @@ func TestUnknownFields(t *testing.T) {
 	// inlined-inlined confirms that we see
 	// fields that are doubly nested and don't recognize
 	// those that aren't
-	var inlinedInlinedData = `{
+	inlinedInlinedData := `{
 		"bb": "foo",
 		"bc": {
 			"foo": "bar"
@@ -403,12 +409,12 @@ func TestUnknownFields(t *testing.T) {
 		"aa": 1
 }`
 
-	var inlinedInlinedErrs = []string{
+	inlinedInlinedErrs := []string{
 		`unknown field "aa"`,
 	}
 
 	// combined tests everything together
-	var combinedData = `
+	combinedData := `
 	{
 		"ia": {
 			"aa": 1,
@@ -512,7 +518,7 @@ func TestUnknownFields(t *testing.T) {
 		}
 }`
 
-	var combinedErrs = []string{
+	combinedErrs := []string{
 		`unknown field "ca[1].unknown1"`,
 		`unknown field "ca[2].unknown2"`,
 		`unknown field "ba.unknown3"`,

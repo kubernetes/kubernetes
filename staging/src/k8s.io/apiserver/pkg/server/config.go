@@ -901,7 +901,7 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	}
 
 	privilegedLoopbackToken := loopback.BearerToken
-	var uid = uuid.New().String()
+	uid := uuid.New().String()
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,

@@ -107,7 +107,6 @@ func (m *VcenterVStorageObjectManager) RegisterDisk(ctx *Context, req *types.Reg
 	st, err := os.Stat(filepath.Join(ds.Info.GetDatastoreInfo().Url, u.Path))
 	if err != nil {
 		return invalid()
-
 	}
 	if st.IsDir() {
 		return invalid()
@@ -158,7 +157,7 @@ func (m *VcenterVStorageObjectManager) createObject(req *types.CreateDisk_Task, 
 	if !ok {
 		objects = make(map[types.ID]*VStorageObject)
 		m.objects[ds.Self] = objects
-		_ = os.Mkdir(filepath.Join(ds.Info.GetDatastoreInfo().Url, dir), 0755)
+		_ = os.Mkdir(filepath.Join(ds.Info.GetDatastoreInfo().Url, dir), 0o755)
 	}
 
 	id := uuid.New().String()
@@ -217,7 +216,6 @@ func (m *VcenterVStorageObjectManager) createObject(req *types.CreateDisk_Task, 
 	objects[obj.Config.Id] = &VStorageObject{VStorageObject: obj}
 
 	return &obj, nil
-
 }
 
 func (m *VcenterVStorageObjectManager) CreateDiskTask(req *types.CreateDisk_Task) soap.HasFault {

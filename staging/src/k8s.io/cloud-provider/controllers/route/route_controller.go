@@ -332,7 +332,6 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 		}
 		return err
 	})
-
 	if err != nil {
 		klog.Errorf("Error updating node %s: %v", node.Name, err)
 	}

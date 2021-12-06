@@ -156,7 +156,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			}
 
 			for _, createDir := range test.setupDirs {
-				err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700)
+				err := os.Mkdir(filepath.Join(tmpDir, createDir), 0o700)
 				if err != nil {
 					t.Errorf("Unable to setup test config directory: %s", err)
 				}

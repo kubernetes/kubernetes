@@ -99,7 +99,7 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+			if err := os.MkdirAll(deviceMountPath, 0o750); err != nil {
 				return err
 			}
 			notMnt = true

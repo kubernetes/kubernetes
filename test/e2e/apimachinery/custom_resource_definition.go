@@ -42,7 +42,6 @@ import (
 )
 
 var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
-
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
 	ginkgo.Context("Simple CustomResourceDefinition", func() {
@@ -54,7 +53,6 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			be successful.
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
-
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
 			apiExtensionClient, err := clientset.NewForConfig(config)
@@ -378,7 +376,6 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		})
 		framework.ExpectNoError(err, "waiting for CR to be defaulted on read for b and a staying the same")
 	})
-
 })
 
 func unstructuredToCRD(obj *unstructured.Unstructured) *v1.CustomResourceDefinition {

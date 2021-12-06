@@ -23,8 +23,7 @@ type Gvk struct {
 
 func NewGvk(g, v, k string) Gvk {
 	result := Gvk{Group: g, Version: v, Kind: k}
-	result.isClusterScoped =
-		openapi.IsCertainlyClusterScoped(result.AsTypeMeta())
+	result.isClusterScoped = openapi.IsCertainlyClusterScoped(result.AsTypeMeta())
 	return result
 }
 
@@ -157,10 +156,12 @@ var orderFirst = []string{
 	"CronJob",
 	"PodDisruptionBudget",
 }
+
 var orderLast = []string{
 	"MutatingWebhookConfiguration",
 	"ValidatingWebhookConfiguration",
 }
+
 var typeOrders = func() map[string]int {
 	m := map[string]int{}
 	for i, n := range orderFirst {

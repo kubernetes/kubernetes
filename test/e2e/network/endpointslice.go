@@ -85,7 +85,6 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		if !endpointSlicesEqual(endpoints, endpointSliceList) {
 			framework.Failf("Expected EndpointSlice to have same addresses and port as Endpoints, got %#v: %#v", endpoints, endpointSliceList)
 		}
-
 	})
 
 	/*
@@ -354,10 +353,12 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		epsClient := f.ClientSet.DiscoveryV1().EndpointSlices(ns)
 
 		epsTemplate := &discoveryv1.EndpointSlice{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-ing",
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "e2e-example-ing",
 				Labels: map[string]string{
 					"special-label": f.UniqueName,
-				}},
+				},
+			},
 			AddressType: discoveryv1.AddressTypeIPv4,
 			Endpoints: []discoveryv1.Endpoint{
 				{Addresses: []string{"1.2.3.4", "5.6.7.8"}},

@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ApplicationGatewaysClient is the network Client
@@ -217,30 +218,54 @@ func (client ApplicationGatewaysClient) CreateOrUpdate(ctx context.Context, reso
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.Enabled", Name: validation.Null, Rule: true, Chain: nil},
-						{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.RuleSetType", Name: validation.Null, Rule: true, Chain: nil},
-						{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.RuleSetVersion", Name: validation.Null, Rule: true, Chain: nil},
-						{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySize", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySize", Name: validation.InclusiveMaximum, Rule: int64(128), Chain: nil},
-								{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySize", Name: validation.InclusiveMinimum, Rule: int64(8), Chain: nil},
-							}},
-						{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySizeInKb", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySizeInKb", Name: validation.InclusiveMaximum, Rule: int64(128), Chain: nil},
-								{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySizeInKb", Name: validation.InclusiveMinimum, Rule: int64(8), Chain: nil},
-							}},
-						{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.FileUploadLimitInMb", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.FileUploadLimitInMb", Name: validation.InclusiveMinimum, Rule: int64(0), Chain: nil}}},
-					}},
-					{Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MinCapacity", Name: validation.Null, Rule: true,
-							Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MinCapacity", Name: validation.InclusiveMinimum, Rule: int64(0), Chain: nil}}},
-							{Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MaxCapacity", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MaxCapacity", Name: validation.InclusiveMinimum, Rule: int64(2), Chain: nil}}},
-						}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.ApplicationGatewayPropertiesFormat", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.Enabled", Name: validation.Null, Rule: true, Chain: nil},
+							{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.RuleSetType", Name: validation.Null, Rule: true, Chain: nil},
+							{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.RuleSetVersion", Name: validation.Null, Rule: true, Chain: nil},
+							{
+								Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySize", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySize", Name: validation.InclusiveMaximum, Rule: int64(128), Chain: nil},
+									{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySize", Name: validation.InclusiveMinimum, Rule: int64(8), Chain: nil},
+								},
+							},
+							{
+								Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySizeInKb", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySizeInKb", Name: validation.InclusiveMaximum, Rule: int64(128), Chain: nil},
+									{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.MaxRequestBodySizeInKb", Name: validation.InclusiveMinimum, Rule: int64(8), Chain: nil},
+								},
+							},
+							{
+								Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.FileUploadLimitInMb", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.FileUploadLimitInMb", Name: validation.InclusiveMinimum, Rule: int64(0), Chain: nil}},
+							},
+						},
+					},
+					{
+						Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MinCapacity", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MinCapacity", Name: validation.InclusiveMinimum, Rule: int64(0), Chain: nil}},
+							},
+							{
+								Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MaxCapacity", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{{Target: "parameters.ApplicationGatewayPropertiesFormat.AutoscaleConfiguration.MaxCapacity", Name: validation.InclusiveMinimum, Rule: int64(2), Chain: nil}},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.ApplicationGatewaysClient", "CreateOrUpdate", err.Error())
 	}
 

@@ -167,7 +167,6 @@ func (g *Cloud) GetBetaRegionAddressByIP(region, ipAddress string) (*computebeta
 }
 
 func (g *Cloud) getNetworkTierFromAddress(name, region string) (string, error) {
-
 	addr, err := g.GetRegionAddress(name, region)
 	if err != nil {
 		// Can't get the network tier, just return an error.

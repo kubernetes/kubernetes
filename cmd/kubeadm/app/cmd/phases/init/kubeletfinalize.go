@@ -33,12 +33,10 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 )
 
-var (
-	kubeletFinalizePhaseExample = cmdutil.Examples(`
+var kubeletFinalizePhaseExample = cmdutil.Examples(`
 		# Updates settings relevant to the kubelet after TLS bootstrap"
 		kubeadm init phase kubelet-finalize all --config
 		`)
-)
 
 // NewKubeletFinalizePhase creates a kubeadm workflow phase that updates settings
 // relevant to the kubelet after TLS bootstrap.

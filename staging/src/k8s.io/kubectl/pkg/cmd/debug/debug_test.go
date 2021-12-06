@@ -18,10 +18,11 @@ package debug
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

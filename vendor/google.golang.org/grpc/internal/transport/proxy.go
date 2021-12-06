@@ -32,10 +32,8 @@ import (
 
 const proxyAuthHeaderKey = "Proxy-Authorization"
 
-var (
-	// The following variable will be overwritten in the tests.
-	httpProxyFromEnvironment = http.ProxyFromEnvironment
-)
+// The following variable will be overwritten in the tests.
+var httpProxyFromEnvironment = http.ProxyFromEnvironment
 
 func mapAddress(ctx context.Context, address string) (*url.URL, error) {
 	req := &http.Request{

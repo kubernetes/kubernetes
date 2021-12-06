@@ -45,6 +45,7 @@ type BlobMetadata map[string]string
 type blobMetadataEntries struct {
 	Entries []blobMetadataEntry `xml:",any"`
 }
+
 type blobMetadataEntry struct {
 	XMLName xml.Name
 	Value   string `xml:",chardata"`

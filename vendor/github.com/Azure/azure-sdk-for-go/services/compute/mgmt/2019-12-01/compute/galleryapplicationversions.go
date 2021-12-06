@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // GalleryApplicationVersionsClient is the compute Client
@@ -55,15 +56,27 @@ func (client GalleryApplicationVersionsClient) CreateOrUpdate(ctx context.Contex
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: galleryApplicationVersion,
-			Constraints: []validation.Constraint{{Target: "galleryApplicationVersion.GalleryApplicationVersionProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile", Name: validation.Null, Rule: true,
-					Chain: []validation.Constraint{{Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile.Source", Name: validation.Null, Rule: true,
-						Chain: []validation.Constraint{{Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile.Source.FileName", Name: validation.Null, Rule: true, Chain: nil},
-							{Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile.Source.MediaLink", Name: validation.Null, Rule: true, Chain: nil},
-						}},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: galleryApplicationVersion,
+			Constraints: []validation.Constraint{{
+				Target: "galleryApplicationVersion.GalleryApplicationVersionProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{
+							{
+								Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile.Source", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{
+									{Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile.Source.FileName", Name: validation.Null, Rule: true, Chain: nil},
+									{Target: "galleryApplicationVersion.GalleryApplicationVersionProperties.PublishingProfile.Source.MediaLink", Name: validation.Null, Rule: true, Chain: nil},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.GalleryApplicationVersionsClient", "CreateOrUpdate", err.Error())
 	}
 

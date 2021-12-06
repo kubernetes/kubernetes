@@ -60,7 +60,6 @@ func TestAnnotateCRISocket(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			nodename := "node01"
 			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{

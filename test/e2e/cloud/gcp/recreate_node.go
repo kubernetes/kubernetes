@@ -69,7 +69,6 @@ var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
-
 	})
 
 	ginkgo.AfterEach(func() {

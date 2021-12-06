@@ -115,7 +115,6 @@ func balancedResourceScorer(requested, allocable resourceToValueMap) int64 {
 	// Otherwise, set the std to zero is enough.
 	if len(resourceToFractions) == 2 {
 		std = math.Abs((resourceToFractions[0] - resourceToFractions[1]) / 2)
-
 	} else if len(resourceToFractions) > 2 {
 		mean := totalFraction / float64(len(resourceToFractions))
 		var sum float64

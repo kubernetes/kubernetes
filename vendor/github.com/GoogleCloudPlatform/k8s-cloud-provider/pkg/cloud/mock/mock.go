@@ -1038,7 +1038,6 @@ func SetSslPolicyBetaTargetHTTPSProxyHook(ctx context.Context, key *meta.Key, re
 	return nil
 }
 
-
 // InsertFirewallsUnauthorizedErrHook mocks firewall insertion. A forbidden error will be thrown as return.
 func InsertFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *cloud.MockFirewalls) (bool, error) {
 	return true, &googleapi.Error{Code: http.StatusForbidden}

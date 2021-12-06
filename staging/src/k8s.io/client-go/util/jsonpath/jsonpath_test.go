@@ -76,7 +76,7 @@ func testJSONPathSortOutput(tests []jsonpathTest, t *testing.T) {
 			t.Errorf("in %s, execute error %v", test.name, err)
 		}
 		out := buf.String()
-		//since map is visited in random order, we need to sort the results.
+		// since map is visited in random order, we need to sort the results.
 		sortedOut := strings.Fields(out)
 		sort.Strings(sortedOut)
 		sortedExpect := strings.Fields(test.expect)
@@ -170,8 +170,10 @@ func TestTypesInput(t *testing.T) {
 		{"interfaceSubSliceFirst2Alt", `{ .interfaces[:2] }`, types, `true one`, false},
 		{"interfaceSubSliceStep2", `{ .interfaces[:4:2] }`, types, `true 1`, false},
 		// maps slice tests
-		{"mapSlice", `{ .maps }`, types,
-			`[{"name":"one","value":1},{"name":"two","value":2.02},{"name":"three","value":3.03},{"name":"four","value":4.04}]`, false},
+		{
+			"mapSlice", `{ .maps }`, types,
+			`[{"name":"one","value":1},{"name":"two","value":2.02},{"name":"three","value":3.03},{"name":"four","value":4.04}]`, false,
+		},
 		{"mapSliceIndex", `{ .maps[0] }`, types, `{"name":"one","value":1}`, false},
 		{"mapSliceIndexReverse", `{ .maps[-2] }`, types, `{"name":"three","value":3.03}`, false},
 		{"mapSubSliceFirst2", `{ .maps[0:2] }`, types, `{"name":"one","value":1} {"name":"two","value":2.02}`, false},
@@ -179,18 +181,28 @@ func TestTypesInput(t *testing.T) {
 		{"mapSubSliceStepOdd", `{ .maps[::2] }`, types, `{"name":"one","value":1} {"name":"three","value":3.03}`, false},
 		{"mapSubSliceStepEven", `{ .maps[1::2] }`, types, `{"name":"two","value":2.02} {"name":"four","value":4.04}`, false},
 		// structs slice tests
-		{"structSlice", `{ .structs }`, types,
-			`[{"name":"one","value":1,"type":"integer"},{"name":"two","value":2.002,"type":"float"},{"name":"three","value":3,"type":"integer"},{"name":"four","value":4.004,"type":"float"}]`, false},
+		{
+			"structSlice", `{ .structs }`, types,
+			`[{"name":"one","value":1,"type":"integer"},{"name":"two","value":2.002,"type":"float"},{"name":"three","value":3,"type":"integer"},{"name":"four","value":4.004,"type":"float"}]`, false,
+		},
 		{"structSliceIndex", `{ .structs[0] }`, types, `{"name":"one","value":1,"type":"integer"}`, false},
 		{"structSliceIndexReverse", `{ .structs[-2] }`, types, `{"name":"three","value":3,"type":"integer"}`, false},
-		{"structSubSliceFirst2", `{ .structs[0:2] }`, types,
-			`{"name":"one","value":1,"type":"integer"} {"name":"two","value":2.002,"type":"float"}`, false},
-		{"structSubSliceFirst2Alt", `{ .structs[:2] }`, types,
-			`{"name":"one","value":1,"type":"integer"} {"name":"two","value":2.002,"type":"float"}`, false},
-		{"structSubSliceStepOdd", `{ .structs[::2] }`, types,
-			`{"name":"one","value":1,"type":"integer"} {"name":"three","value":3,"type":"integer"}`, false},
-		{"structSubSliceStepEven", `{ .structs[1::2] }`, types,
-			`{"name":"two","value":2.002,"type":"float"} {"name":"four","value":4.004,"type":"float"}`, false},
+		{
+			"structSubSliceFirst2", `{ .structs[0:2] }`, types,
+			`{"name":"one","value":1,"type":"integer"} {"name":"two","value":2.002,"type":"float"}`, false,
+		},
+		{
+			"structSubSliceFirst2Alt", `{ .structs[:2] }`, types,
+			`{"name":"one","value":1,"type":"integer"} {"name":"two","value":2.002,"type":"float"}`, false,
+		},
+		{
+			"structSubSliceStepOdd", `{ .structs[::2] }`, types,
+			`{"name":"one","value":1,"type":"integer"} {"name":"three","value":3,"type":"integer"}`, false,
+		},
+		{
+			"structSubSliceStepEven", `{ .structs[1::2] }`, types,
+			`{"name":"two","value":2.002,"type":"float"} {"name":"four","value":4.004,"type":"float"}`, false,
+		},
 	}
 
 	testJSONPath(sliceTests, false, t)
@@ -213,18 +225,19 @@ type bicycle struct {
 	IsNew bool
 }
 
-type empName string
-type job string
-type store struct {
-	Book      []book
-	Bicycle   []bicycle
-	Name      string
-	Labels    map[string]int
-	Employees map[empName]job
-}
+type (
+	empName string
+	job     string
+	store   struct {
+		Book      []book
+		Bicycle   []bicycle
+		Name      string
+		Labels    map[string]int
+		Employees map[empName]job
+	}
+)
 
 func TestStructInput(t *testing.T) {
-
 	storeData := store{
 		Name: "jsonpath",
 		Book: []book{
@@ -265,14 +278,22 @@ func TestStructInput(t *testing.T) {
 		{"recurfields", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
 		{"recurdotfields", "{...Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
 		{"superrecurfields", "{............................................................Price}", storeData, "", true},
-		{"allstructsSlice", "{.Bicycle}", storeData,
-			`[{"Color":"red","Price":19.95,"IsNew":true},{"Color":"green","Price":20.01,"IsNew":false}]`, false},
-		{"allstructs", `{range .Bicycle[*]}{ @ }{ " " }{end}`, storeData,
-			`{"Color":"red","Price":19.95,"IsNew":true} {"Color":"green","Price":20.01,"IsNew":false} `, false},
-		{"lastarray", "{.Book[-1:]}", storeData,
-			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false},
-		{"recurarray", "{..Book[2]}", storeData,
-			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false},
+		{
+			"allstructsSlice", "{.Bicycle}", storeData,
+			`[{"Color":"red","Price":19.95,"IsNew":true},{"Color":"green","Price":20.01,"IsNew":false}]`, false,
+		},
+		{
+			"allstructs", `{range .Bicycle[*]}{ @ }{ " " }{end}`, storeData,
+			`{"Color":"red","Price":19.95,"IsNew":true} {"Color":"green","Price":20.01,"IsNew":false} `, false,
+		},
+		{
+			"lastarray", "{.Book[-1:]}", storeData,
+			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false,
+		},
+		{
+			"recurarray", "{..Book[2]}", storeData,
+			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false,
+		},
 		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, `{"Color":"red","Price":19.95,"IsNew":true}`, false},
 	}
 
@@ -295,7 +316,7 @@ func TestStructInput(t *testing.T) {
 }
 
 func TestJSONInput(t *testing.T) {
-	var pointsJSON = []byte(`[
+	pointsJSON := []byte(`[
 		{"id": "i1", "x":4, "y":-5},
 		{"id": "i2", "x":-2, "y":-5, "z":1},
 		{"id": "i3", "x":  8, "y":  3 },
@@ -317,7 +338,7 @@ func TestJSONInput(t *testing.T) {
 
 // TestKubernetes tests some use cases from kubernetes
 func TestKubernetes(t *testing.T) {
-	var input = []byte(`{
+	input := []byte(`{
 	  "kind": "List",
 	  "items":[
 		{
@@ -372,15 +393,23 @@ func TestKubernetes(t *testing.T) {
 	nodesTests := []jsonpathTest{
 		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List", false},
 		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t", false},
-		{"range addresss", `{.items[*].status.addresses[*].address}`, nodesData,
-			"127.0.0.1 127.0.0.2 127.0.0.3", false},
-		{"double range", `{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}`, nodesData,
-			"127.0.0.1, 127.0.0.2, 127.0.0.3, ", false},
+		{
+			"range addresss", `{.items[*].status.addresses[*].address}`, nodesData,
+			"127.0.0.1 127.0.0.2 127.0.0.3", false,
+		},
+		{
+			"double range", `{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}`, nodesData,
+			"127.0.0.1, 127.0.0.2, 127.0.0.3, ", false,
+		},
 		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2", false},
-		{"union nodes capacity", `{.items[*]['metadata.name', 'status.capacity']}`, nodesData,
-			`127.0.0.1 127.0.0.2 {"cpu":"4"} {"cpu":"8"}`, false},
-		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
-			`[127.0.0.1, {"cpu":"4"}] [127.0.0.2, {"cpu":"8"}] `, false},
+		{
+			"union nodes capacity", `{.items[*]['metadata.name', 'status.capacity']}`, nodesData,
+			`127.0.0.1 127.0.0.2 {"cpu":"4"} {"cpu":"8"}`, false,
+		},
+		{
+			"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
+			`[127.0.0.1, {"cpu":"4"}] [127.0.0.2, {"cpu":"8"}] `, false,
+		},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret", false},
 		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1", false},
 		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None", false},
@@ -395,7 +424,7 @@ func TestKubernetes(t *testing.T) {
 }
 
 func TestEmptyRange(t *testing.T) {
-	var input = []byte(`{"items":[]}`)
+	input := []byte(`{"items":[]}`)
 	var emptyList interface{}
 	err := json.Unmarshal(input, &emptyList)
 	if err != nil {
@@ -410,7 +439,7 @@ func TestEmptyRange(t *testing.T) {
 }
 
 func TestNestedRanges(t *testing.T) {
-	var input = []byte(`{
+	input := []byte(`{
 		"items": [
 			{
 				"metadata": {
@@ -538,7 +567,7 @@ func TestNestedRanges(t *testing.T) {
 
 func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 	// for https://issues.k8s.io/45546
-	var input = []byte(`{
+	input := []byte(`{
 		"kind": "List",
 		"items": [
 			{
@@ -612,7 +641,7 @@ func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 }
 
 func TestNegativeIndex(t *testing.T) {
-	var input = []byte(
+	input := []byte(
 		`{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -762,7 +791,7 @@ func TestNegativeIndex(t *testing.T) {
 }
 
 func TestRunningPodsJSONPathOutput(t *testing.T) {
-	var input = []byte(`{
+	input := []byte(`{
 		"kind": "List",
 		"items": [
 			{
@@ -820,7 +849,7 @@ func TestRunningPodsJSONPathOutput(t *testing.T) {
 }
 
 func TestStep(t *testing.T) {
-	var input = []byte(
+	input := []byte(
 		`{
 			"apiVersion": "v1",
 			"kind": "Pod",

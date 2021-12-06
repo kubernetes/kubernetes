@@ -36,12 +36,10 @@ const (
 	Path      = "/lookupservice" + vim25.Path
 )
 
-var (
-	ServiceInstance = vim.ManagedObjectReference{
-		Type:  "LookupServiceInstance",
-		Value: "ServiceInstance",
-	}
-)
+var ServiceInstance = vim.ManagedObjectReference{
+	Type:  "LookupServiceInstance",
+	Value: "ServiceInstance",
+}
 
 // Client is a soap.Client targeting the SSO Lookup Service API endpoint.
 type Client struct {

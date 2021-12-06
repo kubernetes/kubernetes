@@ -43,7 +43,6 @@ func TestCompatibility(
 	expectedKeys map[string]string,
 	absentKeys []string,
 ) {
-
 	// Decode
 	codec := legacyscheme.Codecs.LegacyCodec(version)
 	obj, err := runtime.Decode(codec, input)

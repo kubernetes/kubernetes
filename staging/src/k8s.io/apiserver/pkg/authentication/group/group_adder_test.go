@@ -107,5 +107,4 @@ func TestAuthenticatedGroupAdder(t *testing.T) {
 			t.Errorf("Unexpected user\ngot:\t%#v\nwant:\t%#v", r.User, test.expectedUser)
 		}
 	}
-
 }

@@ -96,7 +96,6 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	if e, a := previousInodes, actual.InodesUsed.Value(); e != a {
 		t.Errorf("Unexpected Used for directory with file.  Expected %v, got %d.", e, a)
 	}
-
 }
 
 // TestMetricsDuRequireInit tests that if MetricsDu is not initialized with a path, GetMetrics

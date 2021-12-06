@@ -30,24 +30,22 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-var (
-	tests = []struct {
-		name            string
-		existingPodsNum int
-		allNodesNum     int
-	}{
-		{
-			name:            "100nodes",
-			existingPodsNum: 1000,
-			allNodesNum:     100,
-		},
-		{
-			name:            "1000nodes",
-			existingPodsNum: 10000,
-			allNodesNum:     1000,
-		},
-	}
-)
+var tests = []struct {
+	name            string
+	existingPodsNum int
+	allNodesNum     int
+}{
+	{
+		name:            "100nodes",
+		existingPodsNum: 1000,
+		allNodesNum:     100,
+	},
+	{
+		name:            "1000nodes",
+		existingPodsNum: 10000,
+		allNodesNum:     1000,
+	},
+}
 
 func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 	for _, tt := range tests {

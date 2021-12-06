@@ -98,7 +98,6 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating pvc: %v", err)
-
 	})
 
 	framework.AddCleanupAction(func() {
@@ -134,7 +133,8 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 			PVSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexPersistentVolumeSource{
 					Driver: "k8s/" + driver,
-				}},
+				},
+			},
 			NamePrefix:       "pv-",
 			StorageClassName: resizableSc.Name,
 			VolumeMode:       pvc.Spec.VolumeMode,
@@ -232,8 +232,8 @@ func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 			},
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
+	volumeMounts := make([]v1.VolumeMount, len(pvclaims))
+	volumes := make([]v1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
 		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}

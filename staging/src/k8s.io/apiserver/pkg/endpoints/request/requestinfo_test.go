@@ -42,7 +42,6 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		expectedName        string
 		expectedParts       []string
 	}{
-
 		// resource paths
 		{"GET", "/api/v1/namespaces", "list", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
 		{"GET", "/api/v1/namespaces/other", "get", "api", "", "v1", "other", "namespaces", "", "other", []string{"namespaces", "other"}},

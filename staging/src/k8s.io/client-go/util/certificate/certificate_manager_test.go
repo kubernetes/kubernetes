@@ -65,6 +65,7 @@ iQIgZX08DA8VfvcA5/Xj1Zjdey9FVY6POLXen6RPiabE97UCICp6eUW7ht+2jjar
 e35EltCRCjoejRHTuN9TC0uCoVipAiAXaJIx/Q47vGwiw6Y8KXsNU6y54gTbOSxX
 54LzHNk/+Q==
 -----END RSA PRIVATE KEY-----`)
+
 var storeTwoCertsData = newCertificateData(`-----BEGIN CERTIFICATE-----
 MIIDfTCCAyegAwIBAgIUFBl4gUoqZDP/wUJDn37/VJ9upD0wDQYJKoZIhvcNAQEF
 BQAwfjELMAkGA1UEBhMCR0IxDzANBgNVBAgMBkxvbmRvbjEPMA0GA1UEBwwGTG9u
@@ -127,6 +128,7 @@ ju42DQKBgAPtbB/ON3+GtnSTHBSY6HwZvGJrBDicrXmr1U9zuA8yYxv8qaRXZkpn
 2cpLLvO2MJutwXMYf+T3x1ZCFMkE56pOswSTGrCQWRl3hOiJayLHQyAOYHPnYeZB
 78iRJPUZ0biEQUZQ62GBxWkcB0qkxa9m759h/TvLwvV0RrO5Uzd0
 -----END RSA PRIVATE KEY-----`)
+
 var expiredStoreCertData = newCertificateData(`-----BEGIN CERTIFICATE-----
 MIIBFzCBwgIJALhygXnxXmN1MA0GCSqGSIb3DQEBCwUAMBMxETAPBgNVBAMMCGhv
 c3QtMTIzMB4XDTE4MTEwNDIzNTc1NFoXDTE4MTEwNTIzNTc1NFowEzERMA8GA1UE
@@ -144,6 +146,7 @@ iQIgZX08DA8VfvcA5/Xj1Zjdey9FVY6POLXen6RPiabE97UCICp6eUW7ht+2jjar
 e35EltCRCjoejRHTuN9TC0uCoVipAiAXaJIx/Q47vGwiw6Y8KXsNU6y54gTbOSxX
 54LzHNk/+Q==
 -----END RSA PRIVATE KEY-----`)
+
 var bootstrapCertData = newCertificateData(
 	`-----BEGIN CERTIFICATE-----
 MIICRzCCAfGgAwIBAgIJANXr+UzRFq4TMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNV
@@ -169,6 +172,7 @@ wQIgYV/tmQJeIh91q3wBepFQOClFykG8CTMoDUol/YyNqUkCIHfp6Rr7fGL3JIMq
 QQgf9DCK8SPZqq8DYXjdan0kKBJBAiEAyDb+07o2gpggo8BYUKSaiRCiyXfaq87f
 eVqgpBq/QN4=
 -----END RSA PRIVATE KEY-----`)
+
 var apiServerCertData = newCertificateData(
 	`-----BEGIN CERTIFICATE-----
 MIICRzCCAfGgAwIBAgIJAIydTIADd+yqMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNV
@@ -562,7 +566,6 @@ func TestNewManagerNoBootstrap(t *testing.T) {
 		BootstrapCertificatePEM: bootstrapCertData.certificatePEM,
 		BootstrapKeyPEM:         bootstrapCertData.keyPEM,
 	})
-
 	if err != nil {
 		t.Fatalf("Failed to initialize the certificate manager: %v", err)
 	}
@@ -647,7 +650,7 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 }
 
 func TestInitializeCertificateSigningRequestClient(t *testing.T) {
-	var nilCertificate = &certificateData{}
+	nilCertificate := &certificateData{}
 	testCases := []struct {
 		description             string
 		storeCert               *certificateData
@@ -790,7 +793,7 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 }
 
 func TestInitializeOtherRESTClients(t *testing.T) {
-	var nilCertificate = &certificateData{}
+	nilCertificate := &certificateData{}
 	testCases := []struct {
 		description             string
 		storeCert               *certificateData
@@ -1073,7 +1076,6 @@ func TestRotationLogsDuration(t *testing.T) {
 	if h.lastValue != now.Sub(certIss).Seconds() {
 		t.Errorf("rotation metric did not record the right value got: %f; want %f", h.lastValue, now.Sub(certIss).Seconds())
 	}
-
 }
 
 type fakeClientFailureType int

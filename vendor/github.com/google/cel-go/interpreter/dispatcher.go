@@ -35,7 +35,8 @@ type Dispatcher interface {
 // NewDispatcher returns an empty Dispatcher instance.
 func NewDispatcher() Dispatcher {
 	return &defaultDispatcher{
-		overloads: make(map[string]*functions.Overload)}
+		overloads: make(map[string]*functions.Overload),
+	}
 }
 
 // ExtendDispatcher returns a Dispatcher which inherits the overloads of its parent, and
@@ -44,7 +45,8 @@ func NewDispatcher() Dispatcher {
 func ExtendDispatcher(parent Dispatcher) Dispatcher {
 	return &defaultDispatcher{
 		parent:    parent,
-		overloads: make(map[string]*functions.Overload)}
+		overloads: make(map[string]*functions.Overload),
+	}
 }
 
 // overloadMap helper type for indexing overloads by function name.

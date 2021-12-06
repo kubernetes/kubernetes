@@ -373,7 +373,7 @@ const (
 //             Address yaml.Node
 //     }
 //     err := yaml.Unmarshal(data, &person)
-// 
+//
 // Or by itself:
 //
 //     var person Node
@@ -383,7 +383,7 @@ type Node struct {
 	// Kind defines whether the node is a document, a mapping, a sequence,
 	// a scalar value, or an alias to another node. The specific data type of
 	// scalar nodes may be obtained via the ShortTag and LongTag methods.
-	Kind  Kind
+	Kind Kind
 
 	// Style allows customizing the apperance of the node in the tree.
 	Style Style
@@ -430,7 +430,6 @@ func (n *Node) IsZero() bool {
 	return n.Kind == 0 && n.Style == 0 && n.Tag == "" && n.Value == "" && n.Anchor == "" && n.Alias == nil && n.Content == nil &&
 		n.HeadComment == "" && n.LineComment == "" && n.FootComment == "" && n.Line == 0 && n.Column == 0
 }
-
 
 // LongTag returns the long form of the tag that indicates the data type for
 // the node. If the Tag field isn't explicitly defined, one will be computed
@@ -525,9 +524,11 @@ type fieldInfo struct {
 	Inline []int
 }
 
-var structMap = make(map[reflect.Type]*structInfo)
-var fieldMapMutex sync.RWMutex
-var unmarshalerType reflect.Type
+var (
+	structMap       = make(map[reflect.Type]*structInfo)
+	fieldMapMutex   sync.RWMutex
+	unmarshalerType reflect.Type
+)
 
 func init() {
 	var v Unmarshaler

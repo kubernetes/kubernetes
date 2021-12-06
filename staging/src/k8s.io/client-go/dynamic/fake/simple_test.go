@@ -214,7 +214,6 @@ func (tc *patchTestCase) runner(t *testing.T) {
 	if err := tc.verifyResult(got); err != nil {
 		t.Error(err)
 	}
-
 }
 
 // verifyErr verifies that the given error returned from Patch is the error
@@ -325,7 +324,6 @@ func TestListWithUnstructuredObjectsAndTypedScheme(t *testing.T) {
 
 	client := NewSimpleDynamicClient(typedScheme, &u)
 	list, err := client.Resource(gvr).Namespace("namespace").List(context.Background(), metav1.ListOptions{})
-
 	if err != nil {
 		t.Error("error listing", err)
 	}
@@ -353,7 +351,6 @@ func TestListWithNoFixturesAndTypedScheme(t *testing.T) {
 
 	client := NewSimpleDynamicClient(typedScheme)
 	list, err := client.Resource(gvr).Namespace("namespace").List(context.Background(), metav1.ListOptions{})
-
 	if err != nil {
 		t.Error("error listing", err)
 	}
@@ -385,7 +382,6 @@ func TestListWithNoScheme(t *testing.T) {
 
 	client := NewSimpleDynamicClient(emptyScheme, &u)
 	list, err := client.Resource(gvr).Namespace("namespace").List(context.Background(), metav1.ListOptions{})
-
 	if err != nil {
 		t.Error("error listing", err)
 	}
@@ -427,7 +423,6 @@ func TestListWithTypedFixtures(t *testing.T) {
 
 	client := NewSimpleDynamicClient(typedScheme, &r)
 	list, err := client.Resource(gvr).Namespace("namespace").List(context.Background(), metav1.ListOptions{})
-
 	if err != nil {
 		t.Error("error listing", err)
 	}
@@ -465,5 +460,7 @@ func (r *mockResource) DeepCopyObject() runtime.Object {
 	return &o
 }
 
-var _ runtime.Object = (*mockResource)(nil)
-var _ runtime.Object = (*mockResourceList)(nil)
+var (
+	_ runtime.Object = (*mockResource)(nil)
+	_ runtime.Object = (*mockResourceList)(nil)
+)

@@ -34,9 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
-var (
-	ignoreBadValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
-)
+var ignoreBadValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 
 func TestValidateDefaultPreemptionArgs(t *testing.T) {
 	cases := map[string]struct {

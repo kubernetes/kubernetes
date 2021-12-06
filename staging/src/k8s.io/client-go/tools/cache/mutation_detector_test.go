@@ -76,5 +76,4 @@ func TestMutationDetector(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("failed waiting for mutating detector")
 	}
-
 }

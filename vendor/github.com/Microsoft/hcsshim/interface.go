@@ -11,11 +11,13 @@ import (
 // and to convert the parameters to JSON for passing onto the HCS
 type ProcessConfig = schema1.ProcessConfig
 
-type Layer = schema1.Layer
-type MappedDir = schema1.MappedDir
-type MappedPipe = schema1.MappedPipe
-type HvRuntime = schema1.HvRuntime
-type MappedVirtualDisk = schema1.MappedVirtualDisk
+type (
+	Layer             = schema1.Layer
+	MappedDir         = schema1.MappedDir
+	MappedPipe        = schema1.MappedPipe
+	HvRuntime         = schema1.HvRuntime
+	MappedVirtualDisk = schema1.MappedVirtualDisk
+)
 
 // AssignedDevice represents a device that has been directly assigned to a container
 //

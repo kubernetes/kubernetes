@@ -38,7 +38,9 @@ func TestGetContextsAll(t *testing.T) {
 	tconf := clientcmdapi.Config{
 		CurrentContext: "shaker-context",
 		Contexts: map[string]*clientcmdapi.Context{
-			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
@@ -55,7 +57,9 @@ func TestGetContextsAllNoHeader(t *testing.T) {
 	tconf := clientcmdapi.Config{
 		CurrentContext: "shaker-context",
 		Contexts: map[string]*clientcmdapi.Context{
-			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
@@ -72,7 +76,9 @@ func TestGetContextsAllSorted(t *testing.T) {
 		Contexts: map[string]*clientcmdapi.Context{
 			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
 			"abc":            {AuthInfo: "blue-user", Cluster: "abc-cluster", Namespace: "kube-system"},
-			"xyz":            {AuthInfo: "blue-user", Cluster: "xyz-cluster", Namespace: "default"}}}
+			"xyz":            {AuthInfo: "blue-user", Cluster: "xyz-cluster", Namespace: "default"},
+		},
+	}
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
@@ -90,7 +96,9 @@ func TestGetContextsAllSorted(t *testing.T) {
 func TestGetContextsAllName(t *testing.T) {
 	tconf := clientcmdapi.Config{
 		Contexts: map[string]*clientcmdapi.Context{
-			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
@@ -105,7 +113,9 @@ func TestGetContextsAllNameNoHeader(t *testing.T) {
 	tconf := clientcmdapi.Config{
 		CurrentContext: "shaker-context",
 		Contexts: map[string]*clientcmdapi.Context{
-			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
@@ -132,7 +142,9 @@ func TestGetContextsSelectOneOfTwo(t *testing.T) {
 		CurrentContext: "shaker-context",
 		Contexts: map[string]*clientcmdapi.Context{
 			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
-			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{"shaker-context"},

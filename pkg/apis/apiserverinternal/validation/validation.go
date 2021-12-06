@@ -159,8 +159,10 @@ func validateStorageVersionCondition(conditions []apiserverinternal.StorageVersi
 	return allErrs
 }
 
-const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const dns1035LabelErrMsg string = "a DNS-1035 label, which must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
+const (
+	dns1035LabelFmt    string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+	dns1035LabelErrMsg string = "a DNS-1035 label, which must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
+)
 
 // isValidAPIVersion tests whether the value passed is a valid apiVersion. A
 // valid apiVersion contains a version string that matches DNS_LABEL format,

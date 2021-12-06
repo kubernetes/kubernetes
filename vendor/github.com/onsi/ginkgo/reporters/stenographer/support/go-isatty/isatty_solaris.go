@@ -1,5 +1,5 @@
-// +build solaris
-// +build !appengine
+//go:build solaris && !appengine
+// +build solaris,!appengine
 
 package isatty
 

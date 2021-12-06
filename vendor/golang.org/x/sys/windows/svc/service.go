@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 // Package svc provides everything required to build Windows service.
@@ -91,7 +92,6 @@ type ChangeRequest struct {
 
 // Handler is the interface that must be implemented to build Windows service.
 type Handler interface {
-
 	// Execute will be called by the package code at the start of
 	// the service, and the service will exit once Execute completes.
 	// Inside Execute you must read service change requests from r and

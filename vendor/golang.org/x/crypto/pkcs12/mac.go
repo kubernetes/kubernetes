@@ -23,9 +23,7 @@ type digestInfo struct {
 	Digest    []byte
 }
 
-var (
-	oidSHA1 = asn1.ObjectIdentifier([]int{1, 3, 14, 3, 2, 26})
-)
+var oidSHA1 = asn1.ObjectIdentifier([]int{1, 3, 14, 3, 2, 26})
 
 func verifyMac(macData *macData, message, password []byte) error {
 	if !macData.Mac.Algorithm.Algorithm.Equal(oidSHA1) {

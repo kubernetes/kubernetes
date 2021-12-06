@@ -5,7 +5,7 @@ import (
 	"github.com/onsi/ginkgo/types"
 )
 
-//FakeReporter is useful for testing purposes
+// FakeReporter is useful for testing purposes
 type FakeReporter struct {
 	Config config.GinkgoConfigType
 

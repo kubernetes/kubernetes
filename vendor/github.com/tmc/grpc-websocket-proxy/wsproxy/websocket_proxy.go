@@ -338,12 +338,15 @@ func transformSubProtocolHeader(header string) string {
 func (w *inMemoryResponseWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
+
 func (w *inMemoryResponseWriter) Header() http.Header {
 	return w.header
 }
+
 func (w *inMemoryResponseWriter) WriteHeader(code int) {
 	w.code = code
 }
+
 func (w *inMemoryResponseWriter) CloseNotify() <-chan bool {
 	return w.closed
 }

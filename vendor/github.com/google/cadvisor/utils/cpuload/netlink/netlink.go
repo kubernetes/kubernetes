@@ -26,11 +26,9 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 )
 
-var (
-	// TODO(rjnagal): Verify and fix for other architectures.
+// TODO(rjnagal): Verify and fix for other architectures.
 
-	Endian = binary.LittleEndian
-)
+var Endian = binary.LittleEndian
 
 type genMsghdr struct {
 	Command  uint8

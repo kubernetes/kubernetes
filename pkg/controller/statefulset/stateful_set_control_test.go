@@ -1848,7 +1848,8 @@ func newFakeObjectManager(informerFactory informers.SharedInformerFactory) *fake
 		revisionInformer.Informer().GetIndexer(),
 		requestTracker{0, nil, 0},
 		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0}}
+		requestTracker{0, nil, 0},
+	}
 }
 
 func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {

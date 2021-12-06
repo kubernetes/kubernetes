@@ -1,3 +1,4 @@
+//go:build aix || darwin || dragonfly || freebsd || netbsd || openbsd
 // +build aix darwin dragonfly freebsd netbsd openbsd
 
 package godirwalk

@@ -335,7 +335,6 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 	returnMsg := fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
 	framework.Logf("encountered error during dial (%v)", returnMsg)
 	return returnMsg
-
 }
 
 // GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.

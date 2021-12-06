@@ -132,10 +132,12 @@ import (
 	"github.com/onsi/ginkgo/ginkgo/testsuite"
 )
 
-const greenColor = "\x1b[32m"
-const redColor = "\x1b[91m"
-const defaultStyle = "\x1b[0m"
-const lightGrayColor = "\x1b[37m"
+const (
+	greenColor     = "\x1b[32m"
+	redColor       = "\x1b[91m"
+	defaultStyle   = "\x1b[0m"
+	lightGrayColor = "\x1b[37m"
+)
 
 type Command struct {
 	Name                      string
@@ -158,8 +160,10 @@ func (c *Command) Run(args []string, additionalArgs []string) {
 	c.Command(c.FlagSet.Args(), additionalArgs)
 }
 
-var DefaultCommand *Command
-var Commands []*Command
+var (
+	DefaultCommand *Command
+	Commands       []*Command
+)
 
 func init() {
 	DefaultCommand = BuildRunCommand()

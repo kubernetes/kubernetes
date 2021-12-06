@@ -196,6 +196,7 @@ type SEG6Encap struct {
 func (e *SEG6Encap) Type() int {
 	return nl.LWTUNNEL_ENCAP_SEG6
 }
+
 func (e *SEG6Encap) Decode(buf []byte) error {
 	if len(buf) < 4 {
 		return fmt.Errorf("lack of bytes")
@@ -218,6 +219,7 @@ func (e *SEG6Encap) Decode(buf []byte) error {
 
 	return err
 }
+
 func (e *SEG6Encap) Encode() ([]byte, error) {
 	s, err := nl.EncodeSEG6Encap(e.Mode, e.Segments)
 	native := nl.NativeEndian()
@@ -226,6 +228,7 @@ func (e *SEG6Encap) Encode() ([]byte, error) {
 	native.PutUint16(hdr[2:], nl.SEG6_IPTUNNEL_SRH)
 	return append(hdr, s...), err
 }
+
 func (e *SEG6Encap) String() string {
 	segs := make([]string, 0, len(e.Segments))
 	// append segment backwards (from n to 0) since seg#0 is the last segment.
@@ -236,6 +239,7 @@ func (e *SEG6Encap) String() string {
 		len(e.Segments), strings.Join(segs, " "))
 	return str
 }
+
 func (e *SEG6Encap) Equal(x Encap) bool {
 	o, ok := x.(*SEG6Encap)
 	if !ok {
@@ -276,6 +280,7 @@ type SEG6LocalEncap struct {
 func (e *SEG6LocalEncap) Type() int {
 	return nl.LWTUNNEL_ENCAP_SEG6_LOCAL
 }
+
 func (e *SEG6LocalEncap) Decode(buf []byte) error {
 	attrs, err := nl.ParseRouteAttr(buf)
 	if err != nil {
@@ -309,6 +314,7 @@ func (e *SEG6LocalEncap) Decode(buf []byte) error {
 	}
 	return err
 }
+
 func (e *SEG6LocalEncap) Encode() ([]byte, error) {
 	var err error
 	native := nl.NativeEndian()
@@ -369,6 +375,7 @@ func (e *SEG6LocalEncap) Encode() ([]byte, error) {
 	}
 	return res, err
 }
+
 func (e *SEG6LocalEncap) String() string {
 	strs := make([]string, 0, nl.SEG6_LOCAL_MAX)
 	strs = append(strs, fmt.Sprintf("action %s", nl.SEG6LocalActionString(e.Action)))
@@ -400,7 +407,7 @@ func (e *SEG6LocalEncap) String() string {
 	}
 	if e.Flags[nl.SEG6_LOCAL_SRH] {
 		segs := make([]string, 0, len(e.Segments))
-		//append segment backwards (from n to 0) since seg#0 is the last segment.
+		// append segment backwards (from n to 0) since seg#0 is the last segment.
 		for i := len(e.Segments); i > 0; i-- {
 			segs = append(segs, fmt.Sprintf("%s", e.Segments[i-1]))
 		}
@@ -408,6 +415,7 @@ func (e *SEG6LocalEncap) String() string {
 	}
 	return strings.Join(strs, " ")
 }
+
 func (e *SEG6LocalEncap) Equal(x Encap) bool {
 	o, ok := x.(*SEG6LocalEncap)
 	if !ok {
@@ -980,7 +988,6 @@ func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
 		res = append(res, route)
 	}
 	return res, nil
-
 }
 
 // RouteSubscribe takes a chan down which notifications will be sent

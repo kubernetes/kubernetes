@@ -127,7 +127,6 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	coreDNSServiceBytes, err := kubeadmutil.ParseTemplate(CoreDNSService, struct{ DNSIP string }{
 		DNSIP: dnsip.String(),
 	})
-
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS service template")
 	}

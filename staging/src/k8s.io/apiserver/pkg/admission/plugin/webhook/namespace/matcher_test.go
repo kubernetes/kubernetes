@@ -37,6 +37,7 @@ type fakeNamespaceLister struct {
 func (f fakeNamespaceLister) List(selector labels.Selector) (ret []*corev1.Namespace, err error) {
 	return nil, nil
 }
+
 func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
 	ns, ok := f.namespaces[name]
 	if ok {
@@ -64,9 +65,10 @@ func TestGetNamespaceLabels(t *testing.T) {
 			Labels: namespace2Labels,
 		},
 	}
-	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{
-		"1": &namespace1,
-	},
+	namespaceLister := fakeNamespaceLister{
+		map[string]*corev1.Namespace{
+			"1": &namespace1,
+		},
 	}
 
 	tests := []struct {

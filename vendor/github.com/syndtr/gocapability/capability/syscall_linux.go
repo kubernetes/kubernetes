@@ -79,9 +79,7 @@ type vfscapData struct {
 	version   int8
 }
 
-var (
-	_vfsXattrName *byte
-)
+var _vfsXattrName *byte
 
 func init() {
 	_vfsXattrName, _ = syscall.BytePtrFromString(vfsXattrName)

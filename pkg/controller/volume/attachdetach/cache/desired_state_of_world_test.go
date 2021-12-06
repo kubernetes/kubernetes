@@ -323,7 +323,6 @@ func Test_DeleteNode_Positive_NodeExists(t *testing.T) {
 
 	// Act
 	err := dsw.DeleteNode(nodeName)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("DeleteNode failed. Expected: <no error> Actual: <%v>", err)
@@ -350,7 +349,6 @@ func Test_DeleteNode_Positive_NodeDoesntExist(t *testing.T) {
 
 	// Act
 	err := dsw.DeleteNode(notAddedNodeName)
-
 	// Assert
 	if err != nil {
 		t.Fatalf("DeleteNode failed. Expected: <no error> Actual: <%v>", err)

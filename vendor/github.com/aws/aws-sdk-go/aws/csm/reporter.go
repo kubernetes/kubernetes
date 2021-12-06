@@ -20,9 +20,7 @@ type Reporter struct {
 	done      chan struct{}
 }
 
-var (
-	sender *Reporter
-)
+var sender *Reporter
 
 func connect(url string) error {
 	const network = "udp"

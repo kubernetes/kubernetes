@@ -34,7 +34,7 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 		pathTestData = "testdata/"
 	)
 
-	var testFiles = []struct {
+	testFiles := []struct {
 		fileName      string
 		kind          string
 		groupVersion  schema.GroupVersion

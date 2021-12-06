@@ -99,12 +99,10 @@ type Proxier struct {
 // assert Proxier is a proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-var (
-	// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
-	// the loopback address. May be checked for by callers of NewProxier to know whether
-	// the caller provided invalid input.
-	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
-)
+// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
+// the loopback address. May be checked for by callers of NewProxier to know whether
+// the caller provided invalid input.
+var ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
 
 // Used below.
 var localhostIPv4 = netutils.ParseIPSloppy("127.0.0.1")

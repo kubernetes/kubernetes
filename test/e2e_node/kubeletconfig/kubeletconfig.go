@@ -87,7 +87,7 @@ func WriteKubeletConfigFile(kubeletConfig *kubeletconfig.KubeletConfiguration) e
 		return err
 	}
 
-	if err := ioutil.WriteFile(kubeletConfigFilePath, data, 0644); err != nil {
+	if err := ioutil.WriteFile(kubeletConfigFilePath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write the kubelet file to %q: %w", kubeletConfigFilePath, err)
 	}
 

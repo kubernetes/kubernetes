@@ -224,8 +224,10 @@ func (m *RawMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var _ Marshaler = (*RawMessage)(nil)
-var _ Unmarshaler = (*RawMessage)(nil)
+var (
+	_ Marshaler   = (*RawMessage)(nil)
+	_ Unmarshaler = (*RawMessage)(nil)
+)
 
 // A Token holds a value of one of these types:
 //

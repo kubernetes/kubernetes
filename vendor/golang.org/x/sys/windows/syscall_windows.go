@@ -19,8 +19,10 @@ import (
 	"golang.org/x/sys/internal/unsafeheader"
 )
 
-type Handle uintptr
-type HWND uintptr
+type (
+	Handle uintptr
+	HWND   uintptr
+)
 
 const (
 	InvalidHandle = ^Handle(0)
@@ -1279,9 +1281,11 @@ func SetsockoptLinger(fd Handle, level, opt int, l *Linger) (err error) {
 func SetsockoptInet4Addr(fd Handle, level, opt int, value [4]byte) (err error) {
 	return Setsockopt(fd, int32(level), int32(opt), (*byte)(unsafe.Pointer(&value[0])), 4)
 }
+
 func SetsockoptIPMreq(fd Handle, level, opt int, mreq *IPMreq) (err error) {
 	return Setsockopt(fd, int32(level), int32(opt), (*byte)(unsafe.Pointer(mreq)), int32(unsafe.Sizeof(*mreq)))
 }
+
 func SetsockoptIPv6Mreq(fd Handle, level, opt int, mreq *IPv6Mreq) (err error) {
 	return syscall.EWINDOWS
 }

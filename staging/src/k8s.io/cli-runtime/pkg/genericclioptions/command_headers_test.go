@@ -23,13 +23,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var kubectlCmd = &cobra.Command{Use: "kubectl"}
-var applyCmd = &cobra.Command{Use: "apply"}
-var createCmd = &cobra.Command{Use: "create"}
-var secretCmd = &cobra.Command{Use: "secret"}
-var genericCmd = &cobra.Command{Use: "generic"}
-var authCmd = &cobra.Command{Use: "auth"}
-var reconcileCmd = &cobra.Command{Use: "reconcile"}
+var (
+	kubectlCmd   = &cobra.Command{Use: "kubectl"}
+	applyCmd     = &cobra.Command{Use: "apply"}
+	createCmd    = &cobra.Command{Use: "create"}
+	secretCmd    = &cobra.Command{Use: "secret"}
+	genericCmd   = &cobra.Command{Use: "generic"}
+	authCmd      = &cobra.Command{Use: "auth"}
+	reconcileCmd = &cobra.Command{Use: "reconcile"}
+)
 
 func TestParseCommandHeaders(t *testing.T) {
 	tests := map[string]struct {

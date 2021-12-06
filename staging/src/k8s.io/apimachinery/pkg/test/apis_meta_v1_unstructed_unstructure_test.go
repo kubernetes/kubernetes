@@ -447,7 +447,6 @@ func TestUnstructuredListSetters(t *testing.T) {
 }
 
 func TestDecodeNumbers(t *testing.T) {
-
 	// Start with a valid pod
 	originalJSON := []byte(`{
 		"kind":"Carp",

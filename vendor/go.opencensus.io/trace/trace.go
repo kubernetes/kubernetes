@@ -239,7 +239,8 @@ func startSpanInternal(name string, hasParent bool, parent SpanContext, remotePa
 			TraceID:         s.spanContext.TraceID,
 			SpanID:          s.spanContext.SpanID,
 			Name:            name,
-			HasRemoteParent: remoteParent}).Sample)
+			HasRemoteParent: remoteParent,
+		}).Sample)
 	}
 
 	if !internal.LocalSpanStoreEnabled && !s.spanContext.IsSampled() {

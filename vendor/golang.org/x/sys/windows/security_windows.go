@@ -1094,12 +1094,15 @@ type TrusteeValue uintptr
 func TrusteeValueFromString(str string) TrusteeValue {
 	return TrusteeValue(unsafe.Pointer(StringToUTF16Ptr(str)))
 }
+
 func TrusteeValueFromSID(sid *SID) TrusteeValue {
 	return TrusteeValue(unsafe.Pointer(sid))
 }
+
 func TrusteeValueFromObjectsAndSid(objectsAndSid *OBJECTS_AND_SID) TrusteeValue {
 	return TrusteeValue(unsafe.Pointer(objectsAndSid))
 }
+
 func TrusteeValueFromObjectsAndName(objectsAndName *OBJECTS_AND_NAME) TrusteeValue {
 	return TrusteeValue(unsafe.Pointer(objectsAndName))
 }

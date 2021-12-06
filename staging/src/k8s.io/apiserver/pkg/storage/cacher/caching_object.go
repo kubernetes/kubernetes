@@ -224,171 +224,202 @@ func (o *cachingObject) GetNamespace() string {
 	defer o.lock.RUnlock()
 	return o.object.GetNamespace()
 }
+
 func (o *cachingObject) SetNamespace(namespace string) {
 	o.conditionalSet(
 		func() bool { return o.object.GetNamespace() == namespace },
 		func() { o.object.SetNamespace(namespace) },
 	)
 }
+
 func (o *cachingObject) GetName() string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetName()
 }
+
 func (o *cachingObject) SetName(name string) {
 	o.conditionalSet(
 		func() bool { return o.object.GetName() == name },
 		func() { o.object.SetName(name) },
 	)
 }
+
 func (o *cachingObject) GetGenerateName() string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetGenerateName()
 }
+
 func (o *cachingObject) SetGenerateName(name string) {
 	o.conditionalSet(
 		func() bool { return o.object.GetGenerateName() == name },
 		func() { o.object.SetGenerateName(name) },
 	)
 }
+
 func (o *cachingObject) GetUID() types.UID {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetUID()
 }
+
 func (o *cachingObject) SetUID(uid types.UID) {
 	o.conditionalSet(
 		func() bool { return o.object.GetUID() == uid },
 		func() { o.object.SetUID(uid) },
 	)
 }
+
 func (o *cachingObject) GetResourceVersion() string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetResourceVersion()
 }
+
 func (o *cachingObject) SetResourceVersion(version string) {
 	o.conditionalSet(
 		func() bool { return o.object.GetResourceVersion() == version },
 		func() { o.object.SetResourceVersion(version) },
 	)
 }
+
 func (o *cachingObject) GetGeneration() int64 {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetGeneration()
 }
+
 func (o *cachingObject) SetGeneration(generation int64) {
 	o.conditionalSet(
 		func() bool { return o.object.GetGeneration() == generation },
 		func() { o.object.SetGeneration(generation) },
 	)
 }
+
 func (o *cachingObject) GetSelfLink() string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetSelfLink()
 }
+
 func (o *cachingObject) SetSelfLink(selfLink string) {
 	o.conditionalSet(
 		func() bool { return o.object.GetSelfLink() == selfLink },
 		func() { o.object.SetSelfLink(selfLink) },
 	)
 }
+
 func (o *cachingObject) GetCreationTimestamp() metav1.Time {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetCreationTimestamp()
 }
+
 func (o *cachingObject) SetCreationTimestamp(timestamp metav1.Time) {
 	o.conditionalSet(
 		func() bool { return o.object.GetCreationTimestamp() == timestamp },
 		func() { o.object.SetCreationTimestamp(timestamp) },
 	)
 }
+
 func (o *cachingObject) GetDeletionTimestamp() *metav1.Time {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetDeletionTimestamp()
 }
+
 func (o *cachingObject) SetDeletionTimestamp(timestamp *metav1.Time) {
 	o.conditionalSet(
 		func() bool { return o.object.GetDeletionTimestamp() == timestamp },
 		func() { o.object.SetDeletionTimestamp(timestamp) },
 	)
 }
+
 func (o *cachingObject) GetDeletionGracePeriodSeconds() *int64 {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetDeletionGracePeriodSeconds()
 }
+
 func (o *cachingObject) SetDeletionGracePeriodSeconds(gracePeriodSeconds *int64) {
 	o.conditionalSet(
 		func() bool { return o.object.GetDeletionGracePeriodSeconds() == gracePeriodSeconds },
 		func() { o.object.SetDeletionGracePeriodSeconds(gracePeriodSeconds) },
 	)
 }
+
 func (o *cachingObject) GetLabels() map[string]string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetLabels()
 }
+
 func (o *cachingObject) SetLabels(labels map[string]string) {
 	o.conditionalSet(
 		func() bool { return reflect.DeepEqual(o.object.GetLabels(), labels) },
 		func() { o.object.SetLabels(labels) },
 	)
 }
+
 func (o *cachingObject) GetAnnotations() map[string]string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetAnnotations()
 }
+
 func (o *cachingObject) SetAnnotations(annotations map[string]string) {
 	o.conditionalSet(
 		func() bool { return reflect.DeepEqual(o.object.GetAnnotations(), annotations) },
 		func() { o.object.SetAnnotations(annotations) },
 	)
 }
+
 func (o *cachingObject) GetFinalizers() []string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetFinalizers()
 }
+
 func (o *cachingObject) SetFinalizers(finalizers []string) {
 	o.conditionalSet(
 		func() bool { return reflect.DeepEqual(o.object.GetFinalizers(), finalizers) },
 		func() { o.object.SetFinalizers(finalizers) },
 	)
 }
+
 func (o *cachingObject) GetOwnerReferences() []metav1.OwnerReference {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetOwnerReferences()
 }
+
 func (o *cachingObject) SetOwnerReferences(references []metav1.OwnerReference) {
 	o.conditionalSet(
 		func() bool { return reflect.DeepEqual(o.object.GetOwnerReferences(), references) },
 		func() { o.object.SetOwnerReferences(references) },
 	)
 }
+
 func (o *cachingObject) GetClusterName() string {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetClusterName()
 }
+
 func (o *cachingObject) SetClusterName(clusterName string) {
 	o.conditionalSet(
 		func() bool { return o.object.GetClusterName() == clusterName },
 		func() { o.object.SetClusterName(clusterName) },
 	)
 }
+
 func (o *cachingObject) GetManagedFields() []metav1.ManagedFieldsEntry {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
 	return o.object.GetManagedFields()
 }
+
 func (o *cachingObject) SetManagedFields(managedFields []metav1.ManagedFieldsEntry) {
 	o.conditionalSet(
 		func() bool { return reflect.DeepEqual(o.object.GetManagedFields(), managedFields) },

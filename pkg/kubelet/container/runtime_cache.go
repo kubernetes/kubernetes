@@ -22,10 +22,8 @@ import (
 	"time"
 )
 
-var (
-	// TODO(yifan): Maybe set the them as parameters for NewCache().
-	defaultCachePeriod = time.Second * 2
-)
+// TODO(yifan): Maybe set the them as parameters for NewCache().
+var defaultCachePeriod = time.Second * 2
 
 // RuntimeCache is in interface for obtaining cached Pods.
 type RuntimeCache interface {

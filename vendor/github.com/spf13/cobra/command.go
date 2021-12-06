@@ -166,7 +166,7 @@ type Command struct {
 	// errWriter is a writer defined by the user that replaces stderr
 	errWriter io.Writer
 
-	//FParseErrWhitelist flag parse errors to be ignored
+	// FParseErrWhitelist flag parse errors to be ignored
 	FParseErrWhitelist FParseErrWhitelist
 
 	// CompletionOptions is a set of options to control the handling of shell completion

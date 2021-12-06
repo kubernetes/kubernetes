@@ -56,13 +56,13 @@ func Validate(spec SysSpec, validators []Validator) ([]error, []error) {
 // ValidateSpec uses all default validators to validate the system and writes to stdout.
 func ValidateSpec(spec SysSpec, containerRuntime string) ([]error, []error) {
 	// OS-level validators.
-	var osValidators = []Validator{
+	osValidators := []Validator{
 		&OSValidator{Reporter: DefaultReporter},
 		&KernelValidator{Reporter: DefaultReporter},
 	}
 
 	// Docker-specific validators.
-	var dockerValidators = []Validator{
+	dockerValidators := []Validator{
 		&DockerValidator{Reporter: DefaultReporter},
 	}
 

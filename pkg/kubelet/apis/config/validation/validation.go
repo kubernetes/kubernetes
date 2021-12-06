@@ -34,9 +34,7 @@ import (
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
-var (
-	defaultCFSQuota = metav1.Duration{Duration: 100 * time.Millisecond}
-)
+var defaultCFSQuota = metav1.Duration{Duration: 100 * time.Millisecond}
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error {

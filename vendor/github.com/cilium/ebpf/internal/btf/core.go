@@ -254,8 +254,10 @@ func coreRelocate(local, target *Spec, relos coreRelos) (COREFixups, error) {
 	return result, nil
 }
 
-var errAmbiguousRelocation = errors.New("ambiguous relocation")
-var errImpossibleRelocation = errors.New("impossible relocation")
+var (
+	errAmbiguousRelocation  = errors.New("ambiguous relocation")
+	errImpossibleRelocation = errors.New("impossible relocation")
+)
 
 // coreCalculateFixups calculates the fixups for the given relocations using
 // the "best" target.

@@ -18,8 +18,8 @@ type CurlyRouter struct{}
 // for the WebService and its Route for the given Request.
 func (c CurlyRouter) SelectRoute(
 	webServices []*WebService,
-	httpRequest *http.Request) (selectedService *WebService, selected *Route, err error) {
-
+	httpRequest *http.Request) (selectedService *WebService, selected *Route, err error,
+) {
 	requestTokens := tokenizePath(httpRequest.URL.Path)
 
 	detectedService := c.detectWebService(requestTokens, webServices)
@@ -157,7 +157,7 @@ func (c CurlyRouter) computeWebserviceScore(requestTokens []string, tokens []str
 			if each != other {
 				return false, score
 			}
-			score += (len(tokens) - i) * 10 //fuzzy
+			score += (len(tokens) - i) * 10 // fuzzy
 		}
 	}
 	return true, score

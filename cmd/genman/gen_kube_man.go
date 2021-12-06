@@ -218,5 +218,4 @@ January 2015, Originally compiled by Eric Paris (eparis at redhat dot com) based
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
 }

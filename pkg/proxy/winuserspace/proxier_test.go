@@ -111,8 +111,10 @@ func (r *udpEchoServer) Loop() {
 	}
 }
 
-var tcpServerPort int32
-var udpServerPort int32
+var (
+	tcpServerPort int32
+	udpServerPort int32
+)
 
 func TestMain(m *testing.M) {
 	// Don't handle panics

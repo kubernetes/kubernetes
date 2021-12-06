@@ -40,7 +40,7 @@ import (
 )
 
 func TestMakePayload(t *testing.T) {
-	caseMappingMode := int32(0400)
+	caseMappingMode := int32(0o400)
 	cases := []struct {
 		name     string
 		mappings []v1.KeyToPath
@@ -58,10 +58,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"foo": {Data: []byte("foo"), Mode: 0644},
-				"bar": {Data: []byte("bar"), Mode: 0644},
+				"foo": {Data: []byte("foo"), Mode: 0o644},
+				"bar": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -79,9 +79,9 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -99,9 +99,9 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -119,9 +119,9 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -143,10 +143,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0644},
-				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0o644},
+				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -164,7 +164,7 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode:    0644,
+			mode:    0o644,
 			success: false,
 		},
 		{
@@ -187,7 +187,7 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
 				"foo.txt": {Data: []byte("foo"), Mode: caseMappingMode},
 				"bar.bin": {Data: []byte("bar"), Mode: caseMappingMode},
@@ -212,10 +212,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0o644,
 			payload: map[string]util.FileProjection{
-				"foo.txt": {Data: []byte("foo"), Mode: 0644},
-				"bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"foo.txt": {Data: []byte("foo"), Mode: 0o644},
+				"bar.bin": {Data: []byte("bar"), Mode: 0o644},
 			},
 			success: true,
 		},
@@ -233,7 +233,7 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode:     0644,
+			mode:     0o644,
 			optional: true,
 			payload:  map[string]util.FileProjection{},
 			success:  true,
@@ -299,7 +299,7 @@ func TestPlugin(t *testing.T) {
 		testNamespace  = "test_secret_namespace"
 		testName       = "test_secret_name"
 
-		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0o644)
 		secret        = secret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
@@ -369,7 +369,7 @@ func TestInvalidPathSecret(t *testing.T) {
 		testNamespace  = "test_secret_namespace"
 		testName       = "test_secret_name"
 
-		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0o644)
 		secret        = secret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
@@ -423,7 +423,7 @@ func TestPluginReboot(t *testing.T) {
 		testNamespace  = "test_secret_namespace"
 		testName       = "test_secret_name"
 
-		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0o644)
 		secret        = secret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}
@@ -477,7 +477,7 @@ func TestPluginOptional(t *testing.T) {
 		testName       = "test_secret_name"
 		trueVal        = true
 
-		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0o644)
 		client        = fake.NewSimpleClientset()
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
@@ -568,7 +568,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 		testName       = "test_secret_name"
 		trueVal        = true
 
-		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0o644)
 		secret        = secret(testNamespace, testName)
 		client        = fake.NewSimpleClientset(&secret)
 		pluginMgr     = volume.VolumePluginMgr{}

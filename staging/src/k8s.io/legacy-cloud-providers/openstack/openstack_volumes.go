@@ -479,7 +479,6 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 	}
 
 	volumeID, volumeAZ, err := volumes.createVolume(opts)
-
 	if err != nil {
 		return "", "", "", os.bsOpts.IgnoreVolumeAZ, fmt.Errorf("failed to create a %d GB volume: %v", size, err)
 	}
@@ -528,7 +527,6 @@ func (os *OpenStack) getDevicePathFromInstanceMetadata(volumeID string) string {
 	// relying on the metadata service.
 	instanceMetadata, err := getMetadataFromMetadataService(
 		newtonMetadataVersion)
-
 	if err != nil {
 		klog.V(4).Infof(
 			"Could not retrieve instance metadata. Error: %v", err)
@@ -601,7 +599,6 @@ func (os *OpenStack) DeleteVolume(volumeID string) error {
 
 	err = volumes.deleteVolume(volumeID)
 	return err
-
 }
 
 // GetAttachmentDiskPath gets device path of attached volume to the compute running kubelet, as known by cinder

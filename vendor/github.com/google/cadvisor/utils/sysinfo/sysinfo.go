@@ -321,7 +321,7 @@ func getCpusByPhysicalPackageID(sysFs sysfs.SysFs, cpusPaths []string) (map[int]
 // addCacheInfo adds information about cache for NUMA node
 func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
 	for coreID, core := range node.Cores {
-		threadID := core.Threads[0] //get any thread for core
+		threadID := core.Threads[0] // get any thread for core
 		caches, err := GetCacheInfo(sysFs, threadID)
 		if err != nil {
 			return err
@@ -375,7 +375,7 @@ func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
 func getNodeMemInfo(sysFs sysfs.SysFs, nodeDir string) (uint64, error) {
 	rawMem, err := sysFs.GetMemInfo(nodeDir)
 	if err != nil {
-		//Ignore if per-node info is not available.
+		// Ignore if per-node info is not available.
 		klog.Warningf("Found node without memory information, nodeDir: %s", nodeDir)
 		return 0, nil
 	}

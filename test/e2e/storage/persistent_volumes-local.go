@@ -144,7 +144,8 @@ var (
 
 	// Common selinux labels
 	selinuxLabel = &v1.SELinuxOptions{
-		Level: "s0:c0,c1"}
+		Level: "s0:c0,c1",
+	}
 )
 
 var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
@@ -297,7 +298,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					e2epod.DeletePodOrFail(config.client, config.ns, pod2.Name)
 				})
 			})
-
 		})
 	}
 
@@ -623,9 +623,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	})
 
 	ginkgo.Context("Pods sharing a single local PV [Serial]", func() {
-		var (
-			pv *v1.PersistentVolume
-		)
+		var pv *v1.PersistentVolume
 
 		ginkgo.BeforeEach(func() {
 			localVolume := &localTestVolume{
@@ -1097,7 +1095,6 @@ func setupLocalVolumesPVCsPVs(
 	node *v1.Node,
 	count int,
 	mode storagev1.VolumeBindingMode) []*localTestVolume {
-
 	ginkgo.By("Initializing test volumes")
 	testVols := setupLocalVolumes(config, localVolumeType, node, count)
 

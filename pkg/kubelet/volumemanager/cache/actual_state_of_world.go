@@ -582,8 +582,7 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 	defer asw.Unlock()
 	for volumeName, volumeObj := range asw.attachedVolumes {
 		if podObj, podExists := volumeObj.mountedPods[podName]; podExists {
-			volumePlugin, err :=
-				asw.volumePluginMgr.FindPluginBySpec(podObj.volumeSpec)
+			volumePlugin, err := asw.volumePluginMgr.FindPluginBySpec(podObj.volumeSpec)
 			if err != nil || volumePlugin == nil {
 				// Log and continue processing
 				klog.ErrorS(nil, "MarkRemountRequired failed to FindPluginBySpec for volume", "uniquePodName", podObj.podName, "podUID", podObj.podUID, "volumeName", volumeName, "volumeSpecName", podObj.volumeSpec.Name())
@@ -615,8 +614,7 @@ func (asw *actualStateOfWorld) MarkFSResizeRequired(
 		return
 	}
 
-	volumePlugin, err :=
-		asw.volumePluginMgr.FindNodeExpandablePluginBySpec(podObj.volumeSpec)
+	volumePlugin, err := asw.volumePluginMgr.FindNodeExpandablePluginBySpec(podObj.volumeSpec)
 	if err != nil || volumePlugin == nil {
 		// Log and continue processing
 		klog.ErrorS(nil, "MarkFSResizeRequired failed to find expandable plugin for volume", "uniquePodName", podObj.podName, "volumeName", volumeObj.volumeName, "volumeSpecName", podObj.volumeSpec.Name())
@@ -799,7 +797,6 @@ func (asw *actualStateOfWorld) GetAllMountedVolumes() []MountedVolume {
 					mountedVolume,
 					getMountedVolume(&podObj, &volumeObj))
 			}
-
 		}
 	}
 
@@ -912,7 +909,8 @@ func (asw *actualStateOfWorld) newAttachedVolume(
 			PluginIsAttachable: attachedVolume.pluginIsAttachable,
 			DevicePath:         attachedVolume.devicePath,
 			DeviceMountPath:    attachedVolume.deviceMountPath,
-			PluginName:         attachedVolume.pluginName},
+			PluginName:         attachedVolume.pluginName,
+		},
 		DeviceMountState: attachedVolume.deviceMountState,
 	}
 }
@@ -1009,5 +1007,7 @@ func getMountedVolume(
 			BlockVolumeMapper:   mountedPod.blockVolumeMapper,
 			VolumeGidValue:      mountedPod.volumeGidValue,
 			VolumeSpec:          mountedPod.volumeSpec,
-			DeviceMountPath:     attachedVolume.deviceMountPath}}
+			DeviceMountPath:     attachedVolume.deviceMountPath,
+		},
+	}
 }

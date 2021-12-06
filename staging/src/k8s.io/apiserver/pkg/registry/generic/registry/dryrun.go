@@ -117,5 +117,4 @@ func (s *DryRunnableStorage) copyInto(in, out runtime.Object) error {
 		return err
 	}
 	return nil
-
 }

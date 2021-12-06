@@ -63,7 +63,8 @@ func PruneAst(expr *exprpb.Expr, state EvalState) *exprpb.Expr {
 	pruner := &astPruner{
 		expr:       expr,
 		state:      state,
-		nextExprID: 1}
+		nextExprID: 1,
+	}
 	newExpr, _ := pruner.prune(expr)
 	return newExpr
 }

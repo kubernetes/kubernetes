@@ -38,11 +38,11 @@ func copyStat(stat *Stat_t, statLE *Stat_LE_t) {
 	stat.Rdev = uint64(statLE.Rdev)
 	stat.Size = statLE.Size
 	stat.Atim.Sec = int64(statLE.Atim)
-	stat.Atim.Nsec = 0 //zos doesn't return nanoseconds
+	stat.Atim.Nsec = 0 // zos doesn't return nanoseconds
 	stat.Mtim.Sec = int64(statLE.Mtim)
-	stat.Mtim.Nsec = 0 //zos doesn't return nanoseconds
+	stat.Mtim.Nsec = 0 // zos doesn't return nanoseconds
 	stat.Ctim.Sec = int64(statLE.Ctim)
-	stat.Ctim.Nsec = 0 //zos doesn't return nanoseconds
+	stat.Ctim.Nsec = 0 // zos doesn't return nanoseconds
 	stat.Blksize = int64(statLE.Blksize)
 	stat.Blocks = statLE.Blocks
 }
@@ -325,7 +325,7 @@ func Getpgrp() (pid int) {
 func Getrusage(who int, rusage *Rusage) (err error) {
 	var ruz rusage_zos
 	err = getrusage(who, &ruz)
-	//Only the first two fields of Rusage are set
+	// Only the first two fields of Rusage are set
 	rusage.Utime.Sec = ruz.Utime.Sec
 	rusage.Utime.Usec = int64(ruz.Utime.Usec)
 	rusage.Stime.Sec = ruz.Stime.Sec
@@ -575,7 +575,7 @@ func setTimespec(sec, nsec int64) Timespec {
 	return Timespec{Sec: sec, Nsec: nsec}
 }
 
-func setTimeval(sec, usec int64) Timeval { //fix
+func setTimeval(sec, usec int64) Timeval { // fix
 	return Timeval{Sec: sec, Usec: usec}
 }
 
@@ -1223,7 +1223,7 @@ func Readdir(dir uintptr) (*Dirent, error) {
 	// Therefore to avoid false positives we clear errno before calling it.
 
 	// TODO(neeilan): Commented this out to get sys/unix compiling on z/OS. Uncomment and fix. Error: "undefined: clearsyscall"
-	//clearsyscall.Errno() // TODO(mundaym): check pre-emption rules.
+	// clearsyscall.Errno() // TODO(mundaym): check pre-emption rules.
 
 	e, _, _ := syscall_syscall(SYS___READDIR_R_A, dir, uintptr(unsafe.Pointer(&ent)), uintptr(unsafe.Pointer(&res)))
 	var err error
@@ -1280,7 +1280,6 @@ func FcntlFlock(fd uintptr, cmd int, lk *Flock_t) error {
 }
 
 func Flock(fd int, how int) error {
-
 	var flock_type int16
 	var fcntl_cmd int
 
@@ -1353,8 +1352,7 @@ func Munlockall() (err error) {
 }
 
 func ClockGettime(clockid int32, ts *Timespec) error {
-
-	var ticks_per_sec uint32 = 100 //TODO(kenan): value is currently hardcoded; need sysconf() call otherwise
+	var ticks_per_sec uint32 = 100 // TODO(kenan): value is currently hardcoded; need sysconf() call otherwise
 	var nsec_per_sec int64 = 1000000000
 
 	if ts == nil {
@@ -1487,7 +1485,7 @@ func (m *mmapper) Mmap(fd int, offset int64, length int, prot int, flags int) (d
 	}
 
 	// Slice memory layout
-	var sl = struct {
+	sl := struct {
 		addr uintptr
 		len  int
 		cap  int
@@ -1699,7 +1697,7 @@ func SetsockoptByte(fd, level, opt int, value byte) (err error) {
 }
 
 func SetsockoptInt(fd, level, opt int, value int) (err error) {
-	var n = int32(value)
+	n := int32(value)
 	return setsockopt(fd, level, opt, unsafe.Pointer(&n), 4)
 }
 

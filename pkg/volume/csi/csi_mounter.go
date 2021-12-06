@@ -41,7 +41,7 @@ import (
 	utilstrings "k8s.io/utils/strings"
 )
 
-//TODO (vladimirvivien) move this in a central loc later
+// TODO (vladimirvivien) move this in a central loc later
 var (
 	volDataKey = struct {
 		specVolID,
@@ -110,7 +110,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
-
 	}
 	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
 	defer cancel()
@@ -167,7 +166,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			secretRef = pvSrc.NodePublishSecretRef
 		}
 
-		//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+		// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 		if c.spec.PersistentVolume.Spec.AccessModes != nil {
 			accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 		}
@@ -204,7 +203,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	// create target_dir before call to NodePublish
 	parentDir := filepath.Dir(dir)
-	if err := os.MkdirAll(parentDir, 0750); err != nil {
+	if err := os.MkdirAll(parentDir, 0o750); err != nil {
 		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", parentDir, err))
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", parentDir))
@@ -364,6 +363,7 @@ var _ volume.Unmounter = &csiMountMgr{}
 func (c *csiMountMgr) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
+
 func (c *csiMountMgr) TearDownAt(dir string) error {
 	klog.V(4).Infof(log("Unmounter.TearDownAt(%s)", dir))
 

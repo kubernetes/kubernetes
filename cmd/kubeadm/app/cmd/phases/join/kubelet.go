@@ -44,8 +44,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-var (
-	kubeadmJoinFailMsg = dedent.Dedent(`
+var kubeadmJoinFailMsg = dedent.Dedent(`
 		Unfortunately, an error has occurred:
 			%v
 
@@ -57,7 +56,6 @@ var (
 			- 'systemctl status kubelet'
 			- 'journalctl -xeu kubelet'
 		`)
-)
 
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
 func NewKubeletStartPhase() workflow.Phase {

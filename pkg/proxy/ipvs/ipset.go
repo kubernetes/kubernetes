@@ -17,12 +17,12 @@ limitations under the License.
 package ipvs
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-
-	"fmt"
-	"strings"
 
 	"k8s.io/klog/v2"
 )

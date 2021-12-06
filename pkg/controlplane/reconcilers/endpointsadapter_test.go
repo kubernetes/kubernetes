@@ -216,7 +216,6 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 				}
 				if !apiequality.Semantic.DeepEqual(*testCase.expectedEndpointSlice, epSliceList.Items[0]) {
 					t.Errorf("Expected Endpoint Slice: %v, got: %v", testCase.expectedEndpointSlice, epSliceList.Items[0])
-
 				}
 			}
 		})
@@ -328,7 +327,6 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 				}
 				if !apiequality.Semantic.DeepEqual(*testCase.expectedEndpointSlice, epSliceList.Items[0]) {
 					t.Errorf("Expected Endpoint Slice: %v, got: %v", testCase.expectedEndpointSlice, epSliceList.Items[0])
-
 				}
 			}
 		})

@@ -76,7 +76,7 @@ func TestScheme(t *testing.T) {
 	utilruntime.Must(runtimetesting.RegisterConversions(scheme))
 
 	// If set, would clear TypeMeta during conversion.
-	//scheme.AddIgnoredConversionType(&TypeMeta{}, &TypeMeta{})
+	// scheme.AddIgnoredConversionType(&TypeMeta{}, &TypeMeta{})
 
 	// test that scheme is an ObjectTyper
 	var _ runtime.ObjectTyper = scheme

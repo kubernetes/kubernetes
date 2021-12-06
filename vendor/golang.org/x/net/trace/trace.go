@@ -953,8 +953,10 @@ func elapsed(d time.Duration) string {
 	return string(b)
 }
 
-var pageTmplCache *template.Template
-var pageTmplOnce sync.Once
+var (
+	pageTmplCache *template.Template
+	pageTmplOnce  sync.Once
+)
 
 func pageTmpl() *template.Template {
 	pageTmplOnce.Do(func() {

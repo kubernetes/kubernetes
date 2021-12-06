@@ -18,7 +18,8 @@ func CopyComments(from, to *yaml.RNode) error {
 	_, err := walk.Walker{
 		Sources:            []*yaml.RNode{fromCopy, to},
 		Visitor:            &copier{},
-		VisitKeysAsScalars: true}.Walk()
+		VisitKeysAsScalars: true,
+	}.Walk()
 	return err
 }
 

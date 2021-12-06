@@ -96,7 +96,7 @@ func TestUpdate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
 	test.TestUpdate(
-		//valid
+		// valid
 		validNewPodTemplate("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {

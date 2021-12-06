@@ -69,7 +69,6 @@ type SyncImpl interface {
 // BoundSyncImpl is the implementation-level interface to a
 // generic bound synchronous instrument
 type BoundSyncImpl interface {
-
 	// RecordOne captures a single synchronous metric event.
 	RecordOne(ctx context.Context, number number.Number)
 

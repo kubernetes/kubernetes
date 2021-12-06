@@ -96,7 +96,8 @@ func NewRepoSpecFromUrl(n string) (*RepoSpec, error) {
 	return &RepoSpec{
 		raw: n, Host: host, OrgRepo: orgRepo,
 		Dir: notCloned, Path: path, Ref: gitRef, GitSuffix: suffix,
-		Submodules: gitSubmodules, Timeout: gitTimeout}, nil
+		Submodules: gitSubmodules, Timeout: gitTimeout,
+	}, nil
 }
 
 const (
@@ -109,8 +110,8 @@ const (
 // https://github.com/someOrg/someRepo?ref=someHash, extract
 // the parts.
 func parseGitUrl(n string) (
-	host string, orgRepo string, path string, gitRef string, gitSubmodules bool, gitSuff string, gitTimeout time.Duration) {
-
+	host string, orgRepo string, path string, gitRef string, gitSubmodules bool, gitSuff string, gitTimeout time.Duration,
+) {
 	if strings.Contains(n, gitDelimiter) {
 		index := strings.Index(n, gitDelimiter)
 		// Adding _git/ to host
@@ -225,7 +226,8 @@ func parseHostSpec(n string) (string, string) {
 
 	// If host is a http(s) or ssh URL, grab the domain part.
 	for _, p := range []string{
-		"ssh://", "https://", "http://"} {
+		"ssh://", "https://", "http://",
+	} {
 		if strings.HasSuffix(host, p) {
 			i := strings.Index(n, "/")
 			if i > -1 {

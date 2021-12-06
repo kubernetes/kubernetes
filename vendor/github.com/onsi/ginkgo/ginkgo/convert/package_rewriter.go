@@ -89,7 +89,6 @@ func addGinkgoSuiteForPackage(pkg *build.Package) {
 	}
 
 	output, err := exec.Command("ginkgo", "bootstrap").Output()
-
 	if err != nil {
 		panic(fmt.Sprintf("error running 'ginkgo bootstrap'.\nstdout: %s\n%s\n", output, err.Error()))
 	}
@@ -106,7 +105,6 @@ func addGinkgoSuiteForPackage(pkg *build.Package) {
 func goFmtPackage(pkg *build.Package) {
 	path, _ := filepath.Abs(pkg.ImportPath)
 	output, err := exec.Command("go", "fmt", path).CombinedOutput()
-
 	if err != nil {
 		fmt.Printf("Warning: Error running 'go fmt %s'.\nstdout: %s\n%s\n", path, output, err.Error())
 	}

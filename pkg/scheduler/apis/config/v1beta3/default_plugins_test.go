@@ -17,8 +17,9 @@ limitations under the License.
 package v1beta3
 
 import (
-	"k8s.io/kube-scheduler/config/v1beta3"
 	"testing"
+
+	"k8s.io/kube-scheduler/config/v1beta3"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiserver/pkg/util/feature"

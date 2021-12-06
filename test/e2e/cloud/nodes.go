@@ -71,7 +71,6 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		} else if !apierrors.IsNotFound(err) {
 			framework.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
 		}
-
 	})
 })
 

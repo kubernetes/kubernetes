@@ -107,7 +107,8 @@ func TestEvictPodsToFreeRequestsWithError(t *testing.T) {
 			testName: "multiple pods eviction error",
 			inputPods: []*v1.Pod{
 				allPods[clusterCritical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
-				allPods[guaranteed], allPods[highRequestGuaranteed]},
+				allPods[guaranteed], allPods[highRequestGuaranteed],
+			},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,
 			expectedOutput:        nil,
@@ -159,7 +160,8 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 			testName: "multiple pods evicted",
 			inputPods: []*v1.Pod{
 				allPods[clusterCritical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
-				allPods[guaranteed], allPods[highRequestGuaranteed]},
+				allPods[guaranteed], allPods[highRequestGuaranteed],
+			},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,
 			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
@@ -191,7 +193,8 @@ func BenchmarkGetPodsToPreempt(t *testing.B) {
 			{
 				resourceName: v1.ResourceCPU,
 				quantity:     parseCPUToInt64("110m"),
-			}}))
+			},
+		}))
 	}
 }
 

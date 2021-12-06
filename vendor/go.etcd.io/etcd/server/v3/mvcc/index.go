@@ -33,7 +33,6 @@ type index interface {
 	Compact(rev int64) map[revision]struct{}
 	Keep(rev int64) map[revision]struct{}
 	Equal(b index) bool
-
 	Insert(ki *keyIndex)
 	KeyIndex(ki *keyIndex) *keyIndex
 }
@@ -218,8 +217,8 @@ func (ti *treeIndex) Compact(rev int64) map[revision]struct{} {
 
 	clone.Ascend(func(item btree.Item) bool {
 		keyi := item.(*keyIndex)
-		//Lock is needed here to prevent modification to the keyIndex while
-		//compaction is going on or revision added to empty before deletion
+		// Lock is needed here to prevent modification to the keyIndex while
+		// compaction is going on or revision added to empty before deletion
 		ti.Lock()
 		keyi.compact(ti.lg, rev, available)
 		if keyi.isEmpty() {

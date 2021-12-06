@@ -279,7 +279,6 @@ func (a *Arbitrary) GetName() string {
 // Reference implementation depends on the type of document.
 type Reference interface {
 	Schema
-
 	Reference() string
 	SubSchema() Schema
 }

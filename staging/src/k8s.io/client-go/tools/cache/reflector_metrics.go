@@ -52,12 +52,10 @@ type MetricsProvider interface {
 	NewListsMetric(name string) CounterMetric
 	NewListDurationMetric(name string) SummaryMetric
 	NewItemsInListMetric(name string) SummaryMetric
-
 	NewWatchesMetric(name string) CounterMetric
 	NewShortWatchesMetric(name string) CounterMetric
 	NewWatchDurationMetric(name string) SummaryMetric
 	NewItemsInWatchMetric(name string) SummaryMetric
-
 	NewLastResourceVersionMetric(name string) GaugeMetric
 }
 

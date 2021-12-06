@@ -86,7 +86,7 @@ func (b *Blob) StartCopy(sourceBlob string, options *CopyOptions) (string, error
 		headers = addTimeToHeaders(headers, "x-ms-source-if-unmodified-since", options.Source.IfUnmodifiedSince)
 		headers = addToHeaders(headers, "x-ms-source-if-match", options.Source.IfMatch)
 		headers = addToHeaders(headers, "x-ms-source-if-none-match", options.Source.IfNoneMatch)
-		//destiny
+		// destiny
 		headers = addToHeaders(headers, "x-ms-lease-id", options.Destiny.LeaseID)
 		headers = addTimeToHeaders(headers, "x-ms-if-modified-since", options.Destiny.IfModifiedSince)
 		headers = addTimeToHeaders(headers, "x-ms-if-unmodified-since", options.Destiny.IfUnmodifiedSince)

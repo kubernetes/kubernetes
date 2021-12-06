@@ -45,7 +45,7 @@ func OpenOrCreateDataDirectory(path string) (*DataDirectory, error) {
 	}
 	if !exists {
 		klog.Infof("data directory '%s' does not exist, creating it", path)
-		err := os.MkdirAll(path, 0777)
+		err := os.MkdirAll(path, 0o777)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create data directory %s: %v", path, err)
 		}
@@ -83,7 +83,7 @@ func (d *DataDirectory) Backup() error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(backupDir, 0777)
+	err = os.MkdirAll(backupDir, 0o777)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (v *VersionFile) Read() (*EtcdVersionPair, error) {
 // Write creates or overwrites the contents of the version.txt file with the given EtcdVersionPair.
 func (v *VersionFile) Write(vp *EtcdVersionPair) error {
 	data := []byte(fmt.Sprintf("%s/%s", vp.version, vp.storageVersion))
-	return ioutil.WriteFile(v.path, data, 0666)
+	return ioutil.WriteFile(v.path, data, 0o666)
 }
 
 func exists(path string) (bool, error) {

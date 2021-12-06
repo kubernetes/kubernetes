@@ -304,7 +304,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 		p.Out()
 		p.P(`}`)
 
-		//Generate GoString methods for oneof fields
+		// Generate GoString methods for oneof fields
 		for _, field := range message.Field {
 			oneof := field.OneofIndex != nil
 			if !oneof {
@@ -326,7 +326,8 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 				" + `}`",
 				`}`,
 				`,", "`,
-				`)`}, "")
+				`)`,
+			}, "")
 			p.P(outStr)
 			p.P(`return s`)
 			p.Out()

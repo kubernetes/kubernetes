@@ -29,7 +29,7 @@ const (
 )
 
 func TestParseTemplate(t *testing.T) {
-	var tmplTests = []struct {
+	tmplTests := []struct {
 		name        string
 		template    string
 		data        interface{}

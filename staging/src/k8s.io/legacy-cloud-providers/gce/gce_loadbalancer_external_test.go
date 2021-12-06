@@ -22,7 +22,6 @@ package gce
 import (
 	"context"
 	"fmt"
-
 	"reflect"
 	"strings"
 	"testing"
@@ -351,7 +350,6 @@ func TestShouldNotRecreateLBWhenNetworkTiersMismatch(t *testing.T) {
 			mutateSvc: func(service *v1.Service) {
 				svc.Annotations[NetworkTierAnnotationKey] = string(NetworkTierAnnotationStandard)
 				svc.Spec.LoadBalancerIP = staticIP
-
 			},
 			expectNetTier: NetworkTierAnnotationStandard.ToGCEValue(),
 		},
@@ -999,7 +997,6 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, fw.Allowed[0].IPProtocol, "tcp")
 			require.Equal(t, fw.SourceRanges[0], trueSourceRange)
-
 		})
 	}
 }
@@ -1311,7 +1308,6 @@ func TestExternalLoadBalancerEnsureHttpHealthCheck(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-
 			gce, err := fakeGCECloud(DefaultTestClusterValues())
 			require.NoError(t, err)
 			c := gce.c.(*cloud.MockGCE)
@@ -1342,7 +1338,6 @@ func TestExternalLoadBalancerEnsureHttpHealthCheck(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestMergeHttpHealthChecks(t *testing.T) {

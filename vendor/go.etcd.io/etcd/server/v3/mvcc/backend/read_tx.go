@@ -30,7 +30,6 @@ type ReadTx interface {
 	Unlock()
 	RLock()
 	RUnlock()
-
 	UnsafeRange(bucket Bucket, key, endKey []byte, limit int64) (keys [][]byte, vals [][]byte)
 	UnsafeForEach(bucket Bucket, visitor func(k, v []byte) error) error
 }

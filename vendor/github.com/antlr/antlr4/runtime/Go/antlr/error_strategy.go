@@ -33,7 +33,6 @@ type DefaultErrorStrategy struct {
 var _ ErrorStrategy = &DefaultErrorStrategy{}
 
 func NewDefaultErrorStrategy() *DefaultErrorStrategy {
-
 	d := new(DefaultErrorStrategy)
 
 	// Indicates whether the error strategy is currently "recovering from an
@@ -144,7 +143,6 @@ func (d *DefaultErrorStrategy) ReportError(recognizer Parser, e RecognitionExcep
 // that can follow the current rule.</p>
 //
 func (d *DefaultErrorStrategy) Recover(recognizer Parser, e RecognitionException) {
-
 	if d.lastErrorIndex == recognizer.GetInputStream().Index() &&
 		d.lastErrorStates != nil && d.lastErrorStates.contains(recognizer.GetState()) {
 		// uh oh, another error at same token index and previously-Visited
@@ -721,7 +719,6 @@ type BailErrorStrategy struct {
 var _ ErrorStrategy = &BailErrorStrategy{}
 
 func NewBailErrorStrategy() *BailErrorStrategy {
-
 	b := new(BailErrorStrategy)
 
 	b.DefaultErrorStrategy = NewDefaultErrorStrategy()

@@ -31,13 +31,15 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var buildDependencies = flag.Bool("build-dependencies", true, "If true, build all dependencies.")
-var ginkgoFlags = flag.String("ginkgo-flags", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-var testFlags = flag.String("test-flags", "", "Space-separated list of arguments to pass to node e2e test.")
-var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
-var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
+var (
+	buildDependencies = flag.Bool("build-dependencies", true, "If true, build all dependencies.")
+	ginkgoFlags       = flag.String("ginkgo-flags", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
+	testFlags         = flag.String("test-flags", "", "Space-separated list of arguments to pass to node e2e test.")
+	systemSpecName    = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
+	extraEnvs         = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+	runtimeConfig     = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+	kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
+)
 
 func main() {
 	klog.InitFlags(nil)

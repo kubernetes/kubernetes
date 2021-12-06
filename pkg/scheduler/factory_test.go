@@ -352,8 +352,10 @@ type TestPlugin struct {
 	name string
 }
 
-var _ framework.ScorePlugin = &TestPlugin{}
-var _ framework.FilterPlugin = &TestPlugin{}
+var (
+	_ framework.ScorePlugin  = &TestPlugin{}
+	_ framework.FilterPlugin = &TestPlugin{}
+)
 
 func (t *TestPlugin) Name() string {
 	return t.name

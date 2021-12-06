@@ -29,12 +29,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
-var (
-	preflightExample = cmdutil.Examples(`
+var preflightExample = cmdutil.Examples(`
 		# Run pre-flight checks for kubeadm init using a config file.
 		kubeadm init phase preflight --config kubeadm-config.yaml
 		`)
-)
 
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new control-plane node.
 func NewPreflightPhase() workflow.Phase {

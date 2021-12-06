@@ -1649,7 +1649,6 @@ func TestApplyDoesNotChangeManagedFieldsViaSubresources(t *testing.T) {
 		Body(updateBytes).
 		Do(context.TODO()).
 		Get()
-
 	if err != nil {
 		t.Fatalf("Error updating subresource: %v ", err)
 	}

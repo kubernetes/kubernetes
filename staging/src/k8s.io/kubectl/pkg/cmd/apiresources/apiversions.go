@@ -30,11 +30,9 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	apiversionsExample = templates.Examples(i18n.T(`
+var apiversionsExample = templates.Examples(i18n.T(`
 		# Print the supported API versions
 		kubectl api-versions`))
-)
 
 // APIVersionsOptions have the data required for API versions
 type APIVersionsOptions struct {

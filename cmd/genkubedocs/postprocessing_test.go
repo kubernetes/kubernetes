@@ -21,8 +21,7 @@ import (
 )
 
 func TestCleanupForInclude(t *testing.T) {
-
-	var tests = []struct {
+	tests := []struct {
 		markdown, expectedMarkdown string
 	}{
 		{ // first line is removed
@@ -53,5 +52,4 @@ func TestCleanupForInclude(t *testing.T) {
 			)
 		}
 	}
-
 }

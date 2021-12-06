@@ -64,14 +64,12 @@ func CheckSysctls() Check {
 	}
 }
 
-var (
-	sysctls_allowed_1_0 = sets.NewString(
-		"kernel.shm_rmid_forced",
-		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_syncookies",
-		"net.ipv4.ping_group_range",
-		"net.ipv4.ip_unprivileged_port_start",
-	)
+var sysctls_allowed_1_0 = sets.NewString(
+	"kernel.shm_rmid_forced",
+	"net.ipv4.ip_local_port_range",
+	"net.ipv4.tcp_syncookies",
+	"net.ipv4.ping_group_range",
+	"net.ipv4.ip_unprivileged_port_start",
 )
 
 func sysctls_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {

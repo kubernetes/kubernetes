@@ -14,8 +14,10 @@ import (
 	"sync"
 )
 
-const fourMB = uint64(4194304)
-const oneTB = uint64(1099511627776)
+const (
+	fourMB = uint64(4194304)
+	oneTB  = uint64(1099511627776)
+)
 
 // Export maximum range and file sizes
 

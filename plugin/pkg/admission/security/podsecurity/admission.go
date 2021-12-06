@@ -80,9 +80,11 @@ type Plugin struct {
 	delegate *podsecurityadmission.Admission
 }
 
-var _ admission.ValidationInterface = &Plugin{}
-var _ genericadmissioninit.WantsExternalKubeInformerFactory = &Plugin{}
-var _ genericadmissioninit.WantsExternalKubeClientSet = &Plugin{}
+var (
+	_ admission.ValidationInterface                         = &Plugin{}
+	_ genericadmissioninit.WantsExternalKubeInformerFactory = &Plugin{}
+	_ genericadmissioninit.WantsExternalKubeClientSet       = &Plugin{}
+)
 
 var (
 	defaultRecorder     *metrics.PrometheusRecorder
@@ -170,12 +172,10 @@ func (p *Plugin) ValidateInitialization() error {
 	return nil
 }
 
-var (
-	applicableResources = map[schema.GroupResource]bool{
-		corev1.Resource("pods"):       true,
-		corev1.Resource("namespaces"): true,
-	}
-)
+var applicableResources = map[schema.GroupResource]bool{
+	corev1.Resource("pods"):       true,
+	corev1.Resource("namespaces"): true,
+}
 
 func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if !p.enabled {

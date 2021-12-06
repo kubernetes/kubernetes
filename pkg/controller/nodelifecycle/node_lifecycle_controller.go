@@ -365,7 +365,6 @@ func NewNodeLifecycleController(
 	unhealthyZoneThreshold float32,
 	runTaintManager bool,
 ) (*Controller, error) {
-
 	if kubeClient == nil {
 		klog.Fatalf("kubeClient is nil when starting Controller")
 	}
@@ -696,7 +695,7 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 			}
 			result := controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
 			if result {
-				//count the evictionsNumber
+				// count the evictionsNumber
 				zone := nodetopology.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
 			}
@@ -1385,13 +1384,11 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
 		if !nc.runTaintManager {
-			nc.zonePodEvictor[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+			nc.zonePodEvictor[zone] = scheduler.NewRateLimitedTimedQueue(
+				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
 		} else {
-			nc.zoneNoExecuteTainter[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+			nc.zoneNoExecuteTainter[zone] = scheduler.NewRateLimitedTimedQueue(
+				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
 		}
 		// Init the metric for the new zone.
 		klog.Infof("Initializing eviction metric for zone: %v", zone)
@@ -1530,7 +1527,6 @@ func (nc *Controller) reconcileNodeLabels(nodeName string) error {
 			// Secondary label exists, but not consistent with the primary
 			// label. Need to reconcile.
 			labelsToUpdate[r.secondaryKey] = primaryValue
-
 		} else if !secondaryExists && r.ensureSecondaryExists {
 			// Apply secondary label based on primary label.
 			labelsToUpdate[r.secondaryKey] = primaryValue

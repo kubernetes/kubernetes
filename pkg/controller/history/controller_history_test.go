@@ -605,7 +605,8 @@ func TestRealHistory_UpdateControllerRevision(t *testing.T) {
 			},
 			reactor: nil,
 			err:     false,
-		}, {
+		},
+		{
 			name:        "update fails on error",
 			revision:    ss1Rev1,
 			newRevision: ss1Rev1.Revision + 10,
@@ -813,7 +814,8 @@ func TestRealHistory_DeleteControllerRevision(t *testing.T) {
 				},
 			},
 			err: false,
-		}, {
+		},
+		{
 			name:     "delete non-existing fails",
 			revision: ss1Rev1,
 			existing: []struct {
@@ -916,7 +918,8 @@ func TestFakeHistory_DeleteControllerRevision(t *testing.T) {
 				},
 			},
 			err: false,
-		}, {
+		},
+		{
 			name:     "delete non-existing fails",
 			revision: ss1Rev1,
 			existing: []struct {
@@ -985,7 +988,6 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 			default:
 				return false, nil, nil
 			}
-
 		})
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
@@ -1236,7 +1238,6 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 			default:
 				return false, nil, nil
 			}
-
 		})
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
@@ -1486,7 +1487,6 @@ func TestFindEqualRevisions(t *testing.T) {
 			if !test.want[found[i].Name] {
 				t.Errorf("%s: wanted %s not found", test.name, found[i].Name)
 			}
-
 		}
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
@@ -1671,7 +1671,8 @@ func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]
 							HostPath: &v1.HostPathVolumeSource{
 								Path: fmt.Sprintf("/tmp/%v", "home"),
 							},
-						}}},
+						},
+					}},
 				},
 			},
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{

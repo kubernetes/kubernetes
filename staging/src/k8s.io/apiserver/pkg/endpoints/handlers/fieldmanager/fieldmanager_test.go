@@ -327,6 +327,7 @@ func TestVersionCheck(t *testing.T) {
 		}
 	}
 }
+
 func TestVersionCheckDoesNotPanic(t *testing.T) {
 	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
@@ -757,7 +758,6 @@ func TestApplySuccessWithNoManagedFields(t *testing.T) {
 		t.Fatalf("error decoding YAML: %v", err)
 	}
 	err := f.Apply(appliedObj, "fieldmanager_test", false)
-
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
 	}

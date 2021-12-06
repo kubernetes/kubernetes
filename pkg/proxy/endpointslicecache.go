@@ -350,7 +350,6 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 			endpointsMap[svcPortName] = []Endpoint{}
 			for _, endpointInfo := range endpointSet {
 				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], endpointInfo)
-
 			}
 			// Ensure endpoints are always returned in the same order to simplify diffing.
 			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
@@ -389,9 +388,11 @@ type byAddress []*endpointInfo
 func (e byAddress) Len() int {
 	return len(e)
 }
+
 func (e byAddress) Swap(i, j int) {
 	e[i], e[j] = e[j], e[i]
 }
+
 func (e byAddress) Less(i, j int) bool {
 	return strings.Join(e[i].Addresses, ",") < strings.Join(e[j].Addresses, ",")
 }
@@ -402,9 +403,11 @@ type byEndpoint []Endpoint
 func (e byEndpoint) Len() int {
 	return len(e)
 }
+
 func (e byEndpoint) Swap(i, j int) {
 	e[i], e[j] = e[j], e[i]
 }
+
 func (e byEndpoint) Less(i, j int) bool {
 	return e[i].String() < e[j].String()
 }
@@ -415,9 +418,11 @@ type byPort []discovery.EndpointPort
 func (p byPort) Len() int {
 	return len(p)
 }
+
 func (p byPort) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
+
 func (p byPort) Less(i, j int) bool {
 	return *p[i].Port < *p[j].Port
 }

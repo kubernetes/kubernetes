@@ -52,12 +52,14 @@ import (
 	"k8s.io/utils/clock"
 )
 
-var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
-var updateMachineInfoInterval = flag.Duration("update_machine_info_interval", 5*time.Minute, "Interval between machine info updates.")
-var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
-var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
-var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
-var applicationMetricsCountLimit = flag.Int("application_metrics_count_limit", 100, "Max number of application metrics to store (per container)")
+var (
+	globalHousekeepingInterval   = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
+	updateMachineInfoInterval    = flag.Duration("update_machine_info_interval", 5*time.Minute, "Interval between machine info updates.")
+	logCadvisorUsage             = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
+	eventStorageAgeLimit         = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
+	eventStorageEventLimit       = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
+	applicationMetricsCountLimit = flag.Int("application_metrics_count_limit", 100, "Max number of application metrics to store (per container)")
+)
 
 // The namespace under which Docker aliases are unique.
 const DockerNamespace = "docker"
@@ -132,7 +134,6 @@ type Manager interface {
 
 	// Get past events that have been detected and that fit the request.
 	GetPastEvents(request *events.Request) ([]*info.Event, error)
-
 	CloseEventChannel(watchID int)
 
 	// Returns debugging information. Map of lines per category.
@@ -1072,7 +1073,6 @@ func (m *manager) getContainersDiff(containerName string) (added []info.Containe
 		return nil, nil, fmt.Errorf("failed to find container %q while checking for new containers", containerName)
 	}
 	allContainers, err := cont.handler.ListContainers(container.ListRecursive)
-
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1375,7 +1375,6 @@ func (m *manager) getFsInfoByDeviceName(deviceName string) (v2.FsInfo, error) {
 }
 
 func getVersionInfo() (*info.VersionInfo, error) {
-
 	kernelVersion := machine.KernelVersion()
 	osVersion := machine.ContainerOsVersion()
 

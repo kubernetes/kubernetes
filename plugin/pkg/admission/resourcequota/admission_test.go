@@ -532,7 +532,6 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
 		}
 	}
-
 }
 
 // TestAdmitHandlesCreatingUpdates verifies that admit handles updates which behave as creates
@@ -1342,7 +1341,8 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
 								ScopeName: corev1.ResourceQuotaScopePriorityClass,
-								Operator:  corev1.ScopeSelectorOpExists},
+								Operator:  corev1.ScopeSelectorOpExists,
+							},
 						},
 					},
 				},
@@ -1372,7 +1372,8 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
 								ScopeName: corev1.ResourceQuotaScopePriorityClass,
-								Operator:  corev1.ScopeSelectorOpExists},
+								Operator:  corev1.ScopeSelectorOpExists,
+							},
 						},
 					},
 				},
@@ -1736,7 +1737,8 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
 								ScopeName: corev1.ResourceQuotaScopePriorityClass,
-								Operator:  corev1.ScopeSelectorOpExists},
+								Operator:  corev1.ScopeSelectorOpExists,
+							},
 						},
 					},
 				},
@@ -1926,7 +1928,8 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
 								ScopeName: corev1.ResourceQuotaScopePriorityClass,
-								Operator:  corev1.ScopeSelectorOpExists},
+								Operator:  corev1.ScopeSelectorOpExists,
+							},
 						},
 					},
 				},
@@ -1988,7 +1991,6 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 
 // TestAdmitZeroDeltaUsageWithoutCoveringQuota verifies that resource quota is not required for zero delta requests.
 func TestAdmitZeroDeltaUsageWithoutCoveringQuota(t *testing.T) {
-
 	kubeClient := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)

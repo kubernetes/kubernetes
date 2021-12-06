@@ -27,26 +27,29 @@ import (
 )
 
 func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caContent string, t *testing.T) Config {
-	if err := ioutil.WriteFile(certFile, []byte(certContent), 0644); err != nil {
+	if err := ioutil.WriteFile(certFile, []byte(certContent), 0o644); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := ioutil.WriteFile(keyFile, []byte(keyContent), 0600); err != nil {
+	if err := ioutil.WriteFile(keyFile, []byte(keyContent), 0o600); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := ioutil.WriteFile(caFile, []byte(caContent), 0644); err != nil {
+	if err := ioutil.WriteFile(caFile, []byte(caContent), 0o644); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	return Config{
 		AuthInfos: map[string]*AuthInfo{
 			"red-user":  {Token: "red-token", ClientCertificateData: []byte(certContent), ClientKeyData: []byte(keyContent)},
-			"blue-user": {Token: "blue-token", ClientCertificate: certFile, ClientKey: keyFile}},
+			"blue-user": {Token: "blue-token", ClientCertificate: certFile, ClientKey: keyFile},
+		},
 		Clusters: map[string]*Cluster{
 			"cow-cluster":     {Server: "http://cow.org:8080", CertificateAuthorityData: []byte(caContent)},
-			"chicken-cluster": {Server: "http://chicken.org:8080", CertificateAuthority: caFile}},
+			"chicken-cluster": {Server: "http://chicken.org:8080", CertificateAuthority: caFile},
+		},
 		Contexts: map[string]*Context{
 			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"},
-			"shaker-context":  {AuthInfo: "blue-user", Cluster: "chicken-cluster"}},
+			"shaker-context":  {AuthInfo: "blue-user", Cluster: "chicken-cluster"},
+		},
 		CurrentContext: "federal-context",
 	}
 }
@@ -203,7 +206,6 @@ func TestFlattenSuccess(t *testing.T) {
 	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData) != keyData {
 		t.Errorf("expected %v, got %v", keyData, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
 	}
-
 }
 
 func Example_minifyAndShorten() {

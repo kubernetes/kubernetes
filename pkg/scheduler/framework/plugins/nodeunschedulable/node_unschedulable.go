@@ -28,11 +28,12 @@ import (
 
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
 // the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
-type NodeUnschedulable struct {
-}
+type NodeUnschedulable struct{}
 
-var _ framework.FilterPlugin = &NodeUnschedulable{}
-var _ framework.EnqueueExtensions = &NodeUnschedulable{}
+var (
+	_ framework.FilterPlugin      = &NodeUnschedulable{}
+	_ framework.EnqueueExtensions = &NodeUnschedulable{}
+)
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.NodeUnschedulable

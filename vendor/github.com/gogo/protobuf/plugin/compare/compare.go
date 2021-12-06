@@ -554,7 +554,7 @@ func (p *plugin) generateMessage(file *generator.FileDescriptor, message *genera
 	p.Out()
 	p.P(`}`)
 
-	//Generate Compare methods for oneof fields
+	// Generate Compare methods for oneof fields
 	m := proto.Clone(message.DescriptorProto).(*descriptor.DescriptorProto)
 	for _, field := range m.Field {
 		oneof := field.OneofIndex != nil

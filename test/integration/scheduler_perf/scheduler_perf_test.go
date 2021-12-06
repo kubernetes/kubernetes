@@ -70,18 +70,16 @@ const (
 	Create = "create"
 )
 
-var (
-	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: map[string]*labelValues{
-			"scheduler_framework_extension_point_duration_seconds": {
-				label:  extensionPointsLabelName,
-				values: []string{"Filter", "Score"},
-			},
-			"scheduler_e2e_scheduling_duration_seconds": nil,
-			"scheduler_pod_scheduling_duration_seconds": nil,
+var defaultMetricsCollectorConfig = metricsCollectorConfig{
+	Metrics: map[string]*labelValues{
+		"scheduler_framework_extension_point_duration_seconds": {
+			label:  extensionPointsLabelName,
+			values: []string{"Filter", "Score"},
 		},
-	}
-)
+		"scheduler_e2e_scheduling_duration_seconds": nil,
+		"scheduler_pod_scheduling_duration_seconds": nil,
+	},
+}
 
 // testCase defines a set of test cases that intend to test the performance of
 // similar workloads of varying sizes with shared overall settings such as

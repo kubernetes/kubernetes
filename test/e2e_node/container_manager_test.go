@@ -209,7 +209,6 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 
 					return nil
 				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
-
 			})
 			ginkgo.It("burstable container's oom-score-adj should be between [2, 1000)", func() {
 				podClient := f.PodClient()

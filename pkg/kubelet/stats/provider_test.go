@@ -643,7 +643,6 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 	assert.EqualValues(t, 100, *stats.Interfaces[1].RxErrors, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxErrors, label+".Net.TxErrors")
-
 }
 
 // container which had no stats should have zero-valued CPU usage

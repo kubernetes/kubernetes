@@ -94,7 +94,6 @@ type ContainerManager interface {
 	// to make sure it is at least equal to the pod's requested capacity for
 	// any registered device plugin resource
 	UpdatePluginResources(*schedulerframework.NodeInfo, *lifecycle.PodAdmitAttributes) error
-
 	InternalContainerLifecycle() InternalContainerLifecycle
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.

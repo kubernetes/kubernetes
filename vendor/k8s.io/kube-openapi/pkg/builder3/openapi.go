@@ -19,13 +19,14 @@ package builder3
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+
 	restful "github.com/emicklei/go-restful"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -117,7 +118,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 
 	body, err := o.buildRequestBody(route.ParameterDocs, route.ReadSample)
 	if err != nil {
-		return nil ,err
+		return nil, err
 	}
 
 	if body != nil {
@@ -136,7 +137,7 @@ func (o *openAPI) buildRequestBody(parameters []*restful.Parameter, bodySample i
 			r := &spec3.RequestBody{
 				RequestBodyProps: spec3.RequestBodyProps{
 					Content: map[string]*spec3.MediaType{
-						"application/json": &spec3.MediaType{
+						"application/json": {
 							MediaTypeProps: spec3.MediaTypeProps{
 								Schema: schema,
 							},

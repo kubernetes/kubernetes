@@ -39,7 +39,7 @@ func createProductNameFile() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary test file: %v", err)
 	}
-	return file.Name(), ioutil.WriteFile(file.Name(), []byte("Google"), 0600)
+	return file.Name(), ioutil.WriteFile(file.Name(), []byte("Google"), 0o600)
 }
 
 // The tests here are run in this fashion to ensure TestAllProvidersNoMetadata

@@ -1,3 +1,4 @@
+//go:build !solaris
 // +build !solaris
 
 package zfs
@@ -13,5 +14,8 @@ var dsPropListOptions = strings.Join(dsPropList, ",")
 
 // List of Zpool properties to retrieve from zpool list command on a non-Solaris platform
 var zpoolPropList = []string{"name", "health", "allocated", "size", "free", "readonly", "dedupratio", "fragmentation", "freeing", "leaked"}
-var zpoolPropListOptions = strings.Join(zpoolPropList, ",")
-var zpoolArgs = []string{"get", "-p", zpoolPropListOptions}
+
+var (
+	zpoolPropListOptions = strings.Join(zpoolPropList, ",")
+	zpoolArgs            = []string{"get", "-p", zpoolPropListOptions}
+)

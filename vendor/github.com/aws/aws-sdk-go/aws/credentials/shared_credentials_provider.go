@@ -12,10 +12,8 @@ import (
 // SharedCredsProviderName provides a name of SharedCreds provider
 const SharedCredsProviderName = "SharedCredentialsProvider"
 
-var (
-	// ErrSharedCredentialsHomeNotFound is emitted when the user directory cannot be found.
-	ErrSharedCredentialsHomeNotFound = awserr.New("UserHomeNotFound", "user home directory not found.", nil)
-)
+// ErrSharedCredentialsHomeNotFound is emitted when the user directory cannot be found.
+var ErrSharedCredentialsHomeNotFound = awserr.New("UserHomeNotFound", "user home directory not found.", nil)
 
 // A SharedCredentialsProvider retrieves access key pair (access key ID,
 // secret access key, and session token if present) credentials from the current

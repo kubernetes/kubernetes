@@ -81,7 +81,7 @@ func TestRequeueStuckDeployment(t *testing.T) {
 		{
 			Type:           apps.DeploymentProgressing,
 			Status:         v1.ConditionTrue,
-			LastUpdateTime: metav1.Date(2017, 2, 15, 18, 49, 00, 00, time.UTC),
+			LastUpdateTime: metav1.Date(2017, 2, 15, 18, 49, 0o0, 0o0, time.UTC),
 		},
 	}
 
@@ -126,14 +126,14 @@ func TestRequeueStuckDeployment(t *testing.T) {
 			name:     "stuck deployment - 30s",
 			d:        currentDeployment(&pds, 3, 3, 3, 1, stuck),
 			status:   newDeploymentStatus(3, 3, 1),
-			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 49, 30, 00, time.UTC).Time },
+			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 49, 30, 0o0, time.UTC).Time },
 			expected: 30 * time.Second,
 		},
 		{
 			name:     "stuck deployment - 1s",
 			d:        currentDeployment(&pds, 3, 3, 3, 1, stuck),
 			status:   newDeploymentStatus(3, 3, 1),
-			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 49, 59, 00, time.UTC).Time },
+			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 49, 59, 0o0, time.UTC).Time },
 			expected: 1 * time.Second,
 		},
 		{
@@ -147,21 +147,21 @@ func TestRequeueStuckDeployment(t *testing.T) {
 			name:     "failed deployment - now",
 			d:        currentDeployment(&pds, 3, 3, 3, 1, stuck),
 			status:   newDeploymentStatus(3, 3, 1),
-			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 50, 00, 00, time.UTC).Time },
+			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 50, 0o0, 0o0, time.UTC).Time },
 			expected: time.Duration(0),
 		},
 		{
 			name:     "failed deployment - 1s after deadline",
 			d:        currentDeployment(&pds, 3, 3, 3, 1, stuck),
 			status:   newDeploymentStatus(3, 3, 1),
-			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 50, 01, 00, time.UTC).Time },
+			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 50, 0o1, 0o0, time.UTC).Time },
 			expected: time.Duration(0),
 		},
 		{
 			name:     "failed deployment - 60s after deadline",
 			d:        currentDeployment(&pds, 3, 3, 3, 1, stuck),
 			status:   newDeploymentStatus(3, 3, 1),
-			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 51, 00, 00, time.UTC).Time },
+			nowFn:    func() time.Time { return metav1.Date(2017, 2, 15, 18, 51, 0o0, 0o0, time.UTC).Time },
 			expected: time.Duration(0),
 		},
 	}
@@ -186,7 +186,7 @@ func TestRequeueStuckDeployment(t *testing.T) {
 
 func TestSyncRolloutStatus(t *testing.T) {
 	pds := int32(60)
-	testTime := metav1.Date(2017, 2, 15, 18, 49, 00, 00, time.UTC)
+	testTime := metav1.Date(2017, 2, 15, 18, 49, 0o0, 0o0, time.UTC)
 	failedTimedOut := apps.DeploymentCondition{
 		Type:   apps.DeploymentProgressing,
 		Status: v1.ConditionFalse,

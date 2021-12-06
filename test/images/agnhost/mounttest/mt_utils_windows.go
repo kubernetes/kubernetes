@@ -78,7 +78,6 @@ func getFilePerm(path string) (os.FileMode, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &errOut
 	err := cmd.Run()
-
 	if err != nil {
 		fmt.Printf("error from PowerShell Script: %v, %v\n", err, errOut.String())
 		return 0, err

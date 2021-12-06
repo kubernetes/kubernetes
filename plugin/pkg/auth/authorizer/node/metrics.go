@@ -25,18 +25,16 @@ import (
 
 const nodeAuthorizerSubsystem = "node_authorizer"
 
-var (
-	graphActionsDuration = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
-			Subsystem:      nodeAuthorizerSubsystem,
-			Name:           "graph_actions_duration_seconds",
-			Help:           "Histogram of duration of graph actions in node authorizer.",
-			StabilityLevel: metrics.ALPHA,
-			// Start with 0.1ms with the last bucket being [~200ms, Inf)
-			Buckets: metrics.ExponentialBuckets(0.0001, 2, 12),
-		},
-		[]string{"operation"},
-	)
+var graphActionsDuration = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Subsystem:      nodeAuthorizerSubsystem,
+		Name:           "graph_actions_duration_seconds",
+		Help:           "Histogram of duration of graph actions in node authorizer.",
+		StabilityLevel: metrics.ALPHA,
+		// Start with 0.1ms with the last bucket being [~200ms, Inf)
+		Buckets: metrics.ExponentialBuckets(0.0001, 2, 12),
+	},
+	[]string{"operation"},
 )
 
 var registerMetrics sync.Once

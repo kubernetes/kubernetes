@@ -56,11 +56,9 @@ const (
 	ingressesCleanupTimeout  = 80 * time.Minute
 )
 
-var (
-	scaleTestLabels = map[string]string{
-		"app": scaleTestBackendName,
-	}
-)
+var scaleTestLabels = map[string]string{
+	"app": scaleTestBackendName,
+}
 
 // IngressScaleFramework defines the framework for ingress scale testing.
 type IngressScaleFramework struct {
@@ -316,7 +314,7 @@ func (f *IngressScaleFramework) dumpLatencies() {
 	formattedData := f.GetFormattedLatencies()
 	if f.OutputFile != "" {
 		f.Logger.Infof("Dumping scale test latencies to file %s...", f.OutputFile)
-		ioutil.WriteFile(f.OutputFile, []byte(formattedData), 0644)
+		ioutil.WriteFile(f.OutputFile, []byte(formattedData), 0o644)
 		return
 	}
 	f.Logger.Infof("\n%v", formattedData)

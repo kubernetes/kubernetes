@@ -102,7 +102,6 @@ func (ap *AnsiParser) csiDispatch() error {
 		ap.logf("ERROR: Unsupported CSI command: '%s', with full context:  %v", cmd, ap.context)
 		return nil
 	}
-
 }
 
 func (ap *AnsiParser) print() error {

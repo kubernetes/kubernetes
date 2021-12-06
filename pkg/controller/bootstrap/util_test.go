@@ -107,7 +107,6 @@ func TestValidateSecretForSigning(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestValidateSecret(t *testing.T) {

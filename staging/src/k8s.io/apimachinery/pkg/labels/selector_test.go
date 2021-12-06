@@ -29,9 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-var (
-	ignoreDetail = cmpopts.IgnoreFields(field.Error{}, "Detail")
-)
+var ignoreDetail = cmpopts.IgnoreFields(field.Error{}, "Detail")
 
 func TestSelectorParse(t *testing.T) {
 	testGoodStrings := []string{
@@ -165,10 +163,10 @@ func TestSetMatches(t *testing.T) {
 	expectMatchDirect(t, Set{"baz": "blah"}, labelset)
 	expectMatchDirect(t, Set{"foo": "bar", "baz": "blah"}, labelset)
 
-	//TODO: bad values not handled for the moment in SelectorFromSet
-	//expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
-	//expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
-	//expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
+	// TODO: bad values not handled for the moment in SelectorFromSet
+	// expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
+	// expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
+	// expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
 }
 
 func TestNilMapIsValid(t *testing.T) {
@@ -203,12 +201,12 @@ func TestLexer(t *testing.T) {
 		{"==", DoubleEqualsToken},
 		{">", GreaterThanToken},
 		{"<", LessThanToken},
-		//Note that Lex returns the longest valid token found
+		// Note that Lex returns the longest valid token found
 		{"!", DoesNotExistToken},
 		{"!=", NotEqualsToken},
 		{"(", OpenParToken},
 		{")", ClosedParToken},
-		//Non-"special" characters are considered part of an identifier
+		// Non-"special" characters are considered part of an identifier
 		{"~", IdentifierToken},
 		{"||", IdentifierToken},
 	}
@@ -268,6 +266,7 @@ func TestLexerSequence(t *testing.T) {
 		}
 	}
 }
+
 func TestParserLookahead(t *testing.T) {
 	testcases := []struct {
 		s string
@@ -460,7 +459,7 @@ func TestRequirementConstructor(t *testing.T) {
 			},
 		},
 		{
-			Key: strings.Repeat("a", 254), //breaks DNS rule that len(key) <= 253
+			Key: strings.Repeat("a", 254), // breaks DNS rule that len(key) <= 253
 			Op:  selection.Exists,
 			WantErr: field.ErrorList{
 				&field.Error{
@@ -521,37 +520,54 @@ func TestToString(t *testing.T) {
 		Out   string
 		Valid bool
 	}{
-
-		{&internalSelector{
-			getRequirement("x", selection.In, sets.NewString("abc", "def"), t),
-			getRequirement("y", selection.NotIn, sets.NewString("jkl"), t),
-			getRequirement("z", selection.Exists, nil, t)},
-			"x in (abc,def),y notin (jkl),z", true},
-		{&internalSelector{
-			getRequirement("x", selection.NotIn, sets.NewString("abc", "def"), t),
-			getRequirement("y", selection.NotEquals, sets.NewString("jkl"), t),
-			getRequirement("z", selection.DoesNotExist, nil, t)},
-			"x notin (abc,def),y!=jkl,!z", true},
-		{&internalSelector{
-			getRequirement("x", selection.In, sets.NewString("abc", "def"), t),
-			req}, // adding empty req for the trailing ','
-			"x in (abc,def),", false},
-		{&internalSelector{
-			getRequirement("x", selection.NotIn, sets.NewString("abc"), t),
-			getRequirement("y", selection.In, sets.NewString("jkl", "mno"), t),
-			getRequirement("z", selection.NotIn, sets.NewString(""), t)},
-			"x notin (abc),y in (jkl,mno),z notin ()", true},
-		{&internalSelector{
-			getRequirement("x", selection.Equals, sets.NewString("abc"), t),
-			getRequirement("y", selection.DoubleEquals, sets.NewString("jkl"), t),
-			getRequirement("z", selection.NotEquals, sets.NewString("a"), t),
-			getRequirement("z", selection.Exists, nil, t)},
-			"x=abc,y==jkl,z!=a,z", true},
-		{&internalSelector{
-			getRequirement("x", selection.GreaterThan, sets.NewString("2"), t),
-			getRequirement("y", selection.LessThan, sets.NewString("8"), t),
-			getRequirement("z", selection.Exists, nil, t)},
-			"x>2,y<8,z", true},
+		{
+			&internalSelector{
+				getRequirement("x", selection.In, sets.NewString("abc", "def"), t),
+				getRequirement("y", selection.NotIn, sets.NewString("jkl"), t),
+				getRequirement("z", selection.Exists, nil, t),
+			},
+			"x in (abc,def),y notin (jkl),z", true,
+		},
+		{
+			&internalSelector{
+				getRequirement("x", selection.NotIn, sets.NewString("abc", "def"), t),
+				getRequirement("y", selection.NotEquals, sets.NewString("jkl"), t),
+				getRequirement("z", selection.DoesNotExist, nil, t),
+			},
+			"x notin (abc,def),y!=jkl,!z", true,
+		},
+		{
+			&internalSelector{
+				getRequirement("x", selection.In, sets.NewString("abc", "def"), t),
+				req,
+			}, // adding empty req for the trailing ','
+			"x in (abc,def),", false,
+		},
+		{
+			&internalSelector{
+				getRequirement("x", selection.NotIn, sets.NewString("abc"), t),
+				getRequirement("y", selection.In, sets.NewString("jkl", "mno"), t),
+				getRequirement("z", selection.NotIn, sets.NewString(""), t),
+			},
+			"x notin (abc),y in (jkl,mno),z notin ()", true,
+		},
+		{
+			&internalSelector{
+				getRequirement("x", selection.Equals, sets.NewString("abc"), t),
+				getRequirement("y", selection.DoubleEquals, sets.NewString("jkl"), t),
+				getRequirement("z", selection.NotEquals, sets.NewString("a"), t),
+				getRequirement("z", selection.Exists, nil, t),
+			},
+			"x=abc,y==jkl,z!=a,z", true,
+		},
+		{
+			&internalSelector{
+				getRequirement("x", selection.GreaterThan, sets.NewString("2"), t),
+				getRequirement("y", selection.LessThan, sets.NewString("8"), t),
+				getRequirement("z", selection.Exists, nil, t),
+			},
+			"x>2,y<8,z", true,
+		},
 	}
 	for _, ts := range toStringTests {
 		if out := ts.In.String(); out == "" && ts.Valid {
@@ -890,7 +906,6 @@ func TestRequiresExactMatch(t *testing.T) {
 			if found && value != ts.expectedValue {
 				t.Errorf("Expected value %v, found %v", ts.expectedValue, value)
 			}
-
 		})
 	}
 }

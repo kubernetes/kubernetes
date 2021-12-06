@@ -60,6 +60,7 @@ type es2ecServerStream struct{ chanServerStream }
 func (s *es2ecClientStream) Send(rr *v3electionpb.LeaderRequest) error {
 	return s.SendMsg(rr)
 }
+
 func (s *es2ecClientStream) Recv() (*v3electionpb.LeaderResponse, error) {
 	var v interface{}
 	if err := s.RecvMsg(&v); err != nil {
@@ -71,6 +72,7 @@ func (s *es2ecClientStream) Recv() (*v3electionpb.LeaderResponse, error) {
 func (s *es2ecServerStream) Send(rr *v3electionpb.LeaderResponse) error {
 	return s.SendMsg(rr)
 }
+
 func (s *es2ecServerStream) Recv() (*v3electionpb.LeaderRequest, error) {
 	var v interface{}
 	if err := s.RecvMsg(&v); err != nil {

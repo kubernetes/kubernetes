@@ -87,6 +87,7 @@ func TestFindField(t *testing.T) {
 		})
 	}
 }
+
 func TestCrdFindField(t *testing.T) {
 	schema := resources.LookupResource(schema.GroupVersionKind{
 		Group:   "",

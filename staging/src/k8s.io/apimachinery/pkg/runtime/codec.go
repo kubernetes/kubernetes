@@ -322,8 +322,11 @@ func (disabledGroupVersioner) Identifier() string {
 
 // Assert that schema.GroupVersion and GroupVersions implement GroupVersioner
 var _ GroupVersioner = schema.GroupVersion{}
-var _ GroupVersioner = schema.GroupVersions{}
-var _ GroupVersioner = multiGroupVersioner{}
+
+var (
+	_ GroupVersioner = schema.GroupVersions{}
+	_ GroupVersioner = multiGroupVersioner{}
+)
 
 type multiGroupVersioner struct {
 	target             schema.GroupVersion

@@ -251,6 +251,7 @@ func (o FileOptions) NewFiles(fds *descriptorpb.FileDescriptorSet) (*protoregist
 	}
 	return r, nil
 }
+
 func (o FileOptions) addFileDeps(r *protoregistry.Files, fd *descriptorpb.FileDescriptorProto, files map[string]*descriptorpb.FileDescriptorProto) error {
 	// Set the entry to nil while descending into a file's dependencies to detect cycles.
 	files[fd.GetName()] = nil

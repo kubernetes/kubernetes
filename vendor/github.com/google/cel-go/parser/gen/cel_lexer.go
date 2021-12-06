@@ -255,7 +255,6 @@ type CELLexer struct {
 }
 
 func NewCELLexer(input antlr.CharStream) *CELLexer {
-
 	l := new(CELLexer)
 	lexerDeserializer := antlr.NewATNDeserializer(nil)
 	lexerAtn := lexerDeserializer.DeserializeFromUInt16(serializedLexerAtn)

@@ -81,8 +81,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 }
 
-type fakePDManager struct {
-}
+type fakePDManager struct{}
 
 func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)

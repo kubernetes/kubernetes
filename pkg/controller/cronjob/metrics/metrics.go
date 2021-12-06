@@ -25,16 +25,14 @@ import (
 
 const CronJobControllerSubsystem = "cronjob_controller"
 
-var (
-	CronJobCreationSkew = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:      CronJobControllerSubsystem,
-			Name:           "cronjob_job_creation_skew_duration_seconds",
-			Help:           "Time between when a cronjob is scheduled to be run, and when the corresponding job is created",
-			StabilityLevel: metrics.ALPHA,
-			Buckets:        metrics.ExponentialBuckets(1, 2, 10),
-		},
-	)
+var CronJobCreationSkew = metrics.NewHistogram(
+	&metrics.HistogramOpts{
+		Subsystem:      CronJobControllerSubsystem,
+		Name:           "cronjob_job_creation_skew_duration_seconds",
+		Help:           "Time between when a cronjob is scheduled to be run, and when the corresponding job is created",
+		StabilityLevel: metrics.ALPHA,
+		Buckets:        metrics.ExponentialBuckets(1, 2, 10),
+	},
 )
 
 var registerMetrics sync.Once

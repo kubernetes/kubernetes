@@ -220,7 +220,6 @@ func PredictionModehasConfigInRuleStopState(configs ATNConfigSet) bool {
 // @return {@code true} if all configurations in {@code configs} are in a
 // {@link RuleStopState}, otherwise {@code false}
 func PredictionModeallConfigsInRuleStopStates(configs ATNConfigSet) bool {
-
 	for _, c := range configs.GetItems() {
 		if _, ok := c.GetState().(*RuleStopState); !ok {
 			return false
@@ -488,7 +487,7 @@ func PredictionModegetConflictingAltSubsets(configs ATNConfigSet) []*BitSet {
 	configToAlts := make(map[int]*BitSet)
 
 	for _, c := range configs.GetItems() {
-		key := 31 * c.GetState().GetStateNumber() + c.GetContext().hash()
+		key := 31*c.GetState().GetStateNumber() + c.GetContext().hash()
 
 		alts, ok := configToAlts[key]
 		if !ok {

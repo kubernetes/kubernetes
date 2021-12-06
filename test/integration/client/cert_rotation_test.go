@@ -157,7 +157,7 @@ func writeCACertFiles(t *testing.T, certDir string) (string, *x509.Certificate, 
 
 	clientCAFilename := path.Join(certDir, "ca.crt")
 
-	if err := ioutil.WriteFile(clientCAFilename, utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(clientCAFilename, utils.EncodeCertPEM(clientSigningCert), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -175,7 +175,7 @@ func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigning
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(path.Join(certDir, "client.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}), 0666); err != nil {
+	if err := ioutil.WriteFile(path.Join(certDir, "client.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}), 0o666); err != nil {
 		t.Fatal(err)
 	}
 
@@ -201,7 +201,7 @@ func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigning
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(path.Join(certDir, "client.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDERBytes}), 0666); err != nil {
+	if err := ioutil.WriteFile(path.Join(certDir, "client.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDERBytes}), 0o666); err != nil {
 		t.Fatal(err)
 	}
 

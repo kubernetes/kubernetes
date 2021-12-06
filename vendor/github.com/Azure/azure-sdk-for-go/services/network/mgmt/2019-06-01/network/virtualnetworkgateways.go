@@ -8,11 +8,12 @@ package network
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VirtualNetworkGatewaysClient is the network Client
@@ -49,8 +50,11 @@ func (client VirtualNetworkGatewaysClient) CreateOrUpdate(ctx context.Context, r
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.VirtualNetworkGatewayPropertiesFormat", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.VirtualNetworkGatewaysClient", "CreateOrUpdate", err.Error())
 	}
 
@@ -1330,9 +1334,14 @@ func (client VirtualNetworkGatewaysClient) SetVpnclientIpsecParameters(ctx conte
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: vpnclientIpsecParams,
-			Constraints: []validation.Constraint{{Target: "vpnclientIpsecParams.SaLifeTimeSeconds", Name: validation.Null, Rule: true, Chain: nil},
-				{Target: "vpnclientIpsecParams.SaDataSizeKilobytes", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: vpnclientIpsecParams,
+			Constraints: []validation.Constraint{
+				{Target: "vpnclientIpsecParams.SaLifeTimeSeconds", Name: validation.Null, Rule: true, Chain: nil},
+				{Target: "vpnclientIpsecParams.SaDataSizeKilobytes", Name: validation.Null, Rule: true, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("network.VirtualNetworkGatewaysClient", "SetVpnclientIpsecParameters", err.Error())
 	}
 

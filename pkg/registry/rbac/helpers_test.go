@@ -37,7 +37,6 @@ func newPod() *kapi.Pod {
 			OwnerReferences: []metav1.OwnerReference{},
 		},
 	}
-
 }
 
 func TestIsOnlyMutatingGCFields(t *testing.T) {

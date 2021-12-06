@@ -20,14 +20,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestDiskUsage(t *testing.T) {
-
 	dir1, err := ioutil.TempDir("", "dir_1")
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())

@@ -22,8 +22,8 @@ import (
 )
 
 func (c *Client) BlockVolumeCreate(request *api.BlockVolumeCreateRequest) (
-	*api.BlockVolumeInfoResponse, error) {
-
+	*api.BlockVolumeInfoResponse, error,
+) {
 	buffer, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,6 @@ func (c *Client) BlockVolumeCreate(request *api.BlockVolumeCreateRequest) (
 	}
 
 	return &blockvolume, nil
-
 }
 
 func (c *Client) BlockVolumeList() (*api.BlockVolumeListResponse, error) {
@@ -159,8 +158,8 @@ func (c *Client) BlockVolumeDelete(id string) error {
 }
 
 func (c *Client) BlockVolumeExpand(id string, request *api.BlockVolumeExpandRequest) (
-	*api.BlockVolumeInfoResponse, error) {
-
+	*api.BlockVolumeInfoResponse, error,
+) {
 	// Marshal request to JSON
 	buffer, err := json.Marshal(request)
 	if err != nil {

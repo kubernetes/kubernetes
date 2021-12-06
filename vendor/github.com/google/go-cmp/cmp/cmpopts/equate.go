@@ -60,13 +60,16 @@ type approximator struct{ frac, marg float64 }
 func areRealF64s(x, y float64) bool {
 	return !math.IsNaN(x) && !math.IsNaN(y) && !math.IsInf(x, 0) && !math.IsInf(y, 0)
 }
+
 func areRealF32s(x, y float32) bool {
 	return areRealF64s(float64(x), float64(y))
 }
+
 func (a approximator) compareF64(x, y float64) bool {
 	relMarg := a.frac * math.Min(math.Abs(x), math.Abs(y))
 	return math.Abs(x-y) <= math.Max(a.marg, relMarg)
 }
+
 func (a approximator) compareF32(x, y float32) bool {
 	return a.compareF64(float64(x), float64(y))
 }
@@ -85,6 +88,7 @@ func EquateNaNs() cmp.Option {
 func areNaNsF64s(x, y float64) bool {
 	return math.IsNaN(x) && math.IsNaN(y)
 }
+
 func areNaNsF32s(x, y float32) bool {
 	return areNaNsF64s(float64(x), float64(y))
 }

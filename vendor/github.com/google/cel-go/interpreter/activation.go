@@ -187,11 +187,9 @@ func (v *varActivation) ResolveName(name string) (interface{}, bool) {
 	return v.parent.ResolveName(name)
 }
 
-var (
-	// pool of var activations to reduce allocations during folds.
-	varActivationPool = &sync.Pool{
-		New: func() interface{} {
-			return &varActivation{}
-		},
-	}
-)
+// pool of var activations to reduce allocations during folds.
+var varActivationPool = &sync.Pool{
+	New: func() interface{} {
+		return &varActivation{}
+	},
+}

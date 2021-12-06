@@ -156,7 +156,6 @@ func TestRunHandlerHttp(t *testing.T) {
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
 	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
-
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

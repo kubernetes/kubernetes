@@ -98,7 +98,6 @@ func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string)
 			}
 			return false, nil
 		})
-
 	if err != nil {
 		framework.Failf("dig result did not match: %#v after %v",
 			actual, timeout)
@@ -236,7 +235,6 @@ func (t *dnsTestCommon) deleteUtilPod() {
 
 // deleteCoreDNSPods manually deletes the CoreDNS pods to apply the changes to the ConfigMap.
 func (t *dnsTestCommon) deleteCoreDNSPods() {
-
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 

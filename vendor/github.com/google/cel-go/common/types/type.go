@@ -22,10 +22,8 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 )
 
-var (
-	// TypeType is the type of a TypeValue.
-	TypeType = NewTypeValue("type")
-)
+// TypeType is the type of a TypeValue.
+var TypeType = NewTypeValue("type")
 
 // TypeValue is an instance of a Value that describes a value's type.
 type TypeValue struct {
@@ -41,7 +39,8 @@ func NewTypeValue(name string, traits ...int) *TypeValue {
 	}
 	return &TypeValue{
 		name:      name,
-		traitMask: traitMask}
+		traitMask: traitMask,
+	}
 }
 
 // NewObjectTypeValue returns a *TypeValue based on the input name, which is

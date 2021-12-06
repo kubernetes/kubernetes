@@ -553,7 +553,7 @@ func loadCSMConfig(envCfg envConfig, cfgFiles []string) (csmConfig, error) {
 
 func setTLSOptions(opts *Options, cfg *aws.Config, envCfg envConfig, sharedCfg sharedConfig) error {
 	// CA Bundle can be specified in both environment variable shared config file.
-	var caBundleFilename = envCfg.CustomCABundle
+	caBundleFilename := envCfg.CustomCABundle
 	if len(caBundleFilename) == 0 {
 		caBundleFilename = sharedCfg.CustomCABundle
 	}
@@ -593,7 +593,6 @@ func setTLSOptions(opts *Options, cfg *aws.Config, envCfg envConfig, sharedCfg s
 		}
 	} else if opts.ClientTLSCert == nil && opts.ClientTLSKey == nil {
 		// Do nothing if neither values are available.
-
 	} else {
 		return awserr.New(ErrCodeLoadClientTLSCert,
 			fmt.Sprintf("client TLS cert(%t) and key(%t) must both be provided",
@@ -703,7 +702,6 @@ func mergeConfigSrcs(cfg, userCfg *aws.Config,
 	handlers request.Handlers,
 	sessOpts Options,
 ) error {
-
 	// Region if not already set by user
 	if len(aws.StringValue(cfg.Region)) == 0 {
 		if len(envCfg.Region) > 0 {
@@ -844,7 +842,6 @@ func (s *Session) ClientConfig(service string, cfgs ...*aws.Config) client.Confi
 const ec2MetadataServiceID = "ec2metadata"
 
 func (s *Session) resolveEndpoint(service, region string, cfg *aws.Config) (endpoints.ResolvedEndpoint, error) {
-
 	if ep := aws.StringValue(cfg.Endpoint); len(ep) != 0 {
 		return endpoints.ResolvedEndpoint{
 			URL:           endpoints.AddScheme(ep, aws.BoolValue(cfg.DisableSSL)),

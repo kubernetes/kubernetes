@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // VirtualMachineScaleSetVMsClient is the compute Client
@@ -993,8 +994,11 @@ func (client VirtualMachineScaleSetVMsClient) RunCommand(ctx context.Context, re
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.CommandID", Name: validation.Null, Rule: true, Chain: nil}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.CommandID", Name: validation.Null, Rule: true, Chain: nil}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachineScaleSetVMsClient", "RunCommand", err.Error())
 	}
 
@@ -1239,23 +1243,44 @@ func (client VirtualMachineScaleSetVMsClient) Update(ctx context.Context, resour
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetVMProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SecretURL", Name: validation.Null, Rule: true, Chain: nil},
-									{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
-								}},
-								{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey", Name: validation.Null, Rule: false,
-									Chain: []validation.Constraint{{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.KeyURL", Name: validation.Null, Rule: true, Chain: nil},
-										{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
-									}},
-							}},
-						}},
-					}},
-				}}}}}); err != nil {
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.VirtualMachineScaleSetVMProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk", Name: validation.Null, Rule: false,
+								Chain: []validation.Constraint{
+									{
+										Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings", Name: validation.Null, Rule: false,
+										Chain: []validation.Constraint{
+											{
+												Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SecretURL", Name: validation.Null, Rule: true, Chain: nil},
+													{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.DiskEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
+												},
+											},
+											{
+												Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey", Name: validation.Null, Rule: false,
+												Chain: []validation.Constraint{
+													{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.KeyURL", Name: validation.Null, Rule: true, Chain: nil},
+													{Target: "parameters.VirtualMachineScaleSetVMProperties.StorageProfile.OsDisk.EncryptionSettings.KeyEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.VirtualMachineScaleSetVMsClient", "Update", err.Error())
 	}
 

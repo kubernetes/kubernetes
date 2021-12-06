@@ -81,13 +81,16 @@ const (
 
 // Regular expressions used by the normalizations
 var rxPort = regexp.MustCompile(`(:\d+)/?$`)
-var rxDirIndex = regexp.MustCompile(`(^|/)((?:default|index)\.\w{1,4})$`)
-var rxDupSlashes = regexp.MustCompile(`/{2,}`)
-var rxDWORDHost = regexp.MustCompile(`^(\d+)((?:\.+)?(?:\:\d*)?)$`)
-var rxOctalHost = regexp.MustCompile(`^(0\d*)\.(0\d*)\.(0\d*)\.(0\d*)((?:\.+)?(?:\:\d*)?)$`)
-var rxHexHost = regexp.MustCompile(`^0x([0-9A-Fa-f]+)((?:\.+)?(?:\:\d*)?)$`)
-var rxHostDots = regexp.MustCompile(`^(.+?)(:\d+)?$`)
-var rxEmptyPort = regexp.MustCompile(`:+$`)
+
+var (
+	rxDirIndex   = regexp.MustCompile(`(^|/)((?:default|index)\.\w{1,4})$`)
+	rxDupSlashes = regexp.MustCompile(`/{2,}`)
+	rxDWORDHost  = regexp.MustCompile(`^(\d+)((?:\.+)?(?:\:\d*)?)$`)
+	rxOctalHost  = regexp.MustCompile(`^(0\d*)\.(0\d*)\.(0\d*)\.(0\d*)((?:\.+)?(?:\:\d*)?)$`)
+	rxHexHost    = regexp.MustCompile(`^0x([0-9A-Fa-f]+)((?:\.+)?(?:\:\d*)?)$`)
+	rxHostDots   = regexp.MustCompile(`^(.+?)(:\d+)?$`)
+	rxEmptyPort  = regexp.MustCompile(`:+$`)
+)
 
 // Map of flags to implementation function.
 // FlagDecodeUnnecessaryEscapes has no action, since it is done automatically

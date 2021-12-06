@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -25,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	"fmt"
 
 	"github.com/onsi/ginkgo"
 )
@@ -80,7 +79,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 					var err error
 					for i := 0; i < 10; i++ {
 						// need to create a new verification pod on each pass since updates
-						//to the HostPath volume aren't propogated to the pod
+						// to the HostPath volume aren't propogated to the pod
 						pod := f.PodClient().Create(&v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "pod" + string(uuid.NewUUID()),

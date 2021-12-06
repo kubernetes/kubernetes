@@ -126,7 +126,8 @@ func TestTaintBasedEvictions(t *testing.T) {
 			externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
 				QPS:           -1,
 				Host:          testCtx.HTTPServer.URL,
-				ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+				ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
+			})
 			externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)

@@ -17,6 +17,7 @@ limitations under the License.
 package netsh
 
 import (
+	"errors"
 	"net"
 	"os"
 	"testing"
@@ -24,7 +25,6 @@ import (
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
-	"errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -97,7 +97,6 @@ func TestEnsurePortProxyRule(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestDeletePortProxyRule(t *testing.T) {

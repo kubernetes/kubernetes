@@ -17,8 +17,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var _ File = &fsNode{}
-var _ FileSystem = &fsNode{}
+var (
+	_ File       = &fsNode{}
+	_ FileSystem = &fsNode{}
+)
 
 // fsNode is either a file or a directory.
 type fsNode struct {
@@ -163,7 +165,6 @@ func (n *fsNode) AddFile(
 }
 
 func (n *fsNode) addDir(path string) (result *fsNode, err error) {
-
 	parent := n
 	dName, subDirName := mySplit(path)
 	if dName != "" {
@@ -586,7 +587,7 @@ func isLegalFileNameForCreation(n string) bool {
 // Excludes directories.
 func (n *fsNode) RegExpGlob(pattern string) ([]string, error) {
 	var result []string
-	var expression = regexp.MustCompile(pattern)
+	expression := regexp.MustCompile(pattern)
 	err := n.WalkMe(func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

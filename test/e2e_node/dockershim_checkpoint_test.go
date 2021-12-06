@@ -77,7 +77,6 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 			}
 			return false
 		}, gcTimeout, 10*time.Second).Should(gomega.BeTrue())
-
 	})
 
 	ginkgo.Context("When pod sandbox checkpoint is missing", func() {
@@ -138,7 +137,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 					framework.Failf("No checkpoint for the pod was found")
 				}
 				for _, file := range checkpoints {
-					f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0644)
+					f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0o644)
 					framework.ExpectNoError(err, "Failed to open file %q", file)
 					_, err = f.WriteString("blabblab")
 					framework.ExpectNoError(err, "Failed to write to file %q", file)
@@ -193,7 +192,7 @@ func cleanString(output string) string {
 }
 
 func writeFileAndSync(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}

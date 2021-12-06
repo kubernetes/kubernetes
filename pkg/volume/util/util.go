@@ -98,7 +98,7 @@ func IsReady(dir string) bool {
 // directory.  It logs an error if the file cannot be
 // created.
 func SetReady(dir string) {
-	if err := os.MkdirAll(dir, 0750); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(dir, 0o750); err != nil && !os.IsExist(err) {
 		klog.Errorf("Can't mkdir %s: %v", dir, err)
 		return
 	}
@@ -656,7 +656,7 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	return false
 }
 
-//WriteVolumeCache flush disk data given the spcified mount path
+// WriteVolumeCache flush disk data given the spcified mount path
 func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {

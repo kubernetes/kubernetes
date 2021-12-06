@@ -56,22 +56,20 @@ func CheckCapabilitiesBaseline() Check {
 	}
 }
 
-var (
-	capabilities_allowed_1_0 = sets.NewString(
-		"AUDIT_WRITE",
-		"CHOWN",
-		"DAC_OVERRIDE",
-		"FOWNER",
-		"FSETID",
-		"KILL",
-		"MKNOD",
-		"NET_BIND_SERVICE",
-		"SETFCAP",
-		"SETGID",
-		"SETPCAP",
-		"SETUID",
-		"SYS_CHROOT",
-	)
+var capabilities_allowed_1_0 = sets.NewString(
+	"AUDIT_WRITE",
+	"CHOWN",
+	"DAC_OVERRIDE",
+	"FOWNER",
+	"FSETID",
+	"KILL",
+	"MKNOD",
+	"NET_BIND_SERVICE",
+	"SETFCAP",
+	"SETGID",
+	"SETPCAP",
+	"SETUID",
+	"SYS_CHROOT",
 )
 
 func capabilitiesBaseline_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {

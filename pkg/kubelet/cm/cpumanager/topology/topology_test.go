@@ -26,7 +26,6 @@ import (
 )
 
 func Test_Discover(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		machineInfo cadvisorapi.MachineInfo
@@ -47,7 +46,8 @@ func Test_Discover(t *testing.T) {
 				NumCores:   8,
 				NumSockets: 1,
 				Topology: []cadvisorapi.Node{
-					{Id: 0,
+					{
+						Id: 0,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 0, Threads: []int{0, 4}},
 							{SocketID: 0, Id: 1, Threads: []int{1, 5}},
@@ -82,7 +82,8 @@ func Test_Discover(t *testing.T) {
 				NumCores:   80,
 				NumSockets: 2,
 				Topology: []cadvisorapi.Node{
-					{Id: 0,
+					{
+						Id: 0,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 0, Threads: []int{0, 40}},
 							{SocketID: 0, Id: 1, Threads: []int{1, 41}},
@@ -96,7 +97,8 @@ func Test_Discover(t *testing.T) {
 							{SocketID: 0, Id: 25, Threads: []int{9, 49}},
 						},
 					},
-					{Id: 1,
+					{
+						Id: 1,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 3, Threads: []int{10, 50}},
 							{SocketID: 0, Id: 4, Threads: []int{11, 51}},
@@ -110,7 +112,8 @@ func Test_Discover(t *testing.T) {
 							{SocketID: 0, Id: 28, Threads: []int{19, 59}},
 						},
 					},
-					{Id: 2,
+					{
+						Id: 2,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 1, Id: 0, Threads: []int{20, 60}},
 							{SocketID: 1, Id: 1, Threads: []int{21, 61}},
@@ -124,7 +127,8 @@ func Test_Discover(t *testing.T) {
 							{SocketID: 1, Id: 25, Threads: []int{29, 69}},
 						},
 					},
-					{Id: 3,
+					{
+						Id: 3,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 1, Id: 3, Threads: []int{30, 70}},
 							{SocketID: 1, Id: 4, Threads: []int{31, 71}},
@@ -231,7 +235,6 @@ func Test_Discover(t *testing.T) {
 			wantErr: false,
 		},
 		{
-
 			// FAKE Topology from dual xeon gold 6230
 			// (see: dual xeon gold 6230).
 			// We flip NUMA cells and Sockets to exercise the code.
@@ -247,7 +250,8 @@ func Test_Discover(t *testing.T) {
 				NumCores:   80,
 				NumSockets: 4,
 				Topology: []cadvisorapi.Node{
-					{Id: 0,
+					{
+						Id: 0,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 0, Threads: []int{0, 40}},
 							{SocketID: 0, Id: 1, Threads: []int{1, 41}},
@@ -271,7 +275,8 @@ func Test_Discover(t *testing.T) {
 							{SocketID: 1, Id: 28, Threads: []int{19, 59}},
 						},
 					},
-					{Id: 1,
+					{
+						Id: 1,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 2, Id: 0, Threads: []int{20, 60}},
 							{SocketID: 2, Id: 1, Threads: []int{21, 61}},
@@ -393,13 +398,15 @@ func Test_Discover(t *testing.T) {
 				NumCores:   4,
 				NumSockets: 2,
 				Topology: []cadvisorapi.Node{
-					{Id: 0,
+					{
+						Id: 0,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 0, Threads: []int{0}},
 							{SocketID: 0, Id: 2, Threads: []int{2}},
 						},
 					},
-					{Id: 1,
+					{
+						Id: 1,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 1, Id: 1, Threads: []int{1}},
 							{SocketID: 1, Id: 3, Threads: []int{3}},
@@ -427,14 +434,16 @@ func Test_Discover(t *testing.T) {
 				NumCores:   12,
 				NumSockets: 2,
 				Topology: []cadvisorapi.Node{
-					{Id: 0,
+					{
+						Id: 0,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 0, Threads: []int{0, 6}},
 							{SocketID: 0, Id: 1, Threads: []int{1, 7}},
 							{SocketID: 0, Id: 2, Threads: []int{2, 8}},
 						},
 					},
-					{Id: 1,
+					{
+						Id: 1,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 1, Id: 0, Threads: []int{3, 9}},
 							{SocketID: 1, Id: 1, Threads: []int{4, 10}},
@@ -471,7 +480,8 @@ func Test_Discover(t *testing.T) {
 				NumCores:   8,
 				NumSockets: 1,
 				Topology: []cadvisorapi.Node{
-					{Id: 0,
+					{
+						Id: 0,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 0, Threads: []int{0, 4}},
 							{SocketID: 0, Id: 1, Threads: []int{1, 5}},
@@ -490,7 +500,8 @@ func Test_Discover(t *testing.T) {
 				NumCores:   8,
 				NumSockets: 1,
 				Topology: []cadvisorapi.Node{
-					{Id: 0,
+					{
+						Id: 0,
 						Cores: []cadvisorapi.Core{
 							{SocketID: 0, Id: 0, Threads: []int{0, 4}},
 							{SocketID: 0, Id: 1, Threads: []int{1, 5}},
@@ -523,7 +534,6 @@ func Test_Discover(t *testing.T) {
 }
 
 func TestCPUDetailsKeepOnly(t *testing.T) {
-
 	var details CPUDetails
 	details = map[int]CPUInfo{
 		0: {},
@@ -559,7 +569,6 @@ func TestCPUDetailsKeepOnly(t *testing.T) {
 }
 
 func TestCPUDetailsNUMANodes(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -586,7 +595,6 @@ func TestCPUDetailsNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsNUMANodesInSockets(t *testing.T) {
-
 	var details1 CPUDetails
 	details1 = map[int]CPUInfo{
 		0: {SocketID: 0, NUMANodeID: 0},
@@ -642,7 +650,6 @@ func TestCPUDetailsNUMANodesInSockets(t *testing.T) {
 }
 
 func TestCPUDetailsSockets(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -669,7 +676,6 @@ func TestCPUDetailsSockets(t *testing.T) {
 }
 
 func TestCPUDetailsCPUsInSockets(t *testing.T) {
-
 	var details CPUDetails
 	details = map[int]CPUInfo{
 		0: {SocketID: 0},
@@ -703,7 +709,6 @@ func TestCPUDetailsCPUsInSockets(t *testing.T) {
 }
 
 func TestCPUDetailsSocketsInNUMANodes(t *testing.T) {
-
 	var details CPUDetails
 	details = map[int]CPUInfo{
 		0: {NUMANodeID: 0, SocketID: 0},
@@ -737,7 +742,6 @@ func TestCPUDetailsSocketsInNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsCores(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -764,7 +768,6 @@ func TestCPUDetailsCores(t *testing.T) {
 }
 
 func TestCPUDetailsCoresInNUMANodes(t *testing.T) {
-
 	var details CPUDetails
 	details = map[int]CPUInfo{
 		0: {NUMANodeID: 0, CoreID: 0},
@@ -798,7 +801,6 @@ func TestCPUDetailsCoresInNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsCoresInSockets(t *testing.T) {
-
 	var details CPUDetails
 	details = map[int]CPUInfo{
 		0: {SocketID: 0, CoreID: 0},
@@ -832,7 +834,6 @@ func TestCPUDetailsCoresInSockets(t *testing.T) {
 }
 
 func TestCPUDetailsCPUs(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		details CPUDetails
@@ -857,7 +858,6 @@ func TestCPUDetailsCPUs(t *testing.T) {
 }
 
 func TestCPUDetailsCPUsInNUMANodes(t *testing.T) {
-
 	var details CPUDetails
 	details = map[int]CPUInfo{
 		0: {NUMANodeID: 0},
@@ -891,7 +891,6 @@ func TestCPUDetailsCPUsInNUMANodes(t *testing.T) {
 }
 
 func TestCPUDetailsCPUsInCores(t *testing.T) {
-
 	var details CPUDetails
 	details = map[int]CPUInfo{
 		0: {CoreID: 0},

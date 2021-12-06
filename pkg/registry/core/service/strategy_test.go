@@ -194,8 +194,7 @@ func TestDropDisabledField(t *testing.T) {
 		oldSvc                      *api.Service
 		compareSvc                  *api.Service
 	}{
-		/* svc.Status.Conditions */
-		{
+		/* svc.Status.Conditions */ {
 			name:                "mixed protocol not enabled, field not used in old, not used in new",
 			enableMixedProtocol: false,
 			svc:                 makeServiceWithConditions(nil),
@@ -409,7 +408,6 @@ func TestDropDisabledField(t *testing.T) {
 			}
 		}()
 	}
-
 }
 
 func TestDropTypeDependentFields(t *testing.T) {
@@ -656,7 +654,8 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
 			patch:  nil,
 			expect: makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
-		}}
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

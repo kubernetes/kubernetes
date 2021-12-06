@@ -168,8 +168,10 @@ const (
 	SCTP_CANT_STR_ASSOC
 )
 
-var nativeEndian binary.ByteOrder
-var sndRcvInfoSize uintptr
+var (
+	nativeEndian   binary.ByteOrder
+	sndRcvInfoSize uintptr
+)
 
 func init() {
 	i := uint16(1)
@@ -526,7 +528,6 @@ func resolveFromRawAddr(ptr unsafe.Pointer, n int) (*SCTPAddr, error) {
 }
 
 func sctpGetAddrs(fd, id, optname int) (*SCTPAddr, error) {
-
 	type getaddrs struct {
 		assocId int32
 		addrNum uint32
@@ -544,7 +545,6 @@ func sctpGetAddrs(fd, id, optname int) (*SCTPAddr, error) {
 }
 
 func (c *SCTPConn) SCTPGetPrimaryPeerAddr() (*SCTPAddr, error) {
-
 	type sctpGetSetPrim struct {
 		assocId int32
 		addrs   [128]byte

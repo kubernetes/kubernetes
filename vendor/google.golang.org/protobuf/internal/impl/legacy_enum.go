@@ -76,6 +76,7 @@ func (t *legacyEnumType) New(n pref.EnumNumber) pref.Enum {
 	t.m.Store(n, e)
 	return e
 }
+
 func (t *legacyEnumType) Descriptor() pref.EnumDescriptor {
 	return t.desc
 }
@@ -89,15 +90,19 @@ type legacyEnumWrapper struct {
 func (e *legacyEnumWrapper) Descriptor() pref.EnumDescriptor {
 	return e.pbTyp.Descriptor()
 }
+
 func (e *legacyEnumWrapper) Type() pref.EnumType {
 	return e.pbTyp
 }
+
 func (e *legacyEnumWrapper) Number() pref.EnumNumber {
 	return e.num
 }
+
 func (e *legacyEnumWrapper) ProtoReflect() pref.Enum {
 	return e
 }
+
 func (e *legacyEnumWrapper) protoUnwrap() interface{} {
 	v := reflect.New(e.goTyp).Elem()
 	v.SetInt(int64(e.num))

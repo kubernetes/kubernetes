@@ -22,9 +22,7 @@ import (
 	"os"
 )
 
-var (
-	cURLDebug = false
-)
+var cURLDebug = false
 
 func EnablecURLDebug() {
 	cURLDebug = true

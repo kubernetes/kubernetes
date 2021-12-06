@@ -20,6 +20,7 @@ limitations under the License.
 package ipvs
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	"syscall"
 	"time"
 
-	"errors"
 	libipvs "github.com/moby/ipvs"
 
 	"k8s.io/klog/v2"

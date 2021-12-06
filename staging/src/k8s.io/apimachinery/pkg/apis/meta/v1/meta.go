@@ -156,9 +156,11 @@ func (meta *ObjectMeta) GetDeletionTimestamp() *Time { return meta.DeletionTimes
 func (meta *ObjectMeta) SetDeletionTimestamp(deletionTimestamp *Time) {
 	meta.DeletionTimestamp = deletionTimestamp
 }
+
 func (meta *ObjectMeta) GetDeletionGracePeriodSeconds() *int64 {
 	return meta.DeletionGracePeriodSeconds
 }
+
 func (meta *ObjectMeta) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
 	meta.DeletionGracePeriodSeconds = deletionGracePeriodSeconds
 }

@@ -64,7 +64,7 @@ func OpenExecutable(path string) (*Executable, error) {
 		return nil, fmt.Errorf("parse ELF file: %w", err)
 	}
 
-	var ex = Executable{
+	ex := Executable{
 		path:    path,
 		symbols: make(map[string]elf.Symbol),
 	}

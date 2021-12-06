@@ -30,9 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 )
 
-var (
-	quantity = *resource.NewQuantity(1, resource.DecimalSI)
-)
+var quantity = *resource.NewQuantity(1, resource.DecimalSI)
 
 func TestRemoveMissingExtendedResources(t *testing.T) {
 	for _, test := range []struct {

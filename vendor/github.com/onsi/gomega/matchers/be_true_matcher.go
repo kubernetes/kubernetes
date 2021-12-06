@@ -8,8 +8,7 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
-type BeTrueMatcher struct {
-}
+type BeTrueMatcher struct{}
 
 func (matcher *BeTrueMatcher) Match(actual interface{}) (success bool, err error) {
 	if !isBool(actual) {

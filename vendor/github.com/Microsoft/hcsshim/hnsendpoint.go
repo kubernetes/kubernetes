@@ -13,7 +13,7 @@ type HNSEndpointStats = hns.EndpointStats
 // Namespace represents a Compartment.
 type Namespace = hns.Namespace
 
-//SystemType represents the type of the system on which actions are done
+// SystemType represents the type of the system on which actions are done
 type SystemType string
 
 // SystemType const
@@ -94,7 +94,6 @@ func modifyNetworkEndpoint(containerID string, endpointID string, request Reques
 		Data:     endpointID,
 	}
 	err := modifyContainer(containerID, requestMessage)
-
 	if err != nil {
 		return err
 	}

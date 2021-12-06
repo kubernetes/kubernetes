@@ -167,7 +167,6 @@ func createMetadatas(mds ...Metadata) metadatas {
 		WithTTL(TTLUnlimitedPropagation)(&metas)
 	}
 	return metas
-
 }
 
 // Delete returns a mutator that deletes

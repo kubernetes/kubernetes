@@ -35,8 +35,8 @@ const (
 	maxAllowTTL         = time.Duration(30) * time.Minute
 	minDenyTTL          = time.Duration(1) * time.Second
 	maxDenyTTL          = time.Duration(30) * time.Minute
-	useDefault          = time.Duration(0)  //sentinel for using default TTL
-	disableTTL          = time.Duration(-1) //sentinel for disabling a TTL
+	useDefault          = time.Duration(0)  // sentinel for using default TTL
+	disableTTL          = time.Duration(-1) // sentinel for disabling a TTL
 )
 
 // imagePolicyWebhookConfig holds config data for imagePolicyWebhook

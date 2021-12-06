@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1" //Added new
+	autoscalingv1 "k8s.io/api/autoscaling/v1" // Added new
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,9 +71,7 @@ const (
 	dRetryTimeout   = 5 * time.Minute
 )
 
-var (
-	nilRs *appsv1.ReplicaSet
-)
+var nilRs *appsv1.ReplicaSet
 
 var _ = SIGDescribe("Deployment", func() {
 	var ns string
@@ -582,7 +580,6 @@ var _ = SIGDescribe("Deployment", func() {
 		defer cancel()
 
 		_, err = watchtools.Until(ctx, dList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-
 			if e, ok := event.Object.(*appsv1.Deployment); ok {
 				found := e.ObjectMeta.Name == testDeployment.ObjectMeta.Name &&
 					e.ObjectMeta.Namespace == testDeployment.ObjectMeta.Namespace &&

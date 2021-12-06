@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package sockets
@@ -13,7 +14,7 @@ func NewUnixSocket(path string, gid int) (net.Listener, error) {
 	if err := syscall.Unlink(path); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	mask := syscall.Umask(0777)
+	mask := syscall.Umask(0o777)
 	defer syscall.Umask(mask)
 
 	l, err := net.Listen("unix", path)
@@ -24,7 +25,7 @@ func NewUnixSocket(path string, gid int) (net.Listener, error) {
 		l.Close()
 		return nil, err
 	}
-	if err := os.Chmod(path, 0660); err != nil {
+	if err := os.Chmod(path, 0o660); err != nil {
 		l.Close()
 		return nil, err
 	}

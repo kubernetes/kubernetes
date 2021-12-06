@@ -70,12 +70,11 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 	}
 	buf.Write(data)
 
-	err = ioutil.WriteFile(cfgPath, buf.Bytes(), 0644)
+	err = ioutil.WriteFile(cfgPath, buf.Bytes(), 0o644)
 	return cfgPath, err
 }
 
 func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
-
 	// Temporary folders for the test case
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
@@ -89,7 +88,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 		t.Fatalf("couldn't retrieve ca cert: %v", err)
 	}
 
-	var tests = []struct {
+	tests := []struct {
 		name            string
 		command         string
 		clusterName     string

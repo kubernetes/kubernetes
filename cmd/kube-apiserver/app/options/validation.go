@@ -81,7 +81,7 @@ func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) erro
 	// Should be smallish sized cidr, this thing is kept in etcd
 	// bigger cidr (specially those offered by IPv6) will add no value
 	// significantly increase snapshotting time.
-	var ones, bits = cidr.Mask.Size()
+	ones, bits := cidr.Mask.Size()
 	if bits-ones > maxCIDRBits {
 		return fmt.Errorf("specified %s is too large; for %d-bit addresses, the mask must be >= %d", cidrFlag, bits, bits-maxCIDRBits)
 	}

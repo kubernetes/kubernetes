@@ -38,7 +38,6 @@ import (
 var _ volume.BlockVolumePlugin = &vsphereVolumePlugin{}
 
 func (plugin *vsphereVolumePlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
-
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
 	globalMapPathUUID, err := blkUtil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)

@@ -72,7 +72,6 @@ func TestParseEndpoint(t *testing.T) {
 		assert.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
 		assert.Equal(t, test.expectedAddr, addr)
 	}
-
 }
 
 func TestIsUnixDomainSocket(t *testing.T) {

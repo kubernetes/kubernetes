@@ -95,7 +95,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 			podDefaultGrace   = "default (30s)"
 			podImmediateGrace = "immediate (0s)"
 		)
-		var readOnlyMap = map[bool]string{
+		readOnlyMap := map[bool]string{
 			true:  "read-only",
 			false: "RW",
 		}

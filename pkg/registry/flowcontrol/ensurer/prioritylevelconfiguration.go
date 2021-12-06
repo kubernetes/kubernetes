@@ -30,9 +30,7 @@ import (
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 )
 
-var (
-	errObjectNotPriorityLevel = errors.New("object is not a PriorityLevelConfiguration type")
-)
+var errObjectNotPriorityLevel = errors.New("object is not a PriorityLevelConfiguration type")
 
 // PriorityLevelEnsurer ensures the specified bootstrap configuration objects
 type PriorityLevelEnsurer interface {

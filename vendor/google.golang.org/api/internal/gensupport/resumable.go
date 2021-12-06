@@ -162,12 +162,11 @@ func (rx *ResumableUpload) transferChunk(ctx context.Context) (*http.Response, e
 // rx is private to the auto-generated API code.
 // Exactly one of resp or err will be nil.  If resp is non-nil, the caller must call resp.Body.Close.
 func (rx *ResumableUpload) Upload(ctx context.Context) (resp *http.Response, err error) {
-
 	// There are a couple of cases where it's possible for err and resp to both
 	// be non-nil. However, we expose a simpler contract to our callers: exactly
 	// one of resp and err will be non-nil. This means that any response body
 	// must be closed here before returning a non-nil error.
-	var prepareReturn = func(resp *http.Response, err error) (*http.Response, error) {
+	prepareReturn := func(resp *http.Response, err error) (*http.Response, error) {
 		if err != nil {
 			if resp != nil && resp.Body != nil {
 				resp.Body.Close()

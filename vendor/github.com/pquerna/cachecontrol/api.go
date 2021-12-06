@@ -18,10 +18,10 @@
 package cachecontrol
 
 import (
-	"github.com/pquerna/cachecontrol/cacheobject"
-
 	"net/http"
 	"time"
+
+	"github.com/pquerna/cachecontrol/cacheobject"
 )
 
 type Options struct {

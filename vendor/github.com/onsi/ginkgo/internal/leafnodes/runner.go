@@ -99,6 +99,7 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 	failure, outcome = r.failer.Drain(r.nodeType, r.componentIndex, r.codeLocation)
 	return
 }
+
 func (r *runner) runSync() (outcome types.SpecState, failure types.SpecFailure) {
 	finished := false
 

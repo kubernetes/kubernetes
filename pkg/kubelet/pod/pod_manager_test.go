@@ -112,7 +112,6 @@ func TestGetSetPods(t *testing.T) {
 	if !ok || !reflect.DeepEqual(actualPod, staticPod) {
 		t.Errorf("unable to get pod by name; expected: %#v, got: %#v", staticPod, actualPod)
 	}
-
 }
 
 func TestDeletePods(t *testing.T) {

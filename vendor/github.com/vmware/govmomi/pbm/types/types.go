@@ -291,8 +291,7 @@ func init() {
 	types.Add("pbm:PbmAssignDefaultRequirementProfileRequestType", reflect.TypeOf((*PbmAssignDefaultRequirementProfileRequestType)(nil)).Elem())
 }
 
-type PbmAssignDefaultRequirementProfileResponse struct {
-}
+type PbmAssignDefaultRequirementProfileResponse struct{}
 
 type PbmCapabilityConstraintInstance struct {
 	types.DynamicData
@@ -1572,8 +1571,7 @@ func init() {
 	types.Add("pbm:PbmResetDefaultRequirementProfileRequestType", reflect.TypeOf((*PbmResetDefaultRequirementProfileRequestType)(nil)).Elem())
 }
 
-type PbmResetDefaultRequirementProfileResponse struct {
-}
+type PbmResetDefaultRequirementProfileResponse struct{}
 
 type PbmResetVSanDefaultProfile PbmResetVSanDefaultProfileRequestType
 
@@ -1589,8 +1587,7 @@ func init() {
 	types.Add("pbm:PbmResetVSanDefaultProfileRequestType", reflect.TypeOf((*PbmResetVSanDefaultProfileRequestType)(nil)).Elem())
 }
 
-type PbmResetVSanDefaultProfileResponse struct {
-}
+type PbmResetVSanDefaultProfileResponse struct{}
 
 type PbmResourceInUse struct {
 	PbmFault
@@ -1706,8 +1703,7 @@ func init() {
 	types.Add("pbm:PbmUpdateRequestType", reflect.TypeOf((*PbmUpdateRequestType)(nil)).Elem())
 }
 
-type PbmUpdateResponse struct {
-}
+type PbmUpdateResponse struct{}
 
 type PbmVaioDataServiceInfo struct {
 	PbmLineOfServiceInfo

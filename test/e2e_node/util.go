@@ -62,9 +62,11 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var startServices = flag.Bool("start-services", true, "If true, start local node services")
-var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
-var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
+var (
+	startServices = flag.Bool("start-services", true, "If true, start local node services")
+	stopServices  = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
+)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
@@ -360,8 +362,8 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	}
 	imageManagerEndpoint := runtimeEndpoint
 	if framework.TestContext.ImageServiceEndpoint != "" {
-		//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
-		//explicitly specified
+		// ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
+		// explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
 	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)

@@ -440,8 +440,10 @@ func TestSetNodes(t *testing.T) {
 		name: "2 zones, control plane node in 1, ready node in 1",
 		nodes: []nodeInfo{
 			{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
-			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue,
-				labels: map[string]string{"node-role.kubernetes.io/control-plane": ""}},
+			{
+				zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue,
+				labels: map[string]string{"node-role.kubernetes.io/control-plane": ""},
+			},
 		},
 		expectSufficientNodeInfo: false,
 		expectedCPUByZone:        nil,
@@ -467,8 +469,10 @@ func TestSetNodes(t *testing.T) {
 		nodes: []nodeInfo{
 			{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
 			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
-			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue,
-				labels: map[string]string{"node-role.kubernetes.io/control-plane": ""}},
+			{
+				zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue,
+				labels: map[string]string{"node-role.kubernetes.io/control-plane": ""},
+			},
 		},
 		expectSufficientNodeInfo: true,
 		expectedCPUByZone: map[string]*resource.Quantity{

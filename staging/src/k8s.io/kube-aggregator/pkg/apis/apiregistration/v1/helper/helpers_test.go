@@ -61,7 +61,6 @@ func TestIsAPIServiceConditionTrue(t *testing.T) {
 		if isConditionTrue := IsAPIServiceConditionTrue(tc.apiService, tc.conditionType); isConditionTrue != tc.expected {
 			t.Errorf("expected condition of type %v to be %v, actually was %v",
 				tc.conditionType, isConditionTrue, tc.expected)
-
 		}
 	}
 }
@@ -99,7 +98,6 @@ func TestSetAPIServiceCondition(t *testing.T) {
 		startingCondition := GetAPIServiceConditionByType(tc.apiService, tc.conditionType)
 		if !reflect.DeepEqual(startingCondition, tc.initialCondition) {
 			t.Errorf("expected to find condition %s initially, actual was %s", tc.initialCondition, startingCondition)
-
 		}
 		SetAPIServiceCondition(tc.apiService, tc.setCondition)
 		actual := GetAPIServiceConditionByType(tc.apiService, tc.setCondition.Type)

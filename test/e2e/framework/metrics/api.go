@@ -56,6 +56,7 @@ func (a *APIResponsiveness) Len() int { return len(a.APICalls) }
 func (a *APIResponsiveness) Swap(i, j int) {
 	a.APICalls[i], a.APICalls[j] = a.APICalls[j], a.APICalls[i]
 }
+
 func (a *APIResponsiveness) Less(i, j int) bool {
 	return a.APICalls[i].Latency.Perc99 < a.APICalls[j].Latency.Perc99
 }

@@ -77,8 +77,7 @@ func (rl *AcceptRateLimiter) Accept(ctx context.Context, key *RateLimitKey) erro
 }
 
 // NopRateLimiter is a rate limiter that performs no rate limiting.
-type NopRateLimiter struct {
-}
+type NopRateLimiter struct{}
 
 // Accept everything immediately.
 func (*NopRateLimiter) Accept(ctx context.Context, key *RateLimitKey) error {

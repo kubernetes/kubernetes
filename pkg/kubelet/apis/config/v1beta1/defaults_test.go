@@ -33,7 +33,6 @@ import (
 )
 
 func TestSetDefaultsKubeletConfiguration(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		config   *v1beta1.KubeletConfiguration

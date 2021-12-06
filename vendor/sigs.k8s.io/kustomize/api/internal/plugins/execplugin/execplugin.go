@@ -58,7 +58,7 @@ func (p *ExecPlugin) ErrIfNotExecutable() error {
 	// https://golang.org/src/os/types_windows.go
 	// lacks the ability to set the FileMode executable bit in response
 	// to file data on Windows.
-	if f.Mode()&0111 == 0000 && runtime.GOOS != "windows" {
+	if f.Mode()&0o111 == 0o000 && runtime.GOOS != "windows" {
 		return fmt.Errorf("unexecutable plugin at: %s", p.path)
 	}
 	return nil

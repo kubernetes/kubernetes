@@ -376,7 +376,6 @@ type FieldNumbers interface {
 	Get(i int) FieldNumber
 	// Has reports whether n is within the list of fields.
 	Has(n FieldNumber) bool
-
 	doNotImplement
 }
 
@@ -388,7 +387,6 @@ type FieldRanges interface {
 	Get(i int) [2]FieldNumber // start inclusive; end exclusive
 	// Has reports whether n is within any of the ranges.
 	Has(n FieldNumber) bool
-
 	doNotImplement
 }
 
@@ -403,7 +401,6 @@ type EnumRanges interface {
 	Get(i int) [2]EnumNumber // start inclusive; end inclusive
 	// Has reports whether n is within any of the ranges.
 	Has(n EnumNumber) bool
-
 	doNotImplement
 }
 
@@ -425,7 +422,6 @@ type Names interface {
 	Get(i int) Name
 	// Has reports whether s matches any names in the list.
 	Has(s Name) bool
-
 	doNotImplement
 }
 
@@ -468,9 +464,11 @@ func consumeIdent(s string) (i int) {
 	}
 	return i
 }
+
 func isLetter(c byte) bool {
 	return c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 }
+
 func isLetterDigit(c byte) bool {
 	return isLetter(c) || ('0' <= c && c <= '9')
 }

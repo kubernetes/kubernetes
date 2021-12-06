@@ -44,9 +44,9 @@ func (ps *pointerReferences) PushPair(vx, vy reflect.Value, d diffMode, deref bo
 	case diffUnknown, diffIdentical:
 		pp = [2]value.Pointer{value.PointerOf(vx), value.PointerOf(vy)}
 	case diffRemoved:
-		pp = [2]value.Pointer{value.PointerOf(vx), value.Pointer{}}
+		pp = [2]value.Pointer{value.PointerOf(vx), {}}
 	case diffInserted:
-		pp = [2]value.Pointer{value.Pointer{}, value.PointerOf(vy)}
+		pp = [2]value.Pointer{{}, value.PointerOf(vy)}
 	}
 	*ps = append(*ps, pp)
 	return pp
@@ -91,6 +91,7 @@ func wrapTrunkReferences(pp [2]value.Pointer, s textNode) textNode {
 		return &textWrap{Value: s, Metadata: trunkReferences{pp}}
 	}
 }
+
 func wrapTrunkReference(p value.Pointer, printAddress bool, s textNode) textNode {
 	var prefix string
 	if printAddress {
@@ -98,6 +99,7 @@ func wrapTrunkReference(p value.Pointer, printAddress bool, s textNode) textNode
 	}
 	return &textWrap{Prefix: prefix, Value: s, Metadata: trunkReference{p}}
 }
+
 func makeLeafReference(p value.Pointer, printAddress bool) textNode {
 	out := &textWrap{Prefix: "(", Value: textEllipsis, Suffix: ")"}
 	var prefix string

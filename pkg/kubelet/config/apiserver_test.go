@@ -46,13 +46,16 @@ var _ cache.ListerWatcher = fakePodLW{}
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	pod1v1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p"},
-		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}},
+	}
 	pod1v2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p"},
-		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/two"}}}}
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/two"}}},
+	}
 	pod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "q"},
-		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}},
+	}
 
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()
@@ -132,10 +135,12 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 	pod1 := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "one"},
-		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}},
+	}
 	pod2 := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "two"},
-		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}},
+	}
 
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()

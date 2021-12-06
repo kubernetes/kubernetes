@@ -45,8 +45,10 @@ type externalIPsDenierPlugin struct {
 	*admission.Handler
 }
 
-var _ admission.Interface = &externalIPsDenierPlugin{}
-var _ admission.ValidationInterface = &externalIPsDenierPlugin{}
+var (
+	_ admission.Interface           = &externalIPsDenierPlugin{}
+	_ admission.ValidationInterface = &externalIPsDenierPlugin{}
+)
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *externalIPsDenierPlugin {

@@ -28,15 +28,21 @@ import (
 // Lean on the standard net lib as much as possible.
 //
 
-type IP = stdnet.IP
-type IPNet = stdnet.IPNet
-type ParseError = stdnet.ParseError
+type (
+	IP         = stdnet.IP
+	IPNet      = stdnet.IPNet
+	ParseError = stdnet.ParseError
+)
 
-const IPv4len = stdnet.IPv4len
-const IPv6len = stdnet.IPv6len
+const (
+	IPv4len = stdnet.IPv4len
+	IPv6len = stdnet.IPv6len
+)
 
-var CIDRMask = stdnet.CIDRMask
-var IPv4 = stdnet.IPv4
+var (
+	CIDRMask = stdnet.CIDRMask
+	IPv4     = stdnet.IPv4
+)
 
 // Parse IPv4 address (d.d.d.d).
 func parseIPv4(s string) IP {

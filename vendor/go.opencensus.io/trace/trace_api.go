@@ -23,7 +23,6 @@ var DefaultTracer Tracer = &tracer{}
 
 // Tracer can start spans and access context functions.
 type Tracer interface {
-
 	// StartSpan starts a new child span of the current span in the context. If
 	// there is no span in the context, creates a new trace and span.
 	//
@@ -84,7 +83,6 @@ func NewContext(parent context.Context, s *Span) context.Context {
 // Ideally users should interact with Spans by calling the functions in this
 // package that take a Context parameter.
 type SpanInterface interface {
-
 	// IsRecordingEvents returns true if events are being recorded for this span.
 	// Use this check to avoid computing expensive annotations when they will never
 	// be used.

@@ -46,6 +46,7 @@ func newTypeFilter(typs ...interface{}) (tf typeFilter) {
 	}
 	return tf
 }
+
 func (tf typeFilter) filter(p cmp.Path) bool {
 	if len(p) < 1 {
 		return false
@@ -91,6 +92,7 @@ func newIfaceFilter(ifaces interface{}) (tf ifaceFilter) {
 	}
 	return tf
 }
+
 func (tf ifaceFilter) filter(p cmp.Path) bool {
 	if len(p) < 1 {
 		return false
@@ -134,6 +136,7 @@ func newUnexportedFilter(typs ...interface{}) unexportedFilter {
 	}
 	return ux
 }
+
 func (xf unexportedFilter) filter(p cmp.Path) bool {
 	sf, ok := p.Index(-1).(cmp.StructField)
 	if !ok {

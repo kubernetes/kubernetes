@@ -34,9 +34,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var quotaCmd string
-var quotaCmdInitialized bool
-var quotaCmdLock sync.RWMutex
+var (
+	quotaCmd            string
+	quotaCmdInitialized bool
+	quotaCmdLock        sync.RWMutex
+)
 
 // If we later get a filesystem that uses project quota semantics other than
 // XFS, we'll need to change this.
@@ -52,41 +54,43 @@ const (
 	bitsPerWord = 32 << (^uint(0) >> 63) // either 32 or 64
 )
 
-var (
-	linuxSupportedFilesystems = []linuxFilesystemType{
-		{
-			name:             "XFS",
-			typeMagic:        0x58465342,
-			maxQuota:         1<<(bitsPerWord-1) - 1,
-			allowEmptyOutput: true, // XFS filesystems report nothing if a quota is not present
-		}, {
-			name:             "ext4fs",
-			typeMagic:        0xef53,
-			maxQuota:         (1<<(bitsPerWord-1) - 1) & (1<<58 - 1),
-			allowEmptyOutput: false, // ext4 filesystems always report something even if a quota is not present
-		},
-	}
-)
-
-// VolumeProvider supplies a quota applier to the generic code.
-type VolumeProvider struct {
+var linuxSupportedFilesystems = []linuxFilesystemType{
+	{
+		name:             "XFS",
+		typeMagic:        0x58465342,
+		maxQuota:         1<<(bitsPerWord-1) - 1,
+		allowEmptyOutput: true, // XFS filesystems report nothing if a quota is not present
+	}, {
+		name:             "ext4fs",
+		typeMagic:        0xef53,
+		maxQuota:         (1<<(bitsPerWord-1) - 1) & (1<<58 - 1),
+		allowEmptyOutput: false, // ext4 filesystems always report something even if a quota is not present
+	},
 }
 
-var quotaCmds = []string{"/sbin/xfs_quota",
+// VolumeProvider supplies a quota applier to the generic code.
+type VolumeProvider struct{}
+
+var quotaCmds = []string{
+	"/sbin/xfs_quota",
 	"/usr/sbin/xfs_quota",
-	"/bin/xfs_quota"}
+	"/bin/xfs_quota",
+}
 
 var quotaParseRegexp = regexp.MustCompilePOSIX("^[^ \t]*[ \t]*([0-9]+)")
 
-var lsattrCmd = "/usr/bin/lsattr"
-var lsattrParseRegexp = regexp.MustCompilePOSIX("^ *([0-9]+) [^ ]+ (.*)$")
+var (
+	lsattrCmd         = "/usr/bin/lsattr"
+	lsattrParseRegexp = regexp.MustCompilePOSIX("^ *([0-9]+) [^ ]+ (.*)$")
+)
 
 // GetQuotaApplier -- does this backing device support quotas that
 // can be applied to directories?
 func (*VolumeProvider) GetQuotaApplier(mountpoint string, backingDev string) LinuxVolumeQuotaApplier {
 	for _, fsType := range linuxSupportedFilesystems {
 		if isFilesystemOfType(mountpoint, backingDev, fsType.typeMagic) {
-			return linuxVolumeQuotaApplier{mountpoint: mountpoint,
+			return linuxVolumeQuotaApplier{
+				mountpoint:       mountpoint,
 				maxQuota:         fsType.maxQuota,
 				allowEmptyOutput: fsType.allowEmptyOutput,
 			}

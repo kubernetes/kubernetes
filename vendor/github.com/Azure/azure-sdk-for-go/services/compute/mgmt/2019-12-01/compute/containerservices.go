@@ -8,11 +8,12 @@ package compute
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ContainerServicesClient is the compute Client
@@ -50,33 +51,63 @@ func (client ContainerServicesClient) CreateOrUpdate(ctx context.Context, resour
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: parameters,
-			Constraints: []validation.Constraint{{Target: "parameters.ContainerServiceProperties", Name: validation.Null, Rule: false,
-				Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.CustomProfile", Name: validation.Null, Rule: false,
-					Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.CustomProfile.Orchestrator", Name: validation.Null, Rule: true, Chain: nil}}},
-					{Target: "parameters.ContainerServiceProperties.ServicePrincipalProfile", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.ServicePrincipalProfile.ClientID", Name: validation.Null, Rule: true, Chain: nil},
+		{
+			TargetValue: parameters,
+			Constraints: []validation.Constraint{{
+				Target: "parameters.ContainerServiceProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{
+					{
+						Target: "parameters.ContainerServiceProperties.CustomProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.CustomProfile.Orchestrator", Name: validation.Null, Rule: true, Chain: nil}},
+					},
+					{
+						Target: "parameters.ContainerServiceProperties.ServicePrincipalProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{Target: "parameters.ContainerServiceProperties.ServicePrincipalProfile.ClientID", Name: validation.Null, Rule: true, Chain: nil},
 							{Target: "parameters.ContainerServiceProperties.ServicePrincipalProfile.Secret", Name: validation.Null, Rule: true, Chain: nil},
-						}},
-					{Target: "parameters.ContainerServiceProperties.MasterProfile", Name: validation.Null, Rule: true,
-						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.MasterProfile.DNSPrefix", Name: validation.Null, Rule: true, Chain: nil}}},
+						},
+					},
+					{
+						Target: "parameters.ContainerServiceProperties.MasterProfile", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.MasterProfile.DNSPrefix", Name: validation.Null, Rule: true, Chain: nil}},
+					},
 					{Target: "parameters.ContainerServiceProperties.AgentPoolProfiles", Name: validation.Null, Rule: true, Chain: nil},
-					{Target: "parameters.ContainerServiceProperties.WindowsProfile", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminUsername", Name: validation.Null, Rule: true,
-							Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminUsername", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]+([._]?[a-zA-Z0-9]+)*$`, Chain: nil}}},
+					{
+						Target: "parameters.ContainerServiceProperties.WindowsProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminUsername", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminUsername", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]+([._]?[a-zA-Z0-9]+)*$`, Chain: nil}},
+							},
 							{Target: "parameters.ContainerServiceProperties.WindowsProfile.AdminPassword", Name: validation.Null, Rule: true, Chain: nil},
-						}},
-					{Target: "parameters.ContainerServiceProperties.LinuxProfile", Name: validation.Null, Rule: true,
-						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.LinuxProfile.AdminUsername", Name: validation.Null, Rule: true,
-							Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.LinuxProfile.AdminUsername", Name: validation.Pattern, Rule: `^[a-z][a-z0-9_-]*$`, Chain: nil}}},
-							{Target: "parameters.ContainerServiceProperties.LinuxProfile.SSH", Name: validation.Null, Rule: true,
-								Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.LinuxProfile.SSH.PublicKeys", Name: validation.Null, Rule: true, Chain: nil}}},
-						}},
-					{Target: "parameters.ContainerServiceProperties.DiagnosticsProfile", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.DiagnosticsProfile.VMDiagnostics", Name: validation.Null, Rule: true,
-							Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.DiagnosticsProfile.VMDiagnostics.Enabled", Name: validation.Null, Rule: true, Chain: nil}}},
-						}},
-				}}}}}); err != nil {
+						},
+					},
+					{
+						Target: "parameters.ContainerServiceProperties.LinuxProfile", Name: validation.Null, Rule: true,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.ContainerServiceProperties.LinuxProfile.AdminUsername", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.LinuxProfile.AdminUsername", Name: validation.Pattern, Rule: `^[a-z][a-z0-9_-]*$`, Chain: nil}},
+							},
+							{
+								Target: "parameters.ContainerServiceProperties.LinuxProfile.SSH", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.LinuxProfile.SSH.PublicKeys", Name: validation.Null, Rule: true, Chain: nil}},
+							},
+						},
+					},
+					{
+						Target: "parameters.ContainerServiceProperties.DiagnosticsProfile", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{
+							{
+								Target: "parameters.ContainerServiceProperties.DiagnosticsProfile.VMDiagnostics", Name: validation.Null, Rule: true,
+								Chain: []validation.Constraint{{Target: "parameters.ContainerServiceProperties.DiagnosticsProfile.VMDiagnostics.Enabled", Name: validation.Null, Rule: true, Chain: nil}},
+							},
+						},
+					},
+				},
+			}},
+		},
+	}); err != nil {
 		return result, validation.NewError("compute.ContainerServicesClient", "CreateOrUpdate", err.Error())
 	}
 

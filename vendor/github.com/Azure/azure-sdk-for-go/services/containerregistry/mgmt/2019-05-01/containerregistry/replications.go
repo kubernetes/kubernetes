@@ -8,11 +8,12 @@ package containerregistry
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/validation"
 	"github.com/Azure/go-autorest/tracing"
-	"net/http"
 )
 
 // ReplicationsClient is the client for the Replications methods of the Containerregistry service.
@@ -49,16 +50,27 @@ func (client ReplicationsClient) Create(ctx context.Context, resourceGroupName s
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: replicationName,
-			Constraints: []validation.Constraint{{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: replicationName,
+			Constraints: []validation.Constraint{
+				{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "replicationName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.ReplicationsClient", "Create", err.Error())
 	}
 
@@ -145,16 +157,27 @@ func (client ReplicationsClient) Delete(ctx context.Context, resourceGroupName s
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: replicationName,
-			Constraints: []validation.Constraint{{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: replicationName,
+			Constraints: []validation.Constraint{
+				{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "replicationName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.ReplicationsClient", "Delete", err.Error())
 	}
 
@@ -238,16 +261,27 @@ func (client ReplicationsClient) Get(ctx context.Context, resourceGroupName stri
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: replicationName,
-			Constraints: []validation.Constraint{{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: replicationName,
+			Constraints: []validation.Constraint{
+				{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "replicationName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.ReplicationsClient", "Get", err.Error())
 	}
 
@@ -329,12 +363,19 @@ func (client ReplicationsClient) List(ctx context.Context, resourceGroupName str
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.ReplicationsClient", "List", err.Error())
 	}
 
@@ -459,16 +500,27 @@ func (client ReplicationsClient) Update(ctx context.Context, resourceGroupName s
 		}()
 	}
 	if err := validation.Validate([]validation.Validation{
-		{TargetValue: resourceGroupName,
-			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}}},
-		{TargetValue: registryName,
-			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+		{
+			TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil}},
+		},
+		{
+			TargetValue: registryName,
+			Constraints: []validation.Constraint{
+				{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}},
-		{TargetValue: replicationName,
-			Constraints: []validation.Constraint{{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+		{
+			TargetValue: replicationName,
+			Constraints: []validation.Constraint{
+				{Target: "replicationName", Name: validation.MaxLength, Rule: 50, Chain: nil},
 				{Target: "replicationName", Name: validation.MinLength, Rule: 5, Chain: nil},
-				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+				{Target: "replicationName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil},
+			},
+		},
+	}); err != nil {
 		return result, validation.NewError("containerregistry.ReplicationsClient", "Update", err.Error())
 	}
 

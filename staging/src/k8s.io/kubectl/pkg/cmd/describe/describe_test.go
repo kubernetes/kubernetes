@@ -252,7 +252,6 @@ func TestDescribeHelpMessage(t *testing.T) {
 	cmd.SetArgs([]string{"-h"})
 	cmd.SetOutput(buf)
 	_, err := cmd.ExecuteC()
-
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -335,6 +334,7 @@ func (t *testDescriber) Describe(namespace, name string, describerSettings descr
 	t.Settings = describerSettings
 	return t.Output, t.Err
 }
+
 func (t *testDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
 	return t, nil
 }

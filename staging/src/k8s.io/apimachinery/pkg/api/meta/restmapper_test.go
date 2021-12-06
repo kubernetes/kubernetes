@@ -249,12 +249,10 @@ func TestRESTMapperKindsFor(t *testing.T) {
 					continue
 				}
 			}
-
 		} else {
 			if testCase.ExpectedKinds[0] != singleKind {
 				t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedKinds[0], singleKind)
 			}
-
 		}
 	}
 }
@@ -426,12 +424,10 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 						continue
 					}
 				}
-
 			} else {
 				if testCase.ExpectedResources[0] != singleResource {
 					t.Errorf("%s: expected %v, got %v", tcName, testCase.ExpectedResources[0], singleResource)
 				}
-
 			}
 		}
 	}

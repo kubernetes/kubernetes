@@ -18,9 +18,10 @@ package store
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"path/filepath"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"

@@ -32,7 +32,6 @@ import (
 )
 
 var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
-
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")

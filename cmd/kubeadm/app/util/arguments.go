@@ -58,7 +58,6 @@ func ParseArgumentListToMap(arguments []string) map[string]string {
 	resultingMap := map[string]string{}
 	for i, arg := range arguments {
 		key, val, err := parseArgument(arg)
-
 		// Ignore if the first argument doesn't satisfy the criteria, it's most often the binary name
 		// Warn in all other cases, but don't error out. This can happen only if the user has edited the argument list by hand, so they might know what they are doing
 		if err != nil {

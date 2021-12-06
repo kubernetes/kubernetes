@@ -67,5 +67,4 @@ func (s *DistributedVirtualPortgroup) DestroyTask(req *types.Destroy_Task) soap.
 			Returnval: task.Run(),
 		},
 	}
-
 }

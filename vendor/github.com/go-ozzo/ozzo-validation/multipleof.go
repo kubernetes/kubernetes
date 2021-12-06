@@ -24,9 +24,7 @@ func (r *multipleOfRule) Error(message string) *multipleOfRule {
 	return r
 }
 
-
 func (r *multipleOfRule) Validate(value interface{}) error {
-
 	rv := reflect.ValueOf(r.threshold)
 	switch rv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:

@@ -136,7 +136,6 @@ func (o *RolloutHistoryOptions) Validate() error {
 
 // Run performs the execution of 'rollout history' sub command
 func (o *RolloutHistoryOptions) Run() error {
-
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().

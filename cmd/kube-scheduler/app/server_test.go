@@ -77,7 +77,7 @@ users:
 - name: default
   user:
     username: config
-`, server.URL)), os.FileMode(0600)); err != nil {
+`, server.URL)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +115,7 @@ profiles:
       disabled:
       - name: VolumeBinding
       - name: NodeResourcesFit
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -152,7 +152,7 @@ profiles:
       - name: TaintToleration
       disabled:
       - name: "*"
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -182,7 +182,7 @@ profiles:
     score:
       disabled:
       - name: "*"
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,7 +193,7 @@ apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -206,7 +206,7 @@ clientConnection:
   kubeconfig: "%s"
 leaderElection:
   leaseDuration: 1h
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
+`, configKubeconfig)), os.FileMode(0o600)); err != nil {
 		t.Fatal(err)
 	}
 

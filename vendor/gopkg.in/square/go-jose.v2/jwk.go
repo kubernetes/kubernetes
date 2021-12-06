@@ -178,9 +178,11 @@ func (s *JSONWebKeySet) Key(kid string) []JSONWebKey {
 	return keys
 }
 
-const rsaThumbprintTemplate = `{"e":"%s","kty":"RSA","n":"%s"}`
-const ecThumbprintTemplate = `{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`
-const edThumbprintTemplate = `{"crv":"%s","kty":"OKP",x":"%s"}`
+const (
+	rsaThumbprintTemplate = `{"e":"%s","kty":"RSA","n":"%s"}`
+	ecThumbprintTemplate  = `{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`
+	edThumbprintTemplate  = `{"crv":"%s","kty":"OKP",x":"%s"}`
+)
 
 func ecThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
 	coordLength := curveSize(curve)

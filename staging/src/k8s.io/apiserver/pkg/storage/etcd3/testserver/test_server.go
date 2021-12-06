@@ -74,7 +74,7 @@ func NewTestConfig(t *testing.T) *embed.Config {
 
 	cfg.ZapLoggerBuilder = embed.NewZapLoggerBuilder(zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel)).Named("etcd-server"))
 	cfg.Dir = t.TempDir()
-	os.Chmod(cfg.Dir, 0700)
+	os.Chmod(cfg.Dir, 0o700)
 	return cfg
 }
 

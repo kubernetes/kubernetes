@@ -148,7 +148,6 @@ func mapBasedSelectorForObject(object runtime.Object) (string, error) {
 	default:
 		return "", fmt.Errorf("cannot extract pod selector from %T", object)
 	}
-
 }
 
 func MakeLabels(labels map[string]string) string {

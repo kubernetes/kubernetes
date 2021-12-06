@@ -120,8 +120,8 @@ func NewAttachDetachController(
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
 	timerConfig TimerConfig,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (AttachDetachController, error) {
-
+	filteredDialOptions *proxyutil.FilteredDialOptions) (AttachDetachController, error,
+) {
 	adc := &attachDetachController{
 		kubeClient:          kubeClient,
 		pvcLister:           pvcInformer.Lister(),
@@ -161,13 +161,12 @@ func NewAttachDetachController(
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
-	adc.attacherDetacher =
-		operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
-			kubeClient,
-			&adc.volumePluginMgr,
-			recorder,
-			false, // flag for experimental binary check for volume mount
-			blkutil))
+	adc.attacherDetacher = operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		&adc.volumePluginMgr,
+		recorder,
+		false, // flag for experimental binary check for volume mount
+		blkutil))
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
 
@@ -777,8 +776,10 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 	return nil
 }
 
-var _ volume.VolumeHost = &attachDetachController{}
-var _ volume.AttachDetachVolumeHost = &attachDetachController{}
+var (
+	_ volume.VolumeHost             = &attachDetachController{}
+	_ volume.AttachDetachVolumeHost = &attachDetachController{}
+)
 
 func (adc *attachDetachController) CSINodeLister() storagelistersv1.CSINodeLister {
 	return adc.csiNodeLister

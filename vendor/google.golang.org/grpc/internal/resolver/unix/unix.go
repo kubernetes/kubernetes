@@ -26,8 +26,10 @@ import (
 	"google.golang.org/grpc/resolver"
 )
 
-const unixScheme = "unix"
-const unixAbstractScheme = "unix-abstract"
+const (
+	unixScheme         = "unix"
+	unixAbstractScheme = "unix-abstract"
+)
 
 type builder struct {
 	scheme string
@@ -50,8 +52,7 @@ func (b *builder) Scheme() string {
 	return b.scheme
 }
 
-type nopResolver struct {
-}
+type nopResolver struct{}
 
 func (*nopResolver) ResolveNow(resolver.ResolveNowOptions) {}
 

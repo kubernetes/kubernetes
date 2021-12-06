@@ -184,7 +184,8 @@ func TestPlugin(t *testing.T) {
 			"apiUsername": []byte("storageos"),
 			"apiPassword": []byte("storageos"),
 			"apiAddr":     []byte("tcp://localhost:5705"),
-		}}, metav1.CreateOptions{})
+		},
+	}, metav1.CreateOptions{})
 
 	plug.(*storageosPlugin).host = volumetest.NewFakeVolumeHost(t, tmpDir, client, nil)
 

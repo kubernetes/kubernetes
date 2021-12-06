@@ -119,7 +119,6 @@ func TestNamespaceListMethod(t *testing.T) {
 	// act
 	target := dynamiclister.New(indexer, schema.GroupVersionResource{Group: "group", Version: "version", Resource: "TheKinds"}).Namespace(namespaceToList)
 	actualOutput, err := target.List(labels.Everything())
-
 	// validate
 	if err != nil {
 		t.Fatal(err)
@@ -215,7 +214,6 @@ func TestListerListMethod(t *testing.T) {
 	// act
 	target := dynamiclister.New(indexer, schema.GroupVersionResource{Group: "group", Version: "version", Resource: "TheKinds"})
 	actualOutput, err := target.List(labels.Everything())
-
 	// validate
 	if err != nil {
 		t.Fatal(err)

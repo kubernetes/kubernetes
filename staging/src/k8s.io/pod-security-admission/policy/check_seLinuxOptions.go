@@ -70,9 +70,7 @@ func CheckSELinuxOptions() Check {
 	}
 }
 
-var (
-	selinux_allowed_types_1_0 = sets.NewString("", "container_t", "container_init_t", "container_kvm_t")
-)
+var selinux_allowed_types_1_0 = sets.NewString("", "container_t", "container_init_t", "container_kvm_t")
 
 func seLinuxOptions_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var (

@@ -31,9 +31,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var (
-	ErrServerClosed = errors.New("ttrpc: server closed")
-)
+var ErrServerClosed = errors.New("ttrpc: server closed")
 
 type Server struct {
 	config   *serverConfig

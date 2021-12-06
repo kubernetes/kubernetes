@@ -79,8 +79,8 @@ type ephemeralController struct {
 func NewController(
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error) {
-
+	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error,
+) {
 	ec := &ephemeralController{
 		kubeClient: kubeClient,
 		podLister:  podInformer.Lister(),

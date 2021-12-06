@@ -27,10 +27,12 @@ type option struct {
 	downAction optionActionFn // downgrade action affecting this option only
 }
 
-type corefileAction func(*corefile.Corefile) (*corefile.Corefile, error)
-type serverActionFn func(*corefile.Server) (*corefile.Server, error)
-type pluginActionFn func(*corefile.Plugin) (*corefile.Plugin, error)
-type optionActionFn func(*corefile.Option) (*corefile.Option, error)
+type (
+	corefileAction func(*corefile.Corefile) (*corefile.Corefile, error)
+	serverActionFn func(*corefile.Server) (*corefile.Server, error)
+	pluginActionFn func(*corefile.Plugin) (*corefile.Plugin, error)
+	optionActionFn func(*corefile.Option) (*corefile.Option, error)
+)
 
 // plugins holds a map of plugin names and their migration rules per "version".  "Version" here is meaningless outside
 // of the context of this code. Each change in options or migration actions for a plugin requires a new "version"
@@ -603,10 +605,10 @@ func breakForwardStubDomainsIntoServerBlocks(cf *corefile.Corefile) (*corefile.C
 			newSb.Plugins = append(newSb.Plugins, &corefile.Plugin{Name: "errors"})
 			newSb.Plugins = append(newSb.Plugins, &corefile.Plugin{Name: "cache", Args: []string{"30"}})
 
-			//add new server block to corefile
+			// add new server block to corefile
 			cf.Servers = append(cf.Servers, newSb)
 
-			//remove the forward plugin from the original server block
+			// remove the forward plugin from the original server block
 			sb.Plugins = append(sb.Plugins[:j], sb.Plugins[j+1:]...)
 		}
 	}

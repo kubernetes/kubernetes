@@ -45,13 +45,15 @@ var (
 			output: `{
   "access_token": "faketoken",
   "token_expiry": "2016-10-31T22:31:09.123000000Z"
-}`},
+}`,
+		},
 		"/default/legacy/args": {
 			args: []string{"arg1", "arg2", "arg3"},
 			output: `{
   "access_token": "faketoken",
   "token_expiry": "2016-10-31T22:31:09.123000000Z"
-}`},
+}`,
+		},
 		"/space in path/customkeys": {
 			args: []string{"can", "haz", "auth"},
 			output: `{
@@ -59,7 +61,8 @@ var (
   "token_expiry": {
     "datetime": "2016-10-31 22:31:09.123"
   }
-}`},
+}`,
+		},
 		"missing/tokenkey/noargs": {
 			args: []string{},
 			output: `{
@@ -67,26 +70,30 @@ var (
   "token_expiry": {
     "datetime": "2016-10-31 22:31:09.123000000Z"
   }
-}`},
+}`,
+		},
 		"missing/expirykey/legacyargs": {
 			args: []string{"split", "on", "whitespace"},
 			output: `{
   "access_token": "faketoken",
   "expires": "2016-10-31T22:31:09.123000000Z"
-}`},
+}`,
+		},
 		"invalid expiry/timestamp": {
 			args: []string{"foo", "--bar", "--baz=abc,def"},
 			output: `{
   "access_token": "faketoken",
   "token_expiry": "sometime soon, idk"
-}`},
+}`,
+		},
 		"badjson": {
 			args: []string{},
 			output: `{
   "access_token": "faketoken",
   "token_expiry": "sometime soon, idk"
   ------
-`},
+`,
+		},
 	}
 )
 
@@ -136,7 +143,8 @@ func Test_tokenSource_cmd(t *testing.T) {
 
 	c := map[string]string{
 		"cmd-path": "foo",
-		"cmd-args": "bar"}
+		"cmd-args": "bar",
+	}
 	ts, err := tokenSource(true, c)
 	if err != nil {
 		t.Fatalf("failed to return cmd token source: %+v", err)
@@ -152,7 +160,8 @@ func Test_tokenSource_cmd(t *testing.T) {
 func Test_tokenSource_cmdCannotBeUsedWithScopes(t *testing.T) {
 	c := map[string]string{
 		"cmd-path": "foo",
-		"scopes":   "A,B"}
+		"scopes":   "A,B",
+	}
 	if _, err := tokenSource(true, c); err == nil {
 		t.Fatal("expected error when scopes is used with cmd-path")
 	}
@@ -181,7 +190,7 @@ func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
 	}
 	fakeTokenFile.Close()
 	defer os.Remove(fakeTokenFile.Name())
-	if err := ioutil.WriteFile(fakeTokenFile.Name(), []byte(`{"type":"service_account"}`), 0600); err != nil {
+	if err := ioutil.WriteFile(fakeTokenFile.Name(), []byte(`{"type":"service_account"}`), 0o600); err != nil {
 		t.Fatalf("failed to write to fake token file: %+v", err)
 	}
 
@@ -205,7 +214,8 @@ func Test_parseScopes(t *testing.T) {
 			map[string]string{},
 			[]string{
 				"https://www.googleapis.com/auth/cloud-platform",
-				"https://www.googleapis.com/auth/userinfo.email"},
+				"https://www.googleapis.com/auth/userinfo.email",
+			},
 		},
 		{
 			map[string]string{"scopes": ""},
@@ -443,7 +453,6 @@ func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func Test_cmdTokenSource_roundTrip(t *testing.T) {
-
 	accessToken := "fakeToken"
 	fakeExpiry := time.Now().Add(time.Hour)
 	fakeExpiryStr := fakeExpiry.Format(time.RFC3339Nano)
@@ -523,5 +532,4 @@ func Test_cmdTokenSource_roundTrip(t *testing.T) {
 			t.Errorf("got cache %v, want %v", got, tc.expectedCache)
 		}
 	}
-
 }

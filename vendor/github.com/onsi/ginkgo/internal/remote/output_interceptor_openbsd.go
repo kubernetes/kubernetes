@@ -1,9 +1,10 @@
+//go:build openbsd
 // +build openbsd
 
 package remote
 
 import (
-        "golang.org/x/sys/unix"
+	"golang.org/x/sys/unix"
 )
 
 func interceptorDupx(oldfd int, newfd int) {

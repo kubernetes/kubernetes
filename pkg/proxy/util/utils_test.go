@@ -279,7 +279,6 @@ func TestShouldSkipService(t *testing.T) {
 }
 
 func TestNewFilteredDialContext(t *testing.T) {
-
 	_, cidr, _ := netutils.ParseCIDRSloppy("1.1.1.1/28")
 
 	testCases := []struct {
@@ -1228,7 +1227,6 @@ func TestLineBufferWriteBytes(t *testing.T) {
 }
 
 func TestWriteCountLines(t *testing.T) {
-
 	testCases := []struct {
 		name     string
 		expected int
@@ -1291,6 +1289,7 @@ func mustParseIPAddr(str string) net.Addr {
 	}
 	return a
 }
+
 func mustParseIPNet(str string) net.Addr {
 	_, n, err := netutils.ParseCIDRSloppy(str)
 	if err != nil {
@@ -1298,6 +1297,7 @@ func mustParseIPNet(str string) net.Addr {
 	}
 	return n
 }
+
 func mustParseUnix(str string) net.Addr {
 	n, err := net.ResolveUnixAddr("unix", str)
 	if err != nil {
@@ -1313,6 +1313,7 @@ type cidrValidator struct {
 func (v *cidrValidator) isValid(ip net.IP) bool {
 	return v.cidr.Contains(ip)
 }
+
 func newCidrValidator(cidr string) func(ip net.IP) bool {
 	_, n, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {

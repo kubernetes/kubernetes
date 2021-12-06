@@ -72,8 +72,8 @@ func NewFileStore(
 	certDirectory string,
 	keyDirectory string,
 	certFile string,
-	keyFile string) (FileStore, error) {
-
+	keyFile string) (FileStore, error,
+) {
 	s := fileStore{
 		pairNamePrefix: pairNamePrefix,
 		certDirectory:  certDirectory,
@@ -188,12 +188,12 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 	ts := time.Now().Format("2006-01-02-15-04-05")
 	pemFilename := s.filename(ts)
 
-	if err := os.MkdirAll(s.certDirectory, 0755); err != nil {
+	if err := os.MkdirAll(s.certDirectory, 0o755); err != nil {
 		return nil, fmt.Errorf("could not create directory %q to store certificates: %v", s.certDirectory, err)
 	}
 	certPath := filepath.Join(s.certDirectory, pemFilename)
 
-	f, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
+	f, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("could not open %q: %v", certPath, err)
 	}

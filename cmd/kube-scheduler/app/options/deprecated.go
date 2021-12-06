@@ -38,9 +38,7 @@ type DeprecatedOptions struct {
 
 // TODO: remove these insecure flags in v1.24
 func addDummyInsecureFlags(o *DeprecatedOptions, fs *pflag.FlagSet) {
-	var (
-		bindAddr = net.IPv4(127, 0, 0, 1)
-	)
+	bindAddr := net.IPv4(127, 0, 0, 1)
 	fs.IPVar(&bindAddr, "address", bindAddr,
 		"The IP address on which to serve the insecure --port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
 	fs.MarkDeprecated("address", "This flag has no effect now and will be removed in v1.24. You can use --bind-address instead.")

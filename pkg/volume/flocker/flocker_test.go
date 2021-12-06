@@ -32,10 +32,12 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-const pluginName = "kubernetes.io/flocker"
-const datasetOneID = "11111111-1111-1111-1111-111111111100"
-const nodeOneID = "11111111-1111-1111-1111-111111111111"
-const nodeTwoID = "22222222-2222-2222-2222-222222222222"
+const (
+	pluginName   = "kubernetes.io/flocker"
+	datasetOneID = "11111111-1111-1111-1111-111111111100"
+	nodeOneID    = "11111111-1111-1111-1111-111111111111"
+	nodeTwoID    = "22222222-2222-2222-2222-222222222222"
+)
 
 var _ flockerapi.Clientable = &fakeFlockerClient{}
 
@@ -68,7 +70,6 @@ func newFakeFlockerClient() *fakeFlockerClient {
 }
 
 func (c *fakeFlockerClient) CreateDataset(options *flockerapi.CreateDatasetOptions) (*flockerapi.DatasetState, error) {
-
 	if c.Error != nil {
 		return nil, c.Error
 	}
@@ -107,8 +108,7 @@ func (c *fakeFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID strin
 	return &flockerapi.DatasetState{}, nil
 }
 
-type fakeFlockerUtil struct {
-}
+type fakeFlockerUtil struct{}
 
 func (fake *fakeFlockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID string, volumeSizeGB int, labels map[string]string, err error) {
 	labels = make(map[string]string)
@@ -284,7 +284,6 @@ func TestNewMounterDatasetUUID(t *testing.T) {
 	mounter, err := plug.NewMounter(spec, &v1.Pod{}, volume.VolumeOptions{})
 	assert.NoError(err)
 	assert.NotNil(mounter, "got a nil mounter")
-
 }
 
 func TestNewUnmounter(t *testing.T) {

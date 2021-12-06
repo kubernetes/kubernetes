@@ -43,18 +43,23 @@ type validationMatch struct {
 func required(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeRequired}
 }
+
 func invalid(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
 }
+
 func invalidIndex(index int, path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...).Index(index), errorType: field.ErrorTypeInvalid}
 }
+
 func unsupported(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeNotSupported}
 }
+
 func immutable(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
 }
+
 func forbidden(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeForbidden}
 }
@@ -4060,7 +4065,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			// duplicate defaulting behaviour
 			if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
 				tc.resource.Spec.Conversion.ConversionReviewVersions = []string{"v1beta1"}
@@ -5629,7 +5633,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"a": {
 									Type: "number",
-									//Default: jsonPtr(42.0),
+									// Default: jsonPtr(42.0),
 								},
 							},
 						},
