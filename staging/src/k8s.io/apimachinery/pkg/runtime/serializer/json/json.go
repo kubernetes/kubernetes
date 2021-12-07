@@ -131,7 +131,7 @@ func gvkWithDefaults(actual, defaultGVK schema.GroupVersionKind) schema.GroupVer
 // If into is provided and the original data is not fully qualified with kind/version/group, the type of the into will be used to alter the returned gvk.
 // If into is nil or data's gvk different from into's gvk, it will generate a new Object with ObjectCreater.New(gvk)
 // On success or most errors, the method will return the calculated schema kind.
-// The gvk calculate priority will be originalData > default gvk > into
+// The gvk calculate priority will be into > default gvk > originalData
 func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	data := originalData
 	if s.options.Yaml {
