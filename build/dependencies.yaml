@@ -172,8 +172,6 @@ dependencies:
       match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
       match: k8s.gcr.io\/pause:\d+\.\d+
-    - path: pkg/kubelet/dockershim/docker_sandbox.go
-      match: k8s.gcr.io\/pause:\d+\.\d+
     - path: staging/src/k8s.io/kubectl/testdata/set/multi-resource-yaml.yaml
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: staging/src/k8s.io/kubectl/testdata/set/namespaced-resource.yaml
