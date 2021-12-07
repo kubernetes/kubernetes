@@ -295,3 +295,53 @@ func TestKubectlCommandEnvVarNamespaceSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestKubectlCommandEnvVarContextSettings(t *testing.T) {
+	tests := map[string]struct {
+		envVars    map[string]string
+	}{
+		"empty environment variables; default": {
+			envVars:   map[string]string{
+				"": "",
+			},
+		},
+		"KUBE_CONTEXT empty; default": {
+			envVars:   map[string]string{
+				"KUBE_CONTEXT": "",
+			},
+		},
+		"KUBE_CONTEXT = testenv; set context to testenv": {
+			envVars:   map[string]string{
+				"KUBE_CONTEXT": "testenv",
+			},
+		},
+	}
+
+	for name, testCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, ok := testCase.envVars["KUBE_CONTEXT"]; ok {
+				err := os.Setenv("KUBE_CONTEXT", testCase.envVars["KUBE_CONTEXT"])
+				if err != nil {
+					t.Fatal("Unexpected error setting system environment variable KUBE_CONTEXT")
+				}
+			}
+			kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
+
+			// Run the NewKubectlCommand to test using environment variables to update the kubeConfigFlag values
+			_ = NewKubectlCommand(KubectlOptions{ConfigFlags: kubeConfigFlags, IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: ioutil.Discard, ErrOut: os.Stderr}})
+			
+			if testCase.envVars["KUBE_CONTEXT"] != "" && *kubeConfigFlags.Context != testCase.envVars["KUBE_CONTEXT"] {
+				t.Fatalf("Unexpected Context set: expected %q, got %q", testCase.envVars["KUBE_CONTEXT"], *kubeConfigFlags.Context)
+			}
+			if testCase.envVars["KUBE_CONTEXT"] == "" && *kubeConfigFlags.Context != "" {
+				t.Fatalf("Unexpected Context set: expected %q, got %q", "", *kubeConfigFlags.Context)
+			}
+
+			// Unset the system environment variables to reset for the next test
+			err := os.Unsetenv("KUBE_CONTEXT")
+			if err != nil {
+				t.Fatal("Unexpected error unsetting system environment variable KUBE_CONTEXT")
+			}
+		})
+	}
+}
