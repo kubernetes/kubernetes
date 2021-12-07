@@ -245,3 +245,53 @@ func TestKubectlCommandHeadersHooks(t *testing.T) {
 		})
 	}
 }
+
+func TestKubectlCommandEnvVarNamespaceSettings(t *testing.T) {
+	tests := map[string]struct {
+		envVars    map[string]string
+	}{
+		"empty environment variables; default": {
+			envVars:   map[string]string{
+				"": "",
+			},
+		},
+		"KUBE_NAMESPACE empty; default": {
+			envVars:   map[string]string{
+				"KUBE_NAMESPACE": "",
+			},
+		},
+		"KUBE_NAMESPACE = testenv; set namespace to testenv": {
+			envVars:   map[string]string{
+				"KUBE_NAMESPACE": "testenv",
+			},
+		},
+	}
+
+	for name, testCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, ok := testCase.envVars["KUBE_NAMESPACE"]; ok {
+				err := os.Setenv("KUBE_NAMESPACE", testCase.envVars["KUBE_NAMESPACE"])
+				if err != nil {
+					t.Fatal("Unexpected error setting system environment variable KUBE_NAMESPACE")
+				}
+			}
+			kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
+
+			// Run the NewKubectlCommand to test using environment variables to update the kubeConfigFlag values
+			_ = NewKubectlCommand(KubectlOptions{ConfigFlags: kubeConfigFlags, IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: ioutil.Discard, ErrOut: os.Stderr}})
+			
+			if kubeConfigFlags.Namespace != nil && *kubeConfigFlags.Namespace != testCase.envVars["KUBE_NAMESPACE"] {
+				t.Fatalf("Unexpected Namespace set: expected %q, got %q", testCase.envVars["KUBE_NAMESPACE"], *kubeConfigFlags.Namespace)
+			}
+			if testCase.envVars["KUBE_NAMESPACE"] == "" && *kubeConfigFlags.Namespace != "" {
+				t.Fatalf("Unexpected Namespace set: expected %q, got %q", "", *kubeConfigFlags.Namespace)
+			}
+
+			// Unset the system environment variables to reset for the next test
+			err := os.Unsetenv("KUBE_NAMESPACE")
+			if err != nil {
+				t.Fatal("Unexpected error unsetting system environment variable KUBE_NAMESPACE")
+			}
+		})
+	}
+}
