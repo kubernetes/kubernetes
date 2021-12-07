@@ -261,6 +261,86 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 }
 
 // Populates desiredStateOfWorld cache with one volume/pod.
+// Enables controllerAttachDetachEnabled.
+// volume is not repored-in-use
+// Calls Run()
+// Verifies that there is not wait-for-mount call
+// Verifies that there is no exponential-backoff triggered
+func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	kubeClient := createTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		false, /* checkNodeCapabilitiesBeforeMount */
+		fakeHandler))
+	reconciler := NewReconciler(
+		kubeClient,
+		true, /* controllerAttachDetachEnabled */
+		reconcilerLoopSleepDuration,
+		waitForAttachTimeout,
+		nodeName,
+		dsw,
+		asw,
+		hasAddedPods,
+		oex,
+		mount.NewFakeMounter(nil),
+		hostutil.NewFakeHostUtil(nil),
+		volumePluginMgr,
+		kubeletPodsDir)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	podName := util.GetUniquePodName(pod)
+	generatedVolumeName, err := dsw.AddPodToVolume(
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	runReconciler(reconciler)
+	time.Sleep(reconcilerSyncWaitDuration)
+
+	ok := oex.IsOperationSafeToRetry(generatedVolumeName, podName, nodeName, operationexecutor.VerifyControllerAttachedVolumeOpName)
+	if !ok {
+		t.Errorf("operation on volume %s is not safe to retry", generatedVolumeName)
+	}
+
+	// Assert
+	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
+	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
+		0 /* expectedWaitForAttachCallCount */, fakePlugin))
+	assert.NoError(t, volumetesting.VerifyMountDeviceCallCount(
+		0 /* expectedMountDeviceCallCount */, fakePlugin))
+}
+
+// Populates desiredStateOfWorld cache with one volume/pod.
 // Calls Run()
 // Verifies there is one attach/mount/etc call and no detach calls.
 // Deletes volume/pod from desired state of world.
