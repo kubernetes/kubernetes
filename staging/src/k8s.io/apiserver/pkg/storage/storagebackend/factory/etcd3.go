@@ -113,10 +113,38 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 }
 
 func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+	serverName := ""
+	if c.SetServerName {
+		if len(c.ServerList) == 0 {
+			return nil, clientv3.ErrNoAvailableEndpoints
+		}
+
+		ep := c.ServerList[0]
+		host := ep
+
+		// Endpoint could either be a URL or host:port
+		if strings.Contains(ep, "://") {
+			u, err := url.Parse(ep)
+			if err != nil {
+				return nil, err
+			}
+			host = u.Host
+		}
+
+		// Remove port from the host name
+		var err error
+		serverName, _, err = net.SplitHostPort(host)
+		if err != nil {
+			// Either the host didn't have a port or the host could not be parsed
+			serverName = host
+		}
+	}
+
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,
 		TrustedCAFile: c.TrustedCAFile,
+		ServerName:    serverName,
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
@@ -173,6 +201,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
 	}
 	cfg := clientv3.Config{
+		AutoSyncInterval:     c.AutoSyncInterval,
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,

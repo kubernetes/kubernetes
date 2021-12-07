@@ -107,6 +107,10 @@ func (s *EtcdOptions) Validate() []error {
 
 	}
 
+	if s.StorageConfig.Transport.SetServerName && len(s.StorageConfig.Transport.ServerList) != 1 {
+		allErrors = append(allErrors, fmt.Errorf("expect only one host in --etcd-servers if --etcd-set-server-name is set to be true"))
+	}
+
 	return allErrors
 }
 
@@ -154,6 +158,17 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringSliceVar(&s.StorageConfig.Transport.ServerList, "etcd-servers", s.StorageConfig.Transport.ServerList,
 		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
+
+	fs.DurationVar(&s.StorageConfig.Transport.AutoSyncInterval, "etcd-auto-sync-interval", s.StorageConfig.Transport.AutoSyncInterval, ""+
+		"The interval at which to update etcd endpoints to the latest members as reported by the cluster. "+
+		"Do not enable if the api server has a different network view of the etcd cluster members than the etcd cluster reports "+
+		"(for example, if accessing etcd via a load-balancer). Disabled when set to 0.")
+
+	fs.BoolVar(&s.StorageConfig.Transport.SetServerName, "etcd-set-server-name", s.StorageConfig.Transport.SetServerName, ""+
+		"Verify etcd certificate against the first hostname specified in --etcd-servers (or the first per "+
+		"resource in --etcd-servers-overrides). This is useful in a setup where the etcd instances are "+
+		"discovered by a single DNS name, all etcd instances share the same server certificate, and when "+
+		"--etcd-auto-sync-interval is set.")
 
 	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix,
 		"The prefix to prepend to all resource paths in etcd.")

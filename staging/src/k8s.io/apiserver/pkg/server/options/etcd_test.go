@@ -106,6 +106,31 @@ func TestEtcdOptionsValidate(t *testing.T) {
 			expectErr: "--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated",
 		},
 		{
+			name: "test when etcd-set-server-name when multiple hosts are specified in etcd-servers",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Type:   "etcd3",
+					Prefix: "/registry",
+					Transport: storagebackend.TransportConfig{
+						ServerList:    []string{"http://127.0.0.1", "http://127.0.1.1"},
+						KeyFile:       "/var/run/kubernetes/etcd.key",
+						TrustedCAFile: "/var/run/kubernetes/etcdca.crt",
+						CertFile:      "/var/run/kubernetes/etcdce.crt",
+						SetServerName: true,
+					},
+					CompactionInterval:    storagebackend.DefaultCompactInterval,
+					CountMetricPollPeriod: time.Minute,
+				},
+				DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
+				DeleteCollectionWorkers: 1,
+				EnableGarbageCollection: true,
+				EnableWatchCache:        true,
+				DefaultWatchCacheSize:   100,
+				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
+			},
+			expectErr: "expect only one host in --etcd-servers if --etcd-set-server-name is set to be true",
+		},
+		{
 			name: "test when EtcdOptions is valid",
 			testOptions: &EtcdOptions{
 				StorageConfig: storagebackend.Config{
@@ -116,6 +141,7 @@ func TestEtcdOptionsValidate(t *testing.T) {
 						KeyFile:       "/var/run/kubernetes/etcd.key",
 						TrustedCAFile: "/var/run/kubernetes/etcdca.crt",
 						CertFile:      "/var/run/kubernetes/etcdce.crt",
+						SetServerName: true,
 					},
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
 					CountMetricPollPeriod: time.Minute,

@@ -19,10 +19,13 @@ package factory
 import (
 	"context"
 	"io/ioutil"
+	"net"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 
@@ -90,6 +93,82 @@ func TestTLSConnection(t *testing.T) {
 	}
 }
 
+func TestTLSConnectionSetServerName(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+
+	certFile, keyFile, caFile := configureTLSCerts(t)
+	defer os.RemoveAll(filepath.Dir(certFile))
+
+	// override server config to be TLS-enabled
+	etcdConfig := testserver.NewTestConfig(t)
+	etcdConfig.ClientTLSInfo = transport.TLSInfo{
+		CertFile:      certFile,
+		KeyFile:       keyFile,
+		TrustedCAFile: caFile,
+	}
+
+	lcUrl := etcdConfig.LCUrls[0]
+	lcUrl.Scheme = "https"
+	serverList := []string{lcUrl.String()}
+	// override listen-client-urls to be [localhost, 127.0.1.1],
+	// so that the etcd client could both make the initial connection
+	// through serverList (localhost), and later on after AutoSync
+	// has run (127.0.1.1).
+	lcUrls := []url.URL{lcUrl}
+	lcUrl.Host = replaceHost(t, lcUrl.Host, "127.0.1.1")
+	lcUrls = append(lcUrls, lcUrl)
+	etcdConfig.LCUrls = lcUrls
+
+	acUrl := etcdConfig.ACUrls[0]
+	acUrl.Scheme = "https"
+	// override advertise-client-urls to be an address
+	// not valid for the certificate
+	acUrl.Host = replaceHost(t, acUrl.Host, "127.0.1.1")
+	etcdConfig.ACUrls = []url.URL{acUrl}
+
+	// Set ServerName to be a name valid for the certificate so that
+	// the client created in testserver.RunEtcd could connect to etcd
+	serverUrl, err := url.Parse(serverList[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverHost, _, err := net.SplitHostPort(serverUrl.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	etcdConfig.ClientTLSInfo.ServerName = serverHost
+
+	_ = testserver.RunEtcd(t, etcdConfig)
+
+	cfg := storagebackend.Config{
+		Type: storagebackend.StorageTypeETCD3,
+		Transport: storagebackend.TransportConfig{
+			ServerList:       serverList,
+			CertFile:         certFile,
+			KeyFile:          keyFile,
+			TrustedCAFile:    caFile,
+			AutoSyncInterval: time.Second,
+			SetServerName:    true,
+		},
+		Codec: codec,
+	}
+	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil)
+
+	defer destroyFunc()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// sleep 5 seconds so that AutoSync could trigger
+	time.Sleep(5 * time.Second)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelFunc()
+	err = storage.Create(ctx, "/abc", &example.Pod{}, nil, 0)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+}
+
 func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 	baseDir := os.TempDir()
 	tempDir, err := ioutil.TempDir(baseDir, "etcd_certificates")
@@ -109,4 +188,12 @@ func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 		t.Fatal(err)
 	}
 	return certFile, keyFile, caFile
+}
+
+func replaceHost(t *testing.T, hostPort, host string) string {
+	_, port, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return net.JoinHostPort(host, port)
 }
