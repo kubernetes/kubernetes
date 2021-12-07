@@ -48,9 +48,10 @@ import (
 )
 
 const (
-	unknownVolumePlugin           string = "UnknownVolumePlugin"
-	unknownAttachableVolumePlugin string = "UnknownAttachableVolumePlugin"
-	DetachOperationName           string = "volume_detach"
+	unknownVolumePlugin                  string = "UnknownVolumePlugin"
+	unknownAttachableVolumePlugin        string = "UnknownAttachableVolumePlugin"
+	DetachOperationName                  string = "volume_detach"
+	VerifyControllerAttachedVolumeOpName string = "verify_controller_attached_volume"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -1579,7 +1580,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 	}
 
 	return volumetypes.GeneratedOperations{
-		OperationName:     "verify_controller_attached_volume",
+		OperationName:     VerifyControllerAttachedVolumeOpName,
 		OperationFunc:     verifyControllerAttachedVolumeFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "verify_controller_attached_volume"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error

@@ -202,6 +202,11 @@ func (rc *reconciler) mountAttachVolumes() {
 		volumeToMount.DevicePath = devicePath
 		if cache.IsVolumeNotAttachedError(err) {
 			if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
+				//// lets not spin a goroutine and unnecessarily trigger exponential backoff if this happens
+				if volumeToMount.PluginIsAttachable && !volumeToMount.ReportedInUse {
+					klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume failed", " volume not marked in-use"), "pod", klog.KObj(volumeToMount.Pod))
+					continue
+				}
 				// Volume is not attached (or doesn't implement attacher), kubelet attach is disabled, wait
 				// for controller to finish attaching volume.
 				klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
