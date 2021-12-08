@@ -101,11 +101,15 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		ginkgo.By("listing events in all namespaces")
 		foundCreatedEvent := eventExistsInList(clientAllNamespaces, f.Namespace.Name, eventName)
-		framework.ExpectEqual(foundCreatedEvent, true, "failed to find test event in list with cluster scope")
+		if !foundCreatedEvent {
+			framework.Failf("Failed to find test event %s in namespace %s, in list with cluster scope", eventName, f.Namespace.Name)
+		}
 
 		ginkgo.By("listing events in test namespace")
 		foundCreatedEvent = eventExistsInList(client, f.Namespace.Name, eventName)
-		framework.ExpectEqual(foundCreatedEvent, true, "failed to find test event in list with namespace scope")
+		if !foundCreatedEvent {
+			framework.Failf("Failed to find test event %s in namespace %s, in list with namespace scope", eventName, f.Namespace.Name)
+		}
 
 		ginkgo.By("listing events with field selection filtering on source")
 		filteredCoreV1List, err := coreClient.List(context.TODO(), metav1.ListOptions{FieldSelector: "source=test-controller"})
@@ -172,11 +176,15 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		ginkgo.By("listing events in all namespaces")
 		foundCreatedEvent = eventExistsInList(clientAllNamespaces, f.Namespace.Name, eventName)
-		framework.ExpectEqual(foundCreatedEvent, false, "should not have found test event after deletion")
+		if foundCreatedEvent {
+			framework.Failf("Should not have found test event %s in namespace %s, in list with cluster scope after deletion", eventName, f.Namespace.Name)
+		}
 
 		ginkgo.By("listing events in test namespace")
 		foundCreatedEvent = eventExistsInList(client, f.Namespace.Name, eventName)
-		framework.ExpectEqual(foundCreatedEvent, false, "should not have found test event after deletion")
+		if foundCreatedEvent {
+			framework.Failf("Should not have found test event %s in namespace %s, in list with namespace scope after deletion", eventName, f.Namespace.Name)
+		}
 	})
 
 	/*
