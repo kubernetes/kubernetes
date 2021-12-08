@@ -179,7 +179,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 				t.Errorf("updating only spec.Replicas is allowed on a statefulset: %v", errs)
 			}
 			expectedUpdateErrorString := "spec: Forbidden: updates to statefulset spec for fields other than" +
-				" 'replicas', 'template', 'updateStrategy' and 'persistentVolumeClaimRetentionPolicy' are forbidden"
+				" 'podManagementPolicy', 'replicas', 'template', 'updateStrategy' and 'persistentVolumeClaimRetentionPolicy' are forbidden"
 			if errs[0].Error() != expectedUpdateErrorString {
 				t.Errorf("expected error string %v", errs[0].Error())
 			}
