@@ -4,11 +4,16 @@ approvers:
 - sttts
 - nikhita
 - dims
+- justaugustus
 reviewers:
 - sttts
+- cpanato
 - dims
 - nikhita
+- jeremyrickard
 - justaugustus
+- puerco
+- saschagrunert
 labels:
 - sig/release
 - area/release-eng
