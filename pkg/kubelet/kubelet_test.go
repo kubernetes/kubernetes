@@ -214,6 +214,12 @@ func newTestKubeletWithImageList(
 							Address: testKubeletHostIP,
 						},
 					},
+					VolumesAttached: []v1.AttachedVolume{
+						{
+							Name:       "fake/fake-device",
+							DevicePath: "fake/path",
+						},
+					},
 				},
 			},
 		},
