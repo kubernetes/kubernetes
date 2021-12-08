@@ -163,6 +163,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			Claim:        l.pvc,
 			SourceClaim:  l.sourcePVC,
 			Class:        l.sc,
+			Provisioner:  l.sc.Provisioner,
 			ClaimSize:    claimSize,
 			ExpectedSize: claimSize,
 			VolumeMode:   pattern.VolMode,
@@ -254,7 +255,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
 		dataSource, dataSourceCleanup := preparePVCDataSourceForProvisioning(f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
 		defer dataSourceCleanup()
-
 		l.pvc.Spec.DataSource = dataSource
 		l.testCase.NodeSelection = testConfig.ClientNodeSelection
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
@@ -269,6 +269,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			e2evolume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
 		}
+		// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
+		volumeAttachment := e2evolume.GetVolumeAttachmentName(f.ClientSet, testConfig, l.testCase.Provisioner, dataSource.Name, l.sourcePVC.Namespace)
+		e2evolume.WaitForVolumeAttachmentTerminated(volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision)
 		l.testCase.TestDynamicProvisioning()
 	})
 
@@ -322,6 +325,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 					}
 					e2evolume.TestVolumeClientSlow(f, myTestConfig, nil, "", tests)
 				}
+				// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
+				volumeAttachment := e2evolume.GetVolumeAttachmentName(f.ClientSet, testConfig, l.testCase.Provisioner, dataSource.Name, l.sourcePVC.Namespace)
+				e2evolume.WaitForVolumeAttachmentTerminated(volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision)
 				t.TestDynamicProvisioning()
 			}(i)
 		}
@@ -377,7 +383,6 @@ func SetupStorageClass(
 // see #ProvisionStorageClass
 func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	var err error
-
 	client := t.Client
 	gomega.Expect(client).NotTo(gomega.BeNil(), "StorageClassTest.Client is required")
 	claim := t.Claim
@@ -413,7 +418,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		}
 
 		var pod *v1.Pod
-		pod, err := e2epod.CreateSecPod(client, podConfig, framework.PodStartTimeout)
+		pod, err := e2epod.CreateSecPod(client, podConfig, t.Timeouts.DataSourceProvision)
 		// Delete pod now, otherwise PV can't be deleted below
 		framework.ExpectNoError(err)
 		e2epod.DeletePodOrFail(client, pod.Namespace, pod.Name)
