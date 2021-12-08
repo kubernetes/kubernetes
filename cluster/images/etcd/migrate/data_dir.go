@@ -121,6 +121,10 @@ type VersionFile struct {
 	path string
 }
 
+func (v *VersionFile) nextPath() string {
+	return fmt.Sprintf("%s-next", v.path)
+}
+
 // Exists returns true if a version.txt file exists on the file system.
 func (v *VersionFile) Exists() (bool, error) {
 	return exists(v.path)
@@ -142,8 +146,14 @@ func (v *VersionFile) Read() (*EtcdVersionPair, error) {
 
 // Write creates or overwrites the contents of the version.txt file with the given EtcdVersionPair.
 func (v *VersionFile) Write(vp *EtcdVersionPair) error {
-	data := []byte(fmt.Sprintf("%s/%s", vp.version, vp.storageVersion))
-	return ioutil.WriteFile(v.path, data, 0666)
+	// We do write + rename instead of just write to protect from version.txt
+	// corruption under full disk condition.
+	// See https://github.com/kubernetes/kubernetes/issues/98989.
+	err := ioutil.WriteFile(v.nextPath(), []byte(vp.String()), 0666)
+	if err != nil {
+		return fmt.Errorf("failed to write new version file %s: %v", v.nextPath(), err)
+	}
+	return os.Rename(v.nextPath(), v.path)
 }
 
 func exists(path string) (bool, error) {
