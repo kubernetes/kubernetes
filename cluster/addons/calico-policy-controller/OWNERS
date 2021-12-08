@@ -3,10 +3,10 @@
 approvers:
   - bowei
   - caseydavenport
-  - fasaxc
+  #- fasaxc
 emeritus_approvers:
   - dnardo
 reviewers:
   - bowei
   - caseydavenport
-  - fasaxc
+  #- fasaxc
