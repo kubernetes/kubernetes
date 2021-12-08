@@ -59,32 +59,32 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 		return &c
 	}
 
-	var schemaWithValidationExpression = unmarshallSchema([]byte(`{
-	   "type":"object",
-	   "properties":{
-		  "spec":{
-			 "type":"object",
-			 "x-kubernetes-validations":[
-		       { "rule":"self.x + self.y > 0" }
-	         ],
-			 "properties":{
-				"x":{ "type":"integer" },
-				"y":{ "type":"integer" }
-			 }
-		  },
-		  "status":{
-			 "type":"object",
-			 "x-kubernetes-validations":[
-				{ "rule":"self.health == 'ok' || self.health == 'unhealthy'" }
-			 ],
-			 "properties":{
-				"health":{ "type":"string" }
-			 }
-		  }
-	   }
-	}`))
 	ginkgo.It("MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validator rules", func() {
 		ginkgo.By("Creating a custom resource definition with validation rules")
+		var schemaWithValidationExpression = unmarshallSchema([]byte(`{
+			"type":"object",
+			"properties":{
+			   "spec":{
+				  "type":"object",
+				  "x-kubernetes-validations":[
+					{ "rule":"self.x + self.y > 0" }
+				  ],
+				  "properties":{
+					 "x":{ "type":"integer" },
+					 "y":{ "type":"integer" }
+				  }
+			   },
+			   "status":{
+				  "type":"object",
+				  "x-kubernetes-validations":[
+					 { "rule":"self.health == 'ok' || self.health == 'unhealthy'" }
+				  ],
+				  "properties":{
+					 "health":{ "type":"string" }
+				  }
+			   }
+			}
+		 }`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 		framework.ExpectNoError(err, "creating CustomResourceDefinition")
@@ -112,6 +112,30 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 	})
 	ginkgo.It("MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validator rules", func() {
 		ginkgo.By("Creating a custom resource definition with validation rules")
+		var schemaWithValidationExpression = unmarshallSchema([]byte(`{
+			"type":"object",
+			"properties":{
+			   "spec":{
+				  "type":"object",
+				  "x-kubernetes-validations":[
+					{ "rule":"self.x + self.y > 0" }
+				  ],
+				  "properties":{
+					 "x":{ "type":"integer" },
+					 "y":{ "type":"integer" }
+				  }
+			   },
+			   "status":{
+				  "type":"object",
+				  "x-kubernetes-validations":[
+					 { "rule":"self.health == 'ok' || self.health == 'unhealthy'" }
+				  ],
+				  "properties":{
+					 "health":{ "type":"string" }
+				  }
+			   }
+			}
+		 }`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 		framework.ExpectNoError(err, "creating CustomResourceDefinition")
