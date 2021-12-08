@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -81,20 +80,6 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
-// TODO: delete this check after insecure flags removed in v1.24
-func checkNonZeroInsecurePort(fs *pflag.FlagSet) error {
-	for _, name := range options.InsecurePortFlags {
-		val, err := fs.GetInt(name)
-		if err != nil {
-			return err
-		}
-		if val != 0 {
-			return fmt.Errorf("invalid port value %d: only zero is allowed", val)
-		}
-	}
-	return nil
-}
-
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
@@ -124,10 +109,6 @@ cluster's shared state through which all other components interact.`,
 			}
 			cliflag.PrintFlags(fs)
 
-			err := checkNonZeroInsecurePort(fs)
-			if err != nil {
-				return err
-			}
 			// set default options
 			completedOptions, err := Complete(s)
 			if err != nil {
