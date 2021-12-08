@@ -188,7 +188,20 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 // Verifies there are no attach/detach calls.
 func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	// Arrange
-	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(nodeName),
+		},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/fake-device1",
+					DevicePath: "fake/path",
+				},
+			},
+		},
+	}
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
@@ -437,7 +450,20 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 // Verifies there are no attach/detach calls made.
 func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	// Arrange
-	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(nodeName),
+		},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/fake-device1",
+					DevicePath: "fake/path",
+				},
+			},
+		},
+	}
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
@@ -659,9 +685,22 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{
 		PersistentVolume: gcepv,
 	}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(nodeName),
+		},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/fake-device1",
+					DevicePath: "fake/path",
+				},
+			},
+		},
+	}
 
 	// Arrange
-	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
@@ -869,8 +908,22 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		PersistentVolume: gcepv,
 	}
 
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(nodeName),
+		},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/fake-device1",
+					DevicePath: "/fake/path",
+				},
+			},
+		},
+	}
+
 	// Arrange
-	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
@@ -1178,7 +1231,21 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 
 			// deep copy before reconciler runs to avoid data race.
 			pvWithSize := pv.DeepCopy()
-			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(nodeName),
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					VolumesAttached: []v1.AttachedVolume{
+						{
+							Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.pvName)),
+							DevicePath: "fake/path",
+						},
+					},
+				},
+			}
+			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 			dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
@@ -1353,7 +1420,21 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					},
 				}
 
-				volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+				node := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: string(nodeName),
+					},
+					Spec: v1.NodeSpec{},
+					Status: v1.NodeStatus{
+						VolumesAttached: []v1.AttachedVolume{
+							{
+								Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
+								DevicePath: "fake/path",
+							},
+						},
+					},
+				}
+				volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 				fakePlugin.SupportsRemount = tc.supportRemount
 
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
@@ -1563,7 +1644,21 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					},
 				}
 
-				volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+				node := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: string(nodeName),
+					},
+					Status: v1.NodeStatus{
+						VolumesAttached: []v1.AttachedVolume{
+							{
+								Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
+								DevicePath: "fake/path",
+							},
+						},
+					},
+				}
+
+				volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 				fakePlugin.SupportsRemount = tc.supportRemount
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
@@ -1865,7 +1960,20 @@ func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolume
 
 func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	// Arrange
-	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(nodeName),
+		},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/fake-device1",
+					DevicePath: "/fake/path",
+				},
+			},
+		},
+	}
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
