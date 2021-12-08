@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10 AS builder
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
 RUN make WHAT=openshift-hack/e2e/k8s-e2e.test; \
@@ -9,7 +9,7 @@ RUN make WHAT=openshift-hack/e2e/k8s-e2e.test; \
     cp /go/src/k8s.io/kubernetes/openshift-hack/test-kubernetes-e2e.sh /tmp/build/
 
 
-FROM registry.svc.ci.openshift.org/ocp/4.6:tools
+FROM registry.svc.ci.openshift.org/ocp/4.10:tools
 COPY --from=builder /tmp/build/k8s-e2e.test /usr/bin/
 COPY --from=builder /tmp/build/ginkgo /usr/bin/
 COPY --from=builder /tmp/build/test-kubernetes-e2e.sh /usr/bin/
