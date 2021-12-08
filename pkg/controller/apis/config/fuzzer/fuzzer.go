@@ -43,6 +43,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CSRSigningController.ClusterSigningKeyFile = fmt.Sprintf("/%s", c.RandString())
 			obj.PersistentVolumeBinderController.VolumeConfiguration.FlexVolumePluginDir = fmt.Sprintf("/%s", c.RandString())
 			obj.TTLAfterFinishedController.ConcurrentTTLSyncs = c.Int31()
+			obj.SAController.MaxRetries = 0
 		},
 	}
 }

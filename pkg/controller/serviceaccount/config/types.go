@@ -27,4 +27,7 @@ type SAControllerConfiguration struct {
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string
+	// MaxRetries controls the maximum number of times a particular key is retried before giving up.
+	// If zero, a default max is used.
+	MaxRetries int
 }

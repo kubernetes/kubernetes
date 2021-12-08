@@ -627,6 +627,9 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to build token generator: %v", err)
 	}
+
+	maxRetries := controllerContext.ComponentConfig.SAController.MaxRetries
+
 	controller, err := serviceaccountcontroller.NewTokensController(
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
@@ -635,6 +638,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
 			AutoGenerate:   !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenNoAutoGeneration),
+			MaxRetries:     maxRetries,
 		},
 	)
 	if err != nil {

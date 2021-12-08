@@ -92,5 +92,6 @@ func autoConvert_config_SAControllerConfiguration_To_v1alpha1_SAControllerConfig
 	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
 	out.RootCAFile = in.RootCAFile
+	// WARNING: in.MaxRetries requires manual conversion: does not exist in peer-type
 	return nil
 }

@@ -126,6 +126,7 @@ var args = []string{
 	"--leader-elect-retry-period=5s",
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
+	"--max-retries=15",
 	"--min-resync-period=8h",
 	"--mirroring-concurrent-service-endpoint-syncs=2",
 	"--mirroring-max-endpoints-per-subset=1000",
@@ -394,6 +395,7 @@ func TestAddFlags(t *testing.T) {
 			&serviceaccountconfig.SAControllerConfiguration{
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
+				MaxRetries:             15,
 			},
 		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
@@ -629,6 +631,7 @@ func TestApplyTo(t *testing.T) {
 			SAController: serviceaccountconfig.SAControllerConfiguration{
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
+				MaxRetries:             15,
 			},
 			TTLAfterFinishedController: ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 				ConcurrentTTLSyncs: 8,
