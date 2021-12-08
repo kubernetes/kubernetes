@@ -374,7 +374,11 @@ func (rm *Manager) IsExternallyManaged(caBaseName string) (bool, error) {
 		}
 		return externallyManaged, nil
 	case kubeadmconstants.EtcdCACertAndKeyBaseName:
-		return false, nil
+		externallyManaged, err := certsphase.UsingExternalEtcdCA(rm.cfg)
+		if err != nil {
+			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
+		}
+		return externallyManaged, nil
 	default:
 		return false, errors.Errorf("unknown certificate authority %s", caBaseName)
 	}
