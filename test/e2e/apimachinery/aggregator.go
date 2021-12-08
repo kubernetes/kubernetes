@@ -512,7 +512,9 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			break
 		}
 	}
-	framework.ExpectEqual(locatedWardle, true, "Unable to find v1alpha1.wardle.example.com in APIServiceList")
+	if !locatedWardle {
+		framework.Failf("Unable to find v1alpha1.wardle.example.com in APIServiceList")
+	}
 
 	// kubectl delete flunder test-flunder
 	err = dynamicClient.Delete(context.TODO(), flunderName, metav1.DeleteOptions{})
