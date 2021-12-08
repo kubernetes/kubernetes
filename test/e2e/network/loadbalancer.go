@@ -608,7 +608,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
 		svcPort := int(svc.Spec.Ports[0].Port)
 		// should have an internal IP.
-		framework.ExpectEqual(isInternalEndpoint(lbIngress), true)
+		if !isInternalEndpoint(lbIngress) {
+			framework.Failf("lbIngress %v doesn't have an internal IP", lbIngress)
+		}
 
 		// ILBs are not accessible from the test orchestrator, so it's necessary to use
 		//  a pod to test the service.

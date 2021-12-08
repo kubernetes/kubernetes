@@ -2321,7 +2321,9 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 		}
 
-		framework.ExpectEqual(foundSvc, true, "could not find service 'kubernetes' in service list in all namespaces")
+		if !foundSvc {
+			framework.Fail("could not find service 'kubernetes' in service list in all namespaces")
+		}
 	})
 
 	/*
@@ -2395,7 +2397,9 @@ var _ = common.SIGDescribe("Services", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(eventFound, true, "unable to find Endpoint Service in list of Endpoints")
+		if !eventFound {
+			framework.Fail("unable to find Endpoint Service in list of Endpoints")
+		}
 
 		ginkgo.By("updating the Endpoint")
 		foundEndpoint.ObjectMeta.Labels["test-service"] = "updated"
