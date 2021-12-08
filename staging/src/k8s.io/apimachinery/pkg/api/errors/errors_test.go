@@ -279,6 +279,10 @@ func TestReasonForErrorSupportsWrappedErrors(t *testing.T) {
 			err:            fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
 			expectedReason: metav1.StatusReasonUnknown,
 		},
+		{
+			name:           "Nil",
+			expectedReason: metav1.StatusReasonUnknown,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -326,6 +330,10 @@ func TestIsTooManyRequestsSupportsWrappedErrors(t *testing.T) {
 			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
 			expectMatch: false,
 		},
+		{
+			name:        "Nil",
+			expectMatch: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -368,6 +376,10 @@ func TestIsRequestEntityTooLargeErrorSupportsWrappedErrors(t *testing.T) {
 		{
 			name:        "Nested,no match",
 			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}
@@ -414,6 +426,10 @@ func TestIsUnexpectedServerError(t *testing.T) {
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
 			expectMatch: false,
 		},
+		{
+			name:        "Nil",
+			expectMatch: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -452,6 +468,10 @@ func TestIsUnexpectedObjectError(t *testing.T) {
 		{
 			name:        "Nested, no match",
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}
@@ -497,6 +517,10 @@ func TestSuggestsClientDelaySupportsWrapping(t *testing.T) {
 		{
 			name:        "Nested, no match",
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}

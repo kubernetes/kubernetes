@@ -523,7 +523,7 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 }
 
 // IsNotFound returns true if the specified error was created by NewNotFound.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsNotFound(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonNotFound {
@@ -536,13 +536,13 @@ func IsNotFound(err error) bool {
 }
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsAlreadyExists(err error) bool {
 	return ReasonForError(err) == metav1.StatusReasonAlreadyExists
 }
 
 // IsConflict determines if the err is an error which indicates the provided update conflicts.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsConflict(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonConflict {
@@ -555,7 +555,7 @@ func IsConflict(err error) bool {
 }
 
 // IsInvalid determines if the err is an error which indicates the provided resource is not valid.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsInvalid(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonInvalid {
@@ -568,7 +568,7 @@ func IsInvalid(err error) bool {
 }
 
 // IsGone is true if the error indicates the requested resource is no longer available.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsGone(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonGone {
@@ -582,13 +582,13 @@ func IsGone(err error) bool {
 
 // IsResourceExpired is true if the error indicates the resource has expired and the current action is
 // no longer possible.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsResourceExpired(err error) bool {
 	return ReasonForError(err) == metav1.StatusReasonExpired
 }
 
 // IsNotAcceptable determines if err is an error which indicates that the request failed due to an invalid Accept header
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsNotAcceptable(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonNotAcceptable {
@@ -601,7 +601,7 @@ func IsNotAcceptable(err error) bool {
 }
 
 // IsUnsupportedMediaType determines if err is an error which indicates that the request failed due to an invalid Content-Type header
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsUnsupportedMediaType(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonUnsupportedMediaType {
@@ -615,7 +615,7 @@ func IsUnsupportedMediaType(err error) bool {
 
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not
 // be performed because it is not supported by the server.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsMethodNotSupported(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonMethodNotAllowed {
@@ -628,7 +628,7 @@ func IsMethodNotSupported(err error) bool {
 }
 
 // IsServiceUnavailable is true if the error indicates the underlying service is no longer available.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsServiceUnavailable(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonServiceUnavailable {
@@ -641,7 +641,7 @@ func IsServiceUnavailable(err error) bool {
 }
 
 // IsBadRequest determines if err is an error which indicates that the request is invalid.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsBadRequest(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonBadRequest {
@@ -655,7 +655,7 @@ func IsBadRequest(err error) bool {
 
 // IsUnauthorized determines if err is an error which indicates that the request is unauthorized and
 // requires authentication by the user.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsUnauthorized(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonUnauthorized {
@@ -669,7 +669,7 @@ func IsUnauthorized(err error) bool {
 
 // IsForbidden determines if err is an error which indicates that the request is forbidden and cannot
 // be completed as requested.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsForbidden(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonForbidden {
@@ -683,7 +683,7 @@ func IsForbidden(err error) bool {
 
 // IsTimeout determines if err is an error which indicates that request times out due to long
 // processing.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsTimeout(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonTimeout {
@@ -697,7 +697,7 @@ func IsTimeout(err error) bool {
 
 // IsServerTimeout determines if err is an error which indicates that the request needs to be retried
 // by the client.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsServerTimeout(err error) bool {
 	// do not check the status code, because no https status code exists that can
 	// be scoped to retryable timeouts.
@@ -705,7 +705,7 @@ func IsServerTimeout(err error) bool {
 }
 
 // IsInternalError determines if err is an error which indicates an internal server error.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsInternalError(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonInternalError {
@@ -719,7 +719,7 @@ func IsInternalError(err error) bool {
 
 // IsTooManyRequests determines if err is an error which indicates that there are too many requests
 // that the server cannot handle.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsTooManyRequests(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonTooManyRequests {
@@ -737,7 +737,7 @@ func IsTooManyRequests(err error) bool {
 
 // IsRequestEntityTooLargeError determines if err is an error which indicates
 // the request entity is too large.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsRequestEntityTooLargeError(err error) bool {
 	reason, code := reasonAndCodeForError(err)
 	if reason == metav1.StatusReasonRequestEntityTooLarge {
@@ -755,7 +755,7 @@ func IsRequestEntityTooLargeError(err error) bool {
 
 // IsUnexpectedServerError returns true if the server response was not in the expected API format,
 // and may be the result of another HTTP actor.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsUnexpectedServerError(err error) bool {
 	if status := APIStatus(nil); errors.As(err, &status) && status.Status().Details != nil {
 		for _, cause := range status.Status().Details.Causes {
@@ -768,7 +768,7 @@ func IsUnexpectedServerError(err error) bool {
 }
 
 // IsUnexpectedObjectError determines if err is due to an unexpected object from the master.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func IsUnexpectedObjectError(err error) bool {
 	uoe := &UnexpectedObjectError{}
 	return err != nil && errors.As(err, &uoe)
@@ -778,7 +778,7 @@ func IsUnexpectedObjectError(err error) bool {
 // suggested seconds to wait, or false if the error does not imply a wait. It does not
 // address whether the error *should* be retried, since some errors (like a 3xx) may
 // request delay without retry.
-// It supports wrapped errors.
+// It supports wrapped errors and returns false when the error is nil.
 func SuggestsClientDelay(err error) (int, bool) {
 	if t := APIStatus(nil); errors.As(err, &t) && t.Status().Details != nil {
 		switch t.Status().Reason {
@@ -795,7 +795,8 @@ func SuggestsClientDelay(err error) (int, bool) {
 }
 
 // ReasonForError returns the HTTP status for a particular error.
-// It supports wrapped errors.
+// It supports wrapped errors and returns StatusReasonUnknown when
+// the error is nil or doesn't have a status.
 func ReasonForError(err error) metav1.StatusReason {
 	if status := APIStatus(nil); errors.As(err, &status) {
 		return status.Status().Reason
