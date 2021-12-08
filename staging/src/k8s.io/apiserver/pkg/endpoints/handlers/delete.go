@@ -161,6 +161,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 			}
 		}
 
+		trace.Step("About to write a response")
+		defer trace.Step("Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
 	}
 }
@@ -289,6 +291,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			}
 		}
 
+		trace.Step("About to write a response")
+		defer trace.Step("Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
 	}
 }

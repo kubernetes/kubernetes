@@ -246,6 +246,9 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		if wasCreated {
 			status = http.StatusCreated
 		}
+
+		trace.Step("About to write a response")
+		defer trace.Step("Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
 	}
 }
