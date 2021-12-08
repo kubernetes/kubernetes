@@ -695,14 +695,6 @@ const (
 	// Enable POD resources API to return allocatable resources
 	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
 
-	// owner: @jayunit100 @abhiraut @rikatz
-	// kep: http://kep.k8s.io/2161
-	// beta: v1.21
-	// ga: v1.22
-	//
-	// Labels all namespaces with a default label "kubernetes.io/metadata.name: <namespaceName>"
-	NamespaceDefaultLabelName featuregate.Feature = "NamespaceDefaultLabelName"
-
 	// owner: @fengzixu
 	// alpha: v1.21
 	//
@@ -956,7 +948,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LogarithmicScaleDown:                           {Default: true, PreRelease: featuregate.Beta},
 	SuspendJob:                                     {Default: true, PreRelease: featuregate.Beta},
 	KubeletPodResourcesGetAllocatable:              {Default: true, PreRelease: featuregate.Beta},
-	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
 	WindowsHostProcessContainers:                   {Default: true, PreRelease: featuregate.Beta},
 	DisableCloudProviders:                          {Default: false, PreRelease: featuregate.Alpha},
