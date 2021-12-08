@@ -166,6 +166,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 			LongName:   kubeConfig.longName,
 			FileName:   kubeConfig.fileName,
 			CABaseName: kubeadmconstants.CACertAndKeyBaseName, // all certificates in kubeConfig files are signed by the Kubernetes CA
+			CAName:     kubeadmconstants.CACertAndKeyBaseName,
 			readwriter: kubeConfigReadWriter,
 		}
 	}
