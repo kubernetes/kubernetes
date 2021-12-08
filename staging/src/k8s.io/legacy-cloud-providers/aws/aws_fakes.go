@@ -30,6 +30,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
+	_ "github.com/stretchr/testify/mock"
 	"k8s.io/klog/v2"
 )
 

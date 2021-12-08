@@ -73,7 +73,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -310,18 +309,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	switch containerRuntime {
 	case kubetypes.DockerContainerRuntime:
-		klog.InfoS("Using dockershim is deprecated, please consider using a full-fledged CRI implementation")
-		if err := runDockershim(
-			kubeCfg,
-			kubeDeps,
-			crOptions,
-			runtimeCgroups,
-			remoteRuntimeEndpoint,
-			remoteImageEndpoint,
-			nonMasqueradeCIDR,
-		); err != nil {
-			return err
-		}
+		return fmt.Errorf("using dockershim is not supported, please consider using a full-fledged CRI implementation")
 	case kubetypes.RemoteContainerRuntime:
 		// No-op.
 		break
@@ -2439,16 +2427,4 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	// ContainerRemoved doesn't affect pod state
 	return event.Type != pleg.ContainerRemoved
-}
-
-// Gets the streaming server configuration to use with in-process CRI shims.
-func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, crOptions *config.ContainerRuntimeOptions) *streaming.Config {
-	config := &streaming.Config{
-		StreamIdleTimeout:               kubeCfg.StreamingConnectionIdleTimeout.Duration,
-		StreamCreationTimeout:           streaming.DefaultConfig.StreamCreationTimeout,
-		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
-		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
-	}
-	config.Addr = net.JoinHostPort("localhost", "0")
-	return config
 }
