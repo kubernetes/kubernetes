@@ -26,6 +26,7 @@ import (
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -42,5 +43,5 @@ func fuzzBootstrapToken(obj *output.BootstrapToken, c fuzz.Continue) {
 	obj.Description = ""
 	obj.TTL = &metav1.Duration{Duration: time.Hour * 24}
 	obj.Usages = []string{"authentication", "signing"}
-	obj.Groups = []string{"system:bootstrappers:kubeadm:default-node-token"}
+	obj.Groups = []string{constants.NodeBootstrapTokenAuthGroup}
 }

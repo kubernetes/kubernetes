@@ -39,13 +39,6 @@ import (
 )
 
 const (
-	// KubeProxyClusterRoleName sets the name for the kube-proxy ClusterRole
-	// TODO: This k8s-generic, well-known constant should be fetchable from another source, not be in this package
-	KubeProxyClusterRoleName = "system:node-proxier"
-
-	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
-	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
-
 	// KubeProxyServiceAccountName describes the name of the ServiceAccount for the kube-proxy addon
 	KubeProxyServiceAccountName = "kube-proxy"
 
@@ -163,12 +156,12 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 func createClusterRoleBindings(client clientset.Interface) error {
 	if err := apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: KubeProxyClusterRoleBindingName,
+			Name: constants.KubeProxyClusterRoleBindingName,
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "ClusterRole",
-			Name:     KubeProxyClusterRoleName,
+			Name:     constants.KubeProxyClusterRoleName,
 		},
 		Subjects: []rbac.Subject{
 			{
