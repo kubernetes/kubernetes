@@ -72,6 +72,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 						DataDir: tmpdir + "/etcd",
 					},
 				},
+				FeatureGates: map[string]bool{"RootlessControlPlane": false},
 			},
 			expectedError: false,
 		},
@@ -88,6 +89,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 						KeyFile:  "/etc/kubernetes/pki/etcd/apiserver-etcd-client.key",
 					},
 				},
+				FeatureGates: map[string]bool{"RootlessControlPlane": false},
 			},
 			expectedError: true,
 		},
@@ -124,6 +126,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 				DataDir: tmpdir + "/etcd",
 			},
 		},
+		FeatureGates: map[string]bool{"RootlessControlPlane": false},
 	}
 
 	patchesPath := filepath.Join(tmpdir, "patch-files")

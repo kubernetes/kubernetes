@@ -43,7 +43,7 @@ const (
 var InitFeatureGates = FeatureList{
 	IPv6DualStack:               {FeatureSpec: featuregate.FeatureSpec{Default: true, LockToDefault: true, PreRelease: featuregate.GA}, HiddenInHelpText: true},
 	PublicKeysECDSA:             {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	RootlessControlPlane:        {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	RootlessControlPlane:        {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 	UnversionedKubeletConfigMap: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 

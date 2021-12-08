@@ -122,6 +122,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 			// Creates a Cluster Configuration
 			cfg := &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.9.0",
+				FeatureGates:      map[string]bool{"RootlessControlPlane": false},
 			}
 
 			// Execute createStaticPodFunction
@@ -150,6 +151,7 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.9.0",
+		FeatureGates:      map[string]bool{"RootlessControlPlane": false},
 	}
 
 	patchesPath := filepath.Join(tmpdir, "patch-files")
