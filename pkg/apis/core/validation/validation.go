@@ -5564,13 +5564,13 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 
 		// username or password might be empty, but the field must be present
 		if !usernameFieldExists && !passwordFieldExists {
-			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(core.BasicAuthUsernameKey), ""))
-			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(core.BasicAuthPasswordKey), ""))
+			allErrs = append(allErrs, field.Required(dataPath.Key(core.BasicAuthUsernameKey), ""))
+			allErrs = append(allErrs, field.Required(dataPath.Key(core.BasicAuthPasswordKey), ""))
 			break
 		}
 	case core.SecretTypeSSHAuth:
 		if len(secret.Data[core.SSHAuthPrivateKey]) == 0 {
-			allErrs = append(allErrs, field.Required(field.NewPath("data[%s]").Key(core.SSHAuthPrivateKey), ""))
+			allErrs = append(allErrs, field.Required(dataPath.Key(core.SSHAuthPrivateKey), ""))
 			break
 		}
 
