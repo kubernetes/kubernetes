@@ -1312,7 +1312,7 @@ func TestZeroRequest(t *testing.T) {
 			fts := feature.Features{}
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterScorePlugin(noderesources.FitName, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), 1),
+				st.RegisterScorePlugin(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), 1),
 				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(fts, noderesources.NewBalancedAllocation), 1),
 				st.RegisterScorePlugin(selectorspread.Name, selectorspread.New, 1),
 				st.RegisterPreScorePlugin(selectorspread.Name, selectorspread.New),

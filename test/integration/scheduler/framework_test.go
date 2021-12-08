@@ -1965,10 +1965,10 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 						// would fail first and exit the Filter phase.
 						Enabled: []v1beta3.Plugin{
 							{Name: filterPluginName},
-							{Name: noderesources.FitName},
+							{Name: noderesources.Name},
 						},
 						Disabled: []v1beta3.Plugin{
-							{Name: noderesources.FitName},
+							{Name: noderesources.Name},
 						},
 					},
 				},

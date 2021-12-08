@@ -62,7 +62,7 @@ func NewInTreeRegistry() runtime.Registry {
 		nodeaffinity.Name:                    nodeaffinity.New,
 		podtopologyspread.Name:               podtopologyspread.New,
 		nodeunschedulable.Name:               nodeunschedulable.New,
-		noderesources.FitName:                runtime.FactoryAdapter(fts, noderesources.NewFit),
+		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
 		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
 		volumebinding.Name:                   runtime.FactoryAdapter(fts, volumebinding.New),
 		volumerestrictions.Name:              runtime.FactoryAdapter(fts, volumerestrictions.New),

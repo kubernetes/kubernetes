@@ -38,12 +38,12 @@ var _ framework.EnqueueExtensions = &Fit{}
 var _ framework.ScorePlugin = &Fit{}
 
 const (
-	// FitName is the name of the plugin used in the plugin registry and configurations.
-	FitName = names.NodeResourcesFit
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = names.NodeResourcesFit
 
 	// preFilterStateKey is the key in CycleState to NodeResourcesFit pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
-	preFilterStateKey = "PreFilter" + FitName
+	preFilterStateKey = "PreFilter" + Name
 )
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
@@ -100,7 +100,7 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
-	return FitName
+	return Name
 }
 
 // NewFit initializes a new plugin and returns it.
