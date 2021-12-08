@@ -515,7 +515,7 @@ func TestWatcherTimeout(t *testing.T) {
 	// Create a number of watchers that will not be reading any result.
 	nonReadingWatchers := 50
 	for i := 0; i < nonReadingWatchers; i++ {
-		watcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything, Recursive: true})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -523,7 +523,7 @@ func TestWatcherTimeout(t *testing.T) {
 	}
 
 	// Create a second watcher that will be reading result.
-	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
+	readingWatcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -688,7 +688,7 @@ func TestRandomWatchDeliver(t *testing.T) {
 	}
 	startVersion := strconv.Itoa(int(rv))
 
-	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -882,7 +882,7 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
-	watcher, err := cacher.WatchList(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
+	watcher, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred, Recursive: true})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

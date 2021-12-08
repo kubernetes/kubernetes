@@ -534,11 +534,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	return watcher, nil
 }
 
-// WatchList implements storage.Interface.
-func (c *Cacher) WatchList(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
-	return c.Watch(ctx, key, opts)
-}
-
 // Get implements storage.Interface.
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
 	if opts.ResourceVersion == "" {
@@ -1136,11 +1131,12 @@ func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interfac
 	opts := storage.ListOptions{
 		ResourceVersion: options.ResourceVersion,
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EfficientWatchResumption) {
 		opts.ProgressNotify = true
 	}
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, opts)
+	return lw.storage.Watch(context.TODO(), lw.resourcePrefix, opts)
 }
 
 // errWatcher implements watch.Interface to return a single error

@@ -1240,23 +1240,19 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 
 // WatchPredicate starts a watch for the items that matches.
 func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
-	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p}
+	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p, Recursive: true}
+
+	key := e.KeyRootFunc(ctx)
 	if name, ok := p.MatchesSingle(); ok {
-		if key, err := e.KeyFunc(ctx, name); err == nil {
-			w, err := e.Storage.Watch(ctx, key, storageOpts)
-			if err != nil {
-				return nil, err
-			}
-			if e.Decorator != nil {
-				return newDecoratedWatcher(ctx, w, e.Decorator), nil
-			}
-			return w, nil
+		if k, err := e.KeyFunc(ctx, name); err == nil {
+			key = k
+			storageOpts.Recursive = false
 		}
 		// if we cannot extract a key based on the current context, the
 		// optimization is skipped
 	}
 
-	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), storageOpts)
+	w, err := e.Storage.Watch(ctx, key, storageOpts)
 	if err != nil {
 		return nil, err
 	}

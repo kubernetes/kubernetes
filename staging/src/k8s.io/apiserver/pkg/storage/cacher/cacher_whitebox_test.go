@@ -308,9 +308,6 @@ func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *
 func (d *dummyStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
 	return newDummyWatch(), nil
 }
-func (d *dummyStorage) WatchList(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
-	return newDummyWatch(), nil
-}
 func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
 	return d.err
 }
