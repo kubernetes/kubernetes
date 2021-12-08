@@ -1515,6 +1515,20 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.FindPluginBySpec failed", err)
 	}
 
+	// For attachable volume types, lets check if volume is attached by reading from node lister.
+	// This would avoid exponential back-off and creation of goroutine unnecessarily. We still
+	// verify status of attached volume by directly reading from API server later on.This is necessarily
+	// to ensure any race conditions because of cached state in the informer.
+	if volumeToMount.PluginIsAttachable {
+		cachedAttachedVolumes, _ := og.volumePluginMgr.Host.GetAttachedVolumesFromNodeStatus()
+		if cachedAttachedVolumes != nil {
+			_, volumeFound := cachedAttachedVolumes[volumeToMount.VolumeName]
+			if !volumeFound {
+				return volumetypes.GeneratedOperations{}, NewMountPreConditionFailedError(fmt.Sprintf("volume %s is not yet in node's status", volumeToMount.VolumeName))
+			}
+		}
+	}
+
 	verifyControllerAttachedVolumeFunc := func() volumetypes.OperationContext {
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
 		if !volumeToMount.PluginIsAttachable {
