@@ -473,10 +473,7 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*
 		}
 	}
 
-	expectNodePorts := false
-	if svcType != v1.ServiceTypeClusterIP && svcType != v1.ServiceTypeExternalName {
-		expectNodePorts = true
-	}
+	expectNodePorts := needsNodePorts(svc)
 	for i, port := range svc.Spec.Ports {
 		hasNodePort := (port.NodePort != 0)
 		if hasNodePort != expectNodePorts {
@@ -497,6 +494,24 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*
 	// }
 
 	return svc, nil
+}
+
+func needsNodePorts(svc *v1.Service) bool {
+	if svc == nil {
+		return false
+	}
+	// Type NodePort
+	if svc.Spec.Type == v1.ServiceTypeNodePort {
+		return true
+	}
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
+		return false
+	}
+	// Type LoadBalancer
+	if svc.Spec.AllocateLoadBalancerNodePorts == nil {
+		return true //back-compat
+	}
+	return *svc.Spec.AllocateLoadBalancerNodePorts
 }
 
 // UpdateService fetches a service, calls the update function on it, and
