@@ -206,7 +206,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 
 			start := time.Now()
 			result, statusCode, sarErr = w.subjectAccessReview.Create(ctx, r, metav1.CreateOptions{})
-			latency := time.Now().Sub(start)
+			latency := time.Since(start)
 
 			if statusCode != 0 {
 				w.metrics.RecordRequestTotal(ctx, strconv.Itoa(statusCode))
