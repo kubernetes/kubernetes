@@ -124,7 +124,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		t.Fatalf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}
 	if got := podInfo.Pod.Name; got != "pod1" {
-		t.Fatalf("Exepcted pod1 to be popped, but got %v", got)
+		t.Fatalf("Expected pod1 to be popped, but got %v", got)
 	}
 
 	// Pod2 and Pod3 are not expected to be popped out.
