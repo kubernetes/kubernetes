@@ -19,11 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-
 cd "${KUBE_ROOT}"
-# verify the dockerless build
-# https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/1547-building-kubelet-without-docker/README.md
-hack/verify-typecheck.sh --skip-test --tags=dockerless --ignore-dirs=test
 
 # verify using go list
 if _out="$(go list -mod=readonly -tags "dockerless" -e -json  k8s.io/kubernetes/cmd/kubelet/... \
