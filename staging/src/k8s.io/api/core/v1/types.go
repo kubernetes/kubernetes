@@ -2249,6 +2249,15 @@ type Probe struct {
 	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,7,opt,name=terminationGracePeriodSeconds"`
+	// How often (in milliseonds) to perform the probe.
+	// +optional
+	PeriodMilliseconds *int32 `json:"periodMilliseconds,omitempty" protobuf:"varint,8,opt,name=periodMilliseconds"`
+	// Length of time (in milliseconds) before health checking is activated.
+	// +optional
+	InitialDelayMilliseconds *int32 `json:"initialDelayMilliseconds,omitempty" protobuf:"varint,9,opt,name=initialDelayMilliseconds"`
+	// Length of time (in milliseconds) before health checking times out.
+	// +optional
+	TimeoutMilliseconds *int32 `json:"timeoutMilliseconds,omitempty" protobuf:"varint,10,opt,name=timeoutMilliseconds"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

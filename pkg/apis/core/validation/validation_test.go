@@ -6691,6 +6691,42 @@ func Test_validateProbe(t *testing.T) {
 			},
 			want: field.ErrorList{},
 		},
+		{
+			name: "subsecond values working just right",
+			args: args{
+				probe: &core.Probe{
+					ProbeHandler:             core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					PeriodSeconds:            1,
+					PeriodMilliseconds:       utilpointer.Int32(-200),
+					TimeoutSeconds:           1,
+					TimeoutMilliseconds:      utilpointer.Int32(-200),
+					InitialDelaySeconds:      0,
+					InitialDelayMilliseconds: utilpointer.Int32(200),
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{},
+		},
+		{
+			name: "millisecond values too small",
+			args: args{
+				probe: &core.Probe{
+					ProbeHandler:             core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					PeriodSeconds:            1,
+					PeriodMilliseconds:       utilpointer.Int32(-950),
+					TimeoutSeconds:           1,
+					TimeoutMilliseconds:      utilpointer.Int32(-1200),
+					InitialDelaySeconds:      0,
+					InitialDelayMilliseconds: utilpointer.Int32(-100),
+				},
+				fldPath: fldPath,
+			},
+			want: field.ErrorList{
+				field.Invalid(fldPath.Child("periodSeconds"), "periodSeconds + periodMilliseconds", "must be greater than 100ms"),
+				field.Invalid(fldPath.Child("timeoutSeconds"), "timeoutSeconds + timeoutMilliseconds", "must be greater than 100ms"),
+				field.Invalid(fldPath.Child("initialDelaySeconds"), "initialDelaySeconds + initialDelayMilliseconds", "must be greater than 0s"),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -2125,6 +2125,15 @@ type Probe struct {
 	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 	// +optional
 	TerminationGracePeriodSeconds *int64
+	// How often (in milliseconds) to perform the probe.
+	// +optional
+	PeriodMilliseconds *int32
+	// Length of time (in milliseconds) before health checking is activated.
+	// +optional
+	InitialDelayMilliseconds *int32
+	// Length of time (in milliseconds) before health checking times out.
+	// +optional
+	TimeoutMilliseconds *int32
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

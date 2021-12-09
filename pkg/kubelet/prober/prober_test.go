@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestGetURLParts(t *testing.T) {
@@ -331,5 +333,56 @@ func TestNewExecInContainer(t *testing.T) {
 		if e, a := fmt.Sprintf("%v", test.err), fmt.Sprintf("%v", err); e != a {
 			t.Errorf("%s: error: expected %s, got %s", test.name, e, a)
 		}
+	}
+}
+
+func TestProbeTimeDuration(t *testing.T) {
+	tests := []struct {
+		name             string
+		probe            v1.Probe
+		expectedDuration time.Duration
+	}{{
+		name: "only seconds",
+		probe: v1.Probe{
+			PeriodSeconds: 1,
+		},
+		expectedDuration: 1 * time.Second,
+	}, {
+		name: "nil milliseconds",
+		probe: v1.Probe{
+			PeriodSeconds:      1,
+			PeriodMilliseconds: nil,
+		},
+		expectedDuration: 1 * time.Second,
+	}, {
+		name: "zero milliseconds",
+		probe: v1.Probe{
+			PeriodSeconds:      4,
+			PeriodMilliseconds: utilpointer.Int32(0),
+		},
+		expectedDuration: 4 * time.Second,
+	}, {
+		name: "seconds and positive milliseconds",
+		probe: v1.Probe{
+			PeriodSeconds:      1,
+			PeriodMilliseconds: utilpointer.Int32(900),
+		},
+		expectedDuration: 1*time.Second + 900*time.Millisecond,
+	}, {
+		name: "seconds and negative milliseconds",
+		probe: v1.Probe{
+			PeriodSeconds:      1,
+			PeriodMilliseconds: utilpointer.Int32(-900),
+		},
+		expectedDuration: 100 * time.Millisecond,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			duration := getProbeTimeDuration(tt.probe.PeriodSeconds, tt.probe.PeriodMilliseconds)
+			if duration != tt.expectedDuration {
+				t.Errorf("incorrection duration, wanted: %v, got: %v", tt.expectedDuration, duration)
+			}
+		})
 	}
 }

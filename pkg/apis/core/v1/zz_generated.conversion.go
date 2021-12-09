@@ -6643,6 +6643,9 @@ func autoConvert_v1_Probe_To_core_Probe(in *v1.Probe, out *core.Probe, s convers
 	out.SuccessThreshold = in.SuccessThreshold
 	out.FailureThreshold = in.FailureThreshold
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
+	out.PeriodMilliseconds = (*int32)(unsafe.Pointer(in.PeriodMilliseconds))
+	out.InitialDelayMilliseconds = (*int32)(unsafe.Pointer(in.InitialDelayMilliseconds))
+	out.TimeoutMilliseconds = (*int32)(unsafe.Pointer(in.TimeoutMilliseconds))
 	return nil
 }
 
@@ -6661,6 +6664,9 @@ func autoConvert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s convers
 	out.SuccessThreshold = in.SuccessThreshold
 	out.FailureThreshold = in.FailureThreshold
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
+	out.PeriodMilliseconds = (*int32)(unsafe.Pointer(in.PeriodMilliseconds))
+	out.InitialDelayMilliseconds = (*int32)(unsafe.Pointer(in.InitialDelayMilliseconds))
+	out.TimeoutMilliseconds = (*int32)(unsafe.Pointer(in.TimeoutMilliseconds))
 	return nil
 }
 

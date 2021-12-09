@@ -810,6 +810,21 @@ const (
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
 
+	// owner: @mikebrow @psschwei
+	// kep: http://kep.k8s.io/3066
+	// alpha: v1.26
+	//
+	// Allow Probe fields to be specified in seconds or milliseconds
+	SubSecondProbes featuregate.Feature = "SubSecondProbes"
+
+	// owner: @adtac
+	// alpha: v1.21
+	// beta: v1.22
+	// GA: v1.24
+	//
+	// Allows jobs to be created in the suspended state.
+	SuspendJob featuregate.Feature = "SuspendJob"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	// alpha: v1.21
@@ -1130,6 +1145,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetMinReadySeconds: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	StatefulSetStartOrdinal: {Default: false, PreRelease: featuregate.Alpha},
+
+	SubSecondProbes: {Default: false, PreRelease: featuregate.Alpha},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 

@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -60,6 +61,9 @@ const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
+
+// minProbeTimeDuration sets the minimum allowed value for a probe time duration
+const minProbeTimeDuration = 100 * time.Millisecond
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -2831,6 +2835,15 @@ func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
 	if probe.TerminationGracePeriodSeconds != nil && *probe.TerminationGracePeriodSeconds <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("terminationGracePeriodSeconds"), *probe.TerminationGracePeriodSeconds, "must be greater than 0"))
+	}
+	if probe.PeriodMilliseconds != nil && getProbeTimeDuration(probe.PeriodSeconds, probe.PeriodMilliseconds) < minProbeTimeDuration {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("periodSeconds"), "periodSeconds + periodMilliseconds", "must be greater than 100ms"))
+	}
+	if probe.TimeoutMilliseconds != nil && getProbeTimeDuration(probe.TimeoutSeconds, probe.TimeoutMilliseconds) < minProbeTimeDuration {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("timeoutSeconds"), "timeoutSeconds + timeoutMilliseconds", "must be greater than 100ms"))
+	}
+	if probe.InitialDelayMilliseconds != nil && getProbeTimeDuration(probe.InitialDelaySeconds, probe.InitialDelayMilliseconds) < 0*time.Second {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("initialDelaySeconds"), "initialDelaySeconds + initialDelayMilliseconds", "must be greater than 0s"))
 	}
 	return allErrs
 }
@@ -7172,4 +7185,12 @@ func ValidatePodAffinityTermSelector(podAffinityTerm core.PodAffinityTerm, allow
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, labelSelectorValidationOptions, fldPath.Child("labelSelector"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.NamespaceSelector, labelSelectorValidationOptions, fldPath.Child("namespaceSelector"))...)
 	return allErrs
+}
+
+// getProbeTimeDuration combines second and millisecond time increments into a single time.Duration
+func getProbeTimeDuration(seconds int32, milliseconds *int32) time.Duration {
+	if milliseconds != nil {
+		return time.Duration(seconds)*time.Second + time.Duration(*milliseconds)*time.Millisecond
+	}
+	return time.Duration(seconds) * time.Second
 }

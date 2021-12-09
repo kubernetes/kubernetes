@@ -545,6 +545,27 @@ func dropDisabledFields(
 		podSpec.SchedulingGates = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SubSecondProbes) && !probeSubSecondsInUse(oldPodSpec) {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+			if c.LivenessProbe != nil {
+				c.LivenessProbe.PeriodMilliseconds = nil
+				c.LivenessProbe.InitialDelayMilliseconds = nil
+				c.LivenessProbe.TimeoutMilliseconds = nil
+			}
+			if c.ReadinessProbe != nil {
+				c.ReadinessProbe.PeriodMilliseconds = nil
+				c.ReadinessProbe.InitialDelayMilliseconds = nil
+				c.ReadinessProbe.TimeoutMilliseconds = nil
+			}
+			if c.StartupProbe != nil {
+				c.StartupProbe.PeriodMilliseconds = nil
+				c.StartupProbe.InitialDelayMilliseconds = nil
+				c.StartupProbe.TimeoutMilliseconds = nil
+			}
+			return true
+		})
+	}
+
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
@@ -769,6 +790,25 @@ func schedulingGatesInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return len(podSpec.SchedulingGates) != 0
+}
+
+func probeSubSecondsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if (c.LivenessProbe != nil && c.LivenessProbe.PeriodMilliseconds != nil) ||
+			(c.LivenessProbe != nil && c.LivenessProbe.InitialDelayMilliseconds != nil) ||
+			(c.LivenessProbe != nil && c.LivenessProbe.TimeoutMilliseconds != nil) {
+			inUse = true
+			return false
+		}
+		return true
+	})
+
+	return inUse
 }
 
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the

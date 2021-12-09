@@ -24115,6 +24115,27 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 							Format:      "int64",
 						},
 					},
+					"periodMilliseconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "How often (in milliseonds) to perform the probe.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"initialDelayMilliseconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Length of time (in milliseconds) before health checking is activated.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"timeoutMilliseconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Length of time (in milliseconds) before health checking times out.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 			},
 		},

@@ -3855,8 +3855,18 @@
             ],
             "description": "HTTPGet specifies the http request to perform."
           },
+          "initialDelayMilliseconds": {
+            "description": "Length of time (in milliseconds) before health checking is activated.",
+            "format": "int32",
+            "type": "integer"
+          },
           "initialDelaySeconds": {
             "description": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodMilliseconds": {
+            "description": "How often (in milliseonds) to perform the probe.",
             "format": "int32",
             "type": "integer"
           },
@@ -3881,6 +3891,11 @@
           "terminationGracePeriodSeconds": {
             "description": "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
             "format": "int64",
+            "type": "integer"
+          },
+          "timeoutMilliseconds": {
+            "description": "Length of time (in milliseconds) before health checking times out.",
+            "format": "int32",
             "type": "integer"
           },
           "timeoutSeconds": {

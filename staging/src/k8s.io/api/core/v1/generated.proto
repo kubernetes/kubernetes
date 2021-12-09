@@ -4104,6 +4104,18 @@ message Probe {
   // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
   // +optional
   optional int64 terminationGracePeriodSeconds = 7;
+
+  // How often (in milliseonds) to perform the probe.
+  // +optional
+  optional int32 periodMilliseconds = 8;
+
+  // Length of time (in milliseconds) before health checking is activated.
+  // +optional
+  optional int32 initialDelayMilliseconds = 9;
+
+  // Length of time (in milliseconds) before health checking times out.
+  // +optional
+  optional int32 timeoutMilliseconds = 10;
 }
 
 // ProbeHandler defines a specific action that should be taken in a probe.

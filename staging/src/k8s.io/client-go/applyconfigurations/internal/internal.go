@@ -6269,7 +6269,13 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: httpGet
       type:
         namedType: io.k8s.api.core.v1.HTTPGetAction
+    - name: initialDelayMilliseconds
+      type:
+        scalar: numeric
     - name: initialDelaySeconds
+      type:
+        scalar: numeric
+    - name: periodMilliseconds
       type:
         scalar: numeric
     - name: periodSeconds
@@ -6282,6 +6288,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.TCPSocketAction
     - name: terminationGracePeriodSeconds
+      type:
+        scalar: numeric
+    - name: timeoutMilliseconds
       type:
         scalar: numeric
     - name: timeoutSeconds

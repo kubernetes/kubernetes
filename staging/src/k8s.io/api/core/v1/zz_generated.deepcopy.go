@@ -4303,6 +4303,21 @@ func (in *Probe) DeepCopyInto(out *Probe) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.PeriodMilliseconds != nil {
+		in, out := &in.PeriodMilliseconds, &out.PeriodMilliseconds
+		*out = new(int32)
+		**out = **in
+	}
+	if in.InitialDelayMilliseconds != nil {
+		in, out := &in.InitialDelayMilliseconds, &out.InitialDelayMilliseconds
+		*out = new(int32)
+		**out = **in
+	}
+	if in.TimeoutMilliseconds != nil {
+		in, out := &in.TimeoutMilliseconds, &out.TimeoutMilliseconds
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

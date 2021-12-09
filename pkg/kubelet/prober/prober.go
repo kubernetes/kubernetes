@@ -136,7 +136,7 @@ func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, 
 }
 
 func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
-	timeout := time.Duration(p.TimeoutSeconds) * time.Second
+	timeout := getProbeTimeDuration(p.TimeoutSeconds, p.TimeoutMilliseconds)
 	if p.Exec != nil {
 		klog.V(4).InfoS("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
@@ -254,4 +254,12 @@ func (eic *execInContainer) StdoutPipe() (io.ReadCloser, error) {
 
 func (eic *execInContainer) StderrPipe() (io.ReadCloser, error) {
 	return nil, fmt.Errorf("unimplemented")
+}
+
+// getProbeTimeDuration combines second and millisecond time increments into a single time.Duration
+func getProbeTimeDuration(seconds int32, milliseconds *int32) time.Duration {
+	if milliseconds != nil {
+		return time.Duration(seconds)*time.Second + time.Duration(*milliseconds)*time.Millisecond
+	}
+	return time.Duration(seconds) * time.Second
 }
