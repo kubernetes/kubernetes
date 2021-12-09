@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -91,18 +90,6 @@ const (
 	ExternalLoops
 )
 
-// TODO: delete this check after insecure flags removed in v1.24
-func checkNonZeroInsecurePort(fs *pflag.FlagSet) error {
-	val, err := fs.GetInt("port")
-	if err != nil {
-		return err
-	}
-	if val != 0 {
-		return fmt.Errorf("invalid port value %d: only zero is allowed", val)
-	}
-	return nil
-}
-
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
 	s, err := options.NewKubeControllerManagerOptions()
@@ -137,12 +124,6 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 			cliflag.PrintFlags(cmd.Flags())
-
-			err := checkNonZeroInsecurePort(cmd.Flags())
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
-			}
 
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
