@@ -1,0 +1,38 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- thockin
+- lavalamp
+- smarterclayton
+- wojtek-t
+- deads2k
+- caesarxuchao
+- liggitt
+- ncdc
+reviewers:
+- thockin
+- lavalamp
+- smarterclayton
+- wojtek-t
+- deads2k
+- brendandburns
+- derekwaynecarr
+- caesarxuchao
+- mikedanese
+- liggitt
+- davidopp
+- pmorie
+- janetkuo
+- justinsb
+- soltysh
+- jsafrane
+- dims
+- hongchaodeng
+- krousey
+- xiang90
+- ingvagabund
+- resouer
+- jessfraz
+- mfojtik
+- sdminonne
+- ncdc

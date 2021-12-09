@@ -153,7 +153,6 @@ func (c *Command) Matches(name string) bool {
 }
 
 func (c *Command) Run(args []string, additionalArgs []string) {
-	c.FlagSet.Usage = usage
 	c.FlagSet.Parse(args)
 	c.Command(c.FlagSet.Args(), additionalArgs)
 }
@@ -216,21 +215,20 @@ func commandMatching(name string) (*Command, bool) {
 }
 
 func usage() {
-	fmt.Printf("Ginkgo Version %s\n\n", config.VERSION)
+	fmt.Fprintf(os.Stderr, "Ginkgo Version %s\n\n", config.VERSION)
 	usageForCommand(DefaultCommand, false)
 	for _, command := range Commands {
-		fmt.Printf("\n")
+		fmt.Fprintf(os.Stderr, "\n")
 		usageForCommand(command, false)
 	}
 }
 
 func usageForCommand(command *Command, longForm bool) {
-	fmt.Printf("%s\n%s\n", command.UsageCommand, strings.Repeat("-", len(command.UsageCommand)))
-	fmt.Printf("%s\n", strings.Join(command.Usage, "\n"))
+	fmt.Fprintf(os.Stderr, "%s\n%s\n", command.UsageCommand, strings.Repeat("-", len(command.UsageCommand)))
+	fmt.Fprintf(os.Stderr, "%s\n", strings.Join(command.Usage, "\n"))
 	if command.SuppressFlagDocumentation && !longForm {
-		fmt.Printf("%s\n", strings.Join(command.FlagDocSubstitute, "\n  "))
+		fmt.Fprintf(os.Stderr, "%s\n", strings.Join(command.FlagDocSubstitute, "\n  "))
 	} else {
-		command.FlagSet.SetOutput(os.Stdout)
 		command.FlagSet.PrintDefaults()
 	}
 }
@@ -288,9 +286,9 @@ func findSuites(args []string, recurseForAll bool, skipPackage string, allowPrec
 }
 
 func goFmt(path string) {
-	out, err := exec.Command("go", "fmt", path).CombinedOutput()
+	err := exec.Command("go", "fmt", path).Run()
 	if err != nil {
-		complainAndQuit("Could not fmt: " + err.Error() + "\n" + string(out))
+		complainAndQuit("Could not fmt: " + err.Error())
 	}
 }
 

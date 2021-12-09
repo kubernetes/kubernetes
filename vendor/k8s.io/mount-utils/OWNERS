@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - jingxu97
+  - saad-ali
+  - jsafrane
+  - msau42
+  - andyzhangx
+  - gnufied
+approvers:
+  - jingxu97
+  - saad-ali
+  - jsafrane
+
+labels:
+  - sig/storage

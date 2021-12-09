@@ -1,0 +1,19 @@
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/metadata/properties
+  value:
+    name:
+      type: string
+      enum:
+      - ebs.csi.aws.com
+      - efs.csi.aws.com
+      - disk.csi.azure.com
+      - file.csi.azure.com
+      - pd.csi.storage.gke.io
+      - cinder.csi.openstack.org
+      - csi.vsphere.vmware.com
+      - manila.csi.openstack.org
+      - csi.ovirt.org
+      - csi.kubevirt.io
+      - csi.sharedresource.openshift.io
+      - diskplugin.csi.alibabacloud.com
+      - vpc.block.csi.ibm.io
