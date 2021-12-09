@@ -17,7 +17,8 @@ limitations under the License.
 package controllers
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	k8smetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
@@ -27,19 +28,19 @@ var (
 
 // ControllerMetrics includes all the metrics of the proxy server.
 type ControllerMetrics struct {
-	controllerInstanceCount *prometheus.GaugeVec
+	controllerInstanceCount *k8smetrics.GaugeVec
 }
 
 // newControllerMetrics create a new ControllerMetrics, configured with default metric names.
 func newControllerMetrics() *ControllerMetrics {
-	controllerInstanceCount := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	controllerInstanceCount := k8smetrics.NewGaugeVec(
+		&k8smetrics.GaugeOpts{
 			Name: "managed_controller_instance_count",
 			Help: "Instances of individual controllers currently running",
 		},
 		[]string{"controller_name", "controller_manager"},
 	)
-	prometheus.MustRegister(controllerInstanceCount)
+	legacyregistry.MustRegister(controllerInstanceCount)
 	return &ControllerMetrics{
 		controllerInstanceCount: controllerInstanceCount,
 	}
@@ -47,10 +48,10 @@ func newControllerMetrics() *ControllerMetrics {
 
 // ControllerStarted sets the controllerInstanceCount to 1.
 func (a *ControllerMetrics) ControllerStarted(controllerName string, controllerManager string) {
-	a.controllerInstanceCount.With(prometheus.Labels{"controller_name": controllerName, "controller_manager": controllerManager}).Set(float64(1))
+	a.controllerInstanceCount.With(k8smetrics.Labels{"controller_name": controllerName, "controller_manager": controllerManager}).Set(float64(1))
 }
 
 // ControllerStopped sets the controllerInstanceCount to 0.
 func (a *ControllerMetrics) ControllerStopped(controllerName string, controllerManager string) {
-	a.controllerInstanceCount.With(prometheus.Labels{"controller_name": controllerName, "controller_manager": controllerManager}).Set(float64(0))
+	a.controllerInstanceCount.With(k8smetrics.Labels{"controller_name": controllerName, "controller_manager": controllerManager}).Set(float64(0))
 }
