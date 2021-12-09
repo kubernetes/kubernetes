@@ -66,7 +66,12 @@ func NewFakeClock(t time.Time) *testclocks.FakeClock {
 // IntervalClock implements Clock, but each invocation of Now steps
 // the clock forward the specified duration.
 //
-// Deprecated: Use k8s.io/utils/clock/testing.IntervalClock instead.
+// WARNING: most of the Clock methods just `panic`;
+// only PassiveClock is honestly implemented.
+// The alternative, SimpleIntervalClock, has only the
+// PassiveClock methods.
+//
+// Deprecated: Use k8s.io/utils/clock/testing.SimpleIntervalClock instead.
 type IntervalClock = testclocks.IntervalClock
 
 // Timer allows for injecting fake or real timers into code that
