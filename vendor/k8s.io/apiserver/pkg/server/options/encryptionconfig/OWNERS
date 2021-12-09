@@ -1,9 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-approvers:
-- sig-auth-encryption-at-rest-approvers
-reviewers:
-- sig-auth-encryption-at-rest-reviewers
-labels:
-- sig/auth
-
