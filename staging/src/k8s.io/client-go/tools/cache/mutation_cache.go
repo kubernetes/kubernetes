@@ -42,9 +42,18 @@ type MutationCache interface {
 	Mutation(interface{})
 }
 
-// ResourceVersionComparator is able to compare object versions.
+// ResourceVersionComparator is deprecated.
 type ResourceVersionComparator interface {
 	CompareResourceVersion(lhs, rhs runtime.Object) int
+}
+
+// Comparator is able to compare objects.
+type Comparator interface {
+	// Compare determines which of the two objects is newer, returning:
+	// - -1 if rhs is newer
+	// -  0 if they are equivalent
+	// -  1 if lhs is newer
+	Compare(lhs, rhs runtime.Object) int
 }
 
 // NewIntegerResourceVersionMutationCache returns a MutationCache that understands how to
@@ -82,7 +91,7 @@ type mutationCache struct {
 	includeAdds   bool
 	ttl           time.Duration
 
-	comparator ResourceVersionComparator
+	comparator Comparator
 }
 
 // GetByKey is never guaranteed to return back the value set in Mutation.  It could be paged out, it could
@@ -185,7 +194,7 @@ func (c *mutationCache) newerObject(key string, backing runtime.Object) runtime.
 	if !ok {
 		return backing
 	}
-	if c.comparator.CompareResourceVersion(backing, mutatedObjRuntime) >= 0 {
+	if c.comparator.Compare(backing, mutatedObjRuntime) >= 0 {
 		c.mutationCache.Remove(key)
 		return backing
 	}
@@ -211,7 +220,7 @@ func (c *mutationCache) Mutation(obj interface{}) {
 	if objRuntime, ok := obj.(runtime.Object); ok {
 		if mutatedObj, exists := c.mutationCache.Get(key); exists {
 			if mutatedObjRuntime, ok := mutatedObj.(runtime.Object); ok {
-				if c.comparator.CompareResourceVersion(objRuntime, mutatedObjRuntime) < 0 {
+				if c.comparator.Compare(objRuntime, mutatedObjRuntime) < 0 {
 					return
 				}
 			}
@@ -237,9 +246,9 @@ func (a etcdObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, 
 	return strconv.ParseUint(version, 10, 64)
 }
 
-// CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
+// Compare compares etcd resource versions.  Outside this API they are all strings,
 // but etcd resource versions are special, they're actually ints, so we can easily compare them.
-func (a etcdObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
+func (a etcdObjectVersioner) Compare(lhs, rhs runtime.Object) int {
 	lhsVersion, err := a.ObjectResourceVersion(lhs)
 	if err != nil {
 		// coder error
