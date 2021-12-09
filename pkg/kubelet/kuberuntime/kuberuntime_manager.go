@@ -303,7 +303,7 @@ func (m *kubeGenericRuntimeManager) Type() string {
 func (m *kubeGenericRuntimeManager) SupportsSingleFileMapping() bool {
 	switch goruntime.GOOS {
 	case "windows":
-		return m.Type() != types.DockerContainerRuntime
+		return m.Type() == types.RemoteContainerRuntime
 	default:
 		return true
 	}

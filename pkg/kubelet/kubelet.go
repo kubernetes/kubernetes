@@ -225,7 +225,6 @@ type Dependencies struct {
 	CAdvisorInterface       cadvisor.Interface
 	Cloud                   cloudprovider.Interface
 	ContainerManager        cm.ContainerManager
-	DockerOptions           *DockerOptions
 	EventClient             v1core.EventsGetter
 	HeartbeatClient         clientset.Interface
 	OnHeartbeatFailure      func()
@@ -308,8 +307,6 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	switch containerRuntime {
-	case kubetypes.DockerContainerRuntime:
-		return fmt.Errorf("using dockershim is not supported, please consider using a full-fledged CRI implementation")
 	case kubetypes.RemoteContainerRuntime:
 		// No-op.
 		break

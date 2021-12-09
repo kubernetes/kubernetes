@@ -27,7 +27,7 @@ import (
 )
 
 func TestPreInitRuntimeService(t *testing.T) {
-	err := kubelet.PreInitRuntimeService(nil, nil, nil, kubetypes.DockerContainerRuntime, "", "", "", "")
+	err := kubelet.PreInitRuntimeService(nil, nil, nil, kubetypes.RemoteContainerRuntime, "", "", "", "")
 	if err == nil {
 		t.Fatal("PreInitRuntimeService should fail when configured to use docker and compiled dockerless")
 	}

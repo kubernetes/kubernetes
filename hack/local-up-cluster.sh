@@ -746,20 +746,6 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
-    net_plugin_args=()
-    if [[ -n "${NET_PLUGIN}" ]]; then
-      net_plugin_args=("--network-plugin=${NET_PLUGIN}")
-    fi
-
-    cni_conf_dir_args=()
-    if [[ -n "${CNI_CONF_DIR}" ]]; then
-      cni_conf_dir_args=("--cni-conf-dir=${CNI_CONF_DIR}")
-    fi
-
-    cni_bin_dir_args=()
-    if [[ -n "${CNI_BIN_DIR}" ]]; then
-      cni_bin_dir_args=("--cni-bin-dir=${CNI_BIN_DIR}")
-    fi
 
     container_runtime_endpoint_args=()
     if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then

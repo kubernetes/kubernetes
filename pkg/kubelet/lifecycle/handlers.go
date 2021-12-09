@@ -197,8 +197,8 @@ func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult
 		return PodAdmitResult{Admit: true}
 	}
 
-	// Always admit runtimes except docker.
-	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+	// Always admit runtimes is remote
+	if a.Runtime.Type() == kubetypes.RemoteContainerRuntime {
 		return PodAdmitResult{Admit: true}
 	}
 
@@ -265,7 +265,7 @@ func (a *procMountAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 
 	// Always admit runtimes except docker.
-	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+	if a.Runtime.Type() == kubetypes.RemoteContainerRuntime {
 		return PodAdmitResult{Admit: true}
 	}
 
