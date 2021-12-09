@@ -25,7 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -224,6 +224,12 @@ func TestUpdatePodInCache(t *testing.T) {
 			}
 			sched.addPodToCache(tt.oldObj)
 			sched.updatePodInCache(tt.oldObj, tt.newObj)
+
+			if tt.oldObj.(*v1.Pod).UID != tt.newObj.(*v1.Pod).UID {
+				if pod, err := sched.SchedulerCache.GetPod(tt.oldObj.(*v1.Pod)); err == nil {
+					t.Errorf("Get pod UID %v from SchedulerCache but it should not happen", pod.UID)
+				}
+			}
 			pod, err := sched.SchedulerCache.GetPod(tt.newObj.(*v1.Pod))
 			if err != nil {
 				t.Errorf("Failed to get pod from scheduler: %v", err)
