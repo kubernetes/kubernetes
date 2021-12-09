@@ -747,6 +747,10 @@ func (pm *VolumePluginMgr) logDeprecation(plugin string) {
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
 	events, err := pm.prober.Probe()
 
+	if err != nil {
+		klog.ErrorS(err, "Error dynamically probing plugins")
+	}
+
 	// because the probe function can return a list of valid plugins
 	// even when an error is present we still must add the plugins
 	// or they will be skipped because each event only fires once
@@ -765,11 +769,6 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 			klog.ErrorS(nil, "Unknown Operation on PluginName.",
 				"pluginName", event.Plugin.GetPluginName())
 		}
-	}
-	
-	if err != nil {
-		klog.ErrorS(err, "Error dynamically probing plugins")
-		return
 	}
 }
 
