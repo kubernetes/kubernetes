@@ -2433,6 +2433,26 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 			expectedErr:            true,
 			vmClientErr:            &retry.Error{RawError: fmt.Errorf("error")},
 		},
+		{
+			description:   "EnsureBackendPoolDeleted should skip the node that doesn't exist",
+			backendpoolID: testLBBackendpoolID0,
+			backendAddressPools: &[]network.BackendAddressPool{
+				{
+					ID: to.StringPtr(testLBBackendpoolID0),
+					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+							{
+								Name: to.StringPtr("ip-1"),
+								ID:   to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/6/networkInterfaces/nic"),
+							},
+						},
+					},
+				},
+				{
+					ID: to.StringPtr(testLBBackendpoolID1),
+				},
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -2487,7 +2507,6 @@ func TestEnsureBackendPoolDeletedConcurrently(t *testing.T) {
 			},
 		},
 		{
-			// this would fail
 			ID: to.StringPtr(testLBBackendpoolID2),
 			BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
 				BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
@@ -2526,7 +2545,7 @@ func TestEnsureBackendPoolDeletedConcurrently(t *testing.T) {
 	mockVMSSVMClient.EXPECT().UpdateVMs(gomock.Any(), ss.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	backendpoolAddressIDs := []string{testLBBackendpoolID0, testLBBackendpoolID1, testLBBackendpoolID2}
-	testVMSSNames := []string{"vmss-0", "vmss-1", "vmss-0"}
+	testVMSSNames := []string{"vmss-0", "vmss-1", "vmss-2"}
 	testFunc := make([]func() error, 0)
 	for i, id := range backendpoolAddressIDs {
 		i := i
