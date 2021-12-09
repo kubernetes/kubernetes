@@ -510,5 +510,5 @@ func isPodShutdown(pod *v1.Pod) bool {
 		}
 	}
 
-	return pod.Status.Message == podShutdownMessage && pod.Status.Reason == podShutdownReason && hasContainersNotReadyCondition
+	return pod.Status.Message == podShutdownMessage && pod.Status.Reason == podShutdownReason && hasContainersNotReadyCondition && pod.Status.Phase == v1.PodFailed
 }
