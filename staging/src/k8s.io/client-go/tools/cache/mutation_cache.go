@@ -80,6 +80,26 @@ func NewIntegerResourceVersionMutationCache(backingCache Store, indexer Indexer,
 	}
 }
 
+// NewGenerationMutationCache returns a MutationCache that understands how to
+// deal with objects that have:
+//
+//   - a generation in their metadata
+//   - an observed generation in their status
+//
+// If includeAdds is true, objects in the mutation cache will be returned even if they don't exist
+// in the underlying store. This is only safe if your use of the cache can handle mutation entries
+// remaining in the cache for up to ttl when mutations and deletes occur very closely in time.
+func NewGenerationMutationCache(backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
+	return &mutationCache{
+		backingCache:  backingCache,
+		indexer:       indexer,
+		mutationCache: utilcache.NewLRUExpireCache(100),
+		comparator:    generationComparator{},
+		ttl:           ttl,
+		includeAdds:   includeAdds,
+	}
+}
+
 // mutationCache doesn't guarantee that it returns values added via Mutation since they can page out and
 // since you can't distinguish between, "didn't observe create" and "was deleted after create",
 // if the key is missing from the backing cache, we always return it as missing
@@ -269,3 +289,67 @@ func (a etcdObjectVersioner) Compare(lhs, rhs runtime.Object) int {
 
 	return 1
 }
+
+type generationComparator struct {}
+
+func (c generationComparator) generation(obj runtime.Object) (int64, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return 0, err
+	}
+	return accessor.GetGeneration(), nil
+}
+
+// ObservedGenerationAccesor knows how to surface all generations of the object that have been
+// observed by controllers, whether that is at a top-level or in specific conditions.
+type ObservedGenerationAccesor interface {
+	// ObservedGenerations surfaces all generations of the object that have been observed
+	ObservedGenerations() []int64
+}
+
+func (c generationComparator) observedGeneration(obj runtime.Object) (int64, error) {
+	accessor, ok := obj.(ObservedGenerationAccesor)
+	if !ok {
+		return 0, fmt.Errorf("%T does not expose observed generations", obj)
+	}
+	var latestObservedGeneration int64
+	for _, observedGeneration := range accessor.ObservedGenerations() {
+		if observedGeneration > latestObservedGeneration {
+			latestObservedGeneration = observedGeneration
+		}
+	}
+	return latestObservedGeneration, nil
+}
+
+// Compare determines which of lhs and rhs is newer by looking at the generation and observed
+// generation. In order to utilize this comparator, the user must add mutations to the cache
+// if and only if they are incrementing the observedGeneration in status. Then, the mutation
+// can be removed as soon as we see an object with an observedGeneration at least as new as
+// that in the mutation. This comparator expected the mutated object to be the rhs.
+func (c generationComparator) Compare(lhs, rhs runtime.Object) int {
+	generation, err := c.generation(lhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+
+	observedGeneration, err := c.observedGeneration(rhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+
+	if generation == observedGeneration {
+		// updates may occur to the object's status that do not bump the observedGeneration,
+		// so we can't tell if the rhs is equivalent to the lhs here, or ahead. In any case,
+		// we want to use the rhs in the cache and remove our mutation.
+		return 1
+	}
+	if generation < observedGeneration {
+		return -1
+	}
+
+	return 1
+}
+
+var _ Comparator = &generationComparator{}
