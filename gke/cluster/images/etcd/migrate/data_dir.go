@@ -144,8 +144,8 @@ func (v *VersionFile) Read() (*EtcdVersionPair, error) {
 	return vp, nil
 }
 
-// contains returns true iff VersionFile exists and contains given EtcdVersionPair.
-func (v *VersionFile) contains(vp *EtcdVersionPair) (bool, error) {
+// equals returns true iff VersionFile exists and contains given EtcdVersionPair.
+func (v *VersionFile) equals(vp *EtcdVersionPair) (bool, error) {
 	exists, err := v.Exists()
 	if err != nil {
 		return false, err
@@ -163,7 +163,7 @@ func (v *VersionFile) contains(vp *EtcdVersionPair) (bool, error) {
 // Write creates or overwrites the contents of the version.txt file with the given EtcdVersionPair.
 func (v *VersionFile) Write(vp *EtcdVersionPair) error {
 	// We do write only if file content differs from given EtcdVersionPair.
-	isUpToDate, err := v.contains(vp)
+	isUpToDate, err := v.equals(vp)
 	if err != nil {
 		return fmt.Errorf("failed to to check if version file %s should be changed: %v", v.path, err)
 	}
