@@ -97,6 +97,13 @@ func setDefaults_KubeSchedulerProfile(prof *v1beta2.KubeSchedulerProfile) {
 			Args: runtime.RawExtension{Object: args},
 		})
 	}
+	for _, e := range prof.Plugins.Score.Enabled {
+		// a weight of zero is not permitted, plugins can be disabled explicitly
+		// when configured.
+		if e.Weight == int32(0) {
+			e.Weight = int32(1)
+		}
+	}
 }
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
