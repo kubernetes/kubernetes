@@ -271,7 +271,8 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 					"involvedObject.namespace": l.ns.Name,
 					"reason":                   volevents.ProvisioningFailed,
 				}.AsSelector().String()
-				msg := "does not support block volume provisioning"
+				// The error message is different for each storage driver
+				msg := ""
 
 				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
