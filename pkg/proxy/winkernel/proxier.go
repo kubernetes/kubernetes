@@ -1177,22 +1177,27 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				nodePortEndpoints = hnsLocalEndpoints
 			}
-			hnsLoadBalancer, err := hns.getLoadBalancer(
-				nodePortEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
-				sourceVip,
-				"",
-				Enum(svcInfo.Protocol()),
-				uint16(svcInfo.targetPort),
-				uint16(svcInfo.NodePort()),
-			)
-			if err != nil {
-				klog.Errorf("Policy creation failed: %v", err)
-				continue
-			}
 
-			svcInfo.nodePorthnsID = hnsLoadBalancer.hnsID
-			klog.V(3).Infof("Hns LoadBalancer resource created for nodePort resources %v, Id [%s]", svcInfo.ClusterIP(), hnsLoadBalancer.hnsID)
+			if len(nodePortEndpoints) > 0 {
+				hnsLoadBalancer, err := hns.getLoadBalancer(
+					nodePortEndpoints,
+					loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					sourceVip,
+					"",
+					Enum(svcInfo.Protocol()),
+					uint16(svcInfo.targetPort),
+					uint16(svcInfo.NodePort()),
+				)
+				if err != nil {
+					klog.Errorf("Policy creation failed: %v", err)
+					continue
+				}
+
+				svcInfo.nodePorthnsID = hnsLoadBalancer.hnsID
+				klog.V(3).Infof("Hns LoadBalancer resource created for nodePort resources %v, Id [%s]", svcInfo.ClusterIP(), hnsLoadBalancer.hnsID)
+			} else {
+				klog.V(3).Infof("Skipped creating Hns LoadBalancer for nodePort resources %v, Id [%s]", svcInfo.ClusterIP(), hnsLoadBalancer.hnsID)
+			}	
 		}
 
 		// Create a Load Balancer Policy for each external IP
@@ -1202,22 +1207,26 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.localTrafficDSR {
 				externalIPEndpoints = hnsLocalEndpoints
 			}
-			// Try loading existing policies, if already available
-			hnsLoadBalancer, err = hns.getLoadBalancer(
-				externalIPEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
-				sourceVip,
-				externalIP.ip,
-				Enum(svcInfo.Protocol()),
-				uint16(svcInfo.targetPort),
-				uint16(svcInfo.Port()),
-			)
-			if err != nil {
-				klog.Errorf("Policy creation failed: %v", err)
-				continue
-			}
-			externalIP.hnsID = hnsLoadBalancer.hnsID
-			klog.V(3).Infof("Hns LoadBalancer resource created for externalIP resources %v, Id[%s]", externalIP, hnsLoadBalancer.hnsID)
+			if len(externalIPEndpoints) > 0 {
+				// Try loading existing policies, if already available
+				hnsLoadBalancer, err = hns.getLoadBalancer(
+					externalIPEndpoints,
+					loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					sourceVip,
+					externalIP.ip,
+					Enum(svcInfo.Protocol()),
+					uint16(svcInfo.targetPort),
+					uint16(svcInfo.Port()),
+				)
+				if err != nil {
+					klog.Errorf("Policy creation failed: %v", err)
+					continue
+				}
+				externalIP.hnsID = hnsLoadBalancer.hnsID
+				klog.V(3).Infof("Hns LoadBalancer resource created for externalIP resources %v, Id[%s]", externalIP, hnsLoadBalancer.hnsID)
+			} else {
+				klog.V(3).Infof("Skipped creating Hns LoadBalancer created for externalIP resources %v, Id[%s]", externalIP, hnsLoadBalancer.hnsID)
+			}	
 		}
 		// Create a Load Balancer Policy for each loadbalancer ingress
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
@@ -1226,21 +1235,25 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
-			hnsLoadBalancer, err := hns.getLoadBalancer(
-				lbIngressEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
-				sourceVip,
-				lbIngressIP.ip,
-				Enum(svcInfo.Protocol()),
-				uint16(svcInfo.targetPort),
-				uint16(svcInfo.Port()),
-			)
-			if err != nil {
-				klog.Errorf("Policy creation failed: %v", err)
-				continue
+			if len(lbIngressEndpoints) > 0 {
+				hnsLoadBalancer, err := hns.getLoadBalancer(
+					lbIngressEndpoints,
+					loadBalancerFlags{isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					sourceVip,
+					lbIngressIP.ip,
+					Enum(svcInfo.Protocol()),
+					uint16(svcInfo.targetPort),
+					uint16(svcInfo.Port()),
+				)
+				if err != nil {
+					klog.Errorf("Policy creation failed: %v", err)
+					continue
+				}
+				lbIngressIP.hnsID = hnsLoadBalancer.hnsID
+				klog.V(3).Infof("Hns LoadBalancer resource created for loadBalancer Ingress resources %v", lbIngressIP)
+			} else {
+				klog.V(3).Infof("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources %v", lbIngressIP)
 			}
-			lbIngressIP.hnsID = hnsLoadBalancer.hnsID
-			klog.V(3).Infof("Hns LoadBalancer resource created for loadBalancer Ingress resources %v", lbIngressIP)
 		}
 		svcInfo.policyApplied = true
 		Log(svcInfo, "+++Policy Successfully applied for service +++", 2)
