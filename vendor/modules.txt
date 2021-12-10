@@ -1997,7 +1997,7 @@ k8s.io/cri-api/pkg/apis/testing
 ## explicit
 k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
-# k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c => k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
+# k8s.io/gengo v0.0.0-20211115164449-b448ea381d54 => k8s.io/gengo v0.0.0-20211115164449-b448ea381d54
 ## explicit
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
@@ -2767,7 +2767,7 @@ sigs.k8s.io/yaml
 # k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
 # k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 # k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
-# k8s.io/gengo => k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
+# k8s.io/gengo => k8s.io/gengo v0.0.0-20211115164449-b448ea381d54
 # k8s.io/klog/v2 => k8s.io/klog/v2 v2.30.0
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager

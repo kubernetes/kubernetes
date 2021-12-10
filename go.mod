@@ -115,7 +115,7 @@ require (
 	k8s.io/controller-manager v0.0.0
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
-	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
+	k8s.io/gengo v0.0.0-20211115164449-b448ea381d54
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
@@ -497,7 +497,7 @@ replace (
 	k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
-	k8s.io/gengo => k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
+	k8s.io/gengo => k8s.io/gengo v0.0.0-20211115164449-b448ea381d54
 	k8s.io/klog/v2 => k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
