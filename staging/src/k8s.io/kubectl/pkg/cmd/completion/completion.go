@@ -171,8 +171,7 @@ func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command
 }
 
 func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
-	commandName := kubectl.Name()
-	zshHead := fmt.Sprintf("#compdef %[1]s\ncompdef _%[1]s %[1]s\n", commandName)
+	zshHead := fmt.Sprintf("#compdef %[1]s\ncompdef _%[1]s %[1]s\n", kubectl.Name())
 	out.Write([]byte(zshHead))
 
 	if len(boilerPlate) == 0 {
