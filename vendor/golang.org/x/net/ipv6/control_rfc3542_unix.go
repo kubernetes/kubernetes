@@ -13,11 +13,13 @@ import (
 
 	"golang.org/x/net/internal/iana"
 	"golang.org/x/net/internal/socket"
+
+	"golang.org/x/sys/unix"
 )
 
 func marshalTrafficClass(b []byte, cm *ControlMessage) []byte {
 	m := socket.ControlMessage(b)
-	m.MarshalHeader(iana.ProtocolIPv6, sysIPV6_TCLASS, 4)
+	m.MarshalHeader(iana.ProtocolIPv6, unix.IPV6_TCLASS, 4)
 	if cm != nil {
 		socket.NativeEndian.PutUint32(m.Data(4), uint32(cm.TrafficClass))
 	}
@@ -30,7 +32,7 @@ func parseTrafficClass(cm *ControlMessage, b []byte) {
 
 func marshalHopLimit(b []byte, cm *ControlMessage) []byte {
 	m := socket.ControlMessage(b)
-	m.MarshalHeader(iana.ProtocolIPv6, sysIPV6_HOPLIMIT, 4)
+	m.MarshalHeader(iana.ProtocolIPv6, unix.IPV6_HOPLIMIT, 4)
 	if cm != nil {
 		socket.NativeEndian.PutUint32(m.Data(4), uint32(cm.HopLimit))
 	}
@@ -43,7 +45,7 @@ func parseHopLimit(cm *ControlMessage, b []byte) {
 
 func marshalPacketInfo(b []byte, cm *ControlMessage) []byte {
 	m := socket.ControlMessage(b)
-	m.MarshalHeader(iana.ProtocolIPv6, sysIPV6_PKTINFO, sizeofInet6Pktinfo)
+	m.MarshalHeader(iana.ProtocolIPv6, unix.IPV6_PKTINFO, sizeofInet6Pktinfo)
 	if cm != nil {
 		pi := (*inet6Pktinfo)(unsafe.Pointer(&m.Data(sizeofInet6Pktinfo)[0]))
 		if ip := cm.Src.To16(); ip != nil && ip.To4() == nil {
@@ -67,7 +69,7 @@ func parsePacketInfo(cm *ControlMessage, b []byte) {
 
 func marshalNextHop(b []byte, cm *ControlMessage) []byte {
 	m := socket.ControlMessage(b)
-	m.MarshalHeader(iana.ProtocolIPv6, sysIPV6_NEXTHOP, sizeofSockaddrInet6)
+	m.MarshalHeader(iana.ProtocolIPv6, unix.IPV6_NEXTHOP, sizeofSockaddrInet6)
 	if cm != nil {
 		sa := (*sockaddrInet6)(unsafe.Pointer(&m.Data(sizeofSockaddrInet6)[0]))
 		sa.setSockaddr(cm.NextHop, cm.IfIndex)
@@ -80,7 +82,7 @@ func parseNextHop(cm *ControlMessage, b []byte) {
 
 func marshalPathMTU(b []byte, cm *ControlMessage) []byte {
 	m := socket.ControlMessage(b)
-	m.MarshalHeader(iana.ProtocolIPv6, sysIPV6_PATHMTU, sizeofIPv6Mtuinfo)
+	m.MarshalHeader(iana.ProtocolIPv6, unix.IPV6_PATHMTU, sizeofIPv6Mtuinfo)
 	return m.Next(sizeofIPv6Mtuinfo)
 }
 

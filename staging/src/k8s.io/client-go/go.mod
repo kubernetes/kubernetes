@@ -23,7 +23,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
