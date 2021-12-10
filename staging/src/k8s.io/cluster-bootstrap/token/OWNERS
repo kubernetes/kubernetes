@@ -1,8 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- luxas
+  - luxas
 emeritus_approvers:
-- jbeda
+  - jbeda
 reviewers:
-- mattmoyer
+  - mattmoyer

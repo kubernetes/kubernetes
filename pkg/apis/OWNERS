@@ -9,7 +9,6 @@ filters:
       - api-approvers
     reviewers:
       - api-reviewers
-
   # examples:
   #   pkg/apis/*/types.go
   #   pkg/apis/*/*/types.go

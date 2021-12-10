@@ -47,7 +47,6 @@ emeritus_approvers:
   - ncdc
   - vishh
   - shyamjvs
-
 labels:
-- area/test
-- sig/testing
+  - area/test
+  - sig/testing

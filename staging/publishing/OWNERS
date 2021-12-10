@@ -1,19 +1,19 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sttts
-- nikhita
-- dims
-- justaugustus
+  - sttts
+  - nikhita
+  - dims
+  - justaugustus
 reviewers:
-- sttts
-- cpanato
-- dims
-- nikhita
-- jeremyrickard
-- justaugustus
-- puerco
-- saschagrunert
+  - sttts
+  - cpanato
+  - dims
+  - nikhita
+  - jeremyrickard
+  - justaugustus
+  - puerco
+  - saschagrunert
 labels:
-- sig/release
-- area/release-eng
+  - sig/release
+  - area/release-eng

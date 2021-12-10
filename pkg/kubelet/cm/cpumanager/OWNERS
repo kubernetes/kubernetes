@@ -1,11 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- derekwaynecarr
-- vishh
-- ConnorDoyle
+  - derekwaynecarr
+  - vishh
+  - ConnorDoyle
 reviewers:
-- klueska
-
+  - klueska
 emeritus_approvers:
-- balajismaniam
+  - balajismaniam

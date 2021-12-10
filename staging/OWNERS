@@ -1,17 +1,17 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- dims
-- lavalamp
-- smarterclayton
+  - dims
+  - lavalamp
+  - smarterclayton
 reviewers:
-- dims
-- lavalamp
-- smarterclayton
-- wojtek-t
-- deads2k
-- caesarxuchao
-- mikedanese
-- liggitt
-- sttts
-- krousey
+  - dims
+  - lavalamp
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - caesarxuchao
+  - mikedanese
+  - liggitt
+  - sttts
+  - krousey

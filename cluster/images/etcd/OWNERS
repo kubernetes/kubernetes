@@ -6,4 +6,4 @@ reviewers:
 approvers:
   - jpbetz
 labels:
-- sig/api-machinery
+  - sig/api-machinery

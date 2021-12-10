@@ -11,5 +11,5 @@ approvers:
   - andrewsykim
   - lbernail
 labels:
-- sig/network
-- area/ipvs
+  - sig/network
+  - area/ipvs

@@ -1,8 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- pwittrock
-- mengqiy
+  - pwittrock
+  - mengqiy
 reviewers:
-- mengqiy
-- apelisse
+  - mengqiy
+  - apelisse
