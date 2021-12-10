@@ -330,15 +330,19 @@ func (m *managerImpl) processShutdownEvent() error {
 			}(pod, group)
 		}
 
-		c := make(chan struct{})
+		var (
+			doneCh = make(chan struct{})
+			timer  = m.clock.NewTimer(time.Duration(group.ShutdownGracePeriodSeconds) * time.Second)
+		)
 		go func() {
-			defer close(c)
+			defer close(doneCh)
 			wg.Wait()
 		}()
 
 		select {
-		case <-c:
-		case <-time.After(time.Duration(group.ShutdownGracePeriodSeconds) * time.Second):
+		case <-doneCh:
+			timer.Stop()
+		case <-timer.C():
 			klog.V(1).InfoS("Shutdown manager pod killing time out", "gracePeriod", group.ShutdownGracePeriodSeconds, "priority", group.Priority)
 		}
 	}
