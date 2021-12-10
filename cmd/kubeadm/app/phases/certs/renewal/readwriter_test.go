@@ -126,6 +126,11 @@ func TestKubeconfigReadWriter(t *testing.T) {
 		t.Fatalf("couldn't write new embedded certificate: %v", err)
 	}
 
+	// Make sure that CA key is not present during Read() as it is not needed.
+	// This covers testing when the CA is external and not present on the host.
+	_, caKeyPath := pkiutil.PathsForCertAndKey(dirPKI, caName)
+	os.Remove(caKeyPath)
+
 	// Reads back the new certificate embedded in a kubeconfig writer
 	readCert, err = kubeconfigReadWriter.Read()
 	if err != nil {
