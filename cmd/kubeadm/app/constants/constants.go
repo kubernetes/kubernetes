@@ -358,6 +358,16 @@ const (
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
 
+	// When a token is matched with 'BootstrapTokenPattern', the size of validated substrings returned by
+	// regexp functions which contains 'Submatch' in their names will be 3.
+	// Submatch 0 is the match of the entire expression, submatch 1 is
+	// the match of the first parenthesized subexpression, and so on.
+	// e.g.:
+	// result := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch("abcdef.1234567890123456")
+	// result == []string{"abcdef.1234567890123456","abcdef","1234567890123456"}
+	// len(result) == 3
+	ValidatedSubstringsSize = 3
+
 	// ControlPlaneNumCPU is the number of CPUs required on control-plane
 	ControlPlaneNumCPU = 2
 

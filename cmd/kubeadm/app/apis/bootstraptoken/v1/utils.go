@@ -29,18 +29,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
-)
-
-const (
-	// When a token is matched with 'BootstrapTokenPattern', the size of validated substrings returned by
-	// regexp functions which contains 'Submatch' in their names will be 3.
-	// Submatch 0 is the match of the entire expression, submatch 1 is
-	// the match of the first parenthesized subexpression, and so on.
-	// e.g.:
-	// result := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch("abcdef.1234567890123456")
-	// result == []string{"abcdef.1234567890123456","abcdef","1234567890123456"}
-	// len(result) == 3
-	validatedSubstringsSize = 3
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -81,7 +70,7 @@ func (bts BootstrapTokenString) String() string {
 // is of the right format
 func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
 	substrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(token)
-	if len(substrs) != validatedSubstringsSize {
+	if len(substrs) != constants.ValidatedSubstringsSize {
 		return nil, errors.Errorf("the bootstrap token %q was not of the form %q", token, bootstrapapi.BootstrapTokenPattern)
 	}
 
