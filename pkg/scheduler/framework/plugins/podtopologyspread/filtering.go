@@ -24,9 +24,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/util/taints"
 )
 
 const preFilterStateKey = "PreFilter" + Name
@@ -223,6 +225,8 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 		TpPairToMatchNum:     make(map[topologyPair]*int32, sizeHeuristic(len(allNodes), constraints)),
 	}
 	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(pod)
+
+	var availableNodes []*framework.NodeInfo
 	for _, n := range allNodes {
 		node := n.Node()
 		if node == nil {
@@ -230,8 +234,8 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			continue
 		}
 
-		// filter node who has `node.kubernetes.io/unschedulable:NoSchedule` taint and pod doesn't tolerate it
-		if matchUnSchedulableTaint(node.Spec.Taints) && !matchUnSchedulableTaintToleration(pod.Spec.Tolerations) {
+		// Filter the node out if it carries a `node.kubernetes.io/unschedulable:NoSchedule` taint and pod doesn't tolerate it
+		if taints.TaintExists(node.Spec.Taints, unschedulableTaint) && !corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, unschedulableTaint) {
 			continue
 		}
 
@@ -252,10 +256,11 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			s.TpPairToMatchNum[pair] = new(int32)
 		}
+		availableNodes = append(availableNodes, n)
 	}
 
 	processNode := func(i int) {
-		nodeInfo := allNodes[i]
+		nodeInfo := availableNodes[i]
 		node := nodeInfo.Node()
 
 		for _, constraint := range constraints {
@@ -268,7 +273,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			atomic.AddInt32(tpCount, int32(count))
 		}
 	}
-	pl.parallelizer.Until(context.Background(), len(allNodes), processNode)
+	pl.parallelizer.Until(context.Background(), len(availableNodes), processNode)
 
 	// calculate min match for each topology pair
 	for i := 0; i < len(constraints); i++ {
@@ -289,11 +294,6 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return framework.AsStatus(fmt.Errorf("node not found"))
 	}
 
-	if matchUnSchedulableTaint(node.Spec.Taints) && !matchUnSchedulableTaintToleration(pod.Spec.Tolerations) {
-		klog.V(5).InfoS("Node is unSchedulable", "node", klog.KObj(node))
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeUnschedulable)
-	}
-
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -306,7 +306,6 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 
 	for _, c := range s.Constraints {
 		tpKey := c.TopologyKey
-
 		tpVal, ok := node.Labels[c.TopologyKey]
 		if !ok {
 			klog.V(5).InfoS("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)

@@ -479,11 +479,11 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 }
 
 // Taint add a taint to node with the current time.
-func (n *NodeWrapper) Taint(k, v, e string) *NodeWrapper {
+func (n *NodeWrapper) Taint(k, v string, e v1.TaintEffect) *NodeWrapper {
 	n.Spec.Taints = append(n.Spec.Taints, v1.Taint{
 		Key:       k,
 		Value:     v,
-		Effect:    v1.TaintEffect(e),
+		Effect:    e,
 		TimeAdded: &metav1.Time{Time: time.Now()},
 	})
 	return n

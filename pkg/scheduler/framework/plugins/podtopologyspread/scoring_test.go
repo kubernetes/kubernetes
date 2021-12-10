@@ -39,14 +39,12 @@ import (
 
 func TestPreScoreStateEmptyNodes(t *testing.T) {
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		existingPods []*v1.Pod
-		nodes        []*v1.Node
-		failedNodes  []*v1.Node // nodes + failedNodes = all nodes
-		objs         []runtime.Object
-		config       config.PodTopologySpreadArgs
-		want         *preScoreState
+		name   string
+		pod    *v1.Pod
+		nodes  []*v1.Node
+		objs   []runtime.Object
+		config config.PodTopologySpreadArgs
+		want   *preScoreState
 	}{
 		{
 			name: "normal case",
@@ -223,7 +221,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				DefaultingType: config.ListDefaulting,
 			},
 			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("planet", "mars").Label("galaxy", "andromeda").Obj(),
+				st.MakeNode().Name("node-a").Label("planet", "mars").Label("galaxy", "andromeda").Obj(),
 			},
 			objs: []runtime.Object{
 				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
@@ -243,117 +241,13 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1)},
 			},
 		},
-		{
-			name: "node have unschedulable taint",
-			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
-				Obj(),
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-				st.MakeNode().Name("node-c").Label("zone", "zone3").Obj(),
-			},
-			failedNodes: []*v1.Node{
-				st.MakeNode().Name("node-b").Label("zone", "zone2").Taint(v1.TaintNodeUnschedulable, "", string(v1.TaintEffectNoSchedule)).Obj(),
-			},
-			config: config.PodTopologySpreadArgs{
-				DefaultingType: config.ListDefaulting,
-			},
-			want: &preScoreState{
-				Constraints: []topologySpreadConstraint{
-					{
-						MaxSkew:     1,
-						TopologyKey: "zone",
-						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
-					},
-				},
-				IgnoredNodes: sets.NewString(),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(1),
-					{key: "zone", value: "zone3"}: pointer.Int64Ptr(0),
-				},
-				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
-			},
-		},
-		{
-			name: "node have memory-pressure taint",
-			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
-				Obj(),
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-				st.MakeNode().Name("node-b").Label("zone", "zone2").Taint(v1.TaintNodeMemoryPressure, "", string(v1.TaintEffectNoSchedule)).Obj(),
-				st.MakeNode().Name("node-c").Label("zone", "zone3").Obj(),
-			},
-			config: config.PodTopologySpreadArgs{
-				DefaultingType: config.ListDefaulting,
-			},
-			want: &preScoreState{
-				Constraints: []topologySpreadConstraint{
-					{
-						MaxSkew:     1,
-						TopologyKey: "zone",
-						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
-					},
-				},
-				IgnoredNodes: sets.NewString(),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(1),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(1),
-					{key: "zone", value: "zone3"}: pointer.Int64Ptr(0),
-				},
-				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(3)},
-			},
-		},
-		{
-			name: "node have unschedulable taint, pod tolerated",
-			pod: st.MakePod().Name("p").Label("foo", "").Toleration(v1.TaintNodeUnschedulable).
-				SpreadConstraint(1, "zone", v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
-				Obj(),
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-				st.MakeNode().Name("node-b").Label("zone", "zone2").Taint(v1.TaintNodeUnschedulable, "", string(v1.TaintEffectNoSchedule)).Obj(),
-				st.MakeNode().Name("node-c").Label("zone", "zone3").Obj(),
-			},
-			config: config.PodTopologySpreadArgs{
-				DefaultingType: config.ListDefaulting,
-			},
-			want: &preScoreState{
-				Constraints: []topologySpreadConstraint{
-					{
-						MaxSkew:     1,
-						TopologyKey: "zone",
-						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
-					},
-				},
-				IgnoredNodes: sets.NewString(),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(1),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(1),
-					{key: "zone", value: "zone3"}: pointer.Int64Ptr(0),
-				},
-				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(3)},
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			allNodes := append(tt.nodes, tt.failedNodes...)
 			ctx := context.Background()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(nil, nil,
-				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(tt.existingPods, allNodes)),
+				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
@@ -366,7 +260,6 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-
 			if s := p.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
@@ -830,67 +723,13 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 0},
 			},
 		},
-		{
-			name: "node with unschedulable taint should be excluded",
-			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
-				1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj(),
-			).Obj(),
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
-			},
-			failedNodes: []*v1.Node{
-				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Taint(v1.TaintNodeUnschedulable, "", string(v1.TaintEffectNoSchedule)).Obj(),
-			},
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
-				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
-			},
-			want: []framework.NodeScore{
-				{Name: "node-a", Score: 100},
-			},
-		},
-		{
-			name: "node with memroy-pressure taint should be included",
-			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
-				1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj(),
-			).Obj(),
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
-				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Taint(v1.TaintNodeMemoryPressure, "", string(v1.TaintEffectNoSchedule)).Obj(),
-			},
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
-				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
-			},
-			want: []framework.NodeScore{
-				{Name: "node-a", Score: 100},
-				{Name: "node-b", Score: 100},
-			},
-		},
-		{
-			name: "node with unschedulable taint, pod tolerated",
-			pod: st.MakePod().Name("p").Label("foo", "").Toleration(v1.TaintNodeUnschedulable).
-				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
-				Obj(),
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
-				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Taint(v1.TaintNodeUnschedulable, "", string(v1.TaintEffectNoSchedule)).Obj(),
-			},
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
-				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
-			},
-			want: []framework.NodeScore{
-				{Name: "node-a", Score: 100},
-				{Name: "node-b", Score: 100},
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
-			allNodes := append(tt.nodes, tt.failedNodes...)
+			allNodes := append([]*v1.Node{}, tt.nodes...)
+			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
 			pl := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
 			p := pl.(*PodTopologySpread)

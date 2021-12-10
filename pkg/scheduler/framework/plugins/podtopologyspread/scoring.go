@@ -150,11 +150,9 @@ func (pl *PodTopologySpread) PreScore(
 		}
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 		// (2) all topologyKeys need to be present in `node`
-		// (3) `node` doesn't have `node.kubernetes.io/unschedulable:NoSchedule` taint or `node` has this taint but pod tolerates it
 		match, _ := requiredNodeAffinity.Match(node)
 		if !match ||
-			(requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints)) ||
-			(matchUnSchedulableTaint(node.Spec.Taints) && !matchUnSchedulableTaintToleration(pod.Spec.Tolerations)) {
+			(requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints)) {
 			return
 		}
 
