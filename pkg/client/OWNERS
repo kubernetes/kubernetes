@@ -3,7 +3,6 @@
 approvers:
   - caesarxuchao
   - deads2k
-  - krousey
   - lavalamp
   - liggitt
   - smarterclayton
@@ -16,10 +15,8 @@ reviewers:
   - yujuhong
   - derekwaynecarr
   - caesarxuchao
-  - vishh
   - mikedanese
   - liggitt
-  - davidopp
   - pmorie
   - sttts
   - dchen1107
@@ -28,11 +25,10 @@ reviewers:
   - janetkuo
   - justinsb
   - ncdc
-  - yifan-gu
   - mwielgus
   - timothysc
   - feiskyer
-  - jlowdermilk
   - soltysh
-  - piosz
   - jsafrane
+emeritus_approvers:
+  - krousey

@@ -4,13 +4,12 @@ reviewers:
   - josephburnett
   - MaciekPytel
   - mwielgus
-  - piosz
 approvers:
   - josephburnett
   - MaciekPytel
   - mwielgus
-  - piosz
 emeritus_approvers:
   - jszczepkowski
+  - piosz
 labels:
   - sig/autoscaling

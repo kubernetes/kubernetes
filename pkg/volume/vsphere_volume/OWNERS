@@ -6,17 +6,15 @@ approvers:
   - thockin
   - SandeepPissay
   - divyenpatel
-  - BaluDontu
 emeritus_approvers:
   - matchstick
   - abrarshivani
+  - BaluDontu
 reviewers:
   - saad-ali
   - justinsb
   - jsafrane
-  - rootfs
   - jingxu97
   - msau42
   - SandeepPissay
   - divyenpatel
-  - BaluDontu

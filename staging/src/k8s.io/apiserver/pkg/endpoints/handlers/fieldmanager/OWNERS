@@ -1,5 +1,6 @@
 approvers:
-  - jennybuckley
   - apelisse
 reviewers:
   - kwiesmueller
+emeritus_approvers:
+  - jennybuckley

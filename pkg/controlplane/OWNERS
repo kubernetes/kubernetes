@@ -18,7 +18,6 @@ reviewers:
   - caesarxuchao
   - mikedanese
   - liggitt
-  - davidopp
   - pmorie
   - sttts
   - dchen1107
@@ -30,8 +29,6 @@ reviewers:
   - mwielgus
   - timothysc
   - soltysh
-  - piosz
-  - hongchaodeng
   - enj
 labels:
   - sig/api-machinery

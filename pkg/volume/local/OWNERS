@@ -3,7 +3,6 @@
 approvers:
   - saad-ali
   - thockin
-  - vishh
   - msau42
   - jingxu97
   - jsafrane
@@ -11,8 +10,8 @@ approvers:
 reviewers:
   - saad-ali
   - jsafrane
-  - rootfs
   - jingxu97
   - msau42
-  - vishh
   - cofyc
+emeritus_approvers:
+  - vishh

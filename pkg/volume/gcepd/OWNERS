@@ -3,7 +3,6 @@
 approvers:
   - saad-ali
   - thockin
-  - davidz627
 reviewers:
   - saad-ali
   - jsafrane
@@ -11,4 +10,5 @@ reviewers:
   - gnufied
   - msau42
   - verult
+emeritus_approvers:
   - davidz627

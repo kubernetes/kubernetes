@@ -6,25 +6,21 @@ approvers:
   - thockin
   - SandeepPissay
   - divyenpatel
-  - BaluDontu
-  - imkin
   - frapposelli
   - dougm
-  - sandeeppsunny
 emeritus_approvers:
   - matchstick
   - abrarshivani
+  - BaluDontu
+  - imkin
+  - sandeeppsunny
 reviewers:
   - saad-ali
   - justinsb
   - jsafrane
-  - rootfs
   - jingxu97
   - msau42
   - SandeepPissay
   - divyenpatel
-  - BaluDontu
-  - imkin
   - frapposelli
   - dougm
-  - sandeeppsunny

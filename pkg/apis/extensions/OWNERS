@@ -20,13 +20,8 @@ reviewers:
   - tallclair
   - mwielgus
   - soltysh
-  - piosz
   - dims
   - errordeveloper
-  - rootfs
   - resouer
-  - therc
-  - pweil-
-  - lukaszo
 labels:
   - sig/apps

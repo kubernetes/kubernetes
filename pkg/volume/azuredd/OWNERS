@@ -4,9 +4,7 @@ approvers:
   - andyzhangx
   - brendandburns
   - feiskyer
-  - karataliu
   - khenidak
-  - rootfs
 reviewers:
   - andyzhangx
   - aramase
@@ -15,8 +13,9 @@ reviewers:
   - jingxu97
   - jsafrane
   - msau42
-  - karataliu
   - khenidak
   - ritazh
-  - rootfs
   - saad-ali
+emeritus_approvers:
+  - karataliu
+  - rootfs

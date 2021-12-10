@@ -3,13 +3,12 @@
 approvers:
   - pmorie
   - saad-ali
-  - rootfs
   - humblec
 reviewers:
   - saad-ali
   - jsafrane
-  - rootfs
   - humblec
   - jingxu97
   - msau42
-  - mtanino
+emeritus_approvers:
+  - rootfs

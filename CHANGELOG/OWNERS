@@ -13,7 +13,6 @@ reviewers:
   - parul5sahoo # 1.23 Release Notes shadow
   - sam-cogan # 1.23 Release Notes shadow
   - pmmalinov01 # 1.22 Release Notes Lead
-  - simcard0000 # 1.22 Release Notes shadow
   - sladyn98 # 1.22 Release Notes shadow
 labels:
   - sig/release

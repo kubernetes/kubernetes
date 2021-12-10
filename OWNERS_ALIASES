@@ -95,7 +95,6 @@ aliases:
     - enj
     - liggitt
     - mikedanese
-    - WanLinghao
   # SIG Release
   release-engineering-approvers:
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
@@ -241,8 +240,6 @@ aliases:
     - pmorie
     - resouer
     - sjenning
-    - vishh
-    - yifan-gu
     - yujuhong
     - krmayankk
     - matthyx
@@ -281,7 +278,6 @@ aliases:
     - khenidak
     - m1093782566
     - mrhohn
-    - rramkumar1
     - thockin
   sig-apps-approvers:
     - kow3ns
@@ -290,9 +286,7 @@ aliases:
     - erictune
     - smarterclayton
   sig-apps-reviewers:
-    - enisoc
     - erictune
-    - foxish
     - janetkuo
     - kow3ns
     - mortent
@@ -304,7 +298,6 @@ aliases:
   # - tnozicka
 
   sig-autoscaling-maintainers:
-    - aleksandra-malinowska
     - bskiba
     - MaciekPytel
     - mwielgus
@@ -400,9 +393,7 @@ aliases:
     - brendandburns
     - derekwaynecarr
     - caesarxuchao
-    - vishh
     - mikedanese
-    - davidopp
     - pmorie
     - sttts
     - dchen1107
@@ -413,11 +404,9 @@ aliases:
     - pwittrock
     - ncdc
     - tallclair
-    - yifan-gu
     - mwielgus
     - timothysc
     - soltysh
-    - piosz
     - jsafrane
     - dims
   # api-reviewers targeted by sig area
@@ -501,9 +490,7 @@ aliases:
     - andrewsykim # Cloud Provider
     - brancz # Instrumentation
     - ahg-g # Scheduling
-    - calebamiles # Release
     - caseydavenport # Network
-    - countspongebob # Scalability
     - dcbw # Network
     - dchen1107 # Node
     - deads2k # API Machinery
@@ -512,7 +499,6 @@ aliases:
     - ehashman # Instrumentation
     - janetkuo # Apps
     - jayunit100 # Windows
-    - jdumars # Architecture, Release
     - jsafrane # Storage
     - jsturtevant # Windows
     - kow3ns # Apps
@@ -525,7 +511,6 @@ aliases:
     - mwielgus # Autoscaling
     - prydonius # Apps
     - pwittrock # CLI
-    - quinton-hoole # Multicluster
     - justinsb # Cluster Lifecycle
     - saad-ali # Storage
     - seans3 # CLI
