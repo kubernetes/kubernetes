@@ -1043,7 +1043,10 @@ func TestTransformationFailure(t *testing.T) {
 
 	// List should fail
 	var got example.PodList
-	if err := store.List(ctx, "/", storage.ListOptions{Predicate: storage.Everything}, &got); !storage.IsInternalError(err) {
+	storageOpts := storage.ListOptions{
+		Predicate: storage.Everything,
+	}
+	if err := store.List(ctx, "/", storageOpts, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
@@ -1135,7 +1138,13 @@ func TestList(t *testing.T) {
 	}
 
 	list := &example.PodList{}
-	store.List(ctx, "/two-level", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything}, list)
+	storageOpts := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+	}
+	if err := store.List(ctx, "/two-level", storageOpts, list); err != nil {
+		t.Errorf("Unexpected List error: %v", err)
+	}
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
 	secondContinuation, err := encodeContinue("/two-level/2", "/two-level/", int64(continueRV))
 	if err != nil {
@@ -1519,7 +1528,11 @@ func TestList(t *testing.T) {
 			}
 
 			out := &example.PodList{}
-			storageOpts := storage.ListOptions{ResourceVersion: tt.rv, ResourceVersionMatch: tt.rvMatch, Predicate: tt.pred}
+			storageOpts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate:            tt.pred,
+			}
 			var err error
 			if tt.disablePaging {
 				err = disablePagingStore.List(ctx, tt.prefix, storageOpts, out)
@@ -1630,7 +1643,11 @@ func TestListContinuation(t *testing.T) {
 			},
 		}
 	}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
+	options := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(1, ""),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1652,7 +1669,11 @@ func TestListContinuation(t *testing.T) {
 
 	// no limit, should get two items
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(0, continueFromSecondItem),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1674,7 +1695,11 @@ func TestListContinuation(t *testing.T) {
 
 	// limit, should get two more pages
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromSecondItem)}, out); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(1, continueFromSecondItem),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1695,7 +1720,11 @@ func TestListContinuation(t *testing.T) {
 	continueFromThirdItem := out.Continue
 
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(1, continueFromThirdItem),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1785,7 +1814,11 @@ func TestListContinuationWithFilter(t *testing.T) {
 			},
 		}
 	}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, "")}, out); err != nil {
+	options := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(2, ""),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1814,7 +1847,11 @@ func TestListContinuationWithFilter(t *testing.T) {
 	// but since there is only one item left, that is all we should get with no continueValue
 	// both read counters should be incremented for the singular calls they make in this case
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, cont)}, out); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(2, cont),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1892,7 +1929,11 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	out := &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
+	options := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(1, ""),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1933,7 +1974,11 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	// The old continue token should have expired
-	err = store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out)
+	options = storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(0, continueFromSecondItem),
+	}
+	err = store.List(ctx, "/", options, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -1950,7 +1995,11 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, inconsistentContinueFromSecondItem)}, out); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(1, inconsistentContinueFromSecondItem),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1964,7 +2013,11 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 	continueFromThirdItem := out.Continue
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred(1, continueFromThirdItem),
+	}
+	if err := store.List(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2216,12 +2269,15 @@ func TestConsistentList(t *testing.T) {
 	}
 
 	result1 := example.PodList{}
-	if err := store.List(context.TODO(), "/", storage.ListOptions{Predicate: predicate}, &result1); err != nil {
+	options := storage.ListOptions{
+		Predicate: predicate,
+	}
+	if err := store.List(context.TODO(), "/", options, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
 	// List objects from the returned resource version.
-	options := storage.ListOptions{
+	options = storage.ListOptions{
 		Predicate:            predicate,
 		ResourceVersion:      result1.ResourceVersion,
 		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
