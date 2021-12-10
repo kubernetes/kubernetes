@@ -28,7 +28,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -140,11 +140,15 @@ func (rw *kubeConfigReadWriter) Read() (*x509.Certificate, error) {
 	// For local CA renewal, the local CA on disk could have changed, thus a reload is needed.
 	// For CSR renewal we assume the same CA on disk is mounted for usage with KCM's
 	// '--cluster-signing-cert-file' flag.
-	caCert, _, err := certsphase.LoadCertificateAuthority(rw.certificateDir, rw.baseName)
+	certificatePath, _ := pkiutil.PathsForCertAndKey(rw.certificateDir, rw.baseName)
+	caCerts, err := certutil.CertsFromFile(certificatePath)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to load existing certificate %s", rw.baseName)
 	}
-	rw.caCert = caCert
+	if len(caCerts) != 1 {
+		return nil, errors.Errorf("wanted exactly one certificate, got %d", len(caCerts))
+	}
+	rw.caCert = caCerts[0]
 
 	// get current context
 	if _, ok := kubeConfig.Contexts[kubeConfig.CurrentContext]; !ok {
