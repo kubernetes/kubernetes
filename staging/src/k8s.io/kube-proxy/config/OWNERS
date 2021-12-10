@@ -4,9 +4,9 @@
 options:
   no_parent_owners: true
 approvers:
-- api-approvers
+  - api-approvers
 reviewers:
-- api-reviewers
-- sig-network-reviewers
+  - api-reviewers
+  - sig-network-reviewers
 labels:
-- kind/api-change
+  - kind/api-change

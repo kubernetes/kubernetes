@@ -4,14 +4,14 @@
 options:
   no_parent_owners: true
 approvers:
-- api-approvers
+  - api-approvers
 reviewers:
-- api-reviewers
+  - api-reviewers
 emeritus_reviewers:
-- luxas
-- mtaufen
-- sttts
+  - luxas
+  - mtaufen
+  - sttts
 labels:
-- kind/api-change
-- sig/api-machinery
-- sig/scheduling
+  - kind/api-change
+  - sig/api-machinery
+  - sig/scheduling

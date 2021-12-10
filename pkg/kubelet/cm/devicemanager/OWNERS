@@ -1,10 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- jiayingz
-- vishh
+  - jiayingz
+  - vishh
 reviewers:
-- klueska
-- mindprince
-- RenaudWasTaken
-- vikaschoudhary16
+  - klueska
+  - mindprince
+  - RenaudWasTaken
+  - vikaschoudhary16

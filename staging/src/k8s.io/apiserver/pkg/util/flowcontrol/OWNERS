@@ -1,15 +1,15 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- lavalamp
-- deads2k
-- yue9944882
-- MikeSpreitzer
+  - lavalamp
+  - deads2k
+  - yue9944882
+  - MikeSpreitzer
 reviewers:
-- lavalamp
-- deads2k
-- yue9944882
-- MikeSpreitzer
+  - lavalamp
+  - deads2k
+  - yue9944882
+  - MikeSpreitzer
 labels:
-- sig/api-machinery
-- area/apiserver
+  - sig/api-machinery
+  - area/apiserver

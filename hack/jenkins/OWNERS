@@ -1,6 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-testing-approvers
+  - sig-testing-approvers
 reviewers:
-- sig-testing-reviewers
+  - sig-testing-reviewers

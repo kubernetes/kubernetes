@@ -10,4 +10,4 @@ approvers:
   - brendandburns
   - m1093782566
 labels:
-- sig/network
+  - sig/network

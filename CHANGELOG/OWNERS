@@ -15,7 +15,6 @@ reviewers:
   - pmmalinov01 # 1.22 Release Notes Lead
   - simcard0000 # 1.22 Release Notes shadow
   - sladyn98 # 1.22 Release Notes shadow
-
 labels:
   - sig/release
   - area/release-eng

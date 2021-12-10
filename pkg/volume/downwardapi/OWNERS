@@ -1,17 +1,17 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- pmorie
-- saad-ali
-- thockin
+  - pmorie
+  - saad-ali
+  - thockin
 emeritus_approvers:
-- matchstick
+  - matchstick
 reviewers:
-- ivan4th
-- rata
-- sjenning
-- saad-ali
-- jsafrane
-- rootfs
-- jingxu97
-- msau42
+  - ivan4th
+  - rata
+  - sjenning
+  - saad-ali
+  - jsafrane
+  - rootfs
+  - jingxu97
+  - msau42

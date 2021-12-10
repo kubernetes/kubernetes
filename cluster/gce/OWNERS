@@ -27,5 +27,5 @@ emeritus_approvers:
   - jingax10
   - jszczepkowski
 labels:
-- sig/cloud-provider
-- area/provider/gcp
+  - sig/cloud-provider
+  - area/provider/gcp
