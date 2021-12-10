@@ -446,7 +446,10 @@ func TestDependentsRace(t *testing.T) {
 	owner := &node{dependents: make(map[*node]struct{})}
 	ownerUID := types.UID("owner")
 	gc.dependencyGraphBuilder.uidToNode.Write(owner)
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
 			gc.dependencyGraphBuilder.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
@@ -454,11 +457,13 @@ func TestDependentsRace(t *testing.T) {
 		}
 	}()
 	go func() {
-		gc.attemptToOrphan.Add(owner)
+		defer wg.Done()
 		for i := 0; i < updates; i++ {
+			gc.attemptToOrphan.Add(owner)
 			gc.attemptToOrphanWorker()
 		}
 	}()
+	wg.Wait()
 }
 
 func podToGCNode(pod *v1.Pod) *node {
