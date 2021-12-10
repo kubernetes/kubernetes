@@ -699,6 +699,7 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 				//count the evictionsNumber
 				zone := nodetopology.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
+				evictionsTotal.WithLabelValues(zone).Inc()
 			}
 
 			return result, 0
@@ -742,6 +743,7 @@ func (nc *Controller) doEvictionPass(ctx context.Context) {
 			if node != nil {
 				zone := nodetopology.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
+				evictionsTotal.WithLabelValues(zone).Inc()
 			}
 
 			return true, 0
@@ -1396,6 +1398,7 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 		// Init the metric for the new zone.
 		klog.Infof("Initializing eviction metric for zone: %v", zone)
 		evictionsNumber.WithLabelValues(zone).Add(0)
+		evictionsTotal.WithLabelValues(zone).Add(0)
 	}
 }
 
