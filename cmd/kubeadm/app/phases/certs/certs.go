@@ -378,6 +378,38 @@ func UsingExternalFrontProxyCA(cfg *kubeadmapi.ClusterConfiguration) (bool, erro
 	return true, nil
 }
 
+// UsingExternalEtcdCA determines whether the user is relying on an external etcd CA. We currently implicitly determine this is the case
+// when the etcd CA Cert is present but the etcd CA Key is not.
+// In case we are using an external etcd CA, the function validates the certificates signed by etcd CA that should be provided by the user.
+func UsingExternalEtcdCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
+	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, "", "etcd CA"}); err != nil {
+		return false, err
+	}
+
+	path := filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCAKeyName)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName, "apiserver etcd client"}); err != nil {
+		return true, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.EtcdServerCertAndKeyBaseName, "etcd server"}); err != nil {
+		return true, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.EtcdPeerCertAndKeyBaseName, "etcd peer"}); err != nil {
+		return true, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName, "etcd health-check client"}); err != nil {
+		return true, err
+	}
+
+	return true, nil
+}
+
 // validateCACert tries to load a x509 certificate from pkiDir and validates that it is a CA
 func validateCACert(l certKeyLocation) error {
 	// Check CA Cert
