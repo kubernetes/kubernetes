@@ -203,18 +203,10 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		klog.ErrorS(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
-
-	// A Pod delete event followed by an immediate Pod add event may be merged
-	// into a Pod update event. In this case, we should invalidate the old Pod, and
-	// then add the new Pod.
-	if oldPod.UID != newPod.UID {
-		sched.deletePodFromCache(oldObj)
-		sched.addPodToCache(newObj)
-		return
-	}
+	klog.V(4).InfoS("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 
 	if err := sched.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
-		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "oldPod", klog.KObj(oldPod), "newPod", klog.KObj(newPod))
+		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
 	sched.SchedulingQueue.AssignedPodUpdated(newPod)
