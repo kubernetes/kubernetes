@@ -1502,7 +1502,6 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			// In this unit test, we don't run TaintToleration Filter, so node-a is still success.
 			name: "node with unschedulable taint should be excluded",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(),
@@ -1520,7 +1519,8 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-c2").Node("node-c").Label("foo", "").Label("zone", "zone2").Obj(),
 			},
 			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success, // in real case, it's false
+				// In this unit test, we don't run TaintToleration Filter, so node-a is still success.
+				"node-a": framework.Success,
 				"node-b": framework.Success,
 				"node-c": framework.Unschedulable,
 			},

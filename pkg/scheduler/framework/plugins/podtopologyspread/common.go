@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	// unschedulableTaint is the taint when a node is unschedulable
+	// unschedulableTaint is a system-reversed taint to mark a node as unschedulable.
 	unschedulableTaint = &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
