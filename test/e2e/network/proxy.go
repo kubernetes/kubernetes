@@ -368,7 +368,15 @@ var _ = common.SIGDescribe("Proxy", func() {
 			}
 		})
 
-		ginkgo.It("A set of valid responses are returned for both pod and service Proxy", func() {
+		/*
+			Release: v1.24
+			Testname: Proxy, validate Proxy responses
+			Description: Attempt to create a pod and a service. A
+			set of pod and service endpoints MUST be accessed via
+			Proxy using a list of http methods. A valid response
+			MUST be returned for each endpoint.
+		*/
+		framework.ConformanceIt("A set of valid responses are returned for both pod and service Proxy", func() {
 
 			ns := f.Namespace.Name
 			msg := "foo"

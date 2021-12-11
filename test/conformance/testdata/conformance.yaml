@@ -1377,6 +1377,14 @@
     other platforms like Windows.
   release: v1.9
   file: test/e2e/common/network/networking.go
+- testname: Proxy, validate Proxy responses
+  codename: '[sig-network] Proxy version v1 A set of valid responses are returned
+    for both pod and service Proxy [Conformance]'
+  description: Attempt to create a pod and a service. A set of pod and service endpoints
+    MUST be accessed via Proxy using a list of http methods. A valid response MUST
+    be returned for each endpoint.
+  release: v1.24
+  file: test/e2e/network/proxy.go
 - testname: Proxy, validate ProxyWithPath responses
   codename: '[sig-network] Proxy version v1 A set of valid responses are returned
     for both pod and service ProxyWithPath [Conformance]'
