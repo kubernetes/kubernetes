@@ -1422,7 +1422,7 @@ func TestFilterOutInactivePods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	pods := newTestPods(8)
+	pods := newTestPods(9)
 	now := metav1.NewTime(time.Now())
 
 	// terminal pods are excluded
@@ -1460,6 +1460,12 @@ func TestFilterOutInactivePods(t *testing.T) {
 	kubelet.podWorkers.(*fakePodWorkers).terminationRequested = map[types.UID]bool{
 		pods[7].UID: true,
 	}
+
+	// pod that is still terminating is included, but it can be considered as terminated
+	// on k8s api server (k8s scheduler may consider it has completed status)
+	pods[8].Status.Phase = v1.PodFailed
+	kubelet.podWorkers.(*fakePodWorkers).terminationRequested[pods[8].UID] = true
+	kubelet.statusManager.SetPodStatus(pods[8], v1.PodStatus{Phase: v1.PodFailed})
 
 	expected := []*v1.Pod{pods[2], pods[3], pods[4], pods[7]}
 	kubelet.podManager.SetPods(pods)

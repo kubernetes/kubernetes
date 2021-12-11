@@ -986,6 +986,15 @@ func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 
+		// If a pod can be considered as terminated on k8s API server, it should be always
+		// excluded from the list of pods.
+		// This is needed to avoid insufficient resources errors when kubelet admits new pods.
+		if s, ok := kl.statusManager.GetPodStatus(p.UID); ok {
+			if s.Phase == v1.PodSucceeded || s.Phase == v1.PodFailed {
+				continue
+			}
+		}
+
 		filteredPods = append(filteredPods, p)
 	}
 	return filteredPods
