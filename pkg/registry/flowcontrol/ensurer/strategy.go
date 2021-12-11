@@ -248,9 +248,9 @@ func ensureConfiguration(wrapper configurationWrapper, strategy ensureStrategy, 
 		return fmt.Errorf("failed to determine whether auto-update is required for %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 	}
 	if !update {
-		if klog.V(5).Enabled() {
-			// TODO: if we use structured logging here the diff gets escaped and very awkward to read in the log
-			klog.Infof("No update required for the %s type=%s name=%q diff: %s", wrapper.TypeName(), configurationType, name, cmp.Diff(current, bootstrap))
+		if klogV := klog.V(5); klogV.Enabled() {
+			klogV.InfoS("No update required", "wrapper", wrapper.TypeName(), "type", configurationType, "name", name,
+				"diff", cmp.Diff(current, bootstrap))
 		}
 		return nil
 	}

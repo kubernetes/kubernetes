@@ -1796,16 +1796,26 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		return err
 	}
 	var runningContainers []string
-	var containers []string
+	type container struct {
+		Name       string
+		State      string
+		ExitCode   int
+		FinishedAt string
+	}
+	var containers []container
+	klogV := klog.V(4)
+	klogVEnabled := klogV.Enabled()
 	for _, s := range podStatus.ContainerStatuses {
 		if s.State == kubecontainer.ContainerStateRunning {
 			runningContainers = append(runningContainers, s.ID.String())
 		}
-		containers = append(containers, fmt.Sprintf("(%s state=%s exitCode=%d finishedAt=%s)", s.Name, s.State, s.ExitCode, s.FinishedAt.UTC().Format(time.RFC3339Nano)))
+		if klogVEnabled {
+			containers = append(containers, container{Name: s.Name, State: string(s.State), ExitCode: s.ExitCode, FinishedAt: s.FinishedAt.UTC().Format(time.RFC3339Nano)})
+		}
 	}
-	if klog.V(4).Enabled() {
-		sort.Strings(containers)
-		klog.InfoS("Post-termination container state", "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
+	if klogVEnabled {
+		sort.Slice(containers, func(i, j int) bool { return containers[i].Name < containers[j].Name })
+		klog.V(4).InfoS("Post-termination container state", "pod", klog.KObj(pod), "podUID", pod.UID, "containers", containers)
 	}
 	if len(runningContainers) > 0 {
 		return fmt.Errorf("detected running containers after a successful KillPod, CRI violation: %v", runningContainers)

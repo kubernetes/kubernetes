@@ -608,9 +608,10 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*flowcontrol.FlowSchema) {
 	}
 
 	meal.cfgCtlr.flowSchemas = fsSeq
-	if klog.V(5).Enabled() {
+	klogV := klog.V(5)
+	if klogV.Enabled() {
 		for _, fs := range fsSeq {
-			klog.Infof("Using FlowSchema %s", fcfmt.Fmt(fs))
+			klogV.Infof("Using FlowSchema %s", fcfmt.Fmt(fs))
 		}
 	}
 }

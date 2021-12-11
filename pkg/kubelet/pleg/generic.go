@@ -407,13 +407,13 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
 	if err != nil {
 		if klog.V(6).Enabled() {
-			klog.V(6).ErrorS(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
+			klog.ErrorS(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
 		} else {
-			klog.V(4).ErrorS(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name))
+			klog.ErrorS(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name))
 		}
 	} else {
-		if klog.V(6).Enabled() {
-			klog.V(6).InfoS("PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
+		if klogV := klog.V(6); klogV.Enabled() {
+			klogV.InfoS("PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
 		} else {
 			klog.V(4).InfoS("PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name))
 		}
