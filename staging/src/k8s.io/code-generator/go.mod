@@ -17,7 +17,7 @@ require (
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
 	golang.org/x/tools v0.1.8
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
+	k8s.io/gengo v0.0.0-20211115164449-b448ea381d54
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect

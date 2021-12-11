@@ -167,7 +167,7 @@ func (b *Builder) AddFileForTest(pkg string, path string, src []byte) error {
 	if err := b.addFile(importPathString(pkg), path, src, true); err != nil {
 		return err
 	}
-	if _, err := b.typeCheckPackage(importPathString(pkg)); err != nil {
+	if _, err := b.typeCheckPackage(importPathString(pkg), true); err != nil {
 		return err
 	}
 	return nil
@@ -269,7 +269,11 @@ func (b *Builder) AddDirTo(dir string, u *types.Universe) error {
 	if _, err := b.importPackage(dir, true); err != nil {
 		return err
 	}
-	return b.findTypesIn(canonicalizeImportPath(b.buildPackages[dir].ImportPath), u)
+	pkg, ok := b.buildPackages[dir]
+	if !ok {
+		return fmt.Errorf("no such package: %q", dir)
+	}
+	return b.findTypesIn(canonicalizeImportPath(pkg.ImportPath), u)
 }
 
 // AddDirectoryTo adds an entire directory to a given Universe. Unlike AddDir,
@@ -283,7 +287,11 @@ func (b *Builder) AddDirectoryTo(dir string, u *types.Universe) (*types.Package,
 	if _, err := b.importPackage(dir, true); err != nil {
 		return nil, err
 	}
-	path := canonicalizeImportPath(b.buildPackages[dir].ImportPath)
+	pkg, ok := b.buildPackages[dir]
+	if !ok {
+		return nil, fmt.Errorf("no such package: %q", dir)
+	}
+	path := canonicalizeImportPath(pkg.ImportPath)
 	if err := b.findTypesIn(path, u); err != nil {
 		return nil, err
 	}
@@ -388,13 +396,13 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 	// Run the type checker.  We may end up doing this to pkgs that are already
 	// done, or are in the queue to be done later, but it will short-circuit,
 	// and we can't miss pkgs that are only depended on.
-	pkg, err := b.typeCheckPackage(pkgPath)
+	pkg, err := b.typeCheckPackage(pkgPath, !ignoreError)
 	if err != nil {
 		switch {
 		case ignoreError && pkg != nil:
-			klog.V(2).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
+			klog.V(4).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
 		case !ignoreError && pkg != nil:
-			klog.V(2).Infof("type checking encountered some errors in %q\n", pkgPath)
+			klog.V(3).Infof("type checking encountered some errors in %q\n", pkgPath)
 			return nil, err
 		default:
 			return nil, err
@@ -415,7 +423,7 @@ func (a importAdapter) Import(path string) (*tc.Package, error) {
 // typeCheckPackage will attempt to return the package even if there are some
 // errors, so you may check whether the package is nil or not even if you get
 // an error.
-func (b *Builder) typeCheckPackage(pkgPath importPathString) (*tc.Package, error) {
+func (b *Builder) typeCheckPackage(pkgPath importPathString, logErr bool) (*tc.Package, error) {
 	klog.V(5).Infof("typeCheckPackage %s", pkgPath)
 	if pkg, ok := b.typeCheckedPackages[pkgPath]; ok {
 		if pkg != nil {
@@ -443,7 +451,11 @@ func (b *Builder) typeCheckPackage(pkgPath importPathString) (*tc.Package, error
 		// method. So there can't be cycles in the import graph.
 		Importer: importAdapter{b},
 		Error: func(err error) {
-			klog.V(2).Infof("type checker: %v\n", err)
+			if logErr {
+				klog.V(2).Infof("type checker: %v\n", err)
+			} else {
+				klog.V(3).Infof("type checker: %v\n", err)
+			}
 		},
 	}
 	pkg, err := c.Check(string(pkgPath), b.fset, files, nil)
@@ -653,9 +665,11 @@ func (b *Builder) convertSignature(u types.Universe, t *tc.Signature) *types.Sig
 	signature := &types.Signature{}
 	for i := 0; i < t.Params().Len(); i++ {
 		signature.Parameters = append(signature.Parameters, b.walkType(u, nil, t.Params().At(i).Type()))
+		signature.ParameterNames = append(signature.ParameterNames, t.Params().At(i).Name())
 	}
 	for i := 0; i < t.Results().Len(); i++ {
 		signature.Results = append(signature.Results, b.walkType(u, nil, t.Results().At(i).Type()))
+		signature.ResultNames = append(signature.ResultNames, t.Results().At(i).Name())
 	}
 	if r := t.Recv(); r != nil {
 		signature.Receiver = b.walkType(u, nil, r.Type())
