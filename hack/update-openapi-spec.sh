@@ -103,6 +103,10 @@ curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:$
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR}/v3 for OpenAPI v3"
 
 mkdir -p "${OPENAPI_ROOT_DIR}/v3"
+# clean up folder, note that some files start with dot like
+# ".well-known__openid-configuration_openapi.json"
+rm -r "${OPENAPI_ROOT_DIR}"/v3/{*,.*} || true
+
 curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3" | jq '.Paths' | jq -r '.[]' | while read -r group; do
     kube::log::status "Updating OpenAPI spec for group ${group}"
     OPENAPI_FILENAME="${group}_openapi.json"
