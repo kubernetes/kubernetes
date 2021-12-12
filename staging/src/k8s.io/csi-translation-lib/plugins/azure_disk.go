@@ -58,7 +58,7 @@ func NewAzureDiskCSITranslator() InTreePlugin {
 	return &azureDiskCSITranslator{}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree Azure Disk storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree Azure Disk storage class parameters to CSI storage class
 func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
 	var (
 		generatedTopologies []v1.TopologySelectorTerm
