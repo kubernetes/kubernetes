@@ -29,6 +29,7 @@ const (
 	zoneSizeKey             = "zone_size"
 	zoneNoUnhealthyNodesKey = "unhealthy_nodes_in_zone"
 	evictionsNumberKey      = "evictions_number"
+	evictionsTotalKey       = "evictions_total"
 )
 
 var (
@@ -61,10 +62,20 @@ var (
 	)
 	evictionsNumber = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         nodeControllerSubsystem,
+			Name:              evictionsNumberKey,
+			Help:              "Number of Node evictions that happened since current instance of NodeController started, This metric is replaced by node_collector_evictions_total.",
+			DeprecatedVersion: "1.24.0",
+			StabilityLevel:    metrics.ALPHA,
+		},
+		[]string{"zone"},
+	)
+	evictionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      nodeControllerSubsystem,
-			Name:           evictionsNumberKey,
+			Name:           evictionsTotalKey,
 			Help:           "Number of Node evictions that happened since current instance of NodeController started.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"zone"},
 	)
@@ -79,5 +90,6 @@ func Register() {
 		legacyregistry.MustRegister(zoneSize)
 		legacyregistry.MustRegister(unhealthyNodes)
 		legacyregistry.MustRegister(evictionsNumber)
+		legacyregistry.MustRegister(evictionsTotal)
 	})
 }

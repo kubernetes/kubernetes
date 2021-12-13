@@ -1,3 +1,11 @@
+- name: evictions_total
+  subsystem: node_collector
+  help: Number of Node evictions that happened since current instance of NodeController
+    started.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - zone
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
   help: Latency for running all plugins of a specific extension point.
