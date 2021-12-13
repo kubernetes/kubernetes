@@ -15,6 +15,9 @@ const (
 	sysAF_INET6  = 0xa
 
 	sysSOCK_RAW = 0x3
+
+	sizeofSockaddrInet4 = 0x10
+	sizeofSockaddrInet6 = 0x1c
 )
 
 func marshalInetAddr(ip net.IP, port int, zone string) []byte {

@@ -9,7 +9,6 @@ package socket
 
 import (
 	"os"
-	"syscall"
 )
 
 func (c *Conn) recvMsg(m *Message, flags int) error {
@@ -25,10 +24,7 @@ func (c *Conn) recvMsg(m *Message, flags int) error {
 	var n int
 	fn := func(s uintptr) bool {
 		n, operr = recvmsg(s, &h, flags)
-		if operr == syscall.EAGAIN || operr == syscall.EWOULDBLOCK {
-			return false
-		}
-		return true
+		return ioComplete(flags, operr)
 	}
 	if err := c.c.Read(fn); err != nil {
 		return err
@@ -55,17 +51,16 @@ func (c *Conn) sendMsg(m *Message, flags int) error {
 	vs := make([]iovec, len(m.Buffers))
 	var sa []byte
 	if m.Addr != nil {
-		sa = marshalInetAddr(m.Addr)
+		var a [sizeofSockaddrInet6]byte
+		n := marshalInetAddr(m.Addr, a[:])
+		sa = a[:n]
 	}
 	h.pack(vs, m.Buffers, m.OOB, sa)
 	var operr error
 	var n int
 	fn := func(s uintptr) bool {
 		n, operr = sendmsg(s, &h, flags)
-		if operr == syscall.EAGAIN || operr == syscall.EWOULDBLOCK {
-			return false
-		}
-		return true
+		return ioComplete(flags, operr)
 	}
 	if err := c.c.Write(fn); err != nil {
 		return err

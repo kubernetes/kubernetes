@@ -8,50 +8,6 @@
 package ipv6
 
 const (
-	sysIPV6_ADDR_PREFERENCES  = 32
-	sysIPV6_CHECKSUM          = 19
-	sysIPV6_DONTFRAG          = 29
-	sysIPV6_DSTOPTS           = 23
-	sysIPV6_HOPLIMIT          = 11
-	sysIPV6_HOPOPTS           = 22
-	sysIPV6_JOIN_GROUP        = 5
-	sysIPV6_LEAVE_GROUP       = 6
-	sysIPV6_MULTICAST_HOPS    = 9
-	sysIPV6_MULTICAST_IF      = 7
-	sysIPV6_MULTICAST_LOOP    = 4
-	sysIPV6_NEXTHOP           = 20
-	sysIPV6_PATHMTU           = 12
-	sysIPV6_PKTINFO           = 13
-	sysIPV6_PREFER_SRC_CGA    = 0x10
-	sysIPV6_PREFER_SRC_COA    = 0x02
-	sysIPV6_PREFER_SRC_HOME   = 0x01
-	sysIPV6_PREFER_SRC_NONCGA = 0x20
-	sysIPV6_PREFER_SRC_PUBLIC = 0x08
-	sysIPV6_PREFER_SRC_TMP    = 0x04
-	sysIPV6_RECVDSTOPTS       = 28
-	sysIPV6_RECVHOPLIMIT      = 14
-	sysIPV6_RECVHOPOPTS       = 26
-	sysIPV6_RECVPATHMTU       = 16
-	sysIPV6_RECVPKTINFO       = 15
-	sysIPV6_RECVRTHDR         = 25
-	sysIPV6_RECVTCLASS        = 31
-	sysIPV6_RTHDR             = 21
-	sysIPV6_RTHDRDSTOPTS      = 24
-	sysIPV6_RTHDR_TYPE_0      = 0
-	sysIPV6_TCLASS            = 30
-	sysIPV6_UNICAST_HOPS      = 3
-	sysIPV6_USE_MIN_MTU       = 18
-	sysIPV6_V6ONLY            = 10
-
-	sysMCAST_JOIN_GROUP         = 40
-	sysMCAST_LEAVE_GROUP        = 41
-	sysMCAST_JOIN_SOURCE_GROUP  = 42
-	sysMCAST_LEAVE_SOURCE_GROUP = 43
-	sysMCAST_BLOCK_SOURCE       = 44
-	sysMCAST_UNBLOCK_SOURCE     = 45
-
-	sysICMP6_FILTER = 0x1
-
 	sizeofSockaddrStorage = 128
 	sizeofICMPv6Filter    = 32
 	sizeofInet6Pktinfo    = 20

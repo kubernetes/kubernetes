@@ -14,11 +14,13 @@ import (
 
 	"golang.org/x/net/internal/iana"
 	"golang.org/x/net/internal/socket"
+
+	"golang.org/x/sys/unix"
 )
 
 func marshalDst(b []byte, cm *ControlMessage) []byte {
 	m := socket.ControlMessage(b)
-	m.MarshalHeader(iana.ProtocolIP, sysIP_RECVDSTADDR, net.IPv4len)
+	m.MarshalHeader(iana.ProtocolIP, unix.IP_RECVDSTADDR, net.IPv4len)
 	return m.Next(net.IPv4len)
 }
 
@@ -31,7 +33,7 @@ func parseDst(cm *ControlMessage, b []byte) {
 
 func marshalInterface(b []byte, cm *ControlMessage) []byte {
 	m := socket.ControlMessage(b)
-	m.MarshalHeader(iana.ProtocolIP, sysIP_RECVIF, syscall.SizeofSockaddrDatalink)
+	m.MarshalHeader(iana.ProtocolIP, sockoptReceiveInterface, syscall.SizeofSockaddrDatalink)
 	return m.Next(syscall.SizeofSockaddrDatalink)
 }
 

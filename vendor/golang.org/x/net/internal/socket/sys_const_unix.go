@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
-// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris
+//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris || zos
+// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris zos
 
 package socket
 
@@ -15,4 +15,7 @@ const (
 	sysAF_INET6  = unix.AF_INET6
 
 	sysSOCK_RAW = unix.SOCK_RAW
+
+	sizeofSockaddrInet4 = unix.SizeofSockaddrInet4
+	sizeofSockaddrInet6 = unix.SizeofSockaddrInet6
 )
