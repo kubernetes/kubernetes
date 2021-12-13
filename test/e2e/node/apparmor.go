@@ -22,7 +22,7 @@ import (
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("AppArmor", func() {

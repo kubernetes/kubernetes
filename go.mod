@@ -58,8 +58,8 @@ require (
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
-	github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo/v2 v2.0.0-rc2
+	github.com/onsi/gomega v1.17.0
 	github.com/opencontainers/runc v1.0.2
 	github.com/opencontainers/selinux v1.8.2
 	github.com/pkg/errors v0.9.1
@@ -254,6 +254,7 @@ replace (
 	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
+	github.com/go-task/slim-sprig => github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
 	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.4
 	github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
@@ -270,7 +271,7 @@ replace (
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
-	github.com/google/pprof => github.com/google/pprof v0.0.0-20210226084205-cbba55b83ad5
+	github.com/google/pprof => github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38
 	github.com/google/renameio => github.com/google/renameio v0.1.0
 	github.com/google/shlex => github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid => github.com/google/uuid v1.1.2
@@ -359,10 +360,11 @@ replace (
 	github.com/mwitkow/go-conntrack => github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
-	github.com/nxadm/tail => github.com/nxadm/tail v1.4.4
+	github.com/nxadm/tail => github.com/nxadm/tail v1.4.8
 	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
-	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.0.0-rc2
+	github.com/onsi/gomega => github.com/onsi/gomega v1.17.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.2

@@ -23,7 +23,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"

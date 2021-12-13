@@ -41,7 +41,7 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 

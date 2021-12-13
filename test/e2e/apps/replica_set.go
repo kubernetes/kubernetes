@@ -46,7 +46,7 @@ import (
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 

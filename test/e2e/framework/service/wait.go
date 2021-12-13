@@ -27,7 +27,7 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // WaitForServiceDeletedWithFinalizer waits for the service with finalizer to be deleted.

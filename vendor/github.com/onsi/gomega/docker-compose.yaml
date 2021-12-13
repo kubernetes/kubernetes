@@ -1,0 +1,10 @@
+version: '3.0'
+
+services:
+  test:
+    build:
+      dockerfile: Dockerfile
+      context: .
+    working_dir: /app
+    volumes:
+      - ${PWD}:/app

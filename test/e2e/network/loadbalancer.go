@@ -46,7 +46,7 @@ import (
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 	utilpointer "k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 

@@ -59,7 +59,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilptr "k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 

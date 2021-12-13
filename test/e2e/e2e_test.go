@@ -30,7 +30,7 @@ import (
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
 	// See https://github.com/kubernetes/kubernetes/issues/74827
-	// "github.com/onsi/ginkgo"
+	// "github.com/onsi/ginkgo/v2"
 
 	"k8s.io/component-base/version"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"

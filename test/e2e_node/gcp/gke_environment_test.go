@@ -31,7 +31,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/blang/semver"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // checkProcess checks whether there's a process whose command line contains

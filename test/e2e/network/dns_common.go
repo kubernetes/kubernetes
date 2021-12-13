@@ -37,7 +37,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	dnsclient "k8s.io/kubernetes/third_party/forked/golang/net"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 

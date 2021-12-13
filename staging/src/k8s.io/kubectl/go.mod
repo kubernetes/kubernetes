@@ -22,8 +22,8 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
-	github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo/v2 v2.0.0-rc2
+	github.com/onsi/gomega v1.17.0
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2
 	github.com/spf13/cobra v1.2.1

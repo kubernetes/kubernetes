@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 
 	"github.com/onsi/gomega/format"
 	errorsutil "github.com/onsi/gomega/gstruct/errors"
@@ -24,6 +25,23 @@ import (
 //        "b": Equal("b"),
 //    }))
 func MatchAllElements(identifier Identifier, elements Elements) types.GomegaMatcher {
+	return &ElementsMatcher{
+		Identifier: identifier,
+		Elements:   elements,
+	}
+}
+
+//MatchAllElementsWithIndex succeeds if every element of a slice matches the element matcher it maps to
+//through the id with index function, and every element matcher is matched.
+//    idFn := func(index int, element interface{}) string {
+//        return strconv.Itoa(index)
+//    }
+//
+//    Expect([]string{"a", "b"}).To(MatchAllElements(idFn, Elements{
+//        "0": Equal("a"),
+//        "1": Equal("b"),
+//    }))
+func MatchAllElementsWithIndex(identifier IdentifierWithIndex, elements Elements) types.GomegaMatcher {
 	return &ElementsMatcher{
 		Identifier: identifier,
 		Elements:   elements,
@@ -56,6 +74,32 @@ func MatchElements(identifier Identifier, options Options, elements Elements) ty
 	}
 }
 
+//MatchElementsWithIndex succeeds if each element of a slice matches the element matcher it maps to
+//through the id with index function. It can ignore extra elements and/or missing elements.
+//    idFn := func(index int, element interface{}) string {
+//        return strconv.Itoa(index)
+//    }
+//
+//    Expect([]string{"a", "b", "c"}).To(MatchElements(idFn, IgnoreExtras, Elements{
+//        "0": Equal("a"),
+//        "1": Equal("b"),
+//    }))
+//    Expect([]string{"a", "c"}).To(MatchElements(idFn, IgnoreMissing, Elements{
+//        "0": Equal("a"),
+//        "1": Equal("b"),
+//        "2": Equal("c"),
+//        "3": Equal("d"),
+//    }))
+func MatchElementsWithIndex(identifier IdentifierWithIndex, options Options, elements Elements) types.GomegaMatcher {
+	return &ElementsMatcher{
+		Identifier:      identifier,
+		Elements:        elements,
+		IgnoreExtras:    options&IgnoreExtras != 0,
+		IgnoreMissing:   options&IgnoreMissing != 0,
+		AllowDuplicates: options&AllowDuplicates != 0,
+	}
+}
+
 // ElementsMatcher is a NestingMatcher that applies custom matchers to each element of a slice mapped
 // by the Identifier function.
 // TODO: Extend this to work with arrays & maps (map the key) as well.
@@ -63,7 +107,7 @@ type ElementsMatcher struct {
 	// Matchers for each element.
 	Elements Elements
 	// Function mapping an element to the string key identifying its matcher.
-	Identifier Identifier
+	Identifier Identify
 
 	// Whether to ignore extra elements or consider it an error.
 	IgnoreExtras bool
@@ -81,6 +125,32 @@ type Elements map[string]types.GomegaMatcher
 
 // Function for identifying (mapping) elements.
 type Identifier func(element interface{}) string
+
+// Calls the underlying fucntion with the provided params.
+// Identifier drops the index.
+func (i Identifier) WithIndexAndElement(index int, element interface{}) string {
+	return i(element)
+}
+
+// Uses the index and element to generate an element name
+type IdentifierWithIndex func(index int, element interface{}) string
+
+// Calls the underlying fucntion with the provided params.
+// IdentifierWithIndex uses the index.
+func (i IdentifierWithIndex) WithIndexAndElement(index int, element interface{}) string {
+	return i(index, element)
+}
+
+// Interface for identifing the element
+type Identify interface {
+	WithIndexAndElement(i int, element interface{}) string
+}
+
+// IndexIdentity is a helper function for using an index as
+// the key in the element map
+func IndexIdentity(index int, _ interface{}) string {
+	return strconv.Itoa(index)
+}
 
 func (m *ElementsMatcher) Match(actual interface{}) (success bool, err error) {
 	if reflect.TypeOf(actual).Kind() != reflect.Slice {
@@ -106,7 +176,7 @@ func (m *ElementsMatcher) matchElements(actual interface{}) (errs []error) {
 	elements := map[string]bool{}
 	for i := 0; i < val.Len(); i++ {
 		element := val.Index(i).Interface()
-		id := m.Identifier(element)
+		id := m.Identifier.WithIndexAndElement(i, element)
 		if elements[id] {
 			if !m.AllowDuplicates {
 				errs = append(errs, fmt.Errorf("found duplicate element ID %s", id))

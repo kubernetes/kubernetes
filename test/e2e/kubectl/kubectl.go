@@ -78,7 +78,7 @@ import (
 	uexec "k8s.io/utils/exec"
 	"k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
