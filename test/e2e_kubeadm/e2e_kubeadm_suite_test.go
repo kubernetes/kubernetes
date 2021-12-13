@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 
@@ -48,13 +47,14 @@ func TestE2E(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	reporters := []ginkgo.Reporter{}
 	reportDir := framework.TestContext.ReportDir
+	ginkgoSuiteConfig, _ := ginkgo.GinkgoConfiguration()
 	if reportDir != "" {
 		// Create the directory if it doesn't already exists
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			t.Fatalf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
+			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, ginkgoSuiteConfig.ParallelHost)
 			junitPath := filepath.Join(reportDir, junitFile)
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}

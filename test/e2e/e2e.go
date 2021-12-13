@@ -32,7 +32,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/gomega"
 
@@ -101,9 +100,10 @@ func RunE2ETests(t *testing.T) {
 	defer logs.FlushLogs()
 
 	gomega.RegisterFailHandler(framework.Fail)
+	ginkgoSuiteConfig, _ := ginkgo.GinkgoConfiguration()
 	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
+	if len(ginkgoSuiteConfig.FocusStrings) == 0 && len(ginkgoSuiteConfig.SkipStrings) == 0 {
+		ginkgoSuiteConfig.SkipStrings = append(ginkgoSuiteConfig.SkipStrings, `\[Flaky\]|\[Feature:.+\]`)
 	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
@@ -114,7 +114,7 @@ func RunE2ETests(t *testing.T) {
 		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, ginkgoSuiteConfig.ParallelHost))))
 		}
 	}
 
@@ -127,7 +127,7 @@ func RunE2ETests(t *testing.T) {
 		r = append(r, e2ereporters.NewDetailsReporterFile(framework.TestContext.SpecSummaryOutput))
 	}
 
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, ginkgoSuiteConfig.ParallelHost)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
 

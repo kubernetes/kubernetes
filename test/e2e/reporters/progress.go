@@ -64,14 +64,14 @@ func NewProgressReporter(progressReportURL string) *ProgressReporter {
 
 // SpecSuiteWillBegin is invoked by ginkgo when the suite is about to start and is the first point in which we can
 // antipate the number of tests which will be run.
-func (reporter *ProgressReporter) SpecSuiteWillBegin(cfg config.GinkgoConfigType, summary *types.SuiteSummary) {
+func (reporter *ProgressReporter) SuiteWillBegin(cfg config.GinkgoConfigType, summary *types.SuiteSummary) {
 	reporter.TestsTotal = summary.NumberOfSpecsThatWillBeRun
 	reporter.LastMsg = "Test Suite starting"
 	reporter.sendUpdates()
 }
 
 // SpecSuiteDidEnd is the last method invoked by Ginkgo after all the specs are run.
-func (reporter *ProgressReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
+func (reporter *ProgressReporter) SuiteDidEnd(summary *types.SuiteSummary) {
 	reporter.LastMsg = "Test Suite completed"
 	reporter.sendUpdates()
 }

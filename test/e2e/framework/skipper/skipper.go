@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/onsi/ginkgo/v2/types"
 	"regexp"
 	"runtime"
 	"runtime/debug"
@@ -58,7 +59,9 @@ type SkipPanic struct {
 }
 
 // String makes SkipPanic look like the old Ginkgo panic when printed.
-func (SkipPanic) String() string { return ginkgo.GINKGO_PANIC }
+func (SkipPanic) String() string {
+	return types.GinkgoErrors.UncaughtGinkgoPanic(types.NewCustomCodeLocation("SkipPanic")).Error()
+}
 
 // Skip wraps ginkgo.Skip so that it panics with more useful
 // information about why the test is being skipped. This function will

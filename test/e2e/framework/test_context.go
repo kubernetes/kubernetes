@@ -22,6 +22,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/onsi/ginkgo/v2"
 	"io/ioutil"
 	"math"
 	"os"
@@ -29,7 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2/config"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -281,14 +281,15 @@ func (tc TestContextType) ClusterIsIPv6() bool {
 // options themselves, copy flags from test/e2e/framework/config
 // as shown in HandleFlags.
 func RegisterCommonFlags(flags *flag.FlagSet) {
+	ginkgoSuiteConfig, ginkgoReporterConfig := ginkgo.GinkgoConfiguration()
 	// Turn on verbose by default to get spec names
-	config.DefaultReporterConfig.Verbose = true
+	ginkgoReporterConfig.Verbose = true
 
 	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	config.GinkgoConfig.EmitSpecProgress = true
+	ginkgoSuiteConfig.EmitSpecProgress = true
 
 	// Randomize specs as well as suites
-	config.GinkgoConfig.RandomizeAllSpecs = true
+	ginkgoSuiteConfig.RandomizeAllSpecs = true
 
 	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")

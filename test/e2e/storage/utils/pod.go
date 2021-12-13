@@ -49,7 +49,8 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 
 	ns := driverNamespace.Name
 
-	podEventLog := ginkgo.GinkgoWriter
+	var podEventLog io.Writer
+	podEventLog = ginkgo.GinkgoWriter
 	var podEventLogCloser io.Closer
 	to := podlogs.LogOutput{
 		StatusWriter: ginkgo.GinkgoWriter,

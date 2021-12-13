@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 // FailurePanic is the value that will be panicked from Fail.
@@ -38,7 +39,9 @@ type FailurePanic struct {
 }
 
 // String makes FailurePanic look like the old Ginkgo panic when printed.
-func (FailurePanic) String() string { return ginkgo.GINKGO_PANIC }
+func (FailurePanic) String() string {
+	return types.GinkgoErrors.UncaughtGinkgoPanic(types.NewCustomCodeLocation("FailurePanic")).Error()
+}
 
 // Fail wraps ginkgo.Fail so that it panics with more useful
 // information about the failure. This function will panic with a
