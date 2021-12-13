@@ -313,3 +313,10 @@ func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c
 		skipInternalf(1, "Skipped because client failed to delete component:%s pod, err:%v", componentName, err)
 	}
 }
+
+// SkipIfIPv6 skips if the cluster IP family is IPv6 and the provider is included in the unsupportedProviders.
+func SkipIfIPv6(unsupportedProviders ...string) {
+	if framework.TestContext.ClusterIsIPv6() && framework.ProviderIs(unsupportedProviders...) {
+		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
+	}
+}
