@@ -369,9 +369,12 @@ var _ = common.SIGDescribe("Networking", func() {
 			config.DeleteNodePortService()
 
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP) and getting ZERO host endpoints", config.NodeIP, config.NodeIP, config.NodeHTTPPort))
-			err = config.DialFromNode("http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, config.MaxTries, sets.NewString())
+			// #106770 MaxTries can be very large on large clusters, with the risk that a new NodePort is created by another test and start to answer traffic.
+			// Since we only want to assert that traffic is not being forwarded anymore and the retry timeout is 2 seconds, consider the test is correct
+			// if the service doesn't answer after 10 tries.
+			err = config.DialFromNode("http", config.NodeIP, config.NodeHTTPPort, 10, 10, sets.NewString())
 			if err != nil {
-				framework.Failf("Error dialing http from node: %v", err)
+				framework.Failf("Failure validating that node port service STOPPED removed properly: %v", err)
 			}
 		})
 
@@ -398,7 +401,10 @@ var _ = common.SIGDescribe("Networking", func() {
 			config.DeleteNodePortService()
 
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP) and getting ZERO host endpoints", config.NodeIP, config.NodeIP, config.NodeUDPPort))
-			err = config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, config.MaxTries, sets.NewString())
+			// #106770 MaxTries can be very large on large clusters, with the risk that a new NodePort is created by another test and start to answer traffic.
+			// Since we only want to assert that traffic is not being forwarded anymore and the retry timeout is 2 seconds, consider the test is correct
+			// if the service doesn't answer after 10 tries.
+			err = config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, 10, 10, sets.NewString())
 			if err != nil {
 				framework.Failf("Failure validating that node port service STOPPED removed properly: %v", err)
 			}
