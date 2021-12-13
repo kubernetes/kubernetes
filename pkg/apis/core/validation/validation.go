@@ -2857,12 +2857,8 @@ func validateHandler(handler commonHandler, fldPath *field.Path) field.ErrorList
 	numHandlers := 0
 	allErrors := field.ErrorList{}
 	if handler.Exec != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
-		} else {
-			numHandlers++
-			allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
-		}
+		numHandlers++
+		allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
 	}
 	if handler.HTTPGet != nil {
 		if numHandlers > 0 {
