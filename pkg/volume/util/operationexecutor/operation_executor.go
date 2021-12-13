@@ -388,6 +388,9 @@ type VolumeToMount struct {
 	// DesiredSizeLimit indicates the desired upper bound on the size of the volume
 	// (if so implemented)
 	DesiredSizeLimit *resource.Quantity
+
+	// time at which volume was requested to be mounted
+	MountRequestTime time.Time
 }
 
 // DeviceMountState represents device mount state in a global path.
