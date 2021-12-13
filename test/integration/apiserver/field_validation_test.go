@@ -423,14 +423,14 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			},
 			bodyBase: invalidBodyJSON,
 			strictDecodingErrors: []string{
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`duplicate field "paused"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
 				// note: fields that are both unknown
 				// and duplicated will only be detected
 				// as unknown for typed resources.
-				`unknown field "unknownNested"`,
-				`duplicate field "imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -440,14 +440,14 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			},
 			bodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`duplicate field "paused"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
 				// note: fields that are both unknown
 				// and duplicated will only be detected
 				// as unknown for typed resources.
-				`unknown field "unknownNested"`,
-				`duplicate field "imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -461,14 +461,14 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			name:     "post-default-ignore-validation",
 			bodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`duplicate field "paused"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
 				// note: fields that are both unknown
 				// and duplicated will only be detected
 				// as unknown for typed resources.
-				`unknown field "unknownNested"`,
-				`duplicate field "imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -482,9 +482,9 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 				`line 10: key "unknownDupe" already set in map`,
 				`line 12: key "paused" already set in map`,
 				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`unknown field "unknownNested"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -498,9 +498,9 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 				`line 10: key "unknownDupe" already set in map`,
 				`line 12: key "paused" already set in map`,
 				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -519,9 +519,9 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 				`line 10: key "unknownDupe" already set in map`,
 				`line 12: key "paused" already set in map`,
 				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 	}
@@ -590,14 +590,14 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			},
 			putBodyBase: invalidBodyJSON,
 			strictDecodingErrors: []string{
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`duplicate field "paused"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
 				// note: fields that are both unknown
 				// and duplicated will only be detected
 				// as unknown for typed resources.
-				`unknown field "unknownNested"`,
-				`duplicate field "imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -607,14 +607,14 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			},
 			putBodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`duplicate field "paused"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
 				// note: fields that are both unknown
 				// and duplicated will only be detected
 				// as unknown for typed resources.
-				`unknown field "unknownNested"`,
-				`duplicate field "imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -628,14 +628,14 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			name:        "put-ignore-validation",
 			putBodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`duplicate field "paused"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
 				// note: fields that are both unknown
 				// and duplicated will only be detected
 				// as unknown for typed resources.
-				`unknown field "unknownNested"`,
-				`duplicate field "imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -649,9 +649,9 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 				`line 10: key "unknownDupe" already set in map`,
 				`line 12: key "paused" already set in map`,
 				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
-				`unknown field "unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 			},
 		},
 		{
@@ -665,9 +665,9 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 				`line 10: key "unknownDupe" already set in map`,
 				`line 12: key "paused" already set in map`,
 				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -686,9 +686,9 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 				`line 10: key "unknownDupe" already set in map`,
 				`line 12: key "paused" already set in map`,
 				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 	}
@@ -813,12 +813,12 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			patchType: types.MergePatchType,
 			body:      mergePatchBody,
 			strictDecodingErrors: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -829,12 +829,12 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			patchType: types.MergePatchType,
 			body:      mergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -850,12 +850,12 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			patchType: types.MergePatchType,
 			body:      mergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknownDupe"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -871,12 +871,12 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknown3"`,
-				`unknown field "unknownDupe"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknown3"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -892,12 +892,12 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknown3"`,
-				`unknown field "unknownDupe"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknown3"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -918,12 +918,12 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
-				`unknown field "unknownNested"`,
-				`unknown field "unknown1"`,
-				`unknown field "unknown3"`,
-				`unknown field "unknownDupe"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
+				`unknown field "spec.template.spec.containers[0].unknownNested"`,
+				`unknown field "spec.unknown1"`,
+				`unknown field "spec.unknown3"`,
+				`unknown field "spec.unknownDupe"`,
 			},
 		},
 		{
@@ -934,8 +934,8 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			patchType: types.MergePatchType,
 			body:      nonconflictingMergePatchBody,
 			strictDecodingErrors: []string{
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -946,8 +946,8 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			patchType: types.MergePatchType,
 			body:      nonconflictingMergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -963,8 +963,8 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			patchType: types.MergePatchType,
 			body:      nonconflictingMergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 	}
@@ -1080,9 +1080,9 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			},
 			body: smpBody,
 			strictDecodingErrors: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1095,9 +1095,9 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			},
 			body: smpBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1114,9 +1114,9 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			name: "smp-no-validation",
 			body: smpBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1129,8 +1129,8 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			},
 			body: nonconflictingSMPBody,
 			strictDecodingErrors: []string{
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -1140,8 +1140,8 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			},
 			body: nonconflictingSMPBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 		{
@@ -1155,8 +1155,8 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			name: "nonconflicting-smp-no-validation",
 			body: nonconflictingSMPBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "paused"`,
-				`duplicate field "imagePullPolicy"`,
+				`duplicate field "spec.paused"`,
+				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 			},
 		},
 	}
@@ -1408,9 +1408,9 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			},
 			body: crdInvalidBody,
 			strictDecodingErrors: []string{
-				`duplicate field "hostPort"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "unknownDupe"`,
+				`duplicate field "spec.ports[0].hostPort"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.unknownDupe"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1423,9 +1423,9 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			},
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1442,9 +1442,9 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			name: "crd-post-no-validation",
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1564,9 +1564,9 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			},
 			body: crdInvalidBody,
 			strictDecodingErrors: []string{
-				`duplicate field "hostPort"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "unknownDupe"`,
+				`duplicate field "spec.ports[0].hostPort"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.unknownDupe"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -1577,9 +1577,9 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			},
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -1594,9 +1594,9 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			name: "schemaless-crd-post-no-validation",
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -1716,9 +1716,9 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			},
 			putBody: crdInvalidBody,
 			strictDecodingErrors: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1731,9 +1731,9 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			},
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1750,9 +1750,9 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			name:    "crd-put-no-validation",
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1884,9 +1884,9 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			},
 			putBody: crdInvalidBody,
 			strictDecodingErrors: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -1897,9 +1897,9 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			},
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -1914,9 +1914,9 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			name:    "schemaless-crd-put-no-validation",
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -2098,9 +2098,9 @@ spec:
 			},
 			body: mergePatchBody,
 			strictDecodingErrors: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -2114,9 +2114,9 @@ spec:
 			},
 			body: mergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -2135,9 +2135,9 @@ spec:
 			patchType: types.MergePatchType,
 			body:      mergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -2156,8 +2156,8 @@ spec:
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknown3"`,
@@ -2177,8 +2177,8 @@ spec:
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknown3"`,
@@ -2203,8 +2203,8 @@ spec:
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknown3"`,
@@ -2318,9 +2318,9 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 			},
 			body: mergePatchBody,
 			strictDecodingErrors: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -2332,9 +2332,9 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 			},
 			body: mergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -2351,9 +2351,9 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 			patchType: types.MergePatchType,
 			body:      mergePatchBody,
 			strictDecodingWarnings: []string{
-				`duplicate field "unknownDupe"`,
-				`duplicate field "knownField1"`,
-				`duplicate field "hostPort"`,
+				`duplicate field "spec.unknownDupe"`,
+				`duplicate field "spec.knownField1"`,
+				`duplicate field "spec.ports[0].hostPort"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -2370,8 +2370,8 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -2388,8 +2388,8 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
@@ -2411,8 +2411,8 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 				// evanphx/json-patch library and is expected.
 				// Duplicate fields in the json patch ops
 				// themselves can be detected though
-				`json patch unknown field "foo"`,
-				`json patch duplicate field "path"`,
+				`json patch unknown field "[0].foo"`,
+				`json patch duplicate field "[1].path"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 			},
 		},
