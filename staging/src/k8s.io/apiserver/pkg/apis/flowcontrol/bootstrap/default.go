@@ -73,6 +73,7 @@ var (
 		SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
 		SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
 		SuggestedFlowSchemaWorkloadLeaderElection,    // references "leader-election" priority-level
+		SuggestedFlowSchemaEndpointsController,       // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeControllerManager,     // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeScheduler,             // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeSystemServiceAccounts, // references "workload-high" priority-level
@@ -314,12 +315,6 @@ var (
 			ResourceRules: []flowcontrol.ResourcePolicyRule{
 				resourceRule(
 					[]string{"get", "create", "update"},
-					[]string{corev1.GroupName},
-					[]string{"endpoints", "configmaps"},
-					[]string{"kube-system"},
-					false),
-				resourceRule(
-					[]string{"get", "create", "update"},
 					[]string{coordinationv1.GroupName},
 					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
@@ -327,6 +322,31 @@ var (
 			},
 		},
 	)
+	// We add an explicit rule for endpoints-controller with high precedence
+	// to ensure that those calls won't get catch by the following
+	// <workload-leader-election> flow-schema.
+	//
+	// TODO(#80289): Get rid of this rule once we get rid of support for
+	//   using endpoints and configmaps objects for leader election.
+	SuggestedFlowSchemaEndpointsController = newFlowSchema(
+		"endpoints-controller", "workload-high", 150,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: append(
+				users(user.KubeControllerManager),
+				kubeSystemServiceAccount("endpoints-controller")...),
+			ResourceRules: []flowcontrol.ResourcePolicyRule{
+				resourceRule(
+					[]string{"get", "create", "update"},
+					[]string{corev1.GroupName},
+					[]string{"endpoints", "configmaps"},
+					[]string{flowcontrol.NamespaceEvery},
+					false),
+			},
+		},
+	)
+	// TODO(#80289): Get rid of this rule once we get rid of support for
+	//   using endpoints and configmaps objects for leader election.
 	SuggestedFlowSchemaWorkloadLeaderElection = newFlowSchema(
 		"workload-leader-election", "leader-election", 200,
 		flowcontrol.FlowDistinguisherMethodByUserType,
@@ -337,12 +357,6 @@ var (
 					[]string{"get", "create", "update"},
 					[]string{corev1.GroupName},
 					[]string{"endpoints", "configmaps"},
-					[]string{flowcontrol.NamespaceEvery},
-					false),
-				resourceRule(
-					[]string{"get", "create", "update"},
-					[]string{coordinationv1.GroupName},
-					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
 					false),
 			},
