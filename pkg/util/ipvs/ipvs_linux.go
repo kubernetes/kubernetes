@@ -24,12 +24,12 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"errors"
 	libipvs "github.com/moby/ipvs"
 
+	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
 )
 
@@ -234,7 +234,7 @@ func toVirtualServer(svc *libipvs.Service) (*VirtualServer, error) {
 	vs.Flags = ServiceFlags(svc.Flags &^ uint32(FlagHashed))
 
 	if vs.Address == nil {
-		if svc.AddressFamily == syscall.AF_INET {
+		if svc.AddressFamily == unix.AF_INET {
 			vs.Address = net.IPv4zero
 		} else {
 			vs.Address = net.IPv6zero
@@ -272,10 +272,10 @@ func toIPVSService(vs *VirtualServer) (*libipvs.Service, error) {
 	}
 
 	if ip4 := vs.Address.To4(); ip4 != nil {
-		ipvsSvc.AddressFamily = syscall.AF_INET
+		ipvsSvc.AddressFamily = unix.AF_INET
 		ipvsSvc.Netmask = 0xffffffff
 	} else {
-		ipvsSvc.AddressFamily = syscall.AF_INET6
+		ipvsSvc.AddressFamily = unix.AF_INET6
 		ipvsSvc.Netmask = 128
 	}
 	return ipvsSvc, nil
@@ -297,11 +297,11 @@ func toIPVSDestination(rs *RealServer) (*libipvs.Destination, error) {
 func stringToProtocol(protocol string) uint16 {
 	switch strings.ToLower(protocol) {
 	case "tcp":
-		return uint16(syscall.IPPROTO_TCP)
+		return uint16(unix.IPPROTO_TCP)
 	case "udp":
-		return uint16(syscall.IPPROTO_UDP)
+		return uint16(unix.IPPROTO_UDP)
 	case "sctp":
-		return uint16(syscall.IPPROTO_SCTP)
+		return uint16(unix.IPPROTO_SCTP)
 	}
 	return uint16(0)
 }
@@ -309,11 +309,11 @@ func stringToProtocol(protocol string) uint16 {
 // protocolTypeToString returns the name for the given protocol.
 func protocolToString(proto Protocol) string {
 	switch proto {
-	case syscall.IPPROTO_TCP:
+	case unix.IPPROTO_TCP:
 		return "TCP"
-	case syscall.IPPROTO_UDP:
+	case unix.IPPROTO_UDP:
 		return "UDP"
-	case syscall.IPPROTO_SCTP:
+	case unix.IPPROTO_SCTP:
 		return "SCTP"
 	}
 	return ""
