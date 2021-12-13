@@ -247,6 +247,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.MemoryThrottlingFactor != nil && (*kc.MemoryThrottlingFactor <= 0 || *kc.MemoryThrottlingFactor > 1.0) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", *kc.MemoryThrottlingFactor))
 	}
+	if kc.CAdvisorHousekeepingInterval.Duration <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cAdvisorHousekeepingInterval must be greater than 0"))
+	}
+	if kc.CAdvisorMaxHousekeepingInterval.Duration < kc.CAdvisorHousekeepingInterval.Duration {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cAdvisorMaxHousekeepingInterval must be greater than or equal to cAdvisorHousekeepingInterval"))
+	}
 
 	return utilerrors.NewAggregate(allErrors)
 }

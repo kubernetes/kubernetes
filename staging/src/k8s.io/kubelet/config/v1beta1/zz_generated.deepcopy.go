@@ -362,6 +362,8 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	out.CAdvisorHousekeepingInterval = in.CAdvisorHousekeepingInterval
+	out.CAdvisorMaxHousekeepingInterval = in.CAdvisorMaxHousekeepingInterval
 	return
 }
 

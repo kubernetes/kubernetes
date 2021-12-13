@@ -1072,6 +1072,16 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	RegisterNode *bool `json:"registerNode,omitempty"`
+	// CAdvisorHousekeepingInterval is interval between container housekeepings
+	// See https://github.com/google/cadvisor/blob/master/docs/runtime_options.md#housekeeping-intervals for more details.
+	// Default: 10s
+	// +optional
+	CAdvisorHousekeepingInterval  metav1.Duration `json:"cAdvisorHousekeepingInterval,omitempty"`
+	// cAdvisor maxHousekeepingInterval is the maximum interval between container housekeepings.
+	// See https://github.com/google/cadvisor/blob/master/docs/runtime_options.md#housekeeping-intervals for more details.
+	// Default: 15s
+	// +optional
+	CAdvisorMaxHousekeepingInterval  metav1.Duration `json:"cAdvisorMaxHousekeepingInterval,omitempty"`
 }
 
 type KubeletAuthorizationMode string

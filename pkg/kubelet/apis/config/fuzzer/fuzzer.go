@@ -110,6 +110,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
+			obj.CAdvisorHousekeepingInterval = metav1.Duration{Duration: 10 * time.Second}
+			obj.CAdvisorMaxHousekeepingInterval = metav1.Duration{Duration: 15 * time.Second}
 		},
 	}
 }

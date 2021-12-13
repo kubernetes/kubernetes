@@ -53,18 +53,14 @@ type cadvisorClient struct {
 
 var _ Interface = new(cadvisorClient)
 
-// TODO(vmarmol): Make configurable.
-// The amount of time for which to keep stats in memory.
 const statsCacheDuration = 2 * time.Minute
-const maxHousekeepingInterval = 15 * time.Second
-const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
-func init() {
+func initCadvisorFlags(houseKeepingInterval time.Duration) {
 	// Override cAdvisor flag defaults.
 	flagOverrides := map[string]string{
 		// Override the default cAdvisor housekeeping interval.
-		"housekeeping_interval": defaultHousekeepingInterval.String(),
+		"housekeeping_interval": houseKeepingInterval.String(),
 		// Disable event storage by default.
 		"event_storage_event_limit": "default=0",
 		"event_storage_age_limit":   "default=0",
@@ -80,7 +76,7 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, houseKeepingInterval, maxHousekeepingInterval time.Duration, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
@@ -107,6 +103,9 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		Interval:     &duration,
 		AllowDynamic: pointer.BoolPtr(allowDynamicHousekeeping),
 	}
+
+	// init cadvisor base flags
+	initCadvisorFlags(houseKeepingInterval)
 
 	// Create the cAdvisor container manager.
 	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, housekeepingConfig, includedMetrics, http.DefaultClient, cgroupRoots, nil /* containerEnvMetadataWhiteList */, "" /* perfEventsFile */, time.Duration(0) /*resctrlInterval*/)
