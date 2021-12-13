@@ -1157,8 +1157,6 @@ function Prepare-CniNetworking {
 # Setup cni bridge. This function supports both Docker and containerd.
 function Prepare-CniBridgeNetworking {
   if (${env:CONTAINER_RUNTIME} -eq "containerd") {
-    # For containerd the CNI binaries have already been installed along with
-    # the runtime.
     Configure_Containerd_CniNetworking
   } else {
     Configure_Dockerd_CniNetworking
@@ -1167,7 +1165,10 @@ function Prepare-CniBridgeNetworking {
 
 # Downloads the Windows CNI binaries and puts them in $env:CNI_DIR.
 function Install_Cni_Binaries {
-  # Not to install cni when using containerd and antrea is not enabled.
+  # Only install CNI binaries when necessary.
+  # For containerd the CNI binaries have already been installed along with
+  # the runtime. For antrea, host-local.exe is needed regardless containerd
+  # is enabled or not.
   if ((${env:CONTAINER_RUNTIME} -eq "containerd") -and -not (Is-Antrea-Enabled $kube_env)) {
     return
   }
