@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/spf13/cobra"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
+	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
@@ -60,7 +62,7 @@ type ApplyFlags struct {
 	FieldManager   string
 	Selector       string
 	Prune          bool
-	PruneResources []pruneResource
+	PruneResources []prune.Resource
 	All            bool
 	Overwrite      bool
 	OpenAPIPatch   bool
@@ -85,7 +87,7 @@ type ApplyOptions struct {
 	DryRunStrategy  cmdutil.DryRunStrategy
 	DryRunVerifier  *resource.DryRunVerifier
 	Prune           bool
-	PruneResources  []pruneResource
+	PruneResources  []prune.Resource
 	cmdBaseName     string
 	All             bool
 	Overwrite       bool
@@ -278,7 +280,7 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 	}
 
 	if flags.Prune {
-		flags.PruneResources, err = parsePruneResources(mapper, flags.PruneWhitelist)
+		flags.PruneResources, err = prune.ParseResources(mapper, flags.PruneWhitelist)
 		if err != nil {
 			return nil, err
 		}
