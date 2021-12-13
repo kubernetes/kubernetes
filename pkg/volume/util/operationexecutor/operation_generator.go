@@ -777,6 +777,12 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 		}
 
+		// record total time it takes to mount a volume. This is end to end time that includes waiting for volume to attach, node to be update
+		// plugin call to succeed
+		mountRequestTime := volumeToMount.MountRequestTime
+		totalTimeTaken := time.Since(mountRequestTime).Seconds()
+		util.RecordOperationLatencyMetric(util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec), "volume_mount", totalTimeTaken)
+
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markOpts)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
