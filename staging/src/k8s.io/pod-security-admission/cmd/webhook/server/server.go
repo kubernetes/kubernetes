@@ -131,16 +131,21 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	var shutdownCh <-chan struct{}
+	var listenerStoppedCh <-chan struct{}
 	if s.secureServing != nil {
 		var err error
-		shutdownCh, err = s.secureServing.Serve(mux, 0, ctx.Done())
+		shutdownCh, listenerStoppedCh, err = s.secureServing.Serve(mux, 0, ctx.Done())
 		if err != nil {
 			return fmt.Errorf("failed to start secure server: %w", err)
 		}
 	}
 
+	<-listenerStoppedCh
+	klog.V(1).InfoS("[graceful-termination] HTTP Server has stopped listening")
+
 	// Wait for graceful shutdown.
 	<-shutdownCh
+	klog.V(1).Info("[graceful-termination] HTTP Server is exiting")
 
 	return nil
 }
