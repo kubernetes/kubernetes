@@ -168,7 +168,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	// overide the openAPISchema function to return custom output
+	// override the openAPISchema function to return custom output
 	// for Pod type.
 	tf.OpenAPISchemaFunc = testOpenAPISchemaData
 	tf.UnstructuredClient = &fake.RESTClient{
