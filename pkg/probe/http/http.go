@@ -129,6 +129,10 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
 			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
+			// add some message in case body is empty when redirect is terminated
+			if len(body) == 0 {
+				return probe.Warning, "Probe terminated redirects", nil
+			}
 			return probe.Warning, body, nil
 		}
 		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
