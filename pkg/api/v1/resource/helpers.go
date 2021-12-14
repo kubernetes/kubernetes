@@ -56,6 +56,21 @@ func podRequestsAndLimitsWithoutOverhead(pod *v1.Pod, reqs, limits v1.ResourceLi
 		maxResourceList(reqs, container.Resources.Requests)
 		maxResourceList(limits, container.Resources.Limits)
 	}
+
+	// If any container does not specify a limit that means the resource is not limited for the pod as a whole.  The
+	// previously calculated max limit would only be the max of the explicitly set limits.  However, an unspecified
+	// limit should be considered greater than any explicitly set limit, so delete the calculated limit if there is one.
+	allContainers := append(pod.Spec.Containers, pod.Spec.InitContainers...)
+	if len(allContainers) > 1 {
+		for name := range limits {
+			for _, container := range allContainers {
+				if value, ok := container.Resources.Limits[name]; !ok || value.IsZero() {
+					delete(limits, name)
+					break
+				}
+			}
+		}
+	}
 }
 
 // PodRequestsAndLimitsReuse returns a dictionary of all defined resources summed up for all

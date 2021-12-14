@@ -388,6 +388,42 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 			},
 		},
 		{
+			name: "two containers, one unlimited - should be unlimited",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foobar",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("5"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("10"),
+								},
+							},
+						},
+						{
+							Name: "unlimited",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("4"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("12"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("17"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
 			name: "two container with overhead - shouldn't consider overhead",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -508,6 +544,68 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("80"),
 				v1.ResourceName(v1.ResourceMemory): resource.MustParse("240"),
 			},
+		},
+		{
+			name: "two containers with unlimited init - should be unlimited",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceName(v1.ResourceCPU):    resource.MustParse("3"),
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("8"),
+					},
+					Containers: []v1.Container{
+						{
+							Name: "foobar",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("5"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("10"),
+								},
+							},
+						},
+						{
+							Name: "foobar2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("4"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("12"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("8"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("24"),
+								},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "small-init",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("5"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("5"),
+								},
+							},
+						},
+						{
+							Name: "unlimited-init",
+						},
+					},
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("17"),
+			},
+			expectedLimits: v1.ResourceList{},
 		},
 	}
 	for idx, tc := range cases {

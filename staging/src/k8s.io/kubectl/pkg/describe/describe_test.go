@@ -4860,7 +4860,7 @@ func TestDescribeNode(t *testing.T) {
 						Image: "image:latest",
 						Resources: corev1.ResourceRequirements{
 							Requests: getResourceList("1", "1Gi"),
-							Limits:   getResourceList("2", "2Gi"),
+							Limits:   mergeResourceLists(getResourceList("2", "2Gi"), getHugePageResourceList("2Mi", "512Mi")),
 						},
 					},
 					{
@@ -4868,7 +4868,7 @@ func TestDescribeNode(t *testing.T) {
 						Image: "image:latest",
 						Resources: corev1.ResourceRequirements{
 							Requests: getHugePageResourceList("2Mi", "512Mi"),
-							Limits:   getHugePageResourceList("2Mi", "512Mi"),
+							Limits:   mergeResourceLists(getResourceList("1", "1Gi"), getHugePageResourceList("2Mi", "512Mi")),
 						},
 					},
 				},
@@ -4890,14 +4890,14 @@ func TestDescribeNode(t *testing.T) {
   (Total limits may be over 100 percent, i.e., overcommitted.)
   Resource           Requests     Limits
   --------           --------     ------
-  cpu                1 (25%)      2 (50%)
-  memory             1Gi (8%)     2Gi (16%)
+  cpu                1 (25%)      3 (75%)
+  memory             1Gi (8%)     3Gi (25%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
-  hugepages-2Mi      512Mi (25%)  512Mi (25%)`}
+  hugepages-2Mi      512Mi (25%)  1Gi (50%)`}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
-			t.Errorf("expected to find %q in output: %q", expected, out)
+			t.Errorf("expected to find:\n\n%v\n\nin output:\n\n%v", expected, out)
 		}
 	}
 }

@@ -415,18 +415,18 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 						Containers: []v1.Container{
 							{Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{"cpu": resource.MustParse("1")},
-								Limits:   v1.ResourceList{"cpu": resource.MustParse("2")},
+								Limits:   v1.ResourceList{"cpu": resource.MustParse("2"), "memory": resource.MustParse("1G")},
 							}},
 							{Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{"memory": resource.MustParse("1G")},
-								Limits:   v1.ResourceList{"memory": resource.MustParse("2G")},
+								Limits:   v1.ResourceList{"cpu": resource.MustParse("1"), "memory": resource.MustParse("2G")},
 							}},
 							{Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{"cpu": resource.MustParse("0.5")},
-								Limits:   v1.ResourceList{"cpu": resource.MustParse("1.25")},
+								Limits:   v1.ResourceList{"cpu": resource.MustParse("1.25"), "memory": resource.MustParse("1G")},
 							}},
 							{Resources: v1.ResourceRequirements{
-								Limits: v1.ResourceList{"memory": resource.MustParse("2G")},
+								Limits: v1.ResourceList{"cpu": resource.MustParse("1"), "memory": resource.MustParse("2G")},
 							}},
 						},
 					},
@@ -435,8 +435,8 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 			expected: `            
 				# HELP kube_pod_resource_limit [ALPHA] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 				# TYPE kube_pod_resource_limit gauge
-				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 3.25
-				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 4e+09
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 5.25
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 6e+09
 				# HELP kube_pod_resource_request [ALPHA] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 				# TYPE kube_pod_resource_request gauge
 				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 1.5
