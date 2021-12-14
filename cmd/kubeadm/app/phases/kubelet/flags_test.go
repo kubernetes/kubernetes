@@ -21,12 +21,14 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func TestBuildKubeletArgMap(t *testing.T) {
-
+	// Tests must be updated once kubeadm no longer supports a kubelet version with built-in dockershim.
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2626
 	tests := []struct {
 		name     string
 		opts     kubeletFlagsOpts
@@ -127,10 +129,38 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				"pod-infra-container-image": "k8s.gcr.io/pause:3.6",
 			},
 		},
+		{
+			name: "dockershim socket and kubelet version with built-in dockershim",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					CRISocket: "/var/run/dockershim.sock",
+				},
+				kubeletVersion: version.MustParseSemantic("v1.23.6"),
+			},
+			expected: map[string]string{
+				"network-plugin": "cni",
+			},
+		},
+		{
+			name: "dockershim socket but kubelet version is without built-in dockershim",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					CRISocket: "/var/run/dockershim.sock",
+				},
+				kubeletVersion: version.MustParseSemantic("v1.24.0-alpha.1"),
+			},
+			expected: map[string]string{
+				"container-runtime":          "remote",
+				"container-runtime-endpoint": "/var/run/dockershim.sock",
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if test.opts.kubeletVersion == nil {
+				test.opts.kubeletVersion = version.MustParseSemantic("v1.0.0")
+			}
 			actual := buildKubeletArgMap(test.opts)
 			if !reflect.DeepEqual(actual, test.expected) {
 				t.Errorf(
