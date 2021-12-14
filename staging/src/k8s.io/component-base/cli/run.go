@@ -102,7 +102,7 @@ func Run(cmd *cobra.Command) int {
 		}
 	}
 
-	if err := cmd.Execute(); err != nil {
+	if command, err := cmd.ExecuteC(); err != nil {
 		// If the error is about flag parsing, then printing that error
 		// with the decoration that klog would add ("E0923
 		// 23:02:03.219216 4168816 run.go:61] unknown shorthand flag")
@@ -114,7 +114,9 @@ func Run(cmd *cobra.Command) int {
 		//
 		// We can distinguish these two cases depending on whether
 		// our FlagErrorFunc above was called.
-		if parsingFailed {
+		//
+		// If the subcommand is not valid, the result of command.CalledAs() is empty.
+		if parsingFailed || command.CalledAs() == "" {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		} else {
 			klog.ErrorS(err, "command failed")
