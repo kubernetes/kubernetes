@@ -59,8 +59,8 @@ type NetworkPolicySpec struct {
 	// Initiation from a source is allowed if one of the following is true.
 	// - The source is not a pod.
 	// - The source is a pod and there is at least one NetworkPolicy whose `podSelector`
-	//   selects the pod, `policyTypes` includes "Egress",
-	//   and `egress` includes a rule that allows the initiation.
+	//   selects the pod, whose `policyTypes` includes "Egress",
+	//   and whose `egress` includes a rule that allows the initiation.
 	// - The source is a pod and there is no NetworkPolicy whose `podSelector` selects
 	//   the pod and whose `policyTypes` includes "Egress".
 	//
