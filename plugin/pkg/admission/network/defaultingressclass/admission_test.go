@@ -196,3 +196,242 @@ func TestAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestAdmissionUpdated(t *testing.T) {
+	defaultClass1 := &networkingv1.IngressClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "IngressClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default1",
+			Annotations: map[string]string{
+				networkingv1.AnnotationIsDefaultIngressClass: "true",
+			},
+		},
+	}
+	defaultClass2 := &networkingv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default2",
+			Annotations: map[string]string{
+				networkingv1.AnnotationIsDefaultIngressClass: "true",
+			},
+		},
+	}
+	// Class that has explicit default = false
+	classWithFalseDefault := &networkingv1.IngressClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "IngressClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "nondefault1",
+			Annotations: map[string]string{
+				networkingv1.AnnotationIsDefaultIngressClass: "false",
+			},
+		},
+	}
+	// Class with missing default annotation (=non-default)
+	classWithNoDefault := &networkingv1.IngressClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "IngressClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "nondefault2",
+		},
+	}
+	// Class with empty default annotation (=non-default)
+	classWithEmptyDefault := &networkingv1.IngressClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "IngressClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "nondefault2",
+			Annotations: map[string]string{
+				networkingv1.AnnotationIsDefaultIngressClass: "",
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                  string
+		classesBefore         []*networkingv1.IngressClass
+		classesAfter          []*networkingv1.IngressClass
+		classFieldBefore      *string
+		classFieldAfter       *string
+		classAnnotationBefore *string
+		classAnnotationAfter  *string
+		expectedClass         *string
+		expectedError         error
+	}{
+		{
+			name:                  "no default, modify Ingress with class=nil",
+			classesBefore:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classesAfter:          nil,
+			classFieldBefore:      nil,
+			classFieldAfter:       nil,
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         nil,
+			expectedError:         nil,
+		},
+		{
+			name:                  "no default, modify Ingress with with class annotation='bar'",
+			classesBefore:         nil,
+			classesAfter:          nil,
+			classFieldBefore:      nil,
+			classFieldAfter:       nil,
+			classAnnotationBefore: utilpointer.StringPtr("foo"),
+			classAnnotationAfter:  utilpointer.StringPtr("bar"),
+			expectedClass:         nil,
+			expectedError:         nil,
+		},
+		{
+			name:                  "one default, modify Ingress with class=nil",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      nil,
+			classFieldAfter:       nil,
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         utilpointer.StringPtr(defaultClass1.Name),
+			expectedError:         nil,
+		},
+		{
+			name:                  "one default, modify Ingress with new class defaultClass2",
+			classesBefore:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classesAfter:          []*networkingv1.IngressClass{defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      nil,
+			classFieldAfter:       nil,
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         utilpointer.StringPtr(defaultClass2.Name),
+			expectedError:         nil,
+		},
+		{
+			name:                  "one default, no modification of Ingress with class field=''",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      utilpointer.StringPtr(""),
+			classFieldAfter:       utilpointer.StringPtr(""),
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         utilpointer.StringPtr(""),
+			expectedError:         nil,
+		},
+		{
+			name:                  "one default, no modification of Ingress with class field='foo'",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      nil,
+			classFieldAfter:       utilpointer.StringPtr("foo"),
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         utilpointer.StringPtr("foo"),
+			expectedError:         nil,
+		},
+		{
+			name:                  "one default, no modification of Ingress with new class field='bar'",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      utilpointer.StringPtr("foo"),
+			classFieldAfter:       utilpointer.StringPtr("bar"),
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         utilpointer.StringPtr("bar"),
+			expectedError:         nil,
+		},
+		{
+			name:                  "one default, no modification of Ingress with class annotation='foo'",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      nil,
+			classFieldAfter:       nil,
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  utilpointer.StringPtr("foo"),
+			expectedClass:         nil,
+			expectedError:         nil,
+		},
+		{
+			name:                  "one default, modify Ingress with class annotation='bar'",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      nil,
+			classFieldAfter:       nil,
+			classAnnotationBefore: utilpointer.StringPtr("foo"),
+			classAnnotationAfter:  utilpointer.StringPtr("bar"),
+			expectedClass:         nil,
+			expectedError:         nil,
+		},
+		{
+			name:                  "two defaults, error with Ingress with class field=nil",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      nil,
+			classFieldAfter:       nil,
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         nil,
+			expectedError:         errors.NewForbidden(networkingv1.Resource("ingresses"), "testing", errors.NewInternalError(fmt.Errorf("2 default IngressClasses were found, only 1 allowed"))),
+		},
+		{
+			name:                  "two defaults, no modification with Ingress with class field=''",
+			classesBefore:         nil,
+			classesAfter:          []*networkingv1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classFieldBefore:      utilpointer.StringPtr(""),
+			classFieldAfter:       utilpointer.StringPtr(""),
+			classAnnotationBefore: nil,
+			classAnnotationAfter:  nil,
+			expectedClass:         utilpointer.StringPtr(""),
+			expectedError:         nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctrl := newPlugin()
+			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+			ctrl.SetExternalKubeInformerFactory(informerFactory)
+			for _, c := range testCase.classesAfter {
+				informerFactory.Networking().V1().IngressClasses().Informer().GetStore().Add(c)
+			}
+
+			oldIngress := &networking.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "testing", Namespace: "testing"}}
+			if testCase.classFieldBefore != nil {
+				oldIngress.Spec.IngressClassName = testCase.classFieldBefore
+			}
+
+			if testCase.classAnnotationBefore != nil {
+				oldIngress.Annotations = map[string]string{networkingv1beta1.AnnotationIngressClass: *testCase.classAnnotationBefore}
+			}
+
+			newIngress := &networking.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "testing", Namespace: "testing"}}
+			if testCase.classFieldAfter != nil {
+				newIngress.Spec.IngressClassName = testCase.classFieldAfter
+			}
+			if testCase.classAnnotationAfter != nil {
+				newIngress.Annotations = map[string]string{networkingv1beta1.AnnotationIngressClass: *testCase.classAnnotationAfter}
+			}
+
+			attrs := admission.NewAttributesRecord(
+				newIngress, // new object
+				oldIngress, // old object
+				api.Kind("Ingress").WithVersion("version"),
+				newIngress.Namespace,
+				newIngress.Name,
+				networkingv1.Resource("ingresses").WithVersion("version"),
+				"", // subresource
+				admission.Update,
+				&metav1.UpdateOptions{},
+				false, // dryRun
+				nil,   // userInfo
+			)
+
+			err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(context.TODO(), attrs, nil)
+			if !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Errorf("Expected error: %v, got %v", testCase.expectedError, err)
+			}
+			if !reflect.DeepEqual(testCase.expectedClass, newIngress.Spec.IngressClassName) {
+				t.Errorf("Expected class name %+v, got %+v", *testCase.expectedClass, newIngress.Spec.IngressClassName)
+			}
+		})
+	}
+}

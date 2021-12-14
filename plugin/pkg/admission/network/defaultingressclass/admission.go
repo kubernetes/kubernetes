@@ -59,7 +59,7 @@ var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&classDefau
 // newPlugin creates a new admission plugin.
 func newPlugin() *classDefaulterPlugin {
 	return &classDefaulterPlugin{
-		Handler: admission.NewHandler(admission.Create),
+		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
