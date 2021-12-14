@@ -18,6 +18,7 @@ package csi
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -1023,23 +1024,40 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, testWatchTimeout)
 
 	pluginDir := csiAttacher.plugin.host.GetPluginDir(plug.GetPluginName())
-
 	testCases := []struct {
-		testName          string
-		pvName            string
-		expectedMountPath string
-		shouldFail        bool
+		testName           string
+		pvName             string
+		volumeId           string
+		skipPVCSISource    bool // The test clears PV.Spec.CSI
+		shouldFail         bool
+		addVolSource       bool // The test adds a Volume.VolumeSource.CSI.
+		removeVolumeHandle bool // The test force removes CSI volume handle.
 	}{
 		{
-			testName:          "normal test",
-			pvName:            "test-pv1",
-			expectedMountPath: pluginDir + "/pv/test-pv1/globalmount",
+			testName: "success test",
+			pvName:   "test-pv1",
+			volumeId: "test-vol1",
 		},
 		{
-			testName:          "no pv name",
-			pvName:            "",
-			expectedMountPath: pluginDir + "/pv/test-pv1/globalmount",
-			shouldFail:        true,
+			testName:        "fail test, failed to create device mount path due to missing CSI source",
+			pvName:          "test-pv1",
+			volumeId:        "test-vol1",
+			skipPVCSISource: true,
+			shouldFail:      true,
+		},
+		{
+			testName:     "fail test, failed to create device mount path, CSIVolumeSource found",
+			pvName:       "test-pv1",
+			volumeId:     "test-vol1",
+			addVolSource: true,
+			shouldFail:   true,
+		},
+		{
+			testName:           "fail test, failed to create device mount path, missing CSI volume handle",
+			pvName:             "test-pv1",
+			volumeId:           "test-vol1",
+			shouldFail:         true,
+			removeVolumeHandle: true,
 		},
 	}
 
@@ -1048,9 +1066,18 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 		var spec *volume.Spec
 
 		// Create spec
-		pv := makeTestPV(tc.pvName, 10, testDriver, "testvol")
-		spec = volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
-
+		pv := makeTestPV(tc.pvName, 10, testDriver, tc.volumeId)
+		if tc.removeVolumeHandle {
+			pv.Spec.PersistentVolumeSource.CSI.VolumeHandle = ""
+		}
+		if tc.addVolSource {
+			spec = volume.NewSpecFromVolume(makeTestVol(tc.pvName, testDriver))
+		} else {
+			spec = volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
+			if tc.skipPVCSISource {
+				spec.PersistentVolume.Spec.CSI = nil
+			}
+		}
 		// Run
 		mountPath, err := csiAttacher.GetDeviceMountPath(spec)
 
@@ -1058,10 +1085,11 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 		if err != nil && !tc.shouldFail {
 			t.Errorf("test should not fail, but error occurred: %v", err)
 		} else if err == nil {
+			expectedMountPath := filepath.Join(pluginDir, testDriver, generateSha(tc.volumeId), globalMountInGlobalPath)
 			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
-			} else if mountPath != tc.expectedMountPath {
-				t.Errorf("mountPath does not equal expectedMountPath. Got: %s. Expected: %s", mountPath, tc.expectedMountPath)
+			} else if mountPath != expectedMountPath {
+				t.Errorf("mountPath does not equal expectedMountPath. Got: %s. Expected: %s", mountPath, expectedMountPath)
 			}
 		}
 	}
@@ -1573,52 +1601,75 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		shouldFail      bool
 		watchTimeout    time.Duration
 	}{
+		// PV agnostic path positive test cases
 		{
-			testName:        "normal, json file exists",
+			testName:        "success, json file exists",
 			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
 			jsonFile:        `{"driverName": "csi", "volumeHandle":"project/zone/test-vol1"}`,
-			createPV:        false,
 			stageUnstageSet: true,
 		},
 		{
-			testName:        "normal, json file doesn't exist -> use PV",
+			testName:        "stage_unstage not set, PV agnostic path, unmount device is skipped",
+			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
+			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
+			stageUnstageSet: false,
+		},
+		// PV agnostic path negative test cases
+		{
+			testName:        "fail: missing json, fail to retrieve driver and volumeID from globalpath",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
+			jsonFile:        "",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "fail: invalid json, fail to retrieve driver and volumeID from globalpath",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
+			jsonFile:        `{"driverName"}}`,
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		// Old style PV based path positive test cases
+		{
+			testName:        "success: json file doesn't exist, old style pv based global path -> use PV",
 			volID:           "project/zone/test-vol1",
 			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
 			jsonFile:        "",
-			createPV:        true,
 			stageUnstageSet: true,
+			createPV:        true,
 		},
 		{
-			testName:        "invalid json ->  use PV",
+			testName:        "success: invalid json file, old style pv based global path -> use PV",
 			volID:           "project/zone/test-vol1",
 			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
 			jsonFile:        `{"driverName"}}`,
-			createPV:        true,
 			stageUnstageSet: true,
-		},
-		{
-			testName:        "no json, no PV.volID",
-			volID:           "",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
 			createPV:        true,
-			shouldFail:      true,
 		},
 		{
-			testName:        "no json, no PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
-			createPV:        false,
-			stageUnstageSet: true,
-			shouldFail:      true,
-		},
-		{
-			testName:        "stage_unstage not set no vars should not fail",
+			testName:        "stage_unstage not set, PV based path, unmount device is skipped",
 			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
 			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
 			stageUnstageSet: false,
+		},
+		// Old style PV based path negative test cases
+		{
+			testName:        "fail: json file doesn't exist, old style pv based device path, missing PV",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        "",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "fail: no json, no PV.volID, old style pv based global path",
+			volID:           "",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        "",
+			shouldFail:      true,
 		},
 	}
 
@@ -1640,18 +1691,18 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			if tc.deviceMountPath != "" {
 				tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
 			}
-
 			// Add the volume to NodeStagedVolumes
 			cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
 			cdc.nodeClient.AddNodeStagedVolume(tc.volID, tc.deviceMountPath, nil)
 
-			// Make JSON for this object
+			// Make the device staged path
 			if tc.deviceMountPath != "" {
 				if err := os.MkdirAll(tc.deviceMountPath, 0755); err != nil {
 					t.Fatalf("error creating directory %s: %s", tc.deviceMountPath, err)
 				}
 			}
 			dir := filepath.Dir(tc.deviceMountPath)
+			// Make JSON for this object
 			if tc.jsonFile != "" {
 				dataPath := filepath.Join(dir, volDataFileName)
 				if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
@@ -1748,4 +1799,9 @@ func getCsiAttacherFromDeviceUnmounter(deviceUnmounter volume.DeviceUnmounter, w
 	csiAttacher := deviceUnmounter.(*csiAttacher)
 	csiAttacher.watchTimeout = watchTimeout
 	return csiAttacher
+}
+
+func generateSha(handle string) string {
+	result := sha256.Sum256([]byte(fmt.Sprintf("%s", handle)))
+	return fmt.Sprintf("%x", result)
 }
