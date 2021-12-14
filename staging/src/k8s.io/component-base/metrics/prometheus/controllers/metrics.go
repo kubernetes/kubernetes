@@ -47,12 +47,9 @@ func newControllerMetrics() *ControllerMetrics {
 	}
 }
 
-// controller_name and controller_manager should be updated to validate against bounded lists
-// this will allow us to confirm they are populated with "good" values.
-
+// ControllerStarted sets the controllerInstanceCount to 1.
 // These values use set instead of inc/dec to avoid accidentally double counting
 // a controller that starts but fails to properly signal when it crashes.
-// ControllerStarted sets the controllerInstanceCount to 1.
 func (a *ControllerMetrics) ControllerStarted(controllerName string, controllerManager string) {
 	a.controllerInstanceCount.With(k8smetrics.Labels{"controller_name": controllerName, "controller_manager": controllerManager}).Set(float64(1))
 }
