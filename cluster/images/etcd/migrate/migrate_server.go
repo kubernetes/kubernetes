@@ -105,7 +105,7 @@ func (r *EtcdMigrateServer) Stop() error {
 	}
 	gracefulWait := time.Minute * 2
 	stopped := make(chan bool)
-	timedout := make(chan bool)
+	timedout := make(chan bool, 1)
 	go func() {
 		time.Sleep(gracefulWait)
 		timedout <- true
