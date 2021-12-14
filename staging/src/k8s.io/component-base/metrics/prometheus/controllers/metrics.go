@@ -35,11 +35,11 @@ type ControllerMetrics struct {
 func newControllerMetrics() *ControllerMetrics {
 	controllerInstanceCount := k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
-			Name:           "managed_controller_instance_count",
+			Name:           "managed_controller_instances",
 			Help:           "Instances of individual controllers currently running",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
-		[]string{"controller_name", "controller_manager"},
+		[]string{"name", "manager"},
 	)
 	legacyregistry.MustRegister(controllerInstanceCount)
 	return &ControllerMetrics{
@@ -50,11 +50,11 @@ func newControllerMetrics() *ControllerMetrics {
 // ControllerStarted sets the controllerInstanceCount to 1.
 // These values use set instead of inc/dec to avoid accidentally double counting
 // a controller that starts but fails to properly signal when it crashes.
-func (a *ControllerMetrics) ControllerStarted(controllerName string, controllerManager string) {
-	a.controllerInstanceCount.With(k8smetrics.Labels{"controller_name": controllerName, "controller_manager": controllerManager}).Set(float64(1))
+func (a *ControllerMetrics) ControllerStarted(name string, manager string) {
+	a.controllerInstanceCount.With(k8smetrics.Labels{"name": name, "manager": manager}).Set(float64(1))
 }
 
 // ControllerStopped sets the controllerInstanceCount to 0.
-func (a *ControllerMetrics) ControllerStopped(controllerName string, controllerManager string) {
-	a.controllerInstanceCount.With(k8smetrics.Labels{"controller_name": controllerName, "controller_manager": controllerManager}).Set(float64(0))
+func (a *ControllerMetrics) ControllerStopped(name string, manager string) {
+	a.controllerInstanceCount.With(k8smetrics.Labels{"name": name, "manager": manager}).Set(float64(0))
 }
