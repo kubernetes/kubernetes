@@ -288,6 +288,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		return &authenticator.Response{User: &user.DefaultInfo{}}, true, nil
 	})
 	backend := &testBackend{}
+	lifecycleSignals := newLifecycleSignals()
 	c := &Config{
 		Authentication:           AuthenticationInfo{Authenticator: authn},
 		AuditBackend:             backend,
@@ -298,8 +299,11 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		RequestInfoResolver:   &request.RequestInfoFactory{},
 		RequestTimeout:        10 * time.Second,
 		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
-		lifecycleSignals:      newLifecycleSignals(),
+		lifecycleSignals:      lifecycleSignals,
 	}
+
+	// set the server as initialized
+	lifecycleSignals.HasBeenReady.Signal()
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// confirm this is a no-op
