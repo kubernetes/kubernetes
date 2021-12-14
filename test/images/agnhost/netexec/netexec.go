@@ -18,6 +18,7 @@ package netexec
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,6 +35,8 @@ import (
 	"time"
 
 	"github.com/ishidawataru/sctp"
+	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go/http3"
 	"github.com/spf13/cobra"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -51,6 +54,7 @@ var (
 	privKeyFile        = ""
 	httpOverride       = ""
 	udpListenAddresses = ""
+	http3Enabled       = false
 )
 
 const bindToAny = ""
@@ -103,6 +107,8 @@ If "--tls-cert-file" is added (ideally in conjunction with "--tls-private-key-fi
 will be upgraded to HTTPS. The image has default, "localhost"-based cert/privkey files at
 "/localhost.crt" and "/localhost.key" (see: "porter" subcommand)
 
+If "--http3" is added HTTP3 will be enabled (it requires a cert file).
+
 If "--http-override" is set, the HTTP(S) server will always serve the override path & options,
 ignoring the request URL.
 
@@ -123,6 +129,7 @@ responding to the same commands as the UDP server.
 
 func init() {
 	CmdNetexec.Flags().IntVar(&httpPort, "http-port", 8080, "HTTP Listen Port")
+	CmdNetexec.Flags().BoolVar(&http3Enabled, "http3", false, "Enable HTTP3")
 	CmdNetexec.Flags().StringVar(&certFile, "tls-cert-file", "",
 		"File containing an x509 certificate for HTTPS. (CA cert, if any, concatenated after server cert)")
 	CmdNetexec.Flags().StringVar(&privKeyFile, "tls-private-key-file", "",
@@ -188,10 +195,20 @@ func main(cmd *cobra.Command, args []string) {
 	}
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", httpPort)}
+	if http3Enabled && len(certFile) == 0 {
+		log.Fatal("HTTP3 require a certificate file")
+	} else if http3Enabled && len(certFile) > 0 {
+		server3 := &http3.Server{
+			Server:     server,
+			QuicConfig: &quic.Config{},
+		}
+		go startServer(server3.Shutdown, exitCh, func() error { return server3.ListenAndServeTLS(certFile, privKeyFile) })
+	}
+
 	if len(certFile) > 0 {
-		startServer(server, exitCh, func() error { return server.ListenAndServeTLS(certFile, privKeyFile) })
+		startServer(server.Shutdown, exitCh, func() error { return server.ListenAndServeTLS(certFile, privKeyFile) })
 	} else {
-		startServer(server, exitCh, server.ListenAndServe)
+		startServer(server.Shutdown, exitCh, server.ListenAndServe)
 	}
 }
 
@@ -211,18 +228,21 @@ func addRoutes(mux *http.ServeMux, exitCh chan shutdownRequest) {
 	mux.HandleFunc("/shutdown", shutdownHandler)
 }
 
-func startServer(server *http.Server, exitCh chan shutdownRequest, fn func() error) {
+type listenAndServeFunc func() error
+type serverShutdownFunc func(ctx context.Context) error
+
+func startServer(stopFunc serverShutdownFunc, exitCh chan shutdownRequest, startFunc listenAndServeFunc) {
 	log.Printf("Started HTTP server on port %d", httpPort)
 	go func() {
 		re := <-exitCh
 		ctx, cancelFn := context.WithTimeout(context.Background(), re.timeout)
 		defer cancelFn()
-		err := server.Shutdown(ctx)
+		err := stopFunc(ctx)
 		log.Printf("Graceful shutdown completed with: %v", err)
 		os.Exit(re.code)
 	}()
 
-	if err := fn(); err != nil {
+	if err := startFunc(); err != nil {
 		if err == http.ErrServerClosed {
 			// wait until the goroutine calls os.Exit()
 			select {}
@@ -343,6 +363,12 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	case "", "http":
 		dialer = dialHTTP
 		addr, err = net.ResolveTCPAddr("tcp", hostPort)
+	case "https":
+		dialer = dialHTTPS
+		addr, err = net.ResolveTCPAddr("tcp", hostPort)
+	case "http3":
+		dialer = dialHTTP3
+		addr, err = net.ResolveUDPAddr("udp", hostPort)
 	case "udp":
 		dialer = dialUDP
 		addr, err = net.ResolveUDPAddr("udp", hostPort)
@@ -382,6 +408,43 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, fmt.Sprintf("response could not be serialized. %v", err), http.StatusExpectationFailed)
 	}
+}
+
+func dialHTTP3(request string, addr net.Addr) (string, error) {
+	httpClient := http.Client{
+		Transport: &http3.RoundTripper{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+			QuicConfig: &quic.Config{},
+		},
+	}
+	resp, err := httpClient.Get(fmt.Sprintf("https://%s/%s", addr.String(), request))
+	defer httpClient.CloseIdleConnections()
+	if err == nil {
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err == nil {
+			return string(body), nil
+		}
+	}
+	return "", err
+}
+
+func dialHTTPS(request string, addr net.Addr) (string, error) {
+	transport := utilnet.SetTransportDefaults(&http.Transport{})
+	transport.TLSClientConfig.InsecureSkipVerify = true
+	httpClient := createHTTPClient(transport)
+	resp, err := httpClient.Get(fmt.Sprintf("https://%s/%s", addr.String(), request))
+	defer transport.CloseIdleConnections()
+	if err == nil {
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err == nil {
+			return string(body), nil
+		}
+	}
+	return "", err
 }
 
 func dialHTTP(request string, addr net.Addr) (string, error) {
