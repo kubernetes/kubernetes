@@ -48,30 +48,44 @@ const (
 
 // NetworkPolicySpec provides the specification of a NetworkPolicy
 type NetworkPolicySpec struct {
-	// Selects the pods to which this NetworkPolicy object applies. The array of
-	// ingress rules is applied to any pods selected by this field. Multiple network
-	// policies can select the same set of pods. In this case, the ingress rules for
-	// each are combined additively. This field is NOT optional and follows standard
-	// label selector semantics. An empty podSelector matches all pods in this
-	// namespace.
+	// Selects the pods to which this NetworkPolicy object applies.
+	// A network flow is bidirectional but initiated in one direction,
+	// from a source to a destination.
+	// The whole flow is allowed or not depending on whether the initiation is allowed.
+	// A network flow with a pod on either or both ends is allowed to be initiated
+	// if both (a) initiation from the source is allowed and (b) initiation to the
+	// destination is allowed.
+	//
+	// Initiation from a source is allowed if one of the following is true.
+	// - The source is not a pod.
+	// - The source is a pod and there is at least one NetworkPolicy whose `podSelector`
+	//   selects the pod, `policyTypes` includes "Egress",
+	//   and `egress` includes a rule that allows the initiation.
+	// - The source is a pod and there is no NetworkPolicy whose `podSelector` selects
+	//   the pod and whose `policyTypes` includes "Egress".
+	//
+	// Initiation to a destination is allowed if at least one of the following is true.
+	// - The destination is not a pod.
+	// - The destination is a pod and the source is the pod's node.
+	// - The destination is a pod and there is at least one NetworkPolicy whose
+	//   `podSelector` selects the pod, `policyTypes` includes "Ingress",
+	//   and `ingress` includes a rule that allows the initiation.
+	// - The destination is a pod and there is no NetworkPolicy whose `podSelector`
+	//   selects the pod and whose `policyTypes` includes "Ingress".
+	//
+	// This field is NOT optional and follows standard label selector semantics.
+	// An empty podSelector matches all pods in this namespace.
 	PodSelector metav1.LabelSelector
 
-	// List of ingress rules to be applied to the selected pods. Traffic is allowed to
-	// a pod if there are no NetworkPolicies selecting the pod
-	// (and cluster policy otherwise allows the traffic), OR if the traffic source is
-	// the pod's local node, OR if the traffic matches at least one ingress rule
-	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
-	// this field is empty then this NetworkPolicy does not allow any traffic (and serves
-	// solely to ensure that the pods it selects are isolated by default)
+	// List of ingress rules to be applied to the selected pods if `policyTypes` includes "Ingress".
+	// If this field is empty then this NetworkPolicy does not allow any incoming flows
+	// (and serves solely to ensure that the pods it selects deny ingress by default).
 	// +optional
 	Ingress []NetworkPolicyIngressRule
 
-	// List of egress rules to be applied to the selected pods. Outgoing traffic is
-	// allowed if there are no NetworkPolicies selecting the pod (and cluster policy
-	// otherwise allows the traffic), OR if the traffic matches at least one egress rule
-	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
-	// this field is empty then this NetworkPolicy limits all outgoing traffic (and serves
-	// solely to ensure that the pods it selects are isolated by default).
+	// List of egress rules to be applied to the selected pods if `policyTypes` includes "Egress".
+	// If this field is empty then this NetworkPolicy allows no outgoing flows
+	// (and serves solely to ensure that the pods it selects are isolated by default).
 	// This field is beta-level in 1.8
 	// +optional
 	Egress []NetworkPolicyEgressRule
