@@ -18,3 +18,5 @@ replace (
 )
 
 replace sigs.k8s.io/json => github.com/liggitt/json v0.0.0-20211020163728-48258682683b
+
+replace github.com/google/cadvisor => github.com/kolyshkin/cadvisor v0.43.1-0.20211214053613-c6698fa7d790

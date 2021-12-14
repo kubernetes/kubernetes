@@ -31,8 +31,7 @@ import (
 	"time"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	libctcgmanager "github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -81,10 +80,8 @@ const (
 	maxPidFileLength      = 1 << 10 // 1KB
 )
 
-var (
-	// The docker version in which containerd was introduced.
-	containerdAPIVersion = utilversion.MustParseGeneric("1.23")
-)
+// The docker version in which containerd was introduced.
+var containerdAPIVersion = utilversion.MustParseGeneric("1.23")
 
 // A non-user container tracked by the Kubelet.
 type systemContainer struct {
@@ -242,7 +239,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		}
 	}
 
-	var internalCapacity = v1.ResourceList{}
+	internalCapacity := v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -392,19 +389,13 @@ func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLi
 
 // Create a cgroup container manager.
 func createManager(containerName string) (cgroups.Manager, error) {
-	cg := &configs.Cgroup{
+	return libctcgmanager.New(&configs.Cgroup{
 		Parent: "/",
 		Name:   containerName,
 		Resources: &configs.Resources{
 			SkipDevices: true,
 		},
-	}
-
-	if cgroups.IsCgroup2UnifiedMode() {
-		return cgroupfs2.NewManager(cg, "", false)
-
-	}
-	return cgroupfs.NewManager(cg, nil, false), nil
+	})
 }
 
 type KernelTunableBehavior string
@@ -678,7 +669,6 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 				}
 			}
 		}, time.Minute, wait.NeverStop)
-
 	}
 
 	if len(cm.periodicTasks) > 0 {
