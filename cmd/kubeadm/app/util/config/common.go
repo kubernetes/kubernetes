@@ -69,7 +69,9 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	}
 
 	// Deprecated API versions are supported by us, but can only be used for migration.
-	deprecatedAPIVersions := map[string]struct{}{}
+	deprecatedAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1beta2": {},
+	}
 
 	gvString := gv.String()
 

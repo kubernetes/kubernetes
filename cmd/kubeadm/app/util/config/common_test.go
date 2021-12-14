@@ -73,6 +73,7 @@ func TestValidateSupportedVersion(t *testing.T) {
 				Group:   KubeadmGroupName,
 				Version: "v1beta2",
 			},
+			allowDeprecated: true,
 		},
 		{
 			gv: schema.GroupVersion{
