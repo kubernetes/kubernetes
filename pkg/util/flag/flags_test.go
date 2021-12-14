@@ -225,6 +225,25 @@ func TestReservedMemoryVar(t *testing.T) {
 			},
 		},
 		{
+			desc: "valid input with ';' as separator for multiple reserved-memory arguments",
+			argc: "blah --reserved-memory=0:memory=1Gi,hugepages-1Gi=1Gi;1:memory=1Gi",
+			expectVal: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory:        memory1Gi,
+						resourceNameHugepages1Gi: memory1Gi,
+					},
+				},
+				{
+					NumaNode: 1,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: memory1Gi,
+					},
+				},
+			},
+		},
+		{
 			desc:      "invalid input",
 			argc:      "blah --reserved-memory=bad-input",
 			expectVal: nil,
