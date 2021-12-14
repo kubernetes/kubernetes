@@ -55,7 +55,7 @@ const (
 )
 
 const (
-	maxResolveConfLength = 10 * 1 << 20 // 10MB
+	maxResolvConfLength = 10 * 1 << 20 // 10MB
 )
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
@@ -230,7 +230,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 // parseResolvConf reads a resolv.conf file from the given reader, and parses
 // it into nameservers, searches and options, possibly returning an error.
 func parseResolvConf(reader io.Reader) (nameservers []string, searches []string, options []string, err error) {
-	file, err := utilio.ReadAtMost(reader, maxResolveConfLength)
+	file, err := utilio.ReadAtMost(reader, maxResolvConfLength)
 	if err != nil {
 		return nil, nil, nil, err
 	}
