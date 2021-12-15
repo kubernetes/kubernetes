@@ -534,7 +534,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 
 	// it may confuse why we call set after we do apply, but the issue is that runc
 	// follows a similar pattern.  it's needed to ensure cpu quota is set properly.
-	if err := m.Update(cgroupConfig); err != nil {
+	if err := manager.Set(resources); err != nil {
 		utilruntime.HandleError(fmt.Errorf("cgroup update failed %v", err))
 	}
 
