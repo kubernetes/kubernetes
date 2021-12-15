@@ -17,10 +17,9 @@ limitations under the License.
 package main
 
 import (
-	"os"
-
 	"k8s.io/component-base/cli"
 	"k8s.io/kubectl/pkg/cmd"
+	"k8s.io/kubectl/pkg/cmd/util"
 
 	// Import to initialize client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -28,6 +27,8 @@ import (
 
 func main() {
 	command := cmd.NewDefaultKubectlCommand()
-	code := cli.Run(command)
-	os.Exit(code)
+	if err := cli.RunNoErrOutput(command); err != nil {
+		// Pretty-print the error and exit with an error.
+		util.CheckErr(err)
+	}
 }
