@@ -18,6 +18,7 @@ package builder
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -800,5 +801,32 @@ func TestBuildOpenAPIV3(t *testing.T) {
 				t.Errorf("unexpected schema: %s\nwant = %#v\ngot = %#v", schemaDiff(&wantedSchema, &gotSchema), &wantedSchema, &gotSchema)
 			}
 		})
+	}
+}
+
+// Tests that getDefinition's ref building function respects the v2 flag for v2
+// vs v3 operations
+// This bug did not surface since we only so far look up types which do not make
+// use of refs
+func TestGetDefinitionRefPrefix(t *testing.T) {
+	// A bug was triggered by generating the cached definition map for one version,
+	// but then performing a looking on another. The map is generated upon
+	// the first call to getDefinition
+
+	// ManagedFieldsEntry's Time field is known to use arefs
+	managedFieldsTypePath := "k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry"
+
+	v2Ref := getDefinition(managedFieldsTypePath, true).SchemaProps.Properties["time"].SchemaProps.Ref
+	v3Ref := getDefinition(managedFieldsTypePath, false).SchemaProps.Properties["time"].SchemaProps.Ref
+
+	v2String := v2Ref.String()
+	v3String := v3Ref.String()
+
+	if !strings.HasPrefix(v3String, v3DefinitionPrefix) {
+		t.Errorf("v3 ref (%v) does not have the correct prefix (%v)", v3String, v3DefinitionPrefix)
+	}
+
+	if !strings.HasPrefix(v2String, definitionPrefix) {
+		t.Errorf("v2 ref (%v) does not have the correct prefix (%v)", v2String, definitionPrefix)
 	}
 }
