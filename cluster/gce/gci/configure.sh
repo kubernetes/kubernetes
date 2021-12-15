@@ -340,7 +340,7 @@ function install-crictl {
 
   # Create crictl config file.
   cat > /etc/crictl.yaml <<EOF
-runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
 EOF
 
   if is-preloaded "${crictl}" "${crictl_hash}"; then
@@ -583,7 +583,7 @@ function install-containerd-ubuntu {
 }
 
 function ensure-container-runtime {
-  container_runtime="${CONTAINER_RUNTIME:-docker}"
+  container_runtime="${CONTAINER_RUNTIME:-containerd}"
   if [[ "${container_runtime}" == "docker" ]]; then
     if ! command -v docker >/dev/null 2>&1; then
       log-wrap "InstallDocker" install-docker

@@ -197,37 +197,6 @@ func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult
 		return PodAdmitResult{Admit: true}
 	}
 
-	// Always admit runtimes is remote
-	if a.Runtime.Type() == kubetypes.RemoteContainerRuntime {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// Make sure docker api version is valid.
-	rversion, err := a.Runtime.APIVersion()
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "NoNewPrivs",
-			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
-		}
-	}
-	v, err := rversion.Compare("1.23.0")
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "NoNewPrivs",
-			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
-		}
-	}
-	// If the version is less than 1.23 it will return -1 above.
-	if v == -1 {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "NoNewPrivs",
-			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: docker runtime API version %q must be greater than or equal to 1.23", rversion.String()),
-		}
-	}
-
 	return PodAdmitResult{Admit: true}
 }
 
@@ -262,38 +231,6 @@ func (a *procMountAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// If the containers in a pod only need the default ProcMountType, admit it.
 	if procMountIsDefault(attrs.Pod) {
 		return PodAdmitResult{Admit: true}
-	}
-
-	// Always admit runtimes except docker.
-	if a.Runtime.Type() == kubetypes.RemoteContainerRuntime {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// Make sure docker api version is valid.
-	// Merged in https://github.com/moby/moby/pull/36644
-	rversion, err := a.Runtime.APIVersion()
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "ProcMount",
-			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
-		}
-	}
-	v, err := rversion.Compare("1.38.0")
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "ProcMount",
-			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
-		}
-	}
-	// If the version is less than 1.38 it will return -1 above.
-	if v == -1 {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "ProcMount",
-			Message: fmt.Sprintf("Cannot enforce ProcMount: docker runtime API version %q must be greater than or equal to 1.38", rversion.String()),
-		}
 	}
 
 	return PodAdmitResult{Admit: true}

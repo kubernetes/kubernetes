@@ -232,7 +232,7 @@ LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"containerd"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
@@ -766,9 +766,6 @@ function start_kubelet {
       "${cloud_config_arg[@]}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
       "--kubeconfig=${CERT_DIR}/kubelet-rotated.kubeconfig"
-      ${cni_conf_dir_args[@]+"${cni_conf_dir_args[@]}"}
-      ${cni_bin_dir_args[@]+"${cni_bin_dir_args[@]}"}
-      ${net_plugin_args[@]+"${net_plugin_args[@]}"}
       ${container_runtime_endpoint_args[@]+"${container_runtime_endpoint_args[@]}"}
       ${image_service_endpoint_args[@]+"${image_service_endpoint_args[@]}"}
       ${KUBELET_FLAGS}

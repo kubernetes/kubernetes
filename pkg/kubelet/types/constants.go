@@ -27,6 +27,7 @@ const (
 
 // Different container runtimes.
 const (
+	// TODO: Remove !!!
 	RemoteContainerRuntime = "remote"
 )
 
