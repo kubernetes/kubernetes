@@ -301,6 +301,7 @@ func TestProxyHandler(t *testing.T) {
 	target := &targetHTTPHandler{}
 	for name, tc := range tests {
 		target.Reset()
+		legacyregistry.Reset()
 
 		func() {
 			targetServer := httptest.NewUnstartedServer(target)
