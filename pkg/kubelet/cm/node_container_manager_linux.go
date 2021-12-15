@@ -136,6 +136,9 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
 func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList) error {
 	rp := getCgroupConfig(rl)
+	if rp == nil {
+		return fmt.Errorf("%q cgroup is not configured properly", cName)
+	}
 
 	// Enforce MemoryQoS for cgroups of kube-reserved/system-reserved. For more information,
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
@@ -152,13 +155,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		Name:               cName,
 		ResourceParameters: rp,
 	}
-	if cgroupConfig.ResourceParameters == nil {
-		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
-	}
 	klog.V(4).InfoS("Enforcing limits on cgroup", "cgroupName", cName, "cpuShares", cgroupConfig.ResourceParameters.CpuShares, "memory", cgroupConfig.ResourceParameters.Memory, "pidsLimit", cgroupConfig.ResourceParameters.PidsLimit)
-	if !cgroupManager.Exists(cgroupConfig.Name) {
-		return fmt.Errorf("%q cgroup does not exist", cgroupConfig.Name)
-	}
 	if err := cgroupManager.Update(cgroupConfig); err != nil {
 		return err
 	}

@@ -100,25 +100,27 @@ func TestIsCgroupPod(t *testing.T) {
 			expectedUID:    types.UID(""),
 		},
 	}
-	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
+	for _, useSystemd := range []bool{false, true} {
 		pcm := &podContainerManagerImpl{
-			cgroupManager:     NewCgroupManager(nil, cgroupDriver),
+			cgroupManager:     NewCgroupManager(nil, useSystemd),
 			enforceCPULimits:  true,
 			qosContainersInfo: qosContainersInfo,
 		}
 		for _, testCase := range testCases {
-			// give the right cgroup structure based on driver
-			cgroupfs := testCase.input.ToCgroupfs()
-			if cgroupDriver == "systemd" {
-				cgroupfs = testCase.input.ToSystemd()
+			// Give the right cgroup structure based on whether systemd is enabled.
+			var name string
+			if useSystemd {
+				name = testCase.input.ToSystemd()
+			} else {
+				name = testCase.input.ToCgroupfs()
 			}
 			// check if this is a pod or not with the literal cgroupfs input
-			result, resultUID := pcm.IsPodCgroup(cgroupfs)
+			result, resultUID := pcm.IsPodCgroup(name)
 			if result != testCase.expectedResult {
-				t.Errorf("Unexpected result for driver: %v, input: %v, expected: %v, actual: %v", cgroupDriver, testCase.input, testCase.expectedResult, result)
+				t.Errorf("Unexpected result for systemd: %v, input: %v, expected: %v, actual: %v", useSystemd, testCase.input, testCase.expectedResult, result)
 			}
 			if resultUID != testCase.expectedUID {
-				t.Errorf("Unexpected result for driver: %v, input: %v, expected: %v, actual: %v", cgroupDriver, testCase.input, testCase.expectedUID, resultUID)
+				t.Errorf("Unexpected result for systemd: %v, input: %v, expected: %v, actual: %v", useSystemd, testCase.input, testCase.expectedUID, resultUID)
 			}
 
 		}

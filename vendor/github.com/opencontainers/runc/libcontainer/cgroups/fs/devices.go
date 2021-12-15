@@ -1,5 +1,3 @@
-// +build linux
-
 package fs
 
 import (
@@ -15,15 +13,15 @@ import (
 )
 
 type DevicesGroup struct {
-	testingSkipFinalCheck bool
+	TestingSkipFinalCheck bool
 }
 
 func (s *DevicesGroup) Name() string {
 	return "devices"
 }
 
-func (s *DevicesGroup) Apply(path string, d *cgroupData) error {
-	if d.config.SkipDevices {
+func (s *DevicesGroup) Apply(path string, r *configs.Resources, pid int) error {
+	if r.SkipDevices {
 		return nil
 	}
 	if path == "" {
@@ -31,7 +29,8 @@ func (s *DevicesGroup) Apply(path string, d *cgroupData) error {
 		// is a hard requirement for container's security.
 		return errSubsystemDoesNotExist
 	}
-	return join(path, d.pid)
+
+	return apply(path, pid)
 }
 
 func loadEmulator(path string) (*cgroupdevices.Emulator, error) {
@@ -91,7 +90,7 @@ func (s *DevicesGroup) Set(path string, r *configs.Resources) error {
 	//
 	// This safety-check is skipped for the unit tests because we cannot
 	// currently mock devices.list correctly.
-	if !s.testingSkipFinalCheck {
+	if !s.TestingSkipFinalCheck {
 		currentAfter, err := loadEmulator(path)
 		if err != nil {
 			return err

@@ -1,11 +1,9 @@
-// +build linux
-
 package libcontainer
 
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -75,7 +73,7 @@ func getNetworkInterfaceStats(interfaceName string) (*types.NetworkInterface, er
 
 // Reads the specified statistics available under /sys/class/net/<EthInterface>/statistics
 func readSysfsNetworkStats(ethInterface, statsFile string) (uint64, error) {
-	data, err := ioutil.ReadFile(filepath.Join("/sys/class/net", ethInterface, "statistics", statsFile))
+	data, err := os.ReadFile(filepath.Join("/sys/class/net", ethInterface, "statistics", statsFile))
 	if err != nil {
 		return 0, err
 	}
