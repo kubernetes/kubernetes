@@ -267,6 +267,8 @@ github.com/go-openapi/swag
 ## explicit
 github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
+# github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 => github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
+github.com/go-task/slim-sprig
 # github.com/godbus/dbus/v5 v5.0.4 => github.com/godbus/dbus/v5 v5.0.4
 ## explicit
 github.com/godbus/dbus/v5
@@ -397,6 +399,8 @@ github.com/google/go-cmp/cmp/internal/value
 # github.com/google/gofuzz v1.1.0 => github.com/google/gofuzz v1.1.0
 ## explicit
 github.com/google/gofuzz
+# github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 => github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38
+github.com/google/pprof/profile
 # github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 => github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 github.com/google/shlex
 # github.com/google/uuid v1.1.2 => github.com/google/uuid v1.1.2
@@ -546,6 +550,16 @@ github.com/mxk/go-flowrate/flowrate
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
 github.com/onsi/ginkgo/v2/formatter
+github.com/onsi/ginkgo/v2/ginkgo
+github.com/onsi/ginkgo/v2/ginkgo/build
+github.com/onsi/ginkgo/v2/ginkgo/command
+github.com/onsi/ginkgo/v2/ginkgo/generators
+github.com/onsi/ginkgo/v2/ginkgo/internal
+github.com/onsi/ginkgo/v2/ginkgo/labels
+github.com/onsi/ginkgo/v2/ginkgo/outline
+github.com/onsi/ginkgo/v2/ginkgo/run
+github.com/onsi/ginkgo/v2/ginkgo/unfocus
+github.com/onsi/ginkgo/v2/ginkgo/watch
 github.com/onsi/ginkgo/v2/internal
 github.com/onsi/ginkgo/v2/internal/global
 github.com/onsi/ginkgo/v2/internal/interrupt_handler
@@ -1013,6 +1027,7 @@ golang.org/x/time/rate
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/go/ast/astutil
+golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/internal/gcimporter
 golang.org/x/tools/go/internal/packagesdriver
