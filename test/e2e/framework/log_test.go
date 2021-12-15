@@ -19,14 +19,9 @@ package framework_test
 import (
 	"errors"
 	"regexp"
-	"sort"
-	"strings"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
-	"github.com/onsi/ginkgo/v2/reporters"
-	"github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -72,11 +67,15 @@ var _ = ginkgo.Describe("log", func() {
 	})
 })
 
+/*
+
+MIGRATE TO GINKGO v2
+
 func TestFailureOutput(t *testing.T) {
 	// Run the Ginkgo suite with output collected by a custom
 	// reporter in adddition to the default one. To see what the full
 	// Ginkgo report looks like, run this test with "go test -v".
-	config.DefaultReporterConfig.FullTrace = true
+	// REMOVED IN GINKGO v2 config.DefaultReporterConfig.FullTrace = true
 	gomega.RegisterFailHandler(framework.Fail)
 	fakeT := &testing.T{}
 	reporter := reporters.NewFakeReporter()
@@ -129,6 +128,8 @@ func TestFailureOutput(t *testing.T) {
 	}
 }
 
+
+
 type testResult struct {
 	name string
 	// output written to GinkgoWriter during test.
@@ -157,6 +158,8 @@ func normalizeReport(report reporters.FakeReporter) suiteResults {
 	})
 	return results
 }
+
+*/
 
 // timePrefix matches "Jul 17 08:08:25.950: " at the beginning of each line.
 var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}.[[:digit:]]{3}: `)
