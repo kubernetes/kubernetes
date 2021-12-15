@@ -314,6 +314,8 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 		return err
 	}
 
+	klog.V(4).Infof("KKK builtPaths: %+v", m.buildCgroupPaths(cgroupConfig.Name))
+	klog.V(4).Infof("KKK Removing cgroup: %+v", cgroupConfig.Name, "paths: ", manager.GetPaths())
 	// Delete cgroups using libcontainer cgroup manager's Destroy() method.
 	if err = manager.Destroy(); err != nil {
 		return fmt.Errorf("unable to destroy cgroup paths for cgroup %v : %v", cgroupConfig.Name, err)
@@ -457,6 +459,8 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup manager: %v", err)
 	}
+	klog.V(4).Infof("KKK builtPaths: %+v", m.buildCgroupPaths(cgroupConfig.Name))
+	klog.V(4).Infof("KKK Updating cgroup: %v, paths: %+v", cgroupConfig.Name, manager.GetPaths())
 
 	return manager.Set(config.Resources)
 }
@@ -475,6 +479,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		return err
 	}
 
+	klog.V(4).Infof("KKK Creating cgroup: %v, config: %+v", cgroupConfig.Name, config)
 	// Apply(-1) is a hack to create the cgroup directories for each resource
 	// subsystem. The function [cgroups.Manager.apply()] applies cgroup
 	// configuration to the process with the specified pid.
@@ -484,6 +489,8 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	if err := manager.Apply(-1); err != nil {
 		return err
 	}
+	klog.V(4).Infof("KKK builtPaths: %+v ", m.buildCgroupPaths(cgroupConfig.Name))
+	klog.V(4).Infof("KKK Created cgroup: %v, paths: %+v", cgroupConfig.Name, manager.GetPaths())
 
 	// it may confuse why we call set after we do apply, but the issue is that runc
 	// follows a similar pattern.  it's needed to ensure cpu quota is set properly.
