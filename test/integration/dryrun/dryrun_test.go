@@ -46,15 +46,32 @@ var kindWhiteList = sets.NewString()
 // namespace used for all tests, do not change this
 const testNamespace = "dryrunnamespace"
 
+func DryRunCreateWithGenerateNameTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstructured.Unstructured, gvResource schema.GroupVersionResource) {
+	// Create a new object with generateName
+	gnObj := obj.DeepCopy()
+	gnObj.SetGenerateName(obj.GetName() + "-")
+	gnObj.SetName("")
+	DryRunCreateTest(t, rsc, gnObj, gvResource)
+}
+
 func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstructured.Unstructured, gvResource schema.GroupVersionResource) {
 	createdObj, err := rsc.Create(context.TODO(), obj, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
-		t.Fatalf("failed to dry-run create stub for %s: %#v", gvResource, err)
+		t.Fatalf("failed to dry-run create stub for %s: %#v: %v", gvResource, err, obj)
 	}
 	if obj.GroupVersionKind() != createdObj.GroupVersionKind() {
 		t.Fatalf("created object doesn't have the same gvk as original object: got %v, expected %v",
 			createdObj.GroupVersionKind(),
 			obj.GroupVersionKind())
+	}
+	if createdObj.GetUID() != "" {
+		t.Fatalf("created object shouldn't have a uid: %v", createdObj)
+	}
+	if createdObj.GetResourceVersion() != "" {
+		t.Fatalf("created object shouldn't have a resource version: %v", createdObj)
+	}
+	if obj.GetGenerateName() != "" && createdObj.GetName() != "" {
+		t.Fatalf("created object's name should be an empty string if using GenerateName: %v", createdObj)
 	}
 
 	if _, err := rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
@@ -282,6 +299,7 @@ func TestDryRun(t *testing.T) {
 			name := obj.GetName()
 
 			DryRunCreateTest(t, rsc, obj, gvResource)
+			DryRunCreateWithGenerateNameTest(t, rsc, obj, gvResource)
 
 			if _, err := rsc.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("failed to create stub for %s: %#v", gvResource, err)
