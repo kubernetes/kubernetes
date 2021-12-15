@@ -17,13 +17,14 @@ limitations under the License.
 package controllers
 
 import (
+	"sync"
+
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
-	// Metrics provides access to all controllerreadiness metrics.
-	Metrics = newControllerMetrics()
+	once sync.Once
 )
 
 // ControllerMetrics includes all the metrics of the proxy server.
@@ -32,7 +33,7 @@ type ControllerMetrics struct {
 }
 
 // newControllerMetrics create a new ControllerMetrics, configured with default metric names.
-func newControllerMetrics() *ControllerMetrics {
+func NewControllerMetrics() *ControllerMetrics {
 	controllerInstanceCount := k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
 			Name:           "managed_controller_instances",
@@ -41,10 +42,18 @@ func newControllerMetrics() *ControllerMetrics {
 		},
 		[]string{"name", "manager"},
 	)
-	legacyregistry.MustRegister(controllerInstanceCount)
-	return &ControllerMetrics{
+	//legacyregistry.MustRegister(controllerInstanceCount)
+	controllerMetrics := &ControllerMetrics{
 		controllerInstanceCount: controllerInstanceCount,
 	}
+	once.Do(func() {
+		controllerMetrics.Register()
+	})
+	return controllerMetrics
+}
+
+func (a *ControllerMetrics) Register() {
+	legacyregistry.MustRegister(a.controllerInstanceCount)
 }
 
 // ControllerStarted sets the controllerInstanceCount to 1.
