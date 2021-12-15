@@ -51,24 +51,11 @@ func Run(cmd *cobra.Command) int {
 	// execution fails for other reasons than parsing. We detect this via
 	// the FlagParseError callback.
 	//
-	// A variable is used instead of wrapping the error with a special
-	// error type because the variable is simpler and less fragile: the
-	// original FlagErrorFunc might replace the wrapped error.
-	parsingFailed := false
-	if cmd.SilenceUsage {
-		// Some commands, like kubectl, already deal with this themselves.
-		// We don't change the behavior for those and just track whether
-		// parsing failed for the error output below.
-		flagErrorFunc := cmd.FlagErrorFunc()
-		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-			parsingFailed = true
-			return flagErrorFunc(c, err)
-		})
-	} else {
+	// Some commands, like kubectl, already deal with this themselves.
+	// We don't change the behavior for those.
+	if !cmd.SilenceUsage {
 		cmd.SilenceUsage = true
 		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-			parsingFailed = true
-
 			// Re-enable usage printing.
 			c.SilenceUsage = false
 			return err
@@ -83,22 +70,26 @@ func Run(cmd *cobra.Command) int {
 
 	// Inject logs.InitLogs after command line parsing into one of the
 	// PersistentPre* functions.
+	logsInitialized := false
 	switch {
 	case cmd.PersistentPreRun != nil:
 		pre := cmd.PersistentPreRun
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
+			logsInitialized = true
 			pre(cmd, args)
 		}
 	case cmd.PersistentPreRunE != nil:
 		pre := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			logs.InitLogs()
+			logsInitialized = true
 			return pre(cmd, args)
 		}
 	default:
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
+			logsInitialized = true
 		}
 	}
 
@@ -110,11 +101,24 @@ func Run(cmd *cobra.Command) int {
 		// dumps a stack trace that isn't about the error.
 		//
 		// But if it is some other error encountered at runtime, then
-		// we want to log it as error.
+		// we want to log it as error, at least in most commands because
+		// their output is a log event stream.
 		//
 		// We can distinguish these two cases depending on whether
-		// our FlagErrorFunc above was called.
-		if parsingFailed {
+		// we got to logs.InitLogs() above.
+		//
+		// This heuristic might be problematic for command line
+		// tools like kubectl where the output is carefully controlled
+		// and not a log by default. It works because kubectl has
+		// its own error handling once a command runs.
+		//
+		// The usage of klog is problematic also because we don't know
+		// whether the command has managed to configure it. This cannot
+		// be checked right now, but may become possible when the early
+		// logging proposal from
+		// https://github.com/kubernetes/enhancements/pull/3078
+		// ("contextual logging") is implemented.
+		if !logsInitialized {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		} else {
 			klog.ErrorS(err, "command failed")
