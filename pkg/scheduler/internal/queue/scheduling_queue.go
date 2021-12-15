@@ -474,7 +474,7 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	pInfo := obj.(*framework.QueuedPodInfo)
 	pInfo.Attempts++
 	p.schedulingCycle++
-	return pInfo, err
+	return pInfo, nil
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
