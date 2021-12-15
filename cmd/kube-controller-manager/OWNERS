@@ -7,12 +7,10 @@ approvers:
   - mikedanese
   - sttts
 reviewers:
-  - a-robinson
   - brendandburns
   - caesarxuchao
   - cheftako
   - cjcullen
-  - davidopp
   - deads2k
   - derekwaynecarr
   - errordeveloper
@@ -21,7 +19,6 @@ reviewers:
   - ingvagabund
   - janetkuo
   - jayunit100
-  - jlowdermilk
   - johscheuer
   - jsafrane
   - justinsb
@@ -31,13 +28,9 @@ reviewers:
   - mikedanese
   - mwielgus
   - ping035627
-  - piosz
   - pmorie
-  - quinton-hoole
   - resouer
-  - rootfs
   - saad-ali
-  - screeley44
   - sjenning
   - smarterclayton
   - soltysh

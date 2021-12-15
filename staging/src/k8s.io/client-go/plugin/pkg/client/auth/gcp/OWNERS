@@ -2,7 +2,7 @@
 
 approvers:
   - cjcullen
-  - jlowdermilk
 reviewers:
   - cjcullen
+emeritus_approvers:
   - jlowdermilk

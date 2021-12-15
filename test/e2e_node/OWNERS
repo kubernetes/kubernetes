@@ -3,7 +3,6 @@
 approvers:
   - tallclair
   - derekwaynecarr
-  - ConnorDoyle
   - klueska
   - sjenning
   - mrunalp
@@ -15,6 +14,7 @@ emeritus_approvers:
   - vishh
   - yujuhong
   - dashpole
+  - ConnorDoyle
 reviewers:
   - bart0sh
   - bsdnet

@@ -5,7 +5,6 @@ approvers:
 reviewers:
   - smarterclayton
   - ingvagabund
-  - aveshagarwal
   - k82cn
 labels:
   - sig/network

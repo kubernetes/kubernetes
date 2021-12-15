@@ -3,12 +3,11 @@
 approvers:
   - andrewsykim
   - cheftako
-  - mcrute
 reviewers:
   - andrewsykim
   - cheftako
-  - mcrute
 emeritus_approvers:
   - d-nishi
+  - mcrute
 labels:
   - sig/cloud-provider

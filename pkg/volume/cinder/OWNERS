@@ -4,12 +4,11 @@ approvers:
   - jsafrane
   - anguslees
   - dims
-  - FengyunPan2
 reviewers:
   - anguslees
-  - rootfs
   - saad-ali
   - jsafrane
   - jingxu97
   - msau42
+emeritus_approvers:
   - FengyunPan2

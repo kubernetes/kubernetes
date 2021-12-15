@@ -3,11 +3,11 @@
 approvers:
   - sig-instrumentation-approvers
   - x13n
-  - kawych
 emeritus_approvers:
   - fabxc
   - piosz
   - fgrzadkowski
+  - kawych
 reviewers:
   - sig-instrumentation-reviewers
 labels:

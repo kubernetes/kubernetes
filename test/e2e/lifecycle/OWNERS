@@ -5,7 +5,6 @@ approvers:
   - timothysc
   - fabriziopandini
   - neolit123
-  - rosti
   - ereslibre
 reviewers:
   - luxas
@@ -15,10 +14,11 @@ reviewers:
   - kad
   - detiber
   - dixudx
-  - rosti
   - yagonobre
   - ereslibre
   - SataQiu
   - yastij
 labels:
   - sig/cluster-lifecycle
+emeritus_approvers:
+  - rosti

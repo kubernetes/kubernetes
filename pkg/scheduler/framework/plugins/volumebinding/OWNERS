@@ -6,6 +6,5 @@ approvers:
 reviewers:
   - sig-storage-reviewers
   - cofyc
-  - lichuqiang
 labels:
   - sig/storage

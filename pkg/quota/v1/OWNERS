@@ -3,11 +3,11 @@
 approvers:
   - deads2k
   - derekwaynecarr
-  - vishh
 reviewers:
   - deads2k
   - derekwaynecarr
   - smarterclayton
-  - vishh
 labels:
   - sig/api-machinery
+emeritus_approvers:
+  - vishh

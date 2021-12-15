@@ -5,7 +5,6 @@ approvers:
   - liggitt
   - timothysc
   - wojtek-t
-  - xiang90
 reviewers:
   - lavalamp
   - smarterclayton
@@ -16,9 +15,8 @@ reviewers:
   - liggitt
   - ncdc
   - timothysc
-  - hongchaodeng
-  - krousey
-  - xiang90
   - ingvagabund
   - resouer
   - enj
+emeritus_approvers:
+  - xiang90
