@@ -1,11 +1,10 @@
-// +build linux
-
 package fscommon
 
 import (
 	"errors"
 	"fmt"
 	"math"
+	"path"
 	"strconv"
 	"strings"
 
@@ -13,8 +12,6 @@ import (
 )
 
 var (
-	ErrNotValidFormat = errors.New("line is not a valid key value format")
-
 	// Deprecated: use cgroups.OpenFile instead.
 	OpenFile = cgroups.OpenFile
 	// Deprecated: use cgroups.ReadFile instead.
@@ -22,6 +19,19 @@ var (
 	// Deprecated: use cgroups.WriteFile instead.
 	WriteFile = cgroups.WriteFile
 )
+
+// ParseError records a parse error details, including the file path.
+type ParseError struct {
+	Path string
+	File string
+	Err  error
+}
+
+func (e *ParseError) Error() string {
+	return "unable to parse " + path.Join(e.Path, e.File) + ": " + e.Err.Error()
+}
+
+func (e *ParseError) Unwrap() error { return e.Err }
 
 // ParseUint converts a string to an uint64 integer.
 // Negative values are returned at zero as, due to kernel bugs,
@@ -34,7 +44,7 @@ func ParseUint(s string, base, bitSize int) (uint64, error) {
 		// 2. Handle negative values lesser than MinInt64
 		if intErr == nil && intValue < 0 {
 			return 0, nil
-		} else if intErr != nil && intErr.(*strconv.NumError).Err == strconv.ErrRange && intValue < 0 {
+		} else if errors.Is(intErr, strconv.ErrRange) && intValue < 0 {
 			return 0, nil
 		}
 
@@ -56,7 +66,7 @@ func ParseKeyValue(t string) (string, uint64, error) {
 
 	value, err := ParseUint(parts[1], 10, 64)
 	if err != nil {
-		return "", 0, fmt.Errorf("unable to convert to uint64: %v", err)
+		return "", 0, err
 	}
 
 	return parts[0], value, nil
@@ -71,11 +81,15 @@ func GetValueByKey(path, file, key string) (uint64, error) {
 		return 0, err
 	}
 
-	lines := strings.Split(string(content), "\n")
+	lines := strings.Split(content, "\n")
 	for _, line := range lines {
 		arr := strings.Split(line, " ")
 		if len(arr) == 2 && arr[0] == key {
-			return ParseUint(arr[1], 10, 64)
+			val, err := ParseUint(arr[1], 10, 64)
+			if err != nil {
+				err = &ParseError{Path: path, File: file, Err: err}
+			}
+			return val, err
 		}
 	}
 
@@ -96,7 +110,7 @@ func GetCgroupParamUint(path, file string) (uint64, error) {
 
 	res, err := ParseUint(contents, 10, 64)
 	if err != nil {
-		return res, fmt.Errorf("unable to parse file %q", path+"/"+file)
+		return res, &ParseError{Path: path, File: file, Err: err}
 	}
 	return res, nil
 }
@@ -115,7 +129,7 @@ func GetCgroupParamInt(path, file string) (int64, error) {
 
 	res, err := strconv.ParseInt(contents, 10, 64)
 	if err != nil {
-		return res, fmt.Errorf("unable to parse %q as a int from Cgroup file %q", contents, path+"/"+file)
+		return res, &ParseError{Path: path, File: file, Err: err}
 	}
 	return res, nil
 }
