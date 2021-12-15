@@ -111,7 +111,7 @@ readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
 kube::golang::conformance_image_targets() {
   # NOTE: this contains cmd targets for kube::release::build_conformance_image
   local targets=(
-    vendor/github.com/onsi/ginkgo/ginkgo
+    vendor/github.com/onsi/ginkgo/v2
     test/e2e/e2e.test
     test/conformance/image/go-runner
     cmd/kubectl
@@ -274,7 +274,7 @@ kube::golang::test_targets() {
     cmd/genyaml
     cmd/genswaggertypedocs
     cmd/linkcheck
-    vendor/github.com/onsi/ginkgo/ginkgo
+    vendor/github.com/onsi/ginkgo/v2
     test/e2e/e2e.test
     test/conformance/image/go-runner
   )
@@ -301,7 +301,7 @@ readonly KUBE_TEST_PORTABLE=(
 kube::golang::server_test_targets() {
   local targets=(
     cmd/kubemark
-    vendor/github.com/onsi/ginkgo/ginkgo
+    vendor/github.com/onsi/ginkgo/v2
   )
 
   if [[ "${OSTYPE:-}" == "linux"* ]]; then

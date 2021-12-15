@@ -7,7 +7,7 @@
 
 ```console
 # First, build the binaries by running make from the root directory
-$ make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo cmd/kubectl test/conformance/image/go-runner"
+$ make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/v2 cmd/kubectl test/conformance/image/go-runner"
 
 # Build for linux/amd64 (default)
 # export REGISTRY=$HOST/$ORG to switch from k8s.gcr.io

@@ -22,9 +22,8 @@ import (
 	"strings"
 	"time"
 
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
 	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"

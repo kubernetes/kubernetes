@@ -103,7 +103,7 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 				f.PodClient().DeleteSync(p.Name, metav1.DeleteOptions{}, 2*time.Minute)
 			}
 
-			restartKubelet()
+			restartKubelet(true)
 
 			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
 			gomega.Eventually(func() bool {
@@ -142,7 +142,7 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 			framework.ExpectEqual(devIDRestart1, devID1)
 
 			ginkgo.By("Restarting Kubelet")
-			restartKubelet()
+			restartKubelet(true)
 			framework.WaitForAllNodesSchedulable(f.ClientSet, 30*time.Minute)
 
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
@@ -172,7 +172,7 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 			}
 
 			ginkgo.By("Restarting Kubelet")
-			restartKubelet()
+			restartKubelet(true)
 
 			ginkgo.By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
@@ -181,7 +181,7 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 
 			ginkgo.By("Restarting Kubelet and creating another pod")
 
-			restartKubelet()
+			restartKubelet(true)
 			framework.WaitForAllNodesSchedulable(f.ClientSet, 30*time.Minute)
 
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
