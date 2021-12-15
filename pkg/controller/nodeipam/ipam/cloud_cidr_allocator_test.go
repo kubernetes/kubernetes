@@ -43,12 +43,12 @@ func TestBoundedRetries(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()
 	updateChan := make(chan string, 1) // need to buffer as we are using only on go routine
 	stopChan := make(chan struct{})
-	sharedInfomer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
+	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ca := &cloudCIDRAllocator{
 		client:            clientSet,
 		nodeUpdateChannel: updateChan,
-		nodeLister:        sharedInfomer.Core().V1().Nodes().Lister(),
-		nodesSynced:       sharedInfomer.Core().V1().Nodes().Informer().HasSynced,
+		nodeLister:        sharedInformer.Core().V1().Nodes().Lister(),
+		nodesSynced:       sharedInformer.Core().V1().Nodes().Informer().HasSynced,
 		nodesInProcessing: map[string]*nodeProcessingInfo{},
 	}
 	go ca.worker(stopChan)

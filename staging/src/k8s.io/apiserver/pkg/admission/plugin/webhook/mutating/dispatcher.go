@@ -425,7 +425,7 @@ func (w *webhookAnnotator) addPatchAnnotation(patch interface{}, patchType admis
 	if err := w.attr.Attributes.AddAnnotationWithLevel(w.patchAnnotationKey, value, auditinternal.LevelRequest); err != nil {
 		// NOTE: we don't log actual patch in kube-apiserver log to avoid potentially
 		// leaking information
-		klog.Warningf("failed to set patch annotation for mutating webhook key %s; confugiration name: %s, webhook name: %s", w.patchAnnotationKey, w.configuration, w.webhook)
+		klog.Warningf("failed to set patch annotation for mutating webhook key %s; configuration name: %s, webhook name: %s", w.patchAnnotationKey, w.configuration, w.webhook)
 	}
 }
 
