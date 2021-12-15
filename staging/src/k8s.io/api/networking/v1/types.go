@@ -34,12 +34,12 @@ type NetworkPolicy struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the desired behavior for this NetworkPolicy.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 	// +optional
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // PolicyType string describes the NetworkPolicy type
-// This type is beta-level in 1.8
 // +enum
 type PolicyType string
 
@@ -52,31 +52,38 @@ const (
 
 // NetworkPolicySpec provides the specification of a NetworkPolicy
 type NetworkPolicySpec struct {
-	// Selects the pods to which this NetworkPolicy object applies. The array of
-	// ingress rules is applied to any pods selected by this field. Multiple network
-	// policies can select the same set of pods. In this case, the ingress rules for
-	// each are combined additively. This field is NOT optional and follows standard
+	// `podSelector` selects the pods to which this NetworkPolicy object applies for ingress and/or egress,
+	// as determined by `policyTypes`.  The `ingress` and `egress` fields characterize
+	// connections allowed by this policy.
+	// Multiple NetworkPolicy objects can select a given pod, and the connections they
+	// allow are combined additively.
+	// If any NetworkPolicy applies to a given pod for ingress then the allowed incoming
+	// connections are those from the pod's local node and those characterized by an
+	// ingress rule of an applicable policy.
+	// If no NetworkPolicy applies to a given pod for ingress
+	// then all ingress to that pod is allowed.
+	// If any NetworkPolicy applies to a given pod for egress then the allowed outgoing
+	// connections are those characterized by an egress rule of an applicable policy.
+	// If no NetworkPolicy applies to a given pod for egress
+	// then all egress from that pod is allowed.
+	// A connection from some source pod to some destination pod is allowed if egress
+	// from the source is allowed and ingress to the destination is allowed.
+	// This field is required and follows standard
 	// label selector semantics. An empty podSelector matches all pods in this
 	// namespace.
 	PodSelector metav1.LabelSelector `json:"podSelector" protobuf:"bytes,1,opt,name=podSelector"`
 
-	// List of ingress rules to be applied to the selected pods. Traffic is allowed to
-	// a pod if there are no NetworkPolicies selecting the pod
-	// (and cluster policy otherwise allows the traffic), OR if the traffic source is
-	// the pod's local node, OR if the traffic matches at least one ingress rule
-	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
-	// this field is empty then this NetworkPolicy does not allow any traffic (and serves
-	// solely to ensure that the pods it selects are isolated by default)
+	// List of ingress rules to be applied to the selected pods if `policyTypes` includes "Ingress".
+	// In this case this field holds a list of rules characterizing allowed incoming
+	// connections and an empty list serves only to ensure that the selected pods
+	// are isolated for ingress by default.
 	// +optional
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
-	// List of egress rules to be applied to the selected pods. Outgoing traffic is
-	// allowed if there are no NetworkPolicies selecting the pod (and cluster policy
-	// otherwise allows the traffic), OR if the traffic matches at least one egress rule
-	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
-	// this field is empty then this NetworkPolicy limits all outgoing traffic (and serves
-	// solely to ensure that the pods it selects are isolated by default).
-	// This field is beta-level in 1.8
+	// List of egress rules to be applied to the selected pods if `policyTypes` includes "Egress".
+	// In this case this field holds a list of rules characterizing allowed outgoing
+	// connections and an empty list serves only to ensure that the selected pods
+	// are isolated for egress by default.
 	// +optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
@@ -89,7 +96,6 @@ type NetworkPolicySpec struct {
 	// Likewise, if you want to write a policy that specifies that no egress is allowed,
 	// you must specify a policyTypes value that include "Egress" (since such a policy would not include
 	// an Egress section and would otherwise default to just [ "Ingress" ]).
-	// This field is beta-level in 1.8
 	// +optional
 	PolicyTypes []PolicyType `json:"policyTypes,omitempty" protobuf:"bytes,4,rep,name=policyTypes,casttype=PolicyType"`
 }
@@ -116,7 +122,6 @@ type NetworkPolicyIngressRule struct {
 
 // NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
-// This type is beta-level in 1.8
 type NetworkPolicyEgressRule struct {
 	// List of destination ports for outgoing traffic.
 	// Each item in this list is combined using a logical OR. If this field is
