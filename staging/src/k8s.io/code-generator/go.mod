@@ -6,7 +6,6 @@ go 1.16
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gogo/protobuf v1.3.2
@@ -25,7 +24,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 )
 
-replace (
-	github.com/nxadm/tail => github.com/nxadm/tail v1.4.4
-	k8s.io/code-generator => ../code-generator
-)
+replace k8s.io/code-generator => ../code-generator
