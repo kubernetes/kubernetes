@@ -152,7 +152,7 @@ dependencies:
       match: __default_go_runner_version=
 
   - name: "k8s.gcr.io/pause"
-    version: 3.6
+    version: 3.7
     refPaths:
     - path: build/pause/Makefile
       match: TAG\s*\?=

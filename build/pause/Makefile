@@ -17,15 +17,15 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG ?= 3.6
+TAG ?= 3.7
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
 # Operating systems supported: linux, windows
 OS ?= linux
-# OS Version for the Windows images: 1809, 1903, 1909 2004, 20H2, ltsc2022
-OSVERSION ?= 1809 1903 1909 2004 20H2 ltsc2022
+# OS Version for the Windows images: 1809, 20H2, ltsc2022
+OSVERSION ?= 1809 20H2 ltsc2022
 
 # The output type could either be docker (local), or registry.
 # If it is registry, it will also allow us to push the Windows images.
@@ -35,7 +35,7 @@ ALL_OS = linux windows
 ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
-ALL_OSVERSIONS.windows := 1809 1903 1909 2004 20H2 ltsc2022
+ALL_OSVERSIONS.windows := 1809 20H2 ltsc2022
 ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, ${ALL_OSVERSIONS.windows}, windows-$(arch)-${osversion}))
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
