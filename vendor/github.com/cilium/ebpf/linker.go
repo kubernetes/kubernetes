@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf/asm"
-	"github.com/cilium/ebpf/internal/btf"
 )
 
 // link resolves bpf-to-bpf calls.
@@ -40,7 +39,7 @@ func link(prog *ProgramSpec, libs []*ProgramSpec) error {
 			pending = append(pending, lib.Instructions)
 
 			if prog.BTF != nil && lib.BTF != nil {
-				if err := btf.ProgramAppend(prog.BTF, lib.BTF); err != nil {
+				if err := prog.BTF.Append(lib.BTF); err != nil {
 					return fmt.Errorf("linking BTF of %s: %w", lib.Name, err)
 				}
 			}
@@ -133,6 +132,26 @@ func fixupJumpsAndCalls(insns asm.Instructions) error {
 
 		case ins.IsLoadFromMap() && ins.MapPtr() == -1:
 			return fmt.Errorf("map %s: %w", ins.Reference, errUnsatisfiedReference)
+		}
+	}
+
+	// fixupBPFCalls replaces bpf_probe_read_{kernel,user}[_str] with bpf_probe_read[_str] on older kernels
+	// https://github.com/libbpf/libbpf/blob/master/src/libbpf.c#L6009
+	iter = insns.Iterate()
+	for iter.Next() {
+		ins := iter.Ins
+		if !ins.IsBuiltinCall() {
+			continue
+		}
+		switch asm.BuiltinFunc(ins.Constant) {
+		case asm.FnProbeReadKernel, asm.FnProbeReadUser:
+			if err := haveProbeReadKernel(); err != nil {
+				ins.Constant = int64(asm.FnProbeRead)
+			}
+		case asm.FnProbeReadKernelStr, asm.FnProbeReadUserStr:
+			if err := haveProbeReadKernel(); err != nil {
+				ins.Constant = int64(asm.FnProbeReadStr)
+			}
 		}
 	}
 

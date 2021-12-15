@@ -1,5 +1,3 @@
-// +build linux
-
 package fs
 
 import (
@@ -16,10 +14,10 @@ func (s *NameGroup) Name() string {
 	return s.GroupName
 }
 
-func (s *NameGroup) Apply(path string, d *cgroupData) error {
+func (s *NameGroup) Apply(path string, _ *configs.Resources, pid int) error {
 	if s.Join {
-		// ignore errors if the named cgroup does not exist
-		_ = join(path, d.pid)
+		// Ignore errors if the named cgroup does not exist.
+		_ = apply(path, pid)
 	}
 	return nil
 }

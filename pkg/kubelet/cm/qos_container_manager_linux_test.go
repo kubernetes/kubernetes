@@ -117,7 +117,7 @@ func createTestQOSContainerManager() (*qosContainerManagerImpl, error) {
 
 	qosContainerManager := &qosContainerManagerImpl{
 		subsystems:    subsystems,
-		cgroupManager: NewCgroupManager(subsystems, "cgroupfs"),
+		cgroupManager: NewCgroupManager(subsystems, false),
 		cgroupRoot:    cgroupRoot,
 		qosReserved:   nil,
 	}

@@ -31,8 +31,7 @@ import (
 	"time"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -263,7 +262,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	// Turn CgroupRoot from a string (in cgroupfs path format) to internal CgroupName
 	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
-	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
+	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver == "systemd")
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
@@ -398,13 +397,10 @@ func createManager(containerName string) (cgroups.Manager, error) {
 		Resources: &configs.Resources{
 			SkipDevices: true,
 		},
+		Systemd: false,
 	}
 
-	if cgroups.IsCgroup2UnifiedMode() {
-		return cgroupfs2.NewManager(cg, "", false)
-
-	}
-	return cgroupfs.NewManager(cg, nil, false), nil
+	return manager.New(cg)
 }
 
 type KernelTunableBehavior string

@@ -62,7 +62,7 @@ func GetPodCgroupNameSuffix(podUID types.UID) string {
 }
 
 // NodeAllocatableRoot returns the literal cgroup path for the node allocatable cgroup
-func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver string) string {
+func NodeAllocatableRoot(_ string, _, _ bool) string {
 	return ""
 }
 
