@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -1147,6 +1148,7 @@ func TestPodAddsBatching(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			clock := clock.NewMock()
 			ns := metav1.NamespaceDefault
 			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
 			stopCh := make(chan struct{})
@@ -1164,14 +1166,14 @@ func TestPodAddsBatching(t *testing.T) {
 			})
 
 			for i, add := range tc.adds {
-				time.Sleep(add.delay)
+				clock.Sleep(add.delay)
 
 				p := newPod(i, ns, true, 0, false)
 				esController.podStore.Add(p)
 				esController.addPod(p)
 			}
 
-			time.Sleep(tc.finalDelay)
+			clock.Sleep(tc.finalDelay)
 			assert.Len(t, client.Actions(), tc.wantRequestCount)
 			// In case of error, make debugging easier.
 			for _, action := range client.Actions() {
@@ -1281,6 +1283,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			clock := clock.NewMock()
 			ns := metav1.NamespaceDefault
 			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
 			stopCh := make(chan struct{})
@@ -1300,7 +1303,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 			})
 
 			for _, update := range tc.updates {
-				time.Sleep(update.delay)
+				clock.Sleep(update.delay)
 
 				old, exists, err := esController.podStore.GetByKey(fmt.Sprintf("%s/%s", ns, update.podName))
 				if err != nil {
@@ -1319,7 +1322,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				esController.updatePod(oldPod, newPod)
 			}
 
-			time.Sleep(tc.finalDelay)
+			clock.Sleep(tc.finalDelay)
 			assert.Len(t, client.Actions(), tc.wantRequestCount)
 			// In case of error, make debugging easier.
 			for _, action := range client.Actions() {
