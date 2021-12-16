@@ -122,7 +122,7 @@ var _ = Describe("networking [setup-networking]", func() {
 			})
 		})
 	})
-	ginkgo.Context("dual-stack [Feature:IPv6DualStack]", func() {
+	ginkgo.Context("dual-stack", func() {
 		ginkgo.Context("podSubnet", func() {
 			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
 				if !dualStack {
