@@ -25,6 +25,7 @@ rules:
   resourceNames:
   - metrics-server-v0.3.6
   - metrics-server-v0.4.4
+  - metrics-server-v0.4.5
   - metrics-server-v0.5.0
   - metrics-server-v0.5.2
   verbs:
