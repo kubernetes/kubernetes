@@ -30,6 +30,8 @@ import (
 func init() {
 	// Cause all klog output to be discarded with minimal overhead.
 	// We don't include time stamps and caller information.
+	// Individual tests can change that by calling flag.Set again,
+	// but should always restore this state here.
 	klog.InitFlags(nil)
 	flag.Set("alsologtostderr", "false")
 	flag.Set("logtostderr", "false")
