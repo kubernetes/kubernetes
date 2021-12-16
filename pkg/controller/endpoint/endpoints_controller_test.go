@@ -40,9 +40,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/client-go/util/workqueue"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
+	testingclock "k8s.io/utils/clock/testing"
 	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -1546,8 +1548,6 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 }
 
 // TestPodUpdatesBatching verifies that endpoint updates caused by pod updates are batched together.
-// This test uses real time.Sleep, as there is no easy way to mock time in endpoints controller now.
-// TODO(mborsz): Migrate this test to mock clock when possible.
 func TestPodUpdatesBatching(t *testing.T) {
 	type podUpdate struct {
 		delay   time.Duration
@@ -1625,12 +1625,12 @@ func TestPodUpdatesBatching(t *testing.T) {
 					podIP:   "10.0.0.0",
 				},
 				{
-					delay:   100 * time.Millisecond,
+					delay:   800 * time.Millisecond,
 					podName: "pod1",
 					podIP:   "10.0.0.1",
 				},
 				{
-					delay:   1 * time.Second,
+					delay:   100 * time.Millisecond,
 					podName: "pod2",
 					podIP:   "10.0.0.2",
 				},
@@ -1654,6 +1654,11 @@ func TestPodUpdatesBatching(t *testing.T) {
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			endpoints.queue.ShutDown()
+			endpoints.queue = workqueue.NewNamedRateLimitingQueueWithCustomClock(
+				workqueue.NewMaxOfRateLimiter(workqueue.DefaultControllerRateLimiter()), "test_endpoints", fakeClock)
+
 			go endpoints.Run(context.TODO(), 1)
 
 			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
@@ -1667,8 +1672,6 @@ func TestPodUpdatesBatching(t *testing.T) {
 			})
 
 			for _, update := range tc.updates {
-				time.Sleep(update.delay)
-
 				old, exists, err := endpoints.podStore.GetByKey(fmt.Sprintf("%s/%s", ns, update.podName))
 				if err != nil {
 					t.Fatalf("Error while retrieving old value of %q: %v", update.podName, err)
@@ -1685,17 +1688,19 @@ func TestPodUpdatesBatching(t *testing.T) {
 
 				endpoints.podStore.Update(newPod)
 				endpoints.updatePod(oldPod, newPod)
+
+				fakeClock.Step(update.delay)
+				waitForAdded(endpoints.queue, 0)
 			}
 
-			time.Sleep(tc.finalDelay)
+			fakeClock.Step(tc.finalDelay)
+			waitForAdded(endpoints.queue, 0)
 			endpointsHandler.ValidateRequestCount(t, tc.wantRequestCount)
 		})
 	}
 }
 
 // TestPodAddsBatching verifies that endpoint updates caused by pod addition are batched together.
-// This test uses real time.Sleep, as there is no easy way to mock time in endpoints controller now.
-// TODO(mborsz): Migrate this test to mock clock when possible.
 func TestPodAddsBatching(t *testing.T) {
 	type podAdd struct {
 		delay time.Duration
@@ -1753,10 +1758,10 @@ func TestPodAddsBatching(t *testing.T) {
 					delay: 200 * time.Millisecond,
 				},
 				{
-					delay: 100 * time.Millisecond,
+					delay: 800 * time.Millisecond,
 				},
 				{
-					delay: 1 * time.Second,
+					delay: 100 * time.Millisecond,
 				},
 			},
 			finalDelay:       3 * time.Second,
@@ -1777,6 +1782,11 @@ func TestPodAddsBatching(t *testing.T) {
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			endpoints.queue.ShutDown()
+			endpoints.queue = workqueue.NewNamedRateLimitingQueueWithCustomClock(
+				workqueue.NewMaxOfRateLimiter(workqueue.DefaultControllerRateLimiter()), "test_endpoints", fakeClock)
+
 			go endpoints.Run(context.TODO(), 1)
 
 			endpoints.serviceStore.Add(&v1.Service{
@@ -1788,22 +1798,33 @@ func TestPodAddsBatching(t *testing.T) {
 			})
 
 			for i, add := range tc.adds {
-				time.Sleep(add.delay)
-
 				p := testPod(ns, i, 1, true, ipv4only)
 				endpoints.podStore.Add(p)
 				endpoints.addPod(p)
+
+				fakeClock.Step(add.delay)
+				waitForAdded(endpoints.queue, 0)
 			}
 
-			time.Sleep(tc.finalDelay)
+			fakeClock.Step(tc.finalDelay)
+			waitForAdded(endpoints.queue, 0)
+
 			endpointsHandler.ValidateRequestCount(t, tc.wantRequestCount)
 		})
 	}
 }
 
+func waitForAdded(q workqueue.Interface, depth int) error {
+	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		if q.Len() == depth {
+			return true, nil
+		}
+
+		return false, nil
+	})
+}
+
 // TestPodDeleteBatching verifies that endpoint updates caused by pod deletion are batched together.
-// This test uses real time.Sleep, as there is no easy way to mock time in endpoints controller now.
-// TODO(mborsz): Migrate this test to mock clock when possible.
 func TestPodDeleteBatching(t *testing.T) {
 	type podDelete struct {
 		delay   time.Duration
@@ -1873,11 +1894,11 @@ func TestPodDeleteBatching(t *testing.T) {
 					podName: "pod0",
 				},
 				{
-					delay:   100 * time.Millisecond,
+					delay:   800 * time.Millisecond,
 					podName: "pod1",
 				},
 				{
-					delay:   1 * time.Second,
+					delay:   100 * time.Millisecond,
 					podName: "pod2",
 				},
 			},
@@ -1899,6 +1920,11 @@ func TestPodDeleteBatching(t *testing.T) {
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			endpoints.queue.ShutDown()
+			endpoints.queue = workqueue.NewNamedRateLimitingQueueWithCustomClock(
+				workqueue.NewMaxOfRateLimiter(workqueue.DefaultControllerRateLimiter()), "test_endpoints", fakeClock)
+
 			go endpoints.Run(context.TODO(), 1)
 
 			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
@@ -1912,8 +1938,6 @@ func TestPodDeleteBatching(t *testing.T) {
 			})
 
 			for _, update := range tc.deletes {
-				time.Sleep(update.delay)
-
 				old, exists, err := endpoints.podStore.GetByKey(fmt.Sprintf("%s/%s", ns, update.podName))
 				if err != nil {
 					t.Fatalf("Error while retrieving old value of %q: %v", update.podName, err)
@@ -1923,9 +1947,13 @@ func TestPodDeleteBatching(t *testing.T) {
 				}
 				endpoints.podStore.Delete(old)
 				endpoints.deletePod(old)
+
+				fakeClock.Step(update.delay)
+				waitForAdded(endpoints.queue, 0)
 			}
 
-			time.Sleep(tc.finalDelay)
+			fakeClock.Step(tc.finalDelay)
+			waitForAdded(endpoints.queue, 0)
 			endpointsHandler.ValidateRequestCount(t, tc.wantRequestCount)
 		})
 	}
