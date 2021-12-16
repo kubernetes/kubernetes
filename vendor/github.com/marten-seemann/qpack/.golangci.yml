@@ -1,0 +1,27 @@
+run:
+linters-settings:
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - deadcode
+    - exhaustive
+    - exportloopref
+    - goconst
+    - gofmt # redundant, since gofmt *should* be a no-op after gofumpt
+    - gofumpt
+    - goimports
+    - gosimple
+    - ineffassign
+    - misspell
+    - prealloc
+    - scopelint
+    - staticcheck
+    - stylecheck
+    - structcheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - vet
+

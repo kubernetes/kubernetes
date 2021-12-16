@@ -1,0 +1,45 @@
+run:
+  skip-files:
+    - internal/qtls/structs_equal_test.go
+
+linters-settings:
+  depguard:
+    type: blacklist
+    packages:
+      - github.com/marten-seemann/qtls
+    packages-with-error-message:
+      - github.com/marten-seemann/qtls: "importing qtls only allowed in internal/qtls"
+  misspell:
+    ignore-words:
+      - ect
+
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - deadcode
+    - depguard
+    - exhaustive
+    - exportloopref
+    - goimports
+    - gofmt # redundant, since gofmt *should* be a no-op after gofumpt
+    - gofumpt
+    - gosimple
+    - ineffassign
+    - misspell
+    - prealloc
+    - scopelint
+    - staticcheck
+    - stylecheck
+    - structcheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - vet
+
+issues:
+  exclude-rules:
+    - path: internal/qtls
+      linters:
+        - depguard

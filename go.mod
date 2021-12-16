@@ -40,7 +40,7 @@ require (
 	github.com/godbus/dbus/v5 v5.0.4
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
-	github.com/golang/mock v1.5.0
+	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/cadvisor v0.43.0
 	github.com/google/go-cmp v0.5.5
@@ -58,8 +58,8 @@ require (
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
-	github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.13.0
 	github.com/opencontainers/runc v1.0.2
 	github.com/opencontainers/selinux v1.8.2
 	github.com/pkg/errors v0.9.1
@@ -181,12 +181,14 @@ replace (
 	github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.4
 	github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
+	github.com/buger/jsonparser => github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
 	github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
 	github.com/certifi/gocertifi => github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054
 	github.com/cespare/xxhash => github.com/cespare/xxhash v1.1.0
 	github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu/v5 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
+	github.com/cheekybits/genny => github.com/cheekybits/genny v1.0.0
 	github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 	github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
@@ -236,6 +238,7 @@ replace (
 	github.com/flynn/go-shlex => github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568
 	github.com/fogleman/gg => github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90
 	github.com/form3tech-oss/jwt-go => github.com/form3tech-oss/jwt-go v3.2.3+incompatible
+	github.com/francoispqt/gojay => github.com/francoispqt/gojay v1.2.13
 	github.com/frankban/quicktest => github.com/frankban/quicktest v1.11.3
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 	github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
@@ -328,8 +331,14 @@ replace (
 	github.com/liggitt/tabwriter => github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent => github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc => github.com/lpabon/godbc v0.1.1
+	github.com/lucas-clemente/quic-go => github.com/lucas-clemente/quic-go v0.24.0
+	github.com/lunixbochs/vtclean => github.com/lunixbochs/vtclean v1.0.0
 	github.com/magiconair/properties => github.com/magiconair/properties v1.8.5
 	github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.6
+	github.com/marten-seemann/qpack => github.com/marten-seemann/qpack v0.2.1
+	github.com/marten-seemann/qtls-go1-15 => github.com/marten-seemann/qtls-go1-15 v0.1.4
+	github.com/marten-seemann/qtls-go1-16 => github.com/marten-seemann/qtls-go1-16 v0.1.4
+	github.com/marten-seemann/qtls-go1-17 => github.com/marten-seemann/qtls-go1-17 v0.1.0
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.3
 	github.com/mattn/go-runewidth => github.com/mattn/go-runewidth v0.0.7
@@ -414,6 +423,8 @@ replace (
 	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802
 	github.com/urfave/cli => github.com/urfave/cli v1.22.2
 	github.com/urfave/negroni => github.com/urfave/negroni v1.0.0
+	github.com/viant/assertly => github.com/viant/assertly v0.4.8
+	github.com/viant/toolbox => github.com/viant/toolbox v0.24.0
 	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.3

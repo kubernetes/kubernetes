@@ -1,0 +1,6 @@
+fuzzing/*.zip
+fuzzing/coverprofile
+fuzzing/crashers
+fuzzing/sonarprofile
+fuzzing/suppressions
+fuzzing/corpus/

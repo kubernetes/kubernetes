@@ -19,7 +19,8 @@ require (
 	github.com/moby/spdystream v0.2.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
-	github.com/onsi/ginkgo v1.14.0 // indirect
+	github.com/onsi/ginkgo v1.16.4 // indirect
+	github.com/onsi/gomega v1.13.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
@@ -37,4 +38,9 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	github.com/golang/mock => github.com/golang/mock v1.5.0
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
+	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
+	k8s.io/apimachinery => ../apimachinery
+)

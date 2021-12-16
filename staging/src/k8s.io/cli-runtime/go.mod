@@ -27,6 +27,9 @@ require (
 )
 
 replace (
+	github.com/golang/mock => github.com/golang/mock v1.5.0
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
+	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

@@ -1,0 +1,3 @@
+[submodule "integrationtests/interop/qifs"]
+	path = integrationtests/interop/qifs
+	url = https://github.com/qpackers/qifs.git

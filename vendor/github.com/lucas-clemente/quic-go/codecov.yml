@@ -1,0 +1,21 @@
+coverage:
+  round: nearest
+  ignore:
+    - streams_map_incoming_bidi.go
+    - streams_map_incoming_uni.go
+    - streams_map_outgoing_bidi.go
+    - streams_map_outgoing_uni.go
+    - http3/gzip_reader.go
+    - interop/
+    - internal/ackhandler/packet_linkedlist.go
+    - internal/utils/byteinterval_linkedlist.go
+    - internal/utils/newconnectionid_linkedlist.go
+    - internal/utils/packetinterval_linkedlist.go
+    - internal/utils/linkedlist/linkedlist.go
+    - fuzzing/
+    - metrics/
+  status:
+    project:
+      default:
+        threshold: 0.5
+    patch: false

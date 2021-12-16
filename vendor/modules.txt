@@ -164,6 +164,11 @@ github.com/chai2010/gettext-go/gettext/po
 # github.com/checkpoint-restore/go-criu/v5 v5.0.0 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
 github.com/checkpoint-restore/go-criu/v5
 github.com/checkpoint-restore/go-criu/v5/rpc
+# github.com/cheekybits/genny v1.0.0 => github.com/cheekybits/genny v1.0.0
+github.com/cheekybits/genny
+github.com/cheekybits/genny/generic
+github.com/cheekybits/genny/out
+github.com/cheekybits/genny/parse
 # github.com/cilium/ebpf v0.6.2 => github.com/cilium/ebpf v0.6.2
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
@@ -304,7 +309,7 @@ github.com/gogo/protobuf/vanity/command
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da => github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
-# github.com/golang/mock v1.5.0 => github.com/golang/mock v1.5.0
+# github.com/golang/mock v1.6.0 => github.com/golang/mock v1.5.0
 ## explicit
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.5.2 => github.com/golang/protobuf v1.5.2
@@ -496,10 +501,31 @@ github.com/liggitt/tabwriter
 github.com/lithammer/dedent
 # github.com/lpabon/godbc v0.1.1 => github.com/lpabon/godbc v0.1.1
 ## explicit
+# github.com/lucas-clemente/quic-go v0.24.0 => github.com/lucas-clemente/quic-go v0.24.0
+github.com/lucas-clemente/quic-go
+github.com/lucas-clemente/quic-go/http3
+github.com/lucas-clemente/quic-go/internal/ackhandler
+github.com/lucas-clemente/quic-go/internal/congestion
+github.com/lucas-clemente/quic-go/internal/flowcontrol
+github.com/lucas-clemente/quic-go/internal/handshake
+github.com/lucas-clemente/quic-go/internal/logutils
+github.com/lucas-clemente/quic-go/internal/protocol
+github.com/lucas-clemente/quic-go/internal/qerr
+github.com/lucas-clemente/quic-go/internal/qtls
+github.com/lucas-clemente/quic-go/internal/utils
+github.com/lucas-clemente/quic-go/internal/wire
+github.com/lucas-clemente/quic-go/logging
+github.com/lucas-clemente/quic-go/quicvarint
 # github.com/mailru/easyjson v0.7.6 => github.com/mailru/easyjson v0.7.6
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
+# github.com/marten-seemann/qpack v0.2.1 => github.com/marten-seemann/qpack v0.2.1
+github.com/marten-seemann/qpack
+# github.com/marten-seemann/qtls-go1-16 v0.1.4 => github.com/marten-seemann/qtls-go1-16 v0.1.4
+github.com/marten-seemann/qtls-go1-16
+# github.com/marten-seemann/qtls-go1-17 v0.1.0 => github.com/marten-seemann/qtls-go1-17 v0.1.0
+github.com/marten-seemann/qtls-go1-17
 # github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 => github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989 => github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989
@@ -547,7 +573,7 @@ github.com/nxadm/tail/ratelimiter
 github.com/nxadm/tail/util
 github.com/nxadm/tail/watch
 github.com/nxadm/tail/winfile
-# github.com/onsi/ginkgo v1.14.0 => github.com/onsi/ginkgo v1.14.0
+# github.com/onsi/ginkgo v1.16.4 => github.com/onsi/ginkgo v1.14.0
 ## explicit
 github.com/onsi/ginkgo
 github.com/onsi/ginkgo/config
@@ -575,7 +601,7 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
-# github.com/onsi/gomega v1.10.1 => github.com/onsi/gomega v1.10.1
+# github.com/onsi/gomega v1.13.0 => github.com/onsi/gomega v1.10.1
 ## explicit
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -946,12 +972,14 @@ go.uber.org/zap/zaptest
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
+golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/ed25519/internal/edwards25519
+golang.org/x/crypto/hkdf
 golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/nacl/secretbox
 golang.org/x/crypto/pbkdf2
@@ -979,7 +1007,11 @@ golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
+golang.org/x/net/internal/iana
+golang.org/x/net/internal/socket
 golang.org/x/net/internal/timeseries
+golang.org/x/net/ipv4
+golang.org/x/net/ipv6
 golang.org/x/net/trace
 golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f => golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
@@ -2452,12 +2484,14 @@ sigs.k8s.io/yaml
 # github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.4
 # github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible
 # github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
+# github.com/buger/jsonparser => github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23
 # github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
 # github.com/certifi/gocertifi => github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054
 # github.com/cespare/xxhash => github.com/cespare/xxhash v1.1.0
 # github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
 # github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 # github.com/checkpoint-restore/go-criu/v5 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
+# github.com/cheekybits/genny => github.com/cheekybits/genny v1.0.0
 # github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 # github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 # github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
@@ -2507,6 +2541,7 @@ sigs.k8s.io/yaml
 # github.com/flynn/go-shlex => github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568
 # github.com/fogleman/gg => github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90
 # github.com/form3tech-oss/jwt-go => github.com/form3tech-oss/jwt-go v3.2.3+incompatible
+# github.com/francoispqt/gojay => github.com/francoispqt/gojay v1.2.13
 # github.com/frankban/quicktest => github.com/frankban/quicktest v1.11.3
 # github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 # github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
@@ -2599,8 +2634,14 @@ sigs.k8s.io/yaml
 # github.com/liggitt/tabwriter => github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 # github.com/lithammer/dedent => github.com/lithammer/dedent v1.1.0
 # github.com/lpabon/godbc => github.com/lpabon/godbc v0.1.1
+# github.com/lucas-clemente/quic-go => github.com/lucas-clemente/quic-go v0.24.0
+# github.com/lunixbochs/vtclean => github.com/lunixbochs/vtclean v1.0.0
 # github.com/magiconair/properties => github.com/magiconair/properties v1.8.5
 # github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.6
+# github.com/marten-seemann/qpack => github.com/marten-seemann/qpack v0.2.1
+# github.com/marten-seemann/qtls-go1-15 => github.com/marten-seemann/qtls-go1-15 v0.1.4
+# github.com/marten-seemann/qtls-go1-16 => github.com/marten-seemann/qtls-go1-16 v0.1.4
+# github.com/marten-seemann/qtls-go1-17 => github.com/marten-seemann/qtls-go1-17 v0.1.0
 # github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 # github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.3
 # github.com/mattn/go-runewidth => github.com/mattn/go-runewidth v0.0.7
@@ -2685,6 +2726,8 @@ sigs.k8s.io/yaml
 # github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802
 # github.com/urfave/cli => github.com/urfave/cli v1.22.2
 # github.com/urfave/negroni => github.com/urfave/negroni v1.0.0
+# github.com/viant/assertly => github.com/viant/assertly v0.4.8
+# github.com/viant/toolbox => github.com/viant/toolbox v0.24.0
 # github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.1.0
 # github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
 # github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.3

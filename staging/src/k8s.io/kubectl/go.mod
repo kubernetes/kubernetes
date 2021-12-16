@@ -22,8 +22,8 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
-	github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.13.0
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2
 	github.com/spf13/cobra v1.2.1
@@ -47,6 +47,9 @@ require (
 )
 
 replace (
+	github.com/golang/mock => github.com/golang/mock v1.5.0
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
+	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

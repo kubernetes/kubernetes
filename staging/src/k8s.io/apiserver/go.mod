@@ -20,6 +20,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
+	github.com/lucas-clemente/quic-go v0.24.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
@@ -57,6 +58,9 @@ require (
 )
 
 replace (
+	github.com/golang/mock => github.com/golang/mock v1.5.0
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
+	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

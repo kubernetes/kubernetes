@@ -21,6 +21,7 @@ require (
 	github.com/googleapis/gnostic v0.5.5
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 	github.com/imdario/mergo v0.3.5
+	github.com/lucas-clemente/quic-go v0.24.0
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
@@ -29,6 +30,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
+	golang.org/x/tools v0.1.8 // indirect
 	google.golang.org/protobuf v1.27.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -40,6 +42,9 @@ require (
 )
 
 replace (
+	github.com/golang/mock => github.com/golang/mock v1.5.0
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
+	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
