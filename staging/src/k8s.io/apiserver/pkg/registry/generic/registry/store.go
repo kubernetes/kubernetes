@@ -391,6 +391,11 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 			return nil, err
 		}
 	}
+	if dryrun.IsDryRun(options.DryRun) {
+		if err := dryrun.ResetMetadata(obj, out); err != nil {
+			return nil, err
+		}
+	}
 	return out, nil
 }
 
