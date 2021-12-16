@@ -21,9 +21,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 # CA in /var/run/kubernetes.
 # Usage: `hack/local-up-cluster.sh`.
 
-DOCKER_OPTS=${DOCKER_OPTS:-""}
-export DOCKER=(docker "${DOCKER_OPTS[@]}")
-DOCKER_ROOT=${DOCKER_ROOT:-""}
+§DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
 PSP_ADMISSION=${PSP_ADMISSION:-""}
@@ -40,10 +38,6 @@ FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 NET_PLUGIN=${NET_PLUGIN:-""}
 # Name of the dns addon, eg: "kube-dns" or "coredns"
 DNS_ADDON=${DNS_ADDON:-"coredns"}
-# Place the config files and binaries required by NET_PLUGIN in these directory,
-# eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
-CNI_CONF_DIR=${CNI_CONF_DIR:-""}
-CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 CLUSTER_CIDR=${CLUSTER_CIDR:-10.1.0.0/16}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
@@ -232,7 +226,7 @@ LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"containerd"}
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"remote"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
@@ -249,19 +243,6 @@ CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${CERT_DIR}/client-ca.key"
 # Reuse certs will skip generate new ca/cert files under CERT_DIR
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
 REUSE_CERTS=${REUSE_CERTS:-false}
-
-# name of the cgroup driver, i.e. cgroupfs or systemd
-if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
-  # default cgroup driver to match what is reported by docker to simplify local development
-  if [[ -z ${CGROUP_DRIVER} ]]; then
-    # match driver with docker runtime reported value (they must match)
-    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
-    echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
-  fi
-  if [[ -f /var/log/docker.log && ! -f "${LOG_DIR}/docker.log" ]]; then
-    ln -s /var/log/docker.log "${LOG_DIR}/docker.log"
-  fi
-fi
 
 
 
@@ -1106,19 +1087,6 @@ fi
 # validate that etcd is: not running, in path, and has minimum required version.
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
-fi
-
-if [ "${CONTAINER_RUNTIME}" == "docker" ]; then
-  if ! kube::util::ensure_docker_daemon_connectivity; then
-    exit 1
-  else
-    # docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
-    # so we append a new rule on top of the docker one
-    # -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER  <-- docker rule
-    if ! iptables -t nat -C OUTPUT -m addrtype --dst-type LOCAL -j DOCKER; then
-      iptables -t nat -A OUTPUT -m addrtype --dst-type LOCAL -j DOCKER
-    fi
-  fi
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
