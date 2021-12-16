@@ -132,14 +132,14 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 		return nil, remainingBudget
 	}
 	if s.compilationErr != nil {
-		errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("rule compiler initialization error: %v", s.compilationErr)))
+		errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("rule compiler initialization error: %v", s.compilationErr)))
 		return errs, remainingBudget
 	}
 	if len(s.compiledRules) == 0 {
 		return nil, remainingBudget // nothing to do
 	}
 	if remainingBudget <= 0 {
-		errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run")))
+		errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run")))
 		return errs, -1
 	}
 	if s.isResourceRoot {
@@ -149,7 +149,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	for i, compiled := range s.compiledRules {
 		rule := sts.XValidations[i]
 		if compiled.Error != nil {
-			errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("rule compile error: %v", compiled.Error)))
+			errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("rule compile error: %v", compiled.Error)))
 			continue
 		}
 		if compiled.Program == nil {
@@ -168,11 +168,11 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 		} else {
 			rtCost := evalDetails.ActualCost()
 			if rtCost == nil {
-				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("runtime cost could not be calculated for validation rule: %v, no further validation rules will be run", ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("runtime cost could not be calculated for validation rule: %v, no further validation rules will be run", ruleErrorString(rule))))
 				return errs, -1
 			} else {
 				if *rtCost > math.MaxInt64 || int64(*rtCost) > remainingBudget {
-					errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run")))
+					errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run")))
 					return errs, -1
 				}
 				remainingBudget -= int64(*rtCost)
@@ -185,21 +185,21 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 				// error was found. Here, an overload error has occurred at runtime no details are provided, so we
 				// append a more descriptive error message. This error can only occur when static type checking has
 				// been bypassed. int-or-string is typed as dynamic and so bypasses compiler type checking.
-				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("'%v': call arguments did not match a supported operator, function or macro signature for rule: %v", err, ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("'%v': call arguments did not match a supported operator, function or macro signature for rule: %v", err, ruleErrorString(rule))))
 			} else if strings.HasPrefix(err.Error(), "operation cancelled: actual cost limit exceeded") {
-				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("'%v': no further validation rules will be run due to call cost exceeds limit for rule: %v", err, ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("'%v': no further validation rules will be run due to call cost exceeds limit for rule: %v", err, ruleErrorString(rule))))
 				return errs, -1
 			} else {
 				// no such key: {key}, index out of bounds: {index}, integer overflow, division by zero, ...
-				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("%v evaluating rule: %v", err, ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("%v evaluating rule: %v", err, ruleErrorString(rule))))
 			}
 			continue
 		}
 		if evalResult != types.True {
 			if len(rule.Message) != 0 {
-				errs = append(errs, field.Invalid(fldPath, obj, rule.Message))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, rule.Message))
 			} else {
-				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("failed rule: %s", ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("failed rule: %s", ruleErrorString(rule))))
 			}
 		}
 	}
