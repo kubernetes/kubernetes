@@ -18,6 +18,7 @@ package dryrun
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -47,7 +48,11 @@ var kindAllowList = sets.NewString()
 const testNamespace = "dryrunnamespace"
 
 func DryRunCreateWithGenerateNameTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstructured.Unstructured, gvResource schema.GroupVersionResource) {
-	// Create a new object with generateName
+	// special resources with dots in the name cannot use generateName
+	if strings.Contains(obj.GetName(), ".") {
+		return
+	}
+	// Create a new object with generateName to ensure we don't taint the original object
 	gnObj := obj.DeepCopy()
 	gnObj.SetGenerateName(obj.GetName() + "-")
 	gnObj.SetName("")
@@ -74,8 +79,11 @@ func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstruct
 		t.Fatalf("created object's name should be an empty string if using GenerateName: %v", createdObj)
 	}
 
-	if _, err := rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
-		t.Fatalf("object shouldn't exist: %v", err)
+	// we won't have a generated name here, so we won't check for this case
+	if obj.GetGenerateName() == "" {
+		if _, err := rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+			t.Fatalf("object shouldn't exist: %v, %v", obj, err)
+		}
 	}
 }
 
