@@ -47,7 +47,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 		# TYPE kubelet_volume_stats_inodes_used gauge
 		# HELP kubelet_volume_stats_used_bytes [ALPHA] Number of used bytes in the volume
 		# TYPE kubelet_volume_stats_used_bytes gauge
-		# HELP kubelet_volume_stats_health_status [ALPHA] Volume health status. The count is either 1 or 0. 1 indicates the volume is unhealthy and 0 indicates volume is healthy
+		# HELP kubelet_volume_stats_health_status [ALPHA] Volume health status. The count is either 1 or 0. When volume_health_status is abnormal, 1 indicates the volume is unhealthy, 0 indicates volume is healthy
 		# TYPE kubelet_volume_stats_health_status gauge
 	`
 
