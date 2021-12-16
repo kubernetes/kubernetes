@@ -468,13 +468,16 @@ func toCgroupFsName(cgroupName cm.CgroupName) string {
 	return cgroupName.ToCgroupfs()
 }
 
-// reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
+// reduceAllocatableMemoryUsageIfCgroupv1 uses memory.force_empty (https://lwn.net/Articles/432224/)
 // to make the kernel reclaim memory in the allocatable cgroup
-// the time to reduce pressure may be unbounded, but usually finishes within a second
-func reduceAllocatableMemoryUsage() {
-	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
-	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
-	framework.ExpectNoError(err)
+// the time to reduce pressure may be unbounded, but usually finishes within a second.
+// memory.force_empty is no supported in cgroupv2.
+func reduceAllocatableMemoryUsageIfCgroupv1() {
+	if !IsCgroup2UnifiedMode() {
+		cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
+		_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
+		framework.ExpectNoError(err)
+	}
 }
 
 // Equivalent of featuregatetesting.SetFeatureGateDuringTest

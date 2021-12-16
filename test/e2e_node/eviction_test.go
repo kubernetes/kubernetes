@@ -510,7 +510,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 	ginkgo.Context("", func() {
 		ginkgo.BeforeEach(func() {
 			// reduce memory usage in the allocatable cgroup to ensure we do not have MemoryPressure
-			reduceAllocatableMemoryUsage()
+			reduceAllocatableMemoryUsageIfCgroupv1()
 			// Nodes do not immediately report local storage capacity
 			// Sleep so that pods requesting local storage do not fail to schedule
 			time.Sleep(30 * time.Second)
@@ -603,7 +603,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				return nil
 			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
 
-			reduceAllocatableMemoryUsage()
+			reduceAllocatableMemoryUsageIfCgroupv1()
 			ginkgo.By("making sure we have all the required images for testing")
 			prePullImagesIfNeccecary()
 
