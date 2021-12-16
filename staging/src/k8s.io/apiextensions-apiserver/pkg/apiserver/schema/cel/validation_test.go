@@ -1444,11 +1444,11 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			errors: map[string]string{
 				// data is validated before CEL evaluation, so these errors should not be surfaced to end users
-				"has(self.o)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.m)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.l)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.s)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.lm)":            "invalid data, expected []interface{} to match the provided schema with type=array",
+				"has(self.o)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.m)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.l)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.s)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.lm)":            "invalid data, expected an array for the provided schema with type=array",
 				"has(self.intorstring)":   "invalid data, expected XIntOrString value to be either a string or integer",
 				"self.nullable[0] == 'x'": "invalid data, got null for schema with nullable=false",
 				// TODO: also find a way to test the errors returned for: array with no items, object with no properties or additionalProperties, invalid listType and invalid type.
