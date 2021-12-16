@@ -32,17 +32,16 @@ type ControllerMetrics struct {
 	controllerInstanceCount *k8smetrics.GaugeVec
 }
 
-// newControllerMetrics create a new ControllerMetrics, configured with default metric names.
+// NewControllerMetrics create a new ControllerMetrics, configured with default metric names.
 func NewControllerMetrics() *ControllerMetrics {
 	controllerInstanceCount := k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
 			Name:           "managed_controller_instances",
-			Help:           "Instances of individual controllers currently running",
+			Help:           "Indicates where instances of a controller are currently running",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
 		[]string{"name", "manager"},
 	)
-	//legacyregistry.MustRegister(controllerInstanceCount)
 	controllerMetrics := &ControllerMetrics{
 		controllerInstanceCount: controllerInstanceCount,
 	}
