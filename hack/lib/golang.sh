@@ -89,6 +89,7 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 # The set of server targets we build docker images for
 kube::golang::server_image_targets() {
   # NOTE: this contains cmd targets for kube::build::get_docker_wrapped_binaries
+  local os_name="${1:-}"
   local targets=(
     cmd/kube-apiserver
     cmd/kube-controller-manager
@@ -96,12 +97,23 @@ kube::golang::server_image_targets() {
     cmd/kube-proxy
     cmd/kubectl
   )
+  if [[ "${os_name}" = "windows" ]]; then
+    targets=(
+      cmd/kube-proxy
+    )
+  fi
   echo "${targets[@]}"
 }
 
 IFS=" " read -ra KUBE_SERVER_IMAGE_TARGETS <<< "$(kube::golang::server_image_targets)"
 readonly KUBE_SERVER_IMAGE_TARGETS
 readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
+
+IFS=" " read -ra KUBE_SERVER_WINDOWS_IMAGE_TARGETS <<< "$(kube::golang::server_image_targets windows)"
+readonly KUBE_SERVER_WINDOWS_IMAGE_TARGETS
+# Trim the */ prefix and add the .exe suffix.
+IFS=" " read -ra KUBE_SERVER_WINDOWS_IMAGE_BINARIES <<< "$(printf '%s.exe ' ${KUBE_SERVER_WINDOWS_IMAGE_TARGETS[@]##*/})"
+readonly KUBE_SERVER_WINDOWS_IMAGE_BINARIES
 
 # The set of conformance targets we build docker image for
 kube::golang::conformance_image_targets() {
