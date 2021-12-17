@@ -277,7 +277,9 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 
 	// Clean up.
 	stop <- struct{}{}
-	<- time.updated
+	//a message is sent to time.updated in func Stop() at the end of the child goroutine
+	//to terminate the child, a receive on time.updated is needed here
+	<- time.updated 
 }
 
 func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
@@ -359,6 +361,8 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 
 	// Clean up.
 	stop <- struct{}{}
+	//a message is sent to time.updated in func Stop() at the end of the child goroutine
+	//to terminate the child, a receive on time.updated is needed here
 	<- time.updated
 }
 
@@ -443,5 +447,7 @@ func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
 
 	// Clean up.
 	stop <- struct{}{}
+	//a message is sent to time.updated in func Stop() at the end of the child goroutine
+	//to terminate the child, a receive on time.updated is needed here
 	<- time.updated
 }
