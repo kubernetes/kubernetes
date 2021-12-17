@@ -1231,7 +1231,7 @@ func TestUpdatePod(t *testing.T) {
 		currentPodConditions     []v1.PodCondition
 		newPodCondition          *v1.PodCondition
 		currentNominatedNodeName string
-		newNominatedNodeName     string
+		newNominatingInfo        *framework.NominatingInfo
 		expectedPatchRequests    int
 		expectedPatchDataPattern string
 	}{
@@ -1361,7 +1361,7 @@ func TestUpdatePod(t *testing.T) {
 				Reason:             "currentReason",
 				Message:            "currentMessage",
 			},
-			newNominatedNodeName:     "node1",
+			newNominatingInfo:        &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"},
 			expectedPatchRequests:    1,
 			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
 		},
@@ -1388,7 +1388,7 @@ func TestUpdatePod(t *testing.T) {
 				},
 			}
 
-			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatedNodeName); err != nil {
+			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
 				t.Fatalf("Error calling update: %v", err)
 			}
 
