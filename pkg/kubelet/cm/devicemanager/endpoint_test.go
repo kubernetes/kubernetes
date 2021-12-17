@@ -113,7 +113,7 @@ func TestAllocate(t *testing.T) {
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
 	callbackCount := 0
-	callbackChan := make(chan int)
+	callbackChan := make(chan int, 1)
 	p, e := esetup(t, devs, socket, "mock", func(n string, d []pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
@@ -163,7 +163,7 @@ func TestAllocate(t *testing.T) {
 func TestGetPreferredAllocation(t *testing.T) {
 	socket := path.Join("/tmp", esocketName())
 	callbackCount := 0
-	callbackChan := make(chan int)
+	callbackChan := make(chan int, 1)
 	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
