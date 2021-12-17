@@ -773,8 +773,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		s.ContainerRuntime,
 		s.RuntimeCgroups,
 		s.RemoteRuntimeEndpoint,
-		s.RemoteImageEndpoint,
-		s.NonMasqueradeCIDR)
+		s.RemoteImageEndpoint)
 	if err != nil {
 		return err
 	}
