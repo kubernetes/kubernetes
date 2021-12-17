@@ -533,12 +533,12 @@ func asSingleNodeMultiWriterCapableCSIAccessModeV1(am api.PersistentVolumeAccess
 func newGrpcConn(addr csiAddr, metricsManager *MetricsManager) (*grpc.ClientConn, error) {
 	network := "unix"
 	klog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))
-
+	address := string(addr)
 	return grpc.Dial(
-		string(addr),
+		"unix://"+address,
 		grpc.WithInsecure(),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, target)
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, address)
 		}),
 		grpc.WithChainUnaryInterceptor(metricsManager.RecordMetricsInterceptor),
 	)
