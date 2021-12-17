@@ -268,7 +268,9 @@ func ensureConfiguration(wrapper configurationWrapper, strategy ensureStrategy, 
 	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 }
 
-func removeConfiguration(wrapper configurationWrapper, name string) error {
+// removeAutoUpdateEnabledConfiguration makes an attempt to remove the given
+// configuration object if automatic update of the spec is enabled for this object.
+func removeAutoUpdateEnabledConfiguration(wrapper configurationWrapper, name string) error {
 	current, err := wrapper.Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -305,16 +307,17 @@ func removeConfiguration(wrapper configurationWrapper, name string) error {
 	return nil
 }
 
-// getRemoveCandidate returns a list of configuration objects we should delete
-// from the cluster given a set of bootstrap and current configuration.
-// bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
-// current: a set of configuration objects that exist on the cluster
-// Any object present in current is a candidate for removal if both a and b are true:
+// getDanglingBootstrapObjectNames returns a list of names of bootstrap
+// configuration objects that are potentially candidates for deletion from
+// the cluster, given a set of bootstrap and current configuration.
+//  - bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
+//  - current: a set of configuration objects that exist on the cluster
+// Any object present in current is added to the list if both a and b are true:
 //  a. the object in current is missing from the bootstrap configuration
 //  b. the object has the designated auto-update annotation key
-// This function shares the common logic for both FlowSchema and PriorityLevelConfiguration
-// type and hence it accepts metav1.Object only.
-func getRemoveCandidate(bootstrap sets.String, current []metav1.Object) []string {
+// This function shares the common logic for both FlowSchema and
+// PriorityLevelConfiguration type and hence it accepts metav1.Object only.
+func getDanglingBootstrapObjectNames(bootstrap sets.String, current []metav1.Object) []string {
 	if len(current) == 0 {
 		return nil
 	}
@@ -323,7 +326,9 @@ func getRemoveCandidate(bootstrap sets.String, current []metav1.Object) []string
 	for i := range current {
 		object := current[i]
 		if _, ok := object.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]; !ok {
-			// the configuration object does not have the annotation key
+			// the configuration object does not have the annotation key,
+			// it's probably a user defined configuration object,
+			// so we can skip it.
 			continue
 		}
 

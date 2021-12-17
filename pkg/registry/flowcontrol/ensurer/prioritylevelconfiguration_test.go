@@ -338,7 +338,7 @@ func TestRemovePriorityLevelConfiguration(t *testing.T) {
 			}
 
 			remover := NewPriorityLevelRemover(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer))
-			err := remover.Remove([]string{test.bootstrapName})
+			err := remover.RemoveAutoUpdateEnabledObjects([]string{test.bootstrapName})
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
@@ -426,7 +426,7 @@ func TestGetPriorityLevelRemoveCandidate(t *testing.T) {
 			}
 
 			lister := flowcontrollisters.NewPriorityLevelConfigurationLister(indexer)
-			removeListGot, err := GetPriorityLevelRemoveCandidate(lister, test.bootstrap)
+			removeListGot, err := GetPriorityLevelRemoveCandidates(lister, test.bootstrap)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}

@@ -322,7 +322,7 @@ func TestRemoveFlowSchema(t *testing.T) {
 			}
 
 			remover := NewFlowSchemaRemover(client, flowcontrollisters.NewFlowSchemaLister(indexer))
-			err := remover.Remove([]string{test.bootstrapName})
+			err := remover.RemoveAutoUpdateEnabledObjects([]string{test.bootstrapName})
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
@@ -410,7 +410,7 @@ func TestGetFlowSchemaRemoveCandidate(t *testing.T) {
 			}
 
 			lister := flowcontrollisters.NewFlowSchemaLister(indexer)
-			removeListGot, err := GetFlowSchemaRemoveCandidate(lister, test.bootstrap)
+			removeListGot, err := GetFlowSchemaRemoveCandidates(lister, test.bootstrap)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
