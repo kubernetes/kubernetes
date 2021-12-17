@@ -27,12 +27,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	appsapi "k8s.io/kubernetes/pkg/apis/apps"
+	batchapi "k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1defaults "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
@@ -145,11 +149,12 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
-				{VolumeSource: api.VolumeSource{
-					Projected: &api.ProjectedVolumeSource{
-						Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}},
+				{
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}},
+						},
 					},
-				},
 				},
 			},
 		},
@@ -290,7 +295,6 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
-
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	admit.SetExternalKubeInformerFactory(informerFactory)
@@ -788,6 +792,43 @@ func TestAddImagePullSecrets(t *testing.T) {
 	pod.Spec.ImagePullSecrets[1] = api.LocalObjectReference{Name: "baz"}
 	if !reflect.DeepEqual(originalSA, sa) {
 		t.Errorf("accidentally mutated the ServiceAccount.ImagePullSecrets: %v", sa.ImagePullSecrets)
+	}
+}
+
+func TestNoServiceAccountReject(t *testing.T) {
+	ns := "myns"
+
+	// Build a test client that the admission plugin can use to look up the service account missing from its cache
+	client := fake.NewSimpleClientset()
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.client = client
+
+	podSpec := api.PodSpec{ServiceAccountName: "idontexist"}
+
+	type testData struct {
+		obj      runtime.Object
+		kind     schema.GroupKind
+		resource schema.GroupResource
+	}
+
+	objs := []testData{
+		{obj: &appsapi.DaemonSet{Spec: appsapi.DaemonSetSpec{Template: api.PodTemplateSpec{Spec: podSpec}}}, kind: appsapi.Kind("DaemonSet"), resource: appsapi.Resource("daemonsets")},
+		{obj: &appsapi.Deployment{Spec: appsapi.DeploymentSpec{Template: api.PodTemplateSpec{Spec: podSpec}}}, kind: appsapi.Kind("Deployment"), resource: appsapi.Resource("deployments")},
+		{obj: &appsapi.StatefulSet{Spec: appsapi.StatefulSetSpec{Template: api.PodTemplateSpec{Spec: podSpec}}}, kind: appsapi.Kind("StatefulSet"), resource: appsapi.Resource("statefulsets")},
+		{obj: &batchapi.Job{Spec: batchapi.JobSpec{Template: api.PodTemplateSpec{Spec: podSpec}}}, kind: batchapi.Kind("Job"), resource: batchapi.Resource("jobs")},
+		{obj: &batchapi.CronJob{Spec: batchapi.CronJobSpec{JobTemplate: batchapi.JobTemplateSpec{Spec: batchapi.JobSpec{Template: api.PodTemplateSpec{Spec: podSpec}}}}}, kind: batchapi.Kind("CronJob"), resource: batchapi.Resource("cronjobs")},
+		{obj: &api.Pod{Spec: podSpec}, kind: api.Kind("Pod"), resource: api.Resource("pods")},
+	}
+
+	for _, testObj := range objs {
+		attrs := admission.NewAttributesRecord(testObj.obj, nil, testObj.kind.WithVersion("version"), ns, "myname", testObj.resource.WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+		err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
+		if err == nil {
+			t.Errorf("Expected to be rejected from referencing a service account that doesnt exist: %s", testObj.kind)
+		}
 	}
 }
 

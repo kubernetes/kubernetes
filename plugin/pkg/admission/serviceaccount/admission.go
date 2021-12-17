@@ -37,7 +37,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	appsapi "k8s.io/kubernetes/pkg/apis/apps"
+	batchapi "k8s.io/kubernetes/pkg/apis/batch"
+	coreapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/pointer"
 )
@@ -87,10 +89,12 @@ type Plugin struct {
 	generateName func(string) string
 }
 
-var _ admission.MutationInterface = &Plugin{}
-var _ admission.ValidationInterface = &Plugin{}
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+var (
+	_ admission.MutationInterface   = &Plugin{}
+	_ admission.ValidationInterface = &Plugin{}
+	_                               = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
+	_                               = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+)
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
@@ -141,35 +145,50 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return nil
 	}
 
-	pod := a.GetObject().(*api.Pod)
+	var podSpec *coreapi.PodSpec
 
-	// Don't modify the spec of mirror pods.
-	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
-	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
-	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
-		return s.Validate(ctx, a, o)
+	switch o := a.GetObject().(type) {
+	case *appsapi.DaemonSet:
+		podSpec = &o.Spec.Template.Spec
+	case *appsapi.Deployment:
+		podSpec = &o.Spec.Template.Spec
+	case *appsapi.StatefulSet:
+		podSpec = &o.Spec.Template.Spec
+	case *batchapi.CronJob:
+		podSpec = &o.Spec.JobTemplate.Spec.Template.Spec
+	case *batchapi.Job:
+		podSpec = &o.Spec.Template.Spec
+	case *coreapi.Pod:
+		// Don't modify the spec of mirror pods.
+		// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
+		// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
+		if _, isMirrorPod := o.Annotations[coreapi.MirrorPodAnnotationKey]; isMirrorPod {
+			return s.Validate(ctx, a, nil)
+		}
+
+		podSpec = &o.Spec
 	}
 
 	// Set the default service account if needed
-	if len(pod.Spec.ServiceAccountName) == 0 {
-		pod.Spec.ServiceAccountName = DefaultServiceAccountName
+	if len(podSpec.ServiceAccountName) == 0 {
+		podSpec.ServiceAccountName = DefaultServiceAccountName
 	}
 
-	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
+	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), podSpec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
+		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), podSpec.ServiceAccountName, err))
 	}
-	if s.MountServiceAccountToken && shouldAutomount(serviceAccount, pod) {
-		s.mountServiceAccountToken(serviceAccount, pod)
+	if s.MountServiceAccountToken && shouldAutomount(serviceAccount, podSpec) {
+		s.mountServiceAccountToken(serviceAccount, podSpec)
 	}
-	if len(pod.Spec.ImagePullSecrets) == 0 {
-		pod.Spec.ImagePullSecrets = make([]api.LocalObjectReference, len(serviceAccount.ImagePullSecrets))
+	if len(podSpec.ImagePullSecrets) == 0 {
+		podSpec.ImagePullSecrets = make([]coreapi.LocalObjectReference, len(serviceAccount.ImagePullSecrets))
 		for i := 0; i < len(serviceAccount.ImagePullSecrets); i++ {
-			pod.Spec.ImagePullSecrets[i].Name = serviceAccount.ImagePullSecrets[i].Name
+			podSpec.ImagePullSecrets[i].Name = serviceAccount.ImagePullSecrets[i].Name
 		}
 	}
 
-	return s.Validate(ctx, a, o)
+	return s.Validate(ctx, a, nil)
 }
 
 // Validate the data we obtained
@@ -178,10 +197,11 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return nil
 	}
 
-	pod := a.GetObject().(*api.Pod)
+	// TODO add switch bits here
+	pod := a.GetObject().(*coreapi.Pod)
 
 	// Mirror pods have restrictions on what they can reference
-	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+	if _, isMirrorPod := pod.Annotations[coreapi.MirrorPodAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
 		}
@@ -212,7 +232,7 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	}
 
 	if s.enforceMountableSecrets(serviceAccount) {
-		if err := s.limitSecretReferences(serviceAccount, pod); err != nil {
+		if err := s.limitSecretReferences(serviceAccount, &pod.Spec); err != nil {
 			return admission.NewForbidden(a, err)
 		}
 	}
@@ -221,9 +241,17 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 }
 
 func shouldIgnore(a admission.Attributes) bool {
-	if a.GetResource().GroupResource() != api.Resource("pods") {
+	switch a.GetResource().GroupResource() {
+	case appsapi.Resource("daemonsets"):
+	case appsapi.Resource("deployments"):
+	case appsapi.Resource("statefulsets"):
+	case batchapi.Resource("jobs"):
+	case batchapi.Resource("cronjobs"):
+	case coreapi.Resource("pods"):
+	default:
 		return true
 	}
+
 	if a.GetSubresource() != "" {
 		return true
 	}
@@ -231,18 +259,25 @@ func shouldIgnore(a admission.Attributes) bool {
 	if obj == nil {
 		return true
 	}
-	_, ok := obj.(*api.Pod)
-	if !ok {
+
+	switch obj.(type) {
+	case *appsapi.DaemonSet:
+	case *appsapi.Deployment:
+	case *appsapi.StatefulSet:
+	case *batchapi.Job:
+	case *batchapi.CronJob:
+	case *coreapi.Pod:
+	default:
 		return true
 	}
 
 	return false
 }
 
-func shouldAutomount(sa *corev1.ServiceAccount, pod *api.Pod) bool {
+func shouldAutomount(sa *corev1.ServiceAccount, podSpec *coreapi.PodSpec) bool {
 	// Pod's preference wins
-	if pod.Spec.AutomountServiceAccountToken != nil {
-		return *pod.Spec.AutomountServiceAccountToken
+	if podSpec.AutomountServiceAccountToken != nil {
+		return *podSpec.AutomountServiceAccountToken
 	}
 	// Then service account's
 	if sa.AutomountServiceAccountToken != nil {
@@ -297,16 +332,16 @@ func (s *Plugin) getServiceAccount(namespace string, name string) (*corev1.Servi
 		}
 	}
 
-	return nil, errors.NewNotFound(api.Resource("serviceaccount"), name)
+	return nil, errors.NewNotFound(coreapi.Resource("serviceaccount"), name)
 }
 
-func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
+func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, podSpec *coreapi.PodSpec) error {
 	// Ensure all secrets the pod references are allowed by the service account
 	mountableSecrets := sets.NewString()
 	for _, s := range serviceAccount.Secrets {
 		mountableSecrets.Insert(s.Name)
 	}
-	for _, volume := range pod.Spec.Volumes {
+	for _, volume := range podSpec.Volumes {
 		source := volume.VolumeSource
 		if source.Secret == nil {
 			continue
@@ -317,7 +352,7 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 		}
 	}
 
-	for _, container := range pod.Spec.InitContainers {
+	for _, container := range podSpec.InitContainers {
 		for _, env := range container.Env {
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
@@ -327,7 +362,7 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 		}
 	}
 
-	for _, container := range pod.Spec.Containers {
+	for _, container := range podSpec.Containers {
 		for _, env := range container.Env {
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
@@ -342,7 +377,7 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 	for _, s := range serviceAccount.ImagePullSecrets {
 		pullSecrets.Insert(s.Name)
 	}
-	for i, pullSecretRef := range pod.Spec.ImagePullSecrets {
+	for i, pullSecretRef := range podSpec.ImagePullSecrets {
 		if !pullSecrets.Has(pullSecretRef.Name) {
 			return fmt.Errorf(`imagePullSecrets[%d].name="%s" is not allowed because service account %s does not reference that imagePullSecret`, i, pullSecretRef.Name, serviceAccount.Name)
 		}
@@ -350,12 +385,12 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 	return nil
 }
 
-func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) {
+func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, podSpec *coreapi.PodSpec) {
 	// Find the volume and volume name for the ServiceAccountTokenSecret if it already exists
 	tokenVolumeName := ""
 	hasTokenVolume := false
 	allVolumeNames := sets.NewString()
-	for _, volume := range pod.Spec.Volumes {
+	for _, volume := range podSpec.Volumes {
 		allVolumeNames.Insert(volume.Name)
 		if strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-") {
 			tokenVolumeName = volume.Name
@@ -370,7 +405,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 	}
 
 	// Create the prototypical VolumeMount
-	volumeMount := api.VolumeMount{
+	volumeMount := coreapi.VolumeMount{
 		Name:      tokenVolumeName,
 		ReadOnly:  true,
 		MountPath: DefaultAPITokenMountPath,
@@ -378,7 +413,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 
 	// Ensure every container mounts the APISecret volume
 	needsTokenVolume := false
-	for i, container := range pod.Spec.InitContainers {
+	for i, container := range podSpec.InitContainers {
 		existingContainerMount := false
 		for _, volumeMount := range container.VolumeMounts {
 			// Existing mounts at the default mount path prevent mounting of the API token
@@ -388,11 +423,11 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 			}
 		}
 		if !existingContainerMount {
-			pod.Spec.InitContainers[i].VolumeMounts = append(pod.Spec.InitContainers[i].VolumeMounts, volumeMount)
+			podSpec.InitContainers[i].VolumeMounts = append(podSpec.InitContainers[i].VolumeMounts, volumeMount)
 			needsTokenVolume = true
 		}
 	}
-	for i, container := range pod.Spec.Containers {
+	for i, container := range podSpec.Containers {
 		existingContainerMount := false
 		for _, volumeMount := range container.VolumeMounts {
 			// Existing mounts at the default mount path prevent mounting of the API token
@@ -402,16 +437,16 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 			}
 		}
 		if !existingContainerMount {
-			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, volumeMount)
+			podSpec.Containers[i].VolumeMounts = append(podSpec.Containers[i].VolumeMounts, volumeMount)
 			needsTokenVolume = true
 		}
 	}
 
 	// Add the volume if a container needs it
 	if !hasTokenVolume && needsTokenVolume {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{
+		podSpec.Volumes = append(podSpec.Volumes, coreapi.Volume{
 			Name: tokenVolumeName,
-			VolumeSource: api.VolumeSource{
+			VolumeSource: coreapi.VolumeSource{
 				Projected: TokenVolumeSource(),
 			},
 		})
@@ -419,23 +454,23 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 }
 
 // TokenVolumeSource returns the projected volume source for service account token.
-func TokenVolumeSource() *api.ProjectedVolumeSource {
-	return &api.ProjectedVolumeSource{
+func TokenVolumeSource() *coreapi.ProjectedVolumeSource {
+	return &coreapi.ProjectedVolumeSource{
 		// explicitly set default value, see #104464
 		DefaultMode: pointer.Int32(v1.ProjectedVolumeSourceDefaultMode),
-		Sources: []api.VolumeProjection{
+		Sources: []coreapi.VolumeProjection{
 			{
-				ServiceAccountToken: &api.ServiceAccountTokenProjection{
+				ServiceAccountToken: &coreapi.ServiceAccountTokenProjection{
 					Path:              "token",
 					ExpirationSeconds: serviceaccount.WarnOnlyBoundTokenExpirationSeconds,
 				},
 			},
 			{
-				ConfigMap: &api.ConfigMapProjection{
-					LocalObjectReference: api.LocalObjectReference{
+				ConfigMap: &coreapi.ConfigMapProjection{
+					LocalObjectReference: coreapi.LocalObjectReference{
 						Name: "kube-root-ca.crt",
 					},
-					Items: []api.KeyToPath{
+					Items: []coreapi.KeyToPath{
 						{
 							Key:  "ca.crt",
 							Path: "ca.crt",
@@ -444,11 +479,11 @@ func TokenVolumeSource() *api.ProjectedVolumeSource {
 				},
 			},
 			{
-				DownwardAPI: &api.DownwardAPIProjection{
-					Items: []api.DownwardAPIVolumeFile{
+				DownwardAPI: &coreapi.DownwardAPIProjection{
+					Items: []coreapi.DownwardAPIVolumeFile{
 						{
 							Path: "namespace",
-							FieldRef: &api.ObjectFieldSelector{
+							FieldRef: &coreapi.ObjectFieldSelector{
 								APIVersion: "v1",
 								FieldPath:  "metadata.namespace",
 							},
