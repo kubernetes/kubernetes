@@ -105,7 +105,8 @@ kube::golang::server_image_targets() {
 
 IFS=" " read -ra KUBE_SERVER_IMAGE_TARGETS <<< "$(kube::golang::server_image_targets)"
 readonly KUBE_SERVER_IMAGE_TARGETS
-readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
+readonly KUBE_SERVER_LINUX_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
+readonly KUBE_SERVER_WINDOWS_IMAGE_BINARIES=("kube-proxy.exe")
 
 # The set of conformance targets we build docker image for
 kube::golang::conformance_image_targets() {
@@ -439,7 +440,7 @@ kube::golang::set_platform_envs() {
 
   # if CC is defined for platform then always enable it
   ccenv=$(echo "$platform" | awk -F/ '{print "KUBE_" toupper($1) "_" toupper($2) "_CC"}')
-  if [ -n "${!ccenv-}" ]; then 
+  if [ -n "${!ccenv-}" ]; then
     export CGO_ENABLED=1
     export CC="${!ccenv}"
   fi

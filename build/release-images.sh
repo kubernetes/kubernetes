@@ -38,6 +38,7 @@ fi
 kube::build::verify_prereqs
 kube::build::build_image
 kube::build::run_build_command make all WHAT="${CMD_TARGETS}" KUBE_BUILD_PLATFORMS="${KUBE_SERVER_PLATFORMS[*]}"
+kube::build::run_build_command make all WHAT="cmd/kube-proxy" KUBE_BUILD_PLATFORMS="windows/amd64"
 
 kube::build::copy_output
 

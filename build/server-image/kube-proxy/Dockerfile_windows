@@ -1,0 +1,36 @@
+# Copyright 2022 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Dockerfile used for the server images.
+
+# Note that the image doesn't really matter for Windows Host Process containers
+# # the files in the image are copied to $env:CONTAINER_SANDBOX_MOUNT_POINT on the host
+# # but the file system is the Host NOT the container
+ARG BASEIMAGE
+ARG BINARY
+
+FROM --platform=linux/amd64 curlimages/curl as bins
+
+WORKDIR /kube-proxy
+RUN curl -LO https://raw.githubusercontent.com/microsoft/SDN/master/Kubernetes/windows/hns.psm1
+
+FROM $BASEIMAGE
+
+ENV PATH="C:\Program Files\PowerShell;C:\bin;C:\utils;C:\Windows\system32;C:\Windows;"
+
+COPY ${BINARY} /bin/${BINARY}
+COPY --from=bins /kube-proxy/hns.psm1 /bin/hns.psm1
+ADD start.ps1 /bin/start.ps1
+
+ENTRYPOINT ["PowerShell"]
