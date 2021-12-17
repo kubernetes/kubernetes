@@ -96,11 +96,15 @@ type ProxyReactionFunc func(action Action) (handled bool, ret restclient.Respons
 
 // AddReactor appends a reactor to the end of the chain.
 func (c *Fake) AddReactor(verb, resource string, reaction ReactionFunc) {
+	c.Lock()
+	defer c.Unlock()
 	c.ReactionChain = append(c.ReactionChain, &SimpleReactor{verb, resource, reaction})
 }
 
 // PrependReactor adds a reactor to the beginning of the chain.
 func (c *Fake) PrependReactor(verb, resource string, reaction ReactionFunc) {
+	c.Lock()
+	defer c.Unlock()
 	c.ReactionChain = append([]Reactor{&SimpleReactor{verb, resource, reaction}}, c.ReactionChain...)
 }
 
@@ -120,11 +124,15 @@ func (c *Fake) PrependWatchReactor(resource string, reaction WatchReactionFunc) 
 
 // AddProxyReactor appends a reactor to the end of the chain.
 func (c *Fake) AddProxyReactor(resource string, reaction ProxyReactionFunc) {
+	c.Lock()
+	defer c.Unlock()
 	c.ProxyReactionChain = append(c.ProxyReactionChain, &SimpleProxyReactor{resource, reaction})
 }
 
 // PrependProxyReactor adds a reactor to the beginning of the chain.
 func (c *Fake) PrependProxyReactor(resource string, reaction ProxyReactionFunc) {
+	c.Lock()
+	defer c.Unlock()
 	c.ProxyReactionChain = append([]ProxyReactor{&SimpleProxyReactor{resource, reaction}}, c.ProxyReactionChain...)
 }
 
