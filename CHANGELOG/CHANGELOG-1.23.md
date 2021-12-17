@@ -1198,6 +1198,23 @@ filename | sha512 hash
 - Update the system-validators library to v1.6.0 (#106323, @neolit123) [SIG Cluster Lifecycle and Node]
 - Upgrade etcd to 3.5.1 (#105706, @uthark) [SIG Cloud Provider, Cluster Lifecycle and Testing]
 - When using `RequestedToCapacityRatio` ScoringStrategy, empty shape will cause error. (#106169, @kerthcet) [SIG Scheduling]
+- This release enables in-tree RBD migration to CSI driver with a couple of feature gates.  These featuregates are alpha in this release.
+
+  - `CSIMigrationRBD`: when enabled, it will redirect traffic from in tree rbd plugin ( kubernetes.io/rbd )  to CSI driver ( rbd.csi.ceph.com) , default to `false` now.
+  - `IntreePluginRBDUnregister`: Disables the RBD in-tree driver
+
+  The feature gates can be enabled by:
+
+  1. Adding the feature flag to the kube-controller-manager `--feature-gates=CSIMigrationRBD=true`
+  2. Adding the feature flag to the kubelet config:
+     featureGates:
+     `CSIMigrationRBD`: true
+
+  As a Kubernetes cluster operator that administers storage, here are the prerequisites that you must complete before you attempt migration to the RBD CSI driver:
+
+  * You must install the Ceph CSI driver (rbd.csi.ceph.com), v3.5.0 or above, into your Kubernetes cluster.
+  * Considering the clusterID field is a required parameter for CSI driver for its operations, but in-tree StorageClass has monitors field as a required parameter, a Kubernetes storage admin has to create a clusterID based on the monitors hash ( ex:#echo -n '<monitors_string>' | md5sum) in the CSI config map and keep the monitors under this clusterID configuration.
+  * Also, if the value of adminId in the in-tree Storageclass is different from admin, the adminSecretName mentioned in the in-tree Storageclass has to be patched with the base64 value of the adminId parameter value, otherwise this step can be skipped.(#95361, @humblec) [SIG API Machinery, Node, Scheduling, Storage]
 
 ### Documentation
 
