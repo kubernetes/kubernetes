@@ -383,10 +383,7 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 }
 
 func needsClusterIP(svc *api.Service) bool {
-	if svc.Spec.Type == api.ServiceTypeExternalName {
-		return false
-	}
-	return true
+	return svc.Spec.Type != api.ServiceTypeExternalName
 }
 
 func sameClusterIPs(oldSvc, newSvc *api.Service) bool {
