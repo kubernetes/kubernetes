@@ -277,6 +277,7 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 
 	// Clean up.
 	stop <- struct{}{}
+	<- time.updated
 }
 
 func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
@@ -358,6 +359,7 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 
 	// Clean up.
 	stop <- struct{}{}
+	<- time.updated
 }
 
 func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
@@ -441,4 +443,5 @@ func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
 
 	// Clean up.
 	stop <- struct{}{}
+	<- time.updated
 }
