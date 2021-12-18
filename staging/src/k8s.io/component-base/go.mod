@@ -40,7 +40,3 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 )
-
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20220209214540-3681064d5158
-
-replace golang.org/x/tools => golang.org/x/tools v0.1.10-0.20220218145154-897bd77cd717

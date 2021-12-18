@@ -18,5 +18,3 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cluster-bootstrap => ../cluster-bootstrap
 )
-
-replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220214200702-86341886e292

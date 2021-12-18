@@ -20,5 +20,3 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kubelet => ../kubelet
 )
-
-replace golang.org/x/net => golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd

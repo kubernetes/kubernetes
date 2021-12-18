@@ -44,13 +44,3 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 )
-
-replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-
-replace golang.org/x/net => golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-
-replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-
-replace golang.org/x/term => golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
-
-replace golang.org/x/time => golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
