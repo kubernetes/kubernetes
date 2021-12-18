@@ -797,7 +797,7 @@ func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) (co
 	containerList, _ := runtimeService.ListContainers(nil)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
-			return nil, fmt.Errorf("no PodsandBox found with Id '%s'", c.PodSandboxId)
+			return nil, fmt.Errorf("no PodsandBox found with Id '%s' for container with ID '%s' and Name '%s'", c.PodSandboxId, c.Id, c.Metadata.Name)
 		}
 		containerMap.Add(podSandboxMap[c.PodSandboxId], c.Metadata.Name, c.Id)
 	}
