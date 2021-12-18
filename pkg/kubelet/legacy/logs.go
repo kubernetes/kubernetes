@@ -29,17 +29,6 @@ import (
 // It used to live in the `pkg/kubelet/dockershim` package. While we
 // would eventually like to remove it entirely, we need to give users some form
 // of warning.
-//
-// By including the interface in
-// `pkg/kubelet/legacy/logs.go`, we ensure the interface is
-// available to `pkg/kubelet`, even when we are building with the `dockerless`
-// tag (i.e. not compiling the dockershim).
-// While the interface always exists, there will be no implementations of the
-// interface when building with the `dockerless` tag. The lack of
-// implementations should not be an issue, as we only expect `pkg/kubelet` code
-// to need an implementation of the `DockerLegacyService` when we are using
-// docker. If we are using docker, but building with the `dockerless` tag, than
-// this will be just one of many things that breaks.
 type DockerLegacyService interface {
 	// GetContainerLogs gets logs for a specific container.
 	GetContainerLogs(context.Context, *v1.Pod, kubecontainer.ContainerID, *v1.PodLogOptions, io.Writer, io.Writer) error
