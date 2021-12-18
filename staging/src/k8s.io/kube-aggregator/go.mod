@@ -11,7 +11,7 @@ require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
@@ -33,3 +33,5 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kube-aggregator => ../kube-aggregator
 )
+
+replace golang.org/x/net => golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd

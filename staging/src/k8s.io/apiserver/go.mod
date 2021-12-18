@@ -36,10 +36,10 @@ require (
 	go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.uber.org/zap v1.19.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
+	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
 	google.golang.org/grpc v1.40.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
@@ -63,3 +63,11 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 )
+
+replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+
+replace golang.org/x/net => golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+
+replace golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20220209214540-3681064d5158
