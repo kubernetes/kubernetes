@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -34,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -105,31 +103,34 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 		podType = "memory_limit_test_pod"
 	)
 
-	totalAllocatable := getTotalAllocatableMemory(f)
+	var pod v1.Pod
+	var failurePod v1.Pod
 
-	memValue := totalAllocatable.Value()
-	memPerPod := memValue / int64(allocatablePods)
-	ginkgo.By(fmt.Sprintf("Deploying %d pods with mem limit %v, then one additional pod", allocatablePods, memPerPod))
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	framework.ExpectNoError(err)
 
-	// these should all work
-	pods := newMemLimitTestPods(allocatablePods, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
-	f.PodClient().CreateBatch(pods)
+	for range nodeList.Items {
 
-	failurePods := newMemLimitTestPods(1, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
-	f.PodClient().Create(failurePods[0])
+		f.PodClient().Create(&pod)
+	}
 
+	f.PodClient().Create(&failurePod)
 	gomega.Eventually(func() bool {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
-			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePods[0].ObjectMeta.Name {
+			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePod.ObjectMeta.Name {
 				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
 				return true
 			}
 		}
 		return false
 	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
+
 }
 
 // newMemLimitTestPods creates a list of pods (specification) for test.
