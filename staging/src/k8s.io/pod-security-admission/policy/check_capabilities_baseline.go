@@ -45,8 +45,9 @@ func init() {
 // that limits the capabilities that can be added in 1.0+
 func CheckCapabilitiesBaseline() Check {
 	return Check{
-		ID:    "capabilities_baseline",
-		Level: api.LevelBaseline,
+		ID:      "capabilities_baseline",
+		Level:   api.LevelBaseline,
+		Overlap: true,
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),

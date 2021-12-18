@@ -33,7 +33,7 @@ type Evaluator interface {
 // checkRegistry provides a default implementation of an Evaluator.
 type checkRegistry struct {
 	// The checks are a map of check_ID -> sorted slice of versioned checks, newest first
-	baselineChecks, restrictedChecks map[api.Version][]CheckPodFn
+	baselineChecks, overlappingBaselineChecks, restrictedChecks map[api.Version][]CheckPodFn
 	// maxVersion is the maximum version that is cached, guaranteed to be at least
 	// the max MinimumVersion of all registered checks.
 	maxVersion api.Version
@@ -50,8 +50,9 @@ func NewEvaluator(checks []Check) (Evaluator, error) {
 		return nil, err
 	}
 	r := &checkRegistry{
-		baselineChecks:   map[api.Version][]CheckPodFn{},
-		restrictedChecks: map[api.Version][]CheckPodFn{},
+		baselineChecks:            map[api.Version][]CheckPodFn{},
+		overlappingBaselineChecks: map[api.Version][]CheckPodFn{},
+		restrictedChecks:          map[api.Version][]CheckPodFn{},
 	}
 	populate(r, checks)
 	return r, nil
@@ -69,6 +70,9 @@ func (r *checkRegistry) EvaluatePod(lv api.LevelVersion, podMetadata *metav1.Obj
 		results = append(results, check(podMetadata, podSpec))
 	}
 	if lv.Level == api.LevelBaseline {
+		for _, check := range r.overlappingBaselineChecks[lv.Version] {
+			results = append(results, check(podMetadata, podSpec))
+		}
 		return results
 	}
 	for _, check := range r.restrictedChecks[lv.Version] {
@@ -122,6 +126,8 @@ func populate(r *checkRegistry, validChecks []Check) {
 	for _, c := range validChecks {
 		if c.Level == api.LevelRestricted {
 			inflateVersions(c, r.restrictedChecks, r.maxVersion)
+		} else if c.Overlap {
+			inflateVersions(c, r.overlappingBaselineChecks, r.maxVersion)
 		} else {
 			inflateVersions(c, r.baselineChecks, r.maxVersion)
 		}

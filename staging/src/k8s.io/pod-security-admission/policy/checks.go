@@ -32,6 +32,8 @@ type Check struct {
 	// Baseline checks are evaluated for baseline and restricted namespaces.
 	// Restricted checks are only evaluated for restricted namespaces.
 	Level api.Level
+	// Overlap indicates whether the check is overlapping with the check one level higher than oneself.
+	Overlap bool
 	// Versions contains one or more revisions of the check that apply to different versions.
 	// If the check is not yet assigned to a version, this must be a single-item list with a MinimumVersion of "".
 	// Otherwise, MinimumVersion of items must represent strictly increasing versions.

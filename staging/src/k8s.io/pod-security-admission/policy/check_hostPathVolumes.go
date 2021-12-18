@@ -42,8 +42,9 @@ func init() {
 // that requires hostPath=undefined/null in 1.0+
 func CheckHostPathVolumes() Check {
 	return Check{
-		ID:    "hostPathVolumes",
-		Level: api.LevelBaseline,
+		ID:      "hostPathVolumes",
+		Level:   api.LevelBaseline,
+		Overlap: true,
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),

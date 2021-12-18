@@ -57,8 +57,9 @@ func init() {
 
 func CheckSeccompBaseline() Check {
 	return Check{
-		ID:    "seccompProfile_baseline",
-		Level: api.LevelBaseline,
+		ID:      "seccompProfile_baseline",
+		Level:   api.LevelBaseline,
+		Overlap: true,
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),

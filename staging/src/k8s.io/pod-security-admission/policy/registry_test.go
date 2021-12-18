@@ -29,12 +29,13 @@ import (
 
 func TestCheckRegistry(t *testing.T) {
 	checks := []Check{
-		generateCheck("a", api.LevelBaseline, []string{"v1.0"}),
-		generateCheck("b", api.LevelBaseline, []string{"v1.10"}),
-		generateCheck("c", api.LevelBaseline, []string{"v1.0", "v1.5", "v1.10"}),
-		generateCheck("d", api.LevelBaseline, []string{"v1.11", "v1.15", "v1.20"}),
-		generateCheck("e", api.LevelRestricted, []string{"v1.0"}),
-		generateCheck("f", api.LevelRestricted, []string{"v1.12", "v1.16", "v1.21"}),
+		generateCheck("a", api.LevelBaseline, false, []string{"v1.0"}),
+		generateCheck("b", api.LevelBaseline, false, []string{"v1.10"}),
+		generateCheck("c", api.LevelBaseline, false, []string{"v1.0", "v1.5", "v1.10"}),
+		generateCheck("d", api.LevelBaseline, false, []string{"v1.11", "v1.15", "v1.20"}),
+		generateCheck("e", api.LevelRestricted, false, []string{"v1.0"}),
+		generateCheck("f", api.LevelRestricted, false, []string{"v1.12", "v1.16", "v1.21"}),
+		generateCheck("g", api.LevelBaseline, true, []string{"v1.15"}),
 	}
 
 	reg, err := NewEvaluator(checks)
@@ -52,7 +53,7 @@ func TestCheckRegistry(t *testing.T) {
 		{api.LevelBaseline, "v1.5", []string{"a:v1.0", "c:v1.5"}},
 		{api.LevelBaseline, "v1.10", []string{"a:v1.0", "b:v1.10", "c:v1.10"}},
 		{api.LevelBaseline, "v1.11", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.11"}},
-		{api.LevelBaseline, "latest", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.20"}},
+		{api.LevelBaseline, "latest", []string{"a:v1.0", "b:v1.10", "c:v1.10", "g:v1.15", "d:v1.20"}},
 		{api.LevelRestricted, "v1.0", []string{"a:v1.0", "c:v1.0", "e:v1.0"}},
 		{api.LevelRestricted, "v1.4", []string{"a:v1.0", "c:v1.0", "e:v1.0"}},
 		{api.LevelRestricted, "v1.5", []string{"a:v1.0", "c:v1.5", "e:v1.0"}},
@@ -75,10 +76,11 @@ func TestCheckRegistry(t *testing.T) {
 	}
 }
 
-func generateCheck(id string, level api.Level, versions []string) Check {
+func generateCheck(id string, level api.Level, overlap bool, versions []string) Check {
 	c := Check{
-		ID:    id,
-		Level: level,
+		ID:      id,
+		Level:   level,
+		Overlap: overlap,
 	}
 	for _, ver := range versions {
 		v := versionOrPanic(ver) // Copy ver so it can be used in the CheckPod closure.
