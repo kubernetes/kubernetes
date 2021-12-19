@@ -67,7 +67,8 @@ func TestVersion(t *testing.T) {
 
 	r := createRemoteRuntimeService(endpoint, t)
 	version, err := r.Version(apitest.FakeVersion)
-	assert.NoError(t, err)
-	assert.Equal(t, apitest.FakeVersion, version.Version)
-	assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)
+	if assert.NoError(t, err) {
+		assert.Equal(t, apitest.FakeVersion, version.Version)
+		assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)
+	}
 }
