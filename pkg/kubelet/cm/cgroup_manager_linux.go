@@ -404,8 +404,34 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.PidsLimit != nil {
 		resources.PidsLimit = *resourceConfig.PidsLimit
 	}
-	// if huge pages are enabled, we set them in libcontainer
-	// for each page size enumerated, set that value
+
+	m.maybeSetHugetlb(resourceConfig, resources)
+
+	// Ideally unified is used for all the resources when running on cgroup v2.
+	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
+	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
+	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
+		resources.Unified = make(map[string]string)
+		for k, v := range resourceConfig.Unified {
+			resources.Unified[k] = v
+		}
+	}
+	return resources
+}
+
+func (m *cgroupManagerImpl) maybeSetHugetlb(resourceConfig *ResourceConfig, resources *libcontainerconfigs.Resources) {
+	// Check if hugetlb is supported.
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if !getSupportedUnifiedControllers().Has("hugetlb") {
+			klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
+			return
+		}
+	} else if _, ok := m.subsystems.MountPoints["hugetlb"]; !ok {
+		klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
+		return
+	}
+
+	// For each page size enumerated, set that value.
 	pageSizes := sets.NewString()
 	for pageSize, limit := range resourceConfig.HugePageLimit {
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize)
@@ -429,16 +455,6 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 			Limit:    uint64(0),
 		})
 	}
-	// Ideally unified is used for all the resources when running on cgroup v2.
-	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
-	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
-	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
-		resources.Unified = make(map[string]string)
-		for k, v := range resourceConfig.Unified {
-			resources.Unified[k] = v
-		}
-	}
-	return resources
 }
 
 // Update updates the cgroup with the specified Cgroup Configuration
@@ -467,17 +483,6 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	// depending on the cgroup driver in use, so we need this conditional here.
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
-	}
-
-	if unified {
-		supportedControllers := getSupportedUnifiedControllers()
-		if !supportedControllers.Has("hugetlb") {
-			resources.HugetlbLimit = nil
-			klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
-		}
-	} else if _, ok := m.subsystems.MountPoints["hugetlb"]; !ok {
-		resources.HugetlbLimit = nil
-		klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
 	}
 
 	manager, err := m.adapter.newManager(libcontainerCgroupConfig, paths)
