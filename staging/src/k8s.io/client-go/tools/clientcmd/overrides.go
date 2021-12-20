@@ -73,6 +73,7 @@ type ClusterOverrideFlags struct {
 	CertificateAuthority  FlagInfo
 	InsecureSkipTLSVerify FlagInfo
 	TLSServerName         FlagInfo
+	ProxyURL              FlagInfo
 }
 
 // FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
@@ -160,6 +161,7 @@ const (
 	FlagUsername         = "username"
 	FlagPassword         = "password"
 	FlagTimeout          = "request-timeout"
+	FlagProxyURL         = "proxy-url"
 )
 
 // RecommendedConfigOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -195,6 +197,7 @@ func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert file for the certificate authority"},
 		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
 		TLSServerName:         FlagInfo{prefix + FlagTLSServerName, "", "", "If provided, this name will be used to validate server certificate. If this is not provided, hostname used to contact the server is used."},
+		ProxyURL:              FlagInfo{prefix + FlagProxyURL, "", "", "If provided, this URL will be used to connect via proxy"},
 	}
 }
 
@@ -234,6 +237,7 @@ func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, f
 	flagNames.CertificateAuthority.BindStringFlag(flags, &clusterInfo.CertificateAuthority)
 	flagNames.InsecureSkipTLSVerify.BindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify)
 	flagNames.TLSServerName.BindStringFlag(flags, &clusterInfo.TLSServerName)
+	flagNames.ProxyURL.BindStringFlag(flags, &clusterInfo.ProxyURL)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables
