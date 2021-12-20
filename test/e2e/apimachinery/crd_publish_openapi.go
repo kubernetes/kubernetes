@@ -529,7 +529,7 @@ func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, grou
 
 func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect []byte, groupSuffix string, versions []string, options ...crd.Option) (tCRD *crd.TestCrd, err error) {
 	defer func() {
-		if err == nil {
+		if err != nil {
 			framework.Logf("sleeping 45 seconds before running the actual tests, we hope that during all API servers converge during that window, see %q for more", "https://github.com/kubernetes/kubernetes/pull/90452")
 			time.Sleep(time.Second * 45)
 		}
