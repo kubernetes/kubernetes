@@ -125,7 +125,7 @@ const (
 
 	// owner: @MikeSpreitzer @yue9944882
 	// alpha: v1.15
-	//
+	// beta: v1.20
 	//
 	// Enables managing request concurrency with prioritization and fairness at each server
 	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
