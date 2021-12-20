@@ -934,11 +934,11 @@
   release: v1.22
   file: test/e2e/apps/statefulset.go
 - testname: Conformance tests minimum number of nodes.
-  codename: '[sig-architecture] Conformance Tests should have at least two untainted
+  codename: '[sig-architecture] Conformance Tests [Serial] should have at least two untainted
     nodes [Conformance]'
   description: Conformance tests requires at least two untainted nodes where pods
     can be scheduled.
-  release: v1.23
+  release: v1.24
   file: test/e2e/architecture/conformance.go
 - testname: CertificateSigningRequest API
   codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support

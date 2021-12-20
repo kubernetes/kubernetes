@@ -25,11 +25,11 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
-var _ = SIGDescribe("Conformance Tests", func() {
+var _ = SIGDescribe("Conformance Tests [Serial]", func() {
 	f := framework.NewDefaultFramework("conformance-tests")
 
 	/*
-		Release: v1.23
+		Release: v1.24
 		Testname: Conformance tests minimum number of nodes.
 		Description: Conformance tests requires at least two untainted nodes where pods can be scheduled.
 	*/
