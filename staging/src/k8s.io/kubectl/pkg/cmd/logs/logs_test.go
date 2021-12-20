@@ -60,7 +60,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 
@@ -81,7 +81,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Prefix = true
@@ -103,7 +103,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Prefix = true
@@ -125,7 +125,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Prefix = true
@@ -157,7 +157,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				return o
@@ -194,7 +194,7 @@ func TestLog(t *testing.T) {
 				}
 				wg.Add(3)
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Follow = true
@@ -232,7 +232,7 @@ func TestLog(t *testing.T) {
 				}
 				wg.Add(3)
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.MaxFollowConcurrency = 2
@@ -244,7 +244,7 @@ func TestLog(t *testing.T) {
 		{
 			name: "fail if LogsForObject fails",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 					return nil, errors.New("Error from the LogsForObject")
 				}
@@ -270,7 +270,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = func(req restclient.ResponseWrapper, out io.Writer) error {
 					return errors.New("Error from the ConsumeRequestFn")
@@ -305,7 +305,7 @@ func TestLog(t *testing.T) {
 				}
 				wg.Add(3)
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Follow = true
@@ -344,7 +344,7 @@ func TestLog(t *testing.T) {
 				}
 				wg.Add(3)
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = func(req restclient.ResponseWrapper, out io.Writer) error {
 					return errors.New("Error from the ConsumeRequestFn")
@@ -367,7 +367,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = func(req restclient.ResponseWrapper, out io.Writer) error {
 					return errors.New("Error from the ConsumeRequestFn")
@@ -400,7 +400,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.IgnoreLogErrors = true
@@ -430,7 +430,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				return o
@@ -460,7 +460,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.IgnoreLogErrors = true
@@ -491,7 +491,7 @@ func TestLog(t *testing.T) {
 					},
 				}
 
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Follow = true
@@ -562,8 +562,8 @@ func TestValidateLogOptions(t *testing.T) {
 		{
 			name: "since & since-time",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, false)
-				o.SinceSeconds = time.Hour
+				o := newLogsOptions(streams, false)
+				o.Since = time.Hour
 				o.SinceTime = "2006-01-02T15:04:05Z"
 
 				var err error
@@ -575,13 +575,13 @@ func TestValidateLogOptions(t *testing.T) {
 				return o
 			},
 			args:     []string{"foo"},
-			expected: "at most one of `sinceTime` or `sinceSeconds` may be specified",
+			expected: "at most one of `sinceTime` or `since` may be specified",
 		},
 		{
 			name: "negative since-time",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, false)
-				o.SinceSeconds = -1 * time.Second
+				o := newLogsOptions(streams, false)
+				o.Since = -1 * time.Second
 
 				var err error
 				o.Options, err = o.ToLogOptions()
@@ -597,7 +597,7 @@ func TestValidateLogOptions(t *testing.T) {
 		{
 			name: "negative limit-bytes",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.LimitBytes = -100
 
 				var err error
@@ -614,7 +614,7 @@ func TestValidateLogOptions(t *testing.T) {
 		{
 			name: "negative tail",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.Tail = -100
 
 				var err error
@@ -631,7 +631,7 @@ func TestValidateLogOptions(t *testing.T) {
 		{
 			name: "container name combined with --all-containers",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, true)
+				o := newLogsOptions(streams, true)
 				o.Container = "my-container"
 
 				var err error
@@ -648,7 +648,7 @@ func TestValidateLogOptions(t *testing.T) {
 		{
 			name: "container name combined with second argument",
 			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, false)
+				o := newLogsOptions(streams, false)
 				o.Container = "my-container"
 				o.ContainerNameSpecified = true
 
@@ -681,23 +681,23 @@ func TestValidateLogOptions(t *testing.T) {
 	}
 }
 
-func TestLogComplete(t *testing.T) {
+func TestLogFlags(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
 	tests := []struct {
-		name     string
-		args     []string
-		opts     func(genericclioptions.IOStreams) *LogsOptions
-		expected string
+		name      string
+		args      []string
+		logsFlags func(genericclioptions.IOStreams) *LogsFlags
+		expected  string
 	}{
 		{
 			name: "One args case",
 			args: []string{"foo"},
-			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
-				o := NewLogsOptions(streams, false)
-				o.Selector = "foo"
-				return o
+			logsFlags: func(streams genericclioptions.IOStreams) *LogsFlags {
+				flags := NewLogsFlags(f, streams)
+				flags.Selector = "foo"
+				return flags
 			},
 			expected: "only a selector (-l) or a POD name is allowed",
 		},
@@ -708,8 +708,8 @@ func TestLogComplete(t *testing.T) {
 
 		// checkErr breaks tests in case of errors, plus we just
 		// need to check errors returned by the command validation
-		o := test.opts(genericclioptions.NewTestIOStreamsDiscard())
-		err := o.Complete(f, cmd, test.args)
+		flags := test.logsFlags(genericclioptions.NewTestIOStreamsDiscard())
+		_, err := flags.ToOptions(cmd, test.args)
 		if err == nil {
 			t.Fatalf("expected error %q, got none", test.expected)
 		}
@@ -814,9 +814,9 @@ func TestNoResourceFoundMessage(t *testing.T) {
 
 	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdLogs(tf, streams)
-	o := NewLogsOptions(streams, false)
-	o.Selector = "foo"
-	err := o.Complete(tf, cmd, []string{})
+	flags := NewLogsFlags(tf, streams)
+	flags.Selector = "foo"
+	_, err := flags.ToOptions(cmd, []string{})
 
 	if err != nil {
 		t.Fatalf("Unexpected error, expected none, got %v", err)
@@ -830,6 +830,17 @@ func TestNoResourceFoundMessage(t *testing.T) {
 	expectedErr := "No resources found in test namespace.\n"
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expected to find:\n\t%s\nfound:\n\t%s\n", e, a)
+	}
+}
+
+func newLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
+	return &LogsOptions{
+		IOStreams:            streams,
+		AllContainers:        allContainers,
+		Tail:                 -1,
+		MaxFollowConcurrency: 5,
+
+		containerNameFromRefSpecRegexp: defaultContainerNameFromRefSpecRegexp,
 	}
 }
 
