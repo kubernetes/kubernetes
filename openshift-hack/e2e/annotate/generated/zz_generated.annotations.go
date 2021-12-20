@@ -85,11 +85,11 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for multiple CRDs of same group but different versions [Conformance]": "works for multiple CRDs of same group but different versions [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions] MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validator rules": "MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validator rules [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-api-machinery] CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions] MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validator rules": "MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validator rules [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions] MUST fail create of a custom resource definition that contains a x-kubernetes-validator rule that refers to a property that do not exist": "MUST fail create of a custom resource definition that contains a x-kubernetes-validator rule that refers to a property that do not exist [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-api-machinery] CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions] MUST fail create of a custom resource definition that contains a x-kubernetes-validator rule that refers to a property that do not exist": "MUST fail create of a custom resource definition that contains a x-kubernetes-validator rule that refers to a property that do not exist [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions] MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validator rules": "MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validator rules [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-api-machinery] CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions] MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validator rules": "MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validator rules [Disabled:Alpha] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Discovery Custom resource should have storage version hash": "Custom resource should have storage version hash [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -423,13 +423,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-apps] StatefulSet MinReadySeconds should be honored when enabled": "MinReadySeconds should be honored when enabled [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs after adopting pod (WhenDeleted)": "should delete PVCs after adopting pod (WhenDeleted) [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs after adopting pod (WhenDeleted)": "should delete PVCs after adopting pod (WhenDeleted) [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]": "should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]": "should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs with a OnScaledown policy": "should delete PVCs with a OnScaledown policy [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs with a OnScaledown policy": "should delete PVCs with a OnScaledown policy [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs with a WhenDeleted policy": "should delete PVCs with a WhenDeleted policy [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs with a WhenDeleted policy": "should delete PVCs with a WhenDeleted policy [Disabled:Alpha] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] TTLAfterFinished job should be deleted once it finishes after TTL seconds": "job should be deleted once it finishes after TTL seconds [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
