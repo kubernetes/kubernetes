@@ -120,8 +120,13 @@ func TestEphemeralLimits(t *testing.T) {
 		t.Run(test.test, func(t *testing.T) {
 			fts := feature.Features{}
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), filterName)
-			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts).(framework.FilterPlugin)
-			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
+
+			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts)
+
+			state := framework.NewCycleState()
+			p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
