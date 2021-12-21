@@ -80,6 +80,7 @@ func refForOpenAPIVersion(schemaRef string, v2 bool) string {
 }
 
 var definitions map[string]common.OpenAPIDefinition
+var definitionsV3 map[string]common.OpenAPIDefinition
 var buildDefinitions sync.Once
 var namer *openapi.DefinitionNamer
 
@@ -460,26 +461,31 @@ func addEmbeddedProperties(s *spec.Schema, opts Options) {
 // getDefinition gets definition for given Kubernetes type. This function is extracted from
 // kube-openapi builder logic
 func getDefinition(name string, v2 bool) spec.Schema {
-	buildDefinitions.Do(generateBuildDefinitionsFunc(v2))
-	return definitions[name].Schema
+	buildDefinitions.Do(generateBuildDefinitionsFunc)
+
+	if v2 {
+		return definitions[name].Schema
+	}
+	return definitionsV3[name].Schema
 }
 
 func withDescription(s spec.Schema, desc string) spec.Schema {
 	return *s.WithDescription(desc)
 }
 
-func generateBuildDefinitionsFunc(v2 bool) func() {
-	return func() {
-		namer = openapi.NewDefinitionNamer(runtime.NewScheme())
-		definitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
-			defName, _ := namer.GetDefinitionName(name)
-			prefix := v3DefinitionPrefix
-			if v2 {
-				prefix = definitionPrefix
-			}
-			return spec.MustCreateRef(prefix + common.EscapeJsonPointer(defName))
-		})
-	}
+func generateBuildDefinitionsFunc() {
+	namer = openapi.NewDefinitionNamer(runtime.NewScheme())
+	definitionsV3 = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
+		defName, _ := namer.GetDefinitionName(name)
+		prefix := v3DefinitionPrefix
+		return spec.MustCreateRef(prefix + common.EscapeJsonPointer(defName))
+	})
+
+	definitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
+		defName, _ := namer.GetDefinitionName(name)
+		prefix := definitionPrefix
+		return spec.MustCreateRef(prefix + common.EscapeJsonPointer(defName))
+	})
 }
 
 // addTypeMetaProperties adds Kubernetes-specific type meta properties to input schema:
@@ -528,7 +534,7 @@ func (b *builder) getOpenAPIConfig(v2 bool) *common.Config {
 		},
 		GetOperationIDAndTags: openapi.GetOperationIDAndTags,
 		GetDefinitionName: func(name string) (string, spec.Extensions) {
-			buildDefinitions.Do(generateBuildDefinitionsFunc(v2))
+			buildDefinitions.Do(generateBuildDefinitionsFunc)
 			return namer.GetDefinitionName(name)
 		},
 		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
