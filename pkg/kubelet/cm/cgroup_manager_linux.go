@@ -237,20 +237,41 @@ func (m *cgroupManagerImpl) buildCgroupUnifiedPath(name CgroupName) string {
 	return path.Join(cmutil.CgroupRoot, cgroupFsAdaptedName)
 }
 
-// TODO(filbranden): This logic belongs in libcontainer/cgroup/systemd instead.
-// It should take a libcontainerconfigs.Cgroup.Path field (rather than Name and Parent)
-// and split it appropriately, using essentially the logic below.
-// This was done for cgroupfs in opencontainers/runc#497 but a counterpart
-// for systemd was never introduced.
-func updateSystemdCgroupInfo(cgroupConfig *libcontainerconfigs.Cgroup, cgroupName CgroupName) {
-	dir, base := path.Split(cgroupName.ToSystemd())
+// libctCgroupConfig converts CgroupConfig to libcontainer's Cgroup config.
+func (m *cgroupManagerImpl) libctCgroupConfig(in *CgroupConfig, needResources bool) *libcontainerconfigs.Cgroup {
+	config := &libcontainerconfigs.Cgroup{}
+	if needResources {
+		config.Resources = m.toResources(in.ResourceParameters)
+	} else {
+		config.Resources = &libcontainerconfigs.Resources{}
+	}
+
+	if m.adapter.cgroupManagerType == libcontainerCgroupfs {
+		// For fs cgroup manager, we can either set Path or Name and Parent.
+		// Setting Path is easier.
+		config.Path = in.Name.ToCgroupfs()
+
+		return config
+	}
+
+	// For systemd, we have to set Name and Parent, as they are needed to talk to systemd.
+	// Setting Path is optional as it can be deduced from Name and Parent.
+
+	// TODO(filbranden): This logic belongs in libcontainer/cgroup/systemd instead.
+	// It should take a libcontainerconfigs.Cgroup.Path field (rather than Name and Parent)
+	// and split it appropriately, using essentially the logic below.
+	// This was done for cgroupfs in opencontainers/runc#497 but a counterpart
+	// for systemd was never introduced.
+	dir, base := path.Split(in.Name.ToSystemd())
 	if dir == "/" {
 		dir = "-.slice"
 	} else {
 		dir = path.Base(dir)
 	}
-	cgroupConfig.Parent = dir
-	cgroupConfig.Name = base
+	config.Parent = dir
+	config.Name = base
+
+	return config
 }
 
 // Exists checks if all subsystem cgroups already exist
@@ -313,14 +334,7 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 
 	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
 
-	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{}
-	// libcontainer consumes a different field and expects a different syntax
-	// depending on the cgroup driver in use, so we need this conditional here.
-	if m.adapter.cgroupManagerType == libcontainerSystemd {
-		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
-	} else {
-		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
-	}
+	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, false)
 
 	manager, err := m.adapter.newManager(libcontainerCgroupConfig, cgroupPaths)
 	if err != nil {
@@ -464,12 +478,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		metrics.CgroupManagerDuration.WithLabelValues("update").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	// Extract the cgroup resource parameters
-	resources := m.toResources(cgroupConfig.ResourceParameters)
-
-	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
-		Resources: resources,
-	}
+	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
 
 	unified := libcontainercgroups.IsCgroup2UnifiedMode()
 	var paths map[string]string
@@ -479,17 +488,11 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		paths = m.buildCgroupPaths(cgroupConfig.Name)
 	}
 
-	// libcontainer consumes a different field and expects a different syntax
-	// depending on the cgroup driver in use, so we need this conditional here.
-	if m.adapter.cgroupManagerType == libcontainerSystemd {
-		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
-	}
-
 	manager, err := m.adapter.newManager(libcontainerCgroupConfig, paths)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup manager: %v", err)
 	}
-	return manager.Set(resources)
+	return manager.Set(libcontainerCgroupConfig.Resources)
 }
 
 // Create creates the specified cgroup
@@ -499,18 +502,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		metrics.CgroupManagerDuration.WithLabelValues("create").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	resources := m.toResources(cgroupConfig.ResourceParameters)
-
-	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
-		Resources: resources,
-	}
-	// libcontainer consumes a different field and expects a different syntax
-	// depending on the cgroup driver in use, so we need this conditional here.
-	if m.adapter.cgroupManagerType == libcontainerSystemd {
-		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
-	} else {
-		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
-	}
+	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
 
 	// get the manager with the specified cgroup configuration
 	manager, err := m.adapter.newManager(libcontainerCgroupConfig, nil)
@@ -530,8 +522,8 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 
 	// it may confuse why we call set after we do apply, but the issue is that runc
 	// follows a similar pattern.  it's needed to ensure cpu quota is set properly.
-	if err := manager.Set(resources); err != nil {
-		utilruntime.HandleError(fmt.Errorf("cgroup update failed %v", err))
+	if err := manager.Set(libcontainerCgroupConfig.Resources); err != nil {
+		utilruntime.HandleError(fmt.Errorf("cgroup manager.Set failed: %w", err))
 	}
 
 	return nil
