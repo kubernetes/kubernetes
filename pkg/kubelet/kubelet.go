@@ -272,21 +272,24 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	// source of all configuration
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
 
+	// TODO:  it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+
 	// define file config source
 	if kubeCfg.StaticPodPath != "" {
 		klog.InfoS("Adding static pod path", "path", kubeCfg.StaticPodPath)
-		config.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
+		config.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.FileSource))
 	}
 
 	// define url config source
 	if kubeCfg.StaticPodURL != "" {
 		klog.InfoS("Adding pod URL with HTTP header", "URL", kubeCfg.StaticPodURL, "header", manifestURLHeader)
-		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
+		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.HTTPSource))
 	}
 
 	if kubeDeps.KubeClient != nil {
 		klog.InfoS("Adding apiserver pod source")
-		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(kubetypes.ApiserverSource))
+		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
