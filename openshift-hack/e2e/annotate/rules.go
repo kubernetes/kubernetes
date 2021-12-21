@@ -14,6 +14,7 @@ var (
 			`\[Feature:PodSecurityPolicy\]`,
 			`\[Feature:StatefulSetAutoDeletePVC\]`,
 			`\[Feature:CustomResourceValidationExpressions\]`,
+			`\[Feature:GRPCContainerProbe\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {

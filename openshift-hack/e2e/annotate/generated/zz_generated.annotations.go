@@ -1395,7 +1395,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] Probing container should *not* be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a /healthz http liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Probing container should *not* be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]": "should *not* be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-node] Probing container should *not* be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]": "should *not* be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe] [Disabled:Alpha] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Probing container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1411,7 +1411,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] Probing container should be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": "should be restarted with a /healthz http liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Probing container should be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]": "should be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-node] Probing container should be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe]": "should be restarted with a GRPC liveness probe [NodeAlphaFeature:GRPCContainerProbe][Feature:GRPCContainerProbe] [Disabled:Alpha] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Probing container should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": "should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
