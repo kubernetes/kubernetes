@@ -1372,7 +1372,7 @@ func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone: zone,
 			},
 		}
 	}
