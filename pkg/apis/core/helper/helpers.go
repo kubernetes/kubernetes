@@ -128,32 +128,6 @@ func IsStandardResourceQuotaScope(str string, allowNamespaceAffinityScope bool) 
 		(allowNamespaceAffinityScope && str == string(core.ResourceQuotaScopeCrossNamespacePodAffinity))
 }
 
-var podObjectCountQuotaResources = sets.NewString(
-	string(core.ResourcePods),
-)
-
-var podComputeQuotaResources = sets.NewString(
-	string(core.ResourceCPU),
-	string(core.ResourceMemory),
-	string(core.ResourceLimitsCPU),
-	string(core.ResourceLimitsMemory),
-	string(core.ResourceRequestsCPU),
-	string(core.ResourceRequestsMemory),
-)
-
-// IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
-func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string) bool {
-	switch scope {
-	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort,
-		core.ResourceQuotaScopePriorityClass, core.ResourceQuotaScopeCrossNamespacePodAffinity:
-		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
-	case core.ResourceQuotaScopeBestEffort:
-		return podObjectCountQuotaResources.Has(resource)
-	default:
-		return true
-	}
-}
-
 var standardContainerResources = sets.NewString(
 	string(core.ResourceCPU),
 	string(core.ResourceMemory),

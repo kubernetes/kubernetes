@@ -26,6 +26,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -114,6 +115,24 @@ func TestGetValidationOptionsFromResourceQuota(t *testing.T) {
 			namespaceSelectorFeatureEnabled: true,
 			wantOpts: validation.ResourceQuotaValidationOptions{
 				AllowPodAffinityNamespaceSelector: true,
+			},
+		},
+		"update-old-doesn't-include-emphmeral-storage": {
+			old: &api.ResourceQuota{},
+			wantOpts: validation.ResourceQuotaValidationOptions{
+				AllowEphemeralStorageInScopedQuota: false,
+			},
+		},
+		"update-old-include-emphmeral-storage": {
+			old: &api.ResourceQuota{
+				Spec: api.ResourceQuotaSpec{
+					Hard: map[core.ResourceName]resource.Quantity{
+						core.ResourceEphemeralStorage: {},
+					},
+				},
+			},
+			wantOpts: validation.ResourceQuotaValidationOptions{
+				AllowEphemeralStorageInScopedQuota: true,
 			},
 		},
 	} {

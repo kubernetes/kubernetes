@@ -5751,6 +5751,49 @@ func validateResourceQuantityHugePageValue(name core.ResourceName, quantity reso
 	return nil
 }
 
+var podObjectCountQuotaResources = sets.NewString(
+	string(core.ResourcePods),
+)
+
+var podComputeQuotaResourcesWithoutEphemeralStorage = sets.NewString(
+	string(core.ResourceCPU),
+	string(core.ResourceMemory),
+	string(core.ResourceLimitsCPU),
+	string(core.ResourceLimitsMemory),
+	string(core.ResourceRequestsCPU),
+	string(core.ResourceRequestsMemory),
+)
+
+var podComputeQuotaResourcesWithEphemeralStorage = sets.NewString(
+	string(core.ResourceCPU),
+	string(core.ResourceMemory),
+	string(core.ResourceLimitsCPU),
+	string(core.ResourceLimitsMemory),
+	string(core.ResourceRequestsCPU),
+	string(core.ResourceRequestsMemory),
+	string(core.ResourceEphemeralStorage),
+	string(core.ResourceRequestsEphemeralStorage),
+	string(core.ResourceLimitsEphemeralStorage),
+)
+
+// isResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
+func isResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string, opts ResourceQuotaValidationOptions) bool {
+	podComputeQuotaResources := podComputeQuotaResourcesWithoutEphemeralStorage
+	if opts.AllowEphemeralStorageInScopedQuota {
+		podComputeQuotaResources = podComputeQuotaResourcesWithEphemeralStorage
+	}
+
+	switch scope {
+	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort,
+		core.ResourceQuotaScopePriorityClass, core.ResourceQuotaScopeCrossNamespacePodAffinity:
+		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
+	case core.ResourceQuotaScopeBestEffort:
+		return podObjectCountQuotaResources.Has(resource)
+	default:
+		return true
+	}
+}
+
 // validateResourceQuotaScopes ensures that each enumerated hard resource constraint is valid for set of scopes
 func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, opts ResourceQuotaValidationOptions, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -5768,7 +5811,7 @@ func validateResourceQuotaScopes(resourceQuotaSpec *core.ResourceQuotaSpec, opts
 			allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "unsupported scope"))
 		}
 		for _, k := range hardLimits.List() {
-			if helper.IsStandardQuotaResourceName(k) && !helper.IsResourceQuotaScopeValidForResource(scope, k) {
+			if helper.IsStandardQuotaResourceName(k) && !isResourceQuotaScopeValidForResource(scope, k, opts) {
 				allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.Scopes, "unsupported scope applied to resource"))
 			}
 		}
@@ -5800,7 +5843,7 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scopeName"), req.ScopeName, "unsupported scope"))
 		}
 		for _, k := range hardLimits.List() {
-			if helper.IsStandardQuotaResourceName(k) && !helper.IsResourceQuotaScopeValidForResource(req.ScopeName, k) {
+			if helper.IsStandardQuotaResourceName(k) && !isResourceQuotaScopeValidForResource(req.ScopeName, k, opts) {
 				allErrs = append(allErrs, field.Invalid(fldPath, resourceQuotaSpec.ScopeSelector, "unsupported scope applied to resource"))
 			}
 		}
@@ -5855,6 +5898,9 @@ func validateScopeSelector(resourceQuotaSpec *core.ResourceQuotaSpec, opts Resou
 type ResourceQuotaValidationOptions struct {
 	// Allow pod-affinity namespace selector validation.
 	AllowPodAffinityNamespaceSelector bool
+
+	// Allow emhemeral-storage in resourcequota
+	AllowEphemeralStorageInScopedQuota bool
 }
 
 // ValidateResourceQuota tests if required fields in the ResourceQuota are set.

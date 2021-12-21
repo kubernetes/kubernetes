@@ -16189,6 +16189,7 @@ func TestValidateResourceQuota(t *testing.T) {
 		errDetail                string
 		errField                 string
 		disableNamespaceSelector bool
+		disableEmphemralStorage  bool
 	}{
 		"no-scope": {
 			rq: core.ResourceQuota{
@@ -16311,11 +16312,72 @@ func TestValidateResourceQuota(t *testing.T) {
 			errDetail:                "unsupported scope",
 			disableNamespaceSelector: true,
 		},
+		"priority-scope with ephemeral-storage and scope selector": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: core.ResourceQuotaSpec{
+					Hard: core.ResourceList{
+						core.ResourceRequestsEphemeralStorage: resource.MustParse("100m"),
+					},
+					ScopeSelector: scopeSelectorSpec.ScopeSelector,
+				},
+			},
+		},
+		"priority-scope with ephemeral-storage and scope": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: core.ResourceQuotaSpec{
+					Hard: core.ResourceList{
+						core.ResourceRequestsEphemeralStorage: resource.MustParse("100m"),
+					},
+					Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopePriorityClass},
+				},
+			},
+		},
+		"priority-scope with ephemeral-storage disable and scope selector": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: core.ResourceQuotaSpec{
+					Hard: core.ResourceList{
+						core.ResourceRequestsEphemeralStorage: resource.MustParse("100m"),
+					},
+					ScopeSelector: scopeSelectorSpec.ScopeSelector,
+				},
+			},
+			disableEmphemralStorage: true,
+			errDetail:               "unsupported scope",
+		},
+		"priority-scope with ephemeral-storage disable and scope": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: core.ResourceQuotaSpec{
+					Hard: core.ResourceList{
+						core.ResourceRequestsEphemeralStorage: resource.MustParse("100m"),
+					},
+					Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopePriorityClass},
+				},
+			},
+			disableEmphemralStorage: true,
+			errDetail:               "unsupported scope applied to resource",
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			errs := ValidateResourceQuota(&tc.rq, ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: !tc.disableNamespaceSelector,
+				AllowPodAffinityNamespaceSelector:  !tc.disableNamespaceSelector,
+				AllowEphemeralStorageInScopedQuota: !tc.disableEmphemralStorage,
 			})
 			if len(tc.errDetail) == 0 && len(tc.errField) == 0 && len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)

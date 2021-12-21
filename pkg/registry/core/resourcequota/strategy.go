@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -143,7 +144,8 @@ func (resourcequotaStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, ol
 
 func getValidationOptionsFromResourceQuota(newObj *api.ResourceQuota, oldObj *api.ResourceQuota) validation.ResourceQuotaValidationOptions {
 	opts := validation.ResourceQuotaValidationOptions{
-		AllowPodAffinityNamespaceSelector: utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
+		AllowPodAffinityNamespaceSelector:  utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
+		AllowEphemeralStorageInScopedQuota: false,
 	}
 
 	if oldObj == nil {
@@ -151,7 +153,22 @@ func getValidationOptionsFromResourceQuota(newObj *api.ResourceQuota, oldObj *ap
 	}
 
 	opts.AllowPodAffinityNamespaceSelector = opts.AllowPodAffinityNamespaceSelector || hasCrossNamespacePodAffinityScope(&oldObj.Spec)
+	opts.AllowEphemeralStorageInScopedQuota = hasEphemeralStorage(&oldObj.Spec)
 	return opts
+}
+
+func hasEphemeralStorage(spec *api.ResourceQuotaSpec) bool {
+	if spec == nil {
+		return false
+	}
+
+	for resourceName := range spec.Hard {
+		switch resourceName {
+		case core.ResourceEphemeralStorage, core.ResourceLimitsEphemeralStorage, core.ResourceRequestsEphemeralStorage:
+			return true
+		}
+	}
+	return false
 }
 
 func hasCrossNamespacePodAffinityScope(spec *api.ResourceQuotaSpec) bool {
