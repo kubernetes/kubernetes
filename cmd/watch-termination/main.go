@@ -253,6 +253,20 @@ func (w *terminationFileWriter) WriteToTerminationLog(bs []byte) (int, error) {
 	}
 
 	if w.logger == nil {
+		if exist, err := fileExists(w.fn); err != nil {
+			return 0, err
+		} else if !exist {
+			// lumber creates permissive files by default 0644, at the moment there is no way to specify
+			// permission while creating a file, the only way to workaround is to create a file here
+			// lumberjack respects and copies permission over if the file already exist
+			// so all we have to do is to touch a file with restrictive permissions 0600
+			if f, err := os.OpenFile(w.fn, os.O_WRONLY|os.O_CREATE, 0600); err != nil {
+				return 0, err
+			} else if err := f.Close(); err != nil {
+				return 0, err
+			}
+		}
+
 		l := &lumberjack.Logger{
 			Filename:   w.fn,
 			MaxSize:    100,
@@ -363,4 +377,18 @@ func eventReference() (*corev1.ObjectReference, error) {
 		Name:       pod,
 		APIVersion: "v1",
 	}, nil
+}
+
+func fileExists(filepath string) (bool, error) {
+	fileInfo, err := os.Stat(filepath)
+	if err == nil {
+		if fileInfo.IsDir() {
+			return false, fmt.Errorf("the provided path %v is incorrect and points to a directory", filepath)
+		}
+		return true, nil
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+
+	return false, nil
 }
