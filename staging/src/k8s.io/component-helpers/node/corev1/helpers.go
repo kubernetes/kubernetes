@@ -27,12 +27,12 @@ func GetPodCondition(status *v1.PodStatus, conditionType v1.PodConditionType) (i
 	if status == nil {
 		return -1, nil
 	}
-	return GetPodConditionFromList(status.Conditions, conditionType)
+	return getPodConditionFromList(status.Conditions, conditionType)
 }
 
-// GetPodConditionFromList extracts the provided condition from the given list of condition and
+// getPodConditionFromList extracts the provided condition from the given list of condition and
 // returns the index of the condition and the condition. Returns -1 and nil if the condition is not present.
-func GetPodConditionFromList(conditions []v1.PodCondition, conditionType v1.PodConditionType) (int, *v1.PodCondition) {
+func getPodConditionFromList(conditions []v1.PodCondition, conditionType v1.PodConditionType) (int, *v1.PodCondition) {
 	if conditions == nil {
 		return -1, nil
 	}

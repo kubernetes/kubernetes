@@ -306,7 +306,11 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ready := GeneratePodReadyCondition(test.spec, test.conditions, test.containerStatuses, test.podPhase)
+		ready := GeneratePodReadyCondition(test.spec, &v1.PodStatus{
+			Conditions:        test.conditions,
+			ContainerStatuses: test.containerStatuses,
+			Phase:             test.podPhase,
+		})
 		if !reflect.DeepEqual(ready, test.expectReady) {
 			t.Errorf("On test case %v, expectReady:\n%+v\ngot\n%+v\n", i, test.expectReady, ready)
 		}
