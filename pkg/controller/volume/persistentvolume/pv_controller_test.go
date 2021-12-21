@@ -324,6 +324,8 @@ func TestControllerSync(t *testing.T) {
 		fakeClaimWatch := watch.NewFake()
 		client.PrependWatchReactor("persistentvolumeclaims", core.DefaultWatchReactor(fakeClaimWatch, nil))
 		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
+		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFake(), nil))
+		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		ctrl, err := newTestController(client, informers, true)
