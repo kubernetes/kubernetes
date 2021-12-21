@@ -36,14 +36,8 @@ KUBELET_FLAGS=${KUBELET_FLAGS:-""}
 KUBELET_IMAGE=${KUBELET_IMAGE:-""}
 # many dev environments run with swap on, so we don't fail in this env
 FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
-# Name of the network plugin, eg: "kubenet"
-NET_PLUGIN=${NET_PLUGIN:-""}
 # Name of the dns addon, eg: "kube-dns" or "coredns"
 DNS_ADDON=${DNS_ADDON:-"coredns"}
-# Place the config files and binaries required by NET_PLUGIN in these directory,
-# eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
-CNI_CONF_DIR=${CNI_CONF_DIR:-""}
-CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 CLUSTER_CIDR=${CLUSTER_CIDR:-10.1.0.0/16}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
@@ -232,8 +226,8 @@ LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
-CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"remote"}
+CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
@@ -249,20 +243,6 @@ CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${CERT_DIR}/client-ca.key"
 # Reuse certs will skip generate new ca/cert files under CERT_DIR
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
 REUSE_CERTS=${REUSE_CERTS:-false}
-
-# name of the cgroup driver, i.e. cgroupfs or systemd
-if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
-  # default cgroup driver to match what is reported by docker to simplify local development
-  if [[ -z ${CGROUP_DRIVER} ]]; then
-    # match driver with docker runtime reported value (they must match)
-    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
-    echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
-  fi
-  if [[ -f /var/log/docker.log && ! -f "${LOG_DIR}/docker.log" ]]; then
-    ln -s /var/log/docker.log "${LOG_DIR}/docker.log"
-  fi
-fi
-
 
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
@@ -649,11 +629,6 @@ EOF
 }
 
 function start_controller_manager {
-    node_cidr_args=()
-    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
-    fi
-
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
     cloud_config_arg+=("--configure-cloud-routes=${CONFIGURE_CLOUD_ROUTES}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
@@ -672,7 +647,6 @@ function start_controller_manager {
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
       --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
-      ${node_cidr_args[@]+"${node_cidr_args[@]}"} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       "${cloud_config_arg[@]}" \
@@ -697,16 +671,10 @@ function start_cloud_controller_manager {
       exit 1
     fi
 
-    node_cidr_args=()
-    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
-    fi
-
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
     ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
-      "${node_cidr_args[@]:-}" \
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
@@ -746,21 +714,6 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
-    net_plugin_args=()
-    if [[ -n "${NET_PLUGIN}" ]]; then
-      net_plugin_args=("--network-plugin=${NET_PLUGIN}")
-    fi
-
-    cni_conf_dir_args=()
-    if [[ -n "${CNI_CONF_DIR}" ]]; then
-      cni_conf_dir_args=("--cni-conf-dir=${CNI_CONF_DIR}")
-    fi
-
-    cni_bin_dir_args=()
-    if [[ -n "${CNI_BIN_DIR}" ]]; then
-      cni_bin_dir_args=("--cni-bin-dir=${CNI_BIN_DIR}")
-    fi
-
     container_runtime_endpoint_args=()
     if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
       container_runtime_endpoint_args=("--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}")
@@ -780,9 +733,6 @@ function start_kubelet {
       "${cloud_config_arg[@]}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
       "--kubeconfig=${CERT_DIR}/kubelet-rotated.kubeconfig"
-      ${cni_conf_dir_args[@]+"${cni_conf_dir_args[@]}"}
-      ${cni_bin_dir_args[@]+"${cni_bin_dir_args[@]}"}
-      ${net_plugin_args[@]+"${net_plugin_args[@]}"}
       ${container_runtime_endpoint_args[@]+"${container_runtime_endpoint_args[@]}"}
       ${image_service_endpoint_args[@]+"${image_service_endpoint_args[@]}"}
       ${KUBELET_FLAGS}
@@ -911,10 +861,6 @@ EOF
     if [[ -n ${FEATURE_GATES} ]]; then
       parse_feature_gates "${FEATURE_GATES}"
     fi >>/tmp/kube-proxy.yaml
-
-    if [[ "${NET_PLUGIN}" == "kubenet" && -n ${CLUSTER_CIDR} ]]; then
-        echo "clusterCIDR: \"${CLUSTER_CIDR}\"" >> /tmp/kube-proxy.yaml
-    fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubeproxy_certs
@@ -1123,19 +1069,6 @@ fi
 # validate that etcd is: not running, in path, and has minimum required version.
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
-fi
-
-if [ "${CONTAINER_RUNTIME}" == "docker" ]; then
-  if ! kube::util::ensure_docker_daemon_connectivity; then
-    exit 1
-  else
-    # docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
-    # so we append a new rule on top of the docker one
-    # -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER  <-- docker rule
-    if ! iptables -t nat -C OUTPUT -m addrtype --dst-type LOCAL -j DOCKER; then
-      iptables -t nat -A OUTPUT -m addrtype --dst-type LOCAL -j DOCKER
-    fi
-  fi
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
