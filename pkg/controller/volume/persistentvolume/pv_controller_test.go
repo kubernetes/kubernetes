@@ -140,7 +140,7 @@ func TestControllerSync(t *testing.T) {
 			// delete the corresponding volume from apiserver, and report latency metric
 			"5-5 - delete claim and delete volume report metric",
 			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
-				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
+				newVolumeArray("volume5-5", "10Gi", "uid5-5", "claim5-5", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
 			novolumes,
 			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
