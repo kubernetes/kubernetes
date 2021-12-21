@@ -408,6 +408,19 @@ func restartKubelet(running bool) {
 
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %s", err, string(stdout))
+
+	// wait until the kubelet status succeed
+	gomega.Eventually(func() bool {
+		_, err = exec.Command("sudo", "systemctl", "status", kubeletServiceName).CombinedOutput()
+		return err == nil
+	}, 30*time.Second, 1*time.Second).Should(gomega.BeTrue())
+
+	// wait until the kubelet status is stable
+	gomega.Consistently(func() bool {
+		_, err = exec.Command("sudo", "systemctl", "status", kubeletServiceName).CombinedOutput()
+		return err == nil
+	}, 10*time.Second, 2*time.Second).Should(gomega.BeTrue())
+
 }
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
