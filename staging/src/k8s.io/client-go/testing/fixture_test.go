@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -53,7 +52,7 @@ func getArbitraryResource(s schema.GroupVersionResource, name, namespace string)
 	}
 }
 
-func TestWatchCallNonNamespace(t *testing.T) {
+func TestWatchCallOnNamespace(t *testing.T) {
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
@@ -184,24 +183,19 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
 	watchNamespaces := []string{
 		"",
-		"",
-		"test_namespace",
 		"test_namespace",
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(watchNamespaces))
-	for idx, watchNamespace := range watchNamespaces {
-		i := idx
+	for _, watchNamespace := range watchNamespaces {
 		watchNamespace := watchNamespace
 		w, err := o.Watch(testResource, watchNamespace)
 		if err != nil {
 			t.Fatalf("test resource watch failed in %s: %v", watchNamespace, err)
 		}
 		go func() {
-			assert.NoError(t, err, "watch invocation failed")
 			for _, c := range cases {
 				if watchNamespace == "" || c.ns == watchNamespace {
-					fmt.Printf("%#v %#v\n", c, i)
 					event := <-w.ResultChan()
 					accessor, err := meta.Accessor(event.Object)
 					if err != nil {
