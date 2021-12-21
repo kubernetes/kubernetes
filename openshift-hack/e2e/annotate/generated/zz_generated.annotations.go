@@ -783,7 +783,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] EndpointSliceMirroring should mirror a custom Endpoints resource through create update and delete [Conformance]": "should mirror a custom Endpoints resource through create update and delete [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Feature:Topology Hints should distribute endpoints evenly": "should distribute endpoints evenly [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] Feature:Topology Hints should distribute endpoints evenly": "should distribute endpoints evenly [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Firewall rule [Slow] [Serial] should create valid firewall rules for LoadBalancer type service": "[Slow] [Serial] should create valid firewall rules for LoadBalancer type service [Suite:k8s]",
 
