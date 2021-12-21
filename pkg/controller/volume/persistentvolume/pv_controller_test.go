@@ -225,6 +225,18 @@ func TestControllerSync(t *testing.T) {
 				if err != nil {
 					return err
 				}
+
+				// Wait for the PVC to get fully processed. This avoids races between PV controller and DeleteClaimEvent
+				// below.
+				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					obj := ctrl.claims.List()[0]
+					claim := obj.(*v1.PersistentVolumeClaim)
+					return claim.Status.Phase == v1.ClaimLost, nil
+				})
+				if err != nil {
+					return err
+				}
+
 				// trying to remove the claim as well
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
