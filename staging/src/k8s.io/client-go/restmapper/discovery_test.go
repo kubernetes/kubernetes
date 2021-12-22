@@ -401,10 +401,6 @@ func (d *fakeFailingDiscovery) ServerResourcesForGroupVersion(groupVersion strin
 	return nil, fmt.Errorf("not found")
 }
 
-func (d *fakeFailingDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
-	return ServerResources(d)
-}
-
 func (d *fakeFailingDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return ServerPreferredResources(d)
 }
@@ -462,11 +458,6 @@ func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersi
 	}
 
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
-}
-
-// Deprecated: use ServerGroupsAndResources instead.
-func (c *fakeCachedDiscoveryInterface) ServerResources() ([]*metav1.APIResourceList, error) {
-	return ServerResources(c)
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]*metav1.APIResourceList, error) {

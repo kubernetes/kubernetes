@@ -90,13 +90,6 @@ type ServerGroupsInterface interface {
 type ServerResourcesInterface interface {
 	// ServerResourcesForGroupVersion returns the supported resources for a group and version.
 	ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error)
-	// ServerResources returns the supported resources for all groups and versions.
-	//
-	// The returned resource list might be non-nil with partial results even in the case of
-	// non-nil error.
-	//
-	// Deprecated: use ServerGroupsAndResources instead.
-	ServerResources() ([]*metav1.APIResourceList, error)
 	// ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 	//
 	// The returned group and resource lists might be non-nil with partial results even in the
@@ -210,13 +203,6 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	return resources, nil
 }
 
-// ServerResources returns the supported resources for all groups and versions.
-// Deprecated: use ServerGroupsAndResources instead.
-func (d *DiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := d.ServerGroupsAndResources()
-	return rs, err
-}
-
 // ServerGroupsAndResources returns the supported resources for all groups and versions.
 func (d *DiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
@@ -245,13 +231,6 @@ func (e *ErrGroupDiscoveryFailed) Error() string {
 func IsGroupDiscoveryFailedError(err error) bool {
 	_, ok := err.(*ErrGroupDiscoveryFailed)
 	return err != nil && ok
-}
-
-// ServerResources uses the provided discovery interface to look up supported resources for all groups and versions.
-// Deprecated: use ServerGroupsAndResources instead.
-func ServerResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	_, rs, err := ServerGroupsAndResources(d)
-	return rs, err
 }
 
 func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {

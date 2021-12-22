@@ -54,11 +54,11 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert.True(cdc.Fresh(), "should be fresh after another groups call")
 	assert.Equal(c.groupCalls, 1)
 
-	cdc.ServerResources()
+	cdc.ServerGroupsAndResources()
 	assert.True(cdc.Fresh(), "should be fresh after resources call")
 	assert.Equal(c.resourceCalls, 1)
 
-	cdc.ServerResources()
+	cdc.ServerGroupsAndResources()
 	assert.True(cdc.Fresh(), "should be fresh after another resources call")
 	assert.Equal(c.resourceCalls, 1)
 
@@ -67,14 +67,14 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
 	assert.Equal(c.groupCalls, 1)
 
-	cdc.ServerResources()
+	cdc.ServerGroupsAndResources()
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing resources cache")
 	assert.Equal(c.resourceCalls, 1)
 
 	cdc.Invalidate()
 	assert.True(cdc.Fresh(), "should be fresh after cache invalidation")
 
-	cdc.ServerResources()
+	cdc.ServerGroupsAndResources()
 	assert.True(cdc.Fresh(), "should ignore existing resources cache after invalidation")
 	assert.Equal(c.resourceCalls, 2)
 }
@@ -170,12 +170,6 @@ func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string
 	}
 
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
-}
-
-// Deprecated: use ServerGroupsAndResources instead.
-func (c *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := c.ServerGroupsAndResources()
-	return rs, err
 }
 
 func (c *fakeDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {

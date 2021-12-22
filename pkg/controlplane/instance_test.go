@@ -364,7 +364,7 @@ func TestStorageVersionHashes(t *testing.T) {
 		ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs},
 	}
 	discover := discovery.NewDiscoveryClientForConfigOrDie(c)
-	all, err := discover.ServerResources()
+	_, all, err := discover.ServerGroupsAndResources()
 	if err != nil {
 		t.Error(err)
 	}
