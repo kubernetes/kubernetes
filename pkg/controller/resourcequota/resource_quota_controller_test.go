@@ -1161,10 +1161,6 @@ func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) 
 	return nil, nil
 }
 
-func (*fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
 func (*fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }

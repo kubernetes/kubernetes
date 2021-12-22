@@ -164,7 +164,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
-	serverResources, err := client.ServerResources()
+	_, serverResources, err := client.ServerGroupsAndResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	}
 }
 
-func TestGetServerResources(t *testing.T) {
+func TestGetServerResourcesForGroupVersion(t *testing.T) {
 	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
@@ -365,7 +365,7 @@ func TestGetServerResources(t *testing.T) {
 
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	start := time.Now()
-	serverResources, err := client.ServerResources()
+	_, serverResources, err := client.ServerGroupsAndResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

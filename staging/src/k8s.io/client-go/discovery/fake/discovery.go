@@ -60,13 +60,6 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 		}}
 }
 
-// ServerResources returns the supported resources for all groups and versions.
-// Deprecated: use ServerGroupsAndResources instead.
-func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := c.ServerGroupsAndResources()
-	return rs, err
-}
-
 // ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 func (c *FakeDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	sgs, err := c.ServerGroups()
