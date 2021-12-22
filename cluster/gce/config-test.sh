@@ -109,7 +109,7 @@ export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 # Default container runtime for linux
 export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
 # Default container runtime for windows
-export WINDOWS_CONTAINER_RUNTIME=${KUBE_WINDOWS_CONTAINER_RUNTIME:-docker}
+export WINDOWS_CONTAINER_RUNTIME=${KUBE_WINDOWS_CONTAINER_RUNTIME:-containerd}
 
 # Set default values with override
 if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
