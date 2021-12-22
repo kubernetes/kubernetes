@@ -308,7 +308,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flags.Var(cliflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
-	flags.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/remote).")
+	flags.StringVar(&TestContext.ContainerRuntime, "container-runtime", "remote", "The container runtime of cluster VM instances (remote).")
 	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
@@ -484,6 +484,17 @@ func AfterReadingAllFlags(t *TestContextType) {
 		// We need to support that, changing it would break those usages.
 		Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
 		TestContext.Provider = "skeleton"
+	}
+
+	// TODO: Fix tests scripts that set CONTAINER_RUNTIME="containerd"
+	if TestContext.ContainerRuntime == "containerd" {
+		klog.Warningf("The --container-runtime flag is set to 'containerd' instead of 'remote'.")
+		TestContext.ContainerRuntime = "remote"
+	}
+	// Make sure that container runtime is valid
+	if TestContext.ContainerRuntime != "remote" {
+		klog.Errorf("Unsupported CRI container runtime: %q", TestContext.ContainerRuntime)
+		os.Exit(1)
 	}
 
 	var err error
