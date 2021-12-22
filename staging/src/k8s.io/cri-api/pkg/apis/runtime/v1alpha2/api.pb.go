@@ -1107,11 +1107,6 @@ type PodSandboxConfig struct {
 	// E.g.,
 	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
 	//     ContainerConfig.LogPath = `containerName/Instance#.log`
-	//
-	// WARNING: Log management and how kubelet should interface with the
-	// container logs are under active discussion in
-	// https://issues.k8s.io/24677. There *may* be future change of direction
-	// for logging as the discussion carries on.
 	LogDirectory string `protobuf:"bytes,3,opt,name=log_directory,json=logDirectory,proto3" json:"log_directory,omitempty"`
 	// DNS config for the sandbox.
 	DnsConfig *DNSConfig `protobuf:"bytes,4,opt,name=dns_config,json=dnsConfig,proto3" json:"dns_config,omitempty"`
@@ -2344,7 +2339,7 @@ func (m *PodSandboxStatsResponse) GetStats() *PodSandboxStats {
 	return nil
 }
 
-// PodSandboxStatsFilter is used to filter pod sandboxes.
+// PodSandboxStatsFilter is used to filter the list of pod sandboxes to retrieve stats for.
 // All those fields are combined with 'AND'.
 type PodSandboxStatsFilter struct {
 	// ID of the pod sandbox.
@@ -3076,8 +3071,6 @@ func (m *KeyValue) GetValue() string {
 
 // LinuxContainerResources specifies Linux specific configuration for
 // resources.
-// TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
-// directly.
 type LinuxContainerResources struct {
 	// CPU CFS (Completely Fair Scheduler) period. Default: 0 (not specified).
 	CpuPeriod int64 `protobuf:"varint,1,opt,name=cpu_period,json=cpuPeriod,proto3" json:"cpu_period,omitempty"`
@@ -3679,7 +3672,7 @@ type WindowsSandboxSecurityContext struct {
 	RunAsUsername string `protobuf:"bytes,1,opt,name=run_as_username,json=runAsUsername,proto3" json:"run_as_username,omitempty"`
 	// The contents of the GMSA credential spec to use to run this container.
 	CredentialSpec string `protobuf:"bytes,2,opt,name=credential_spec,json=credentialSpec,proto3" json:"credential_spec,omitempty"`
-	// Indicates whether the container be asked to run as a HostProcess container.
+	// Indicates whether the container requested to run as a HostProcess container.
 	HostProcess          bool     `protobuf:"varint,3,opt,name=host_process,json=hostProcess,proto3" json:"host_process,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -4166,8 +4159,6 @@ type ContainerConfig struct {
 	LogPath string `protobuf:"bytes,11,opt,name=log_path,json=logPath,proto3" json:"log_path,omitempty"`
 	// Variables for interactive containers, these have very specialized
 	// use-cases (e.g. debugging).
-	// TODO: Determine if we need to continue supporting these fields that are
-	// part of Kubernetes's Container Spec.
 	Stdin     bool `protobuf:"varint,12,opt,name=stdin,proto3" json:"stdin,omitempty"`
 	StdinOnce bool `protobuf:"varint,13,opt,name=stdin_once,json=stdinOnce,proto3" json:"stdin_once,omitempty"`
 	Tty       bool `protobuf:"varint,14,opt,name=tty,proto3" json:"tty,omitempty"`
@@ -7735,7 +7726,7 @@ type MemoryUsage struct {
 	Timestamp int64 `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	// The amount of working set memory in bytes.
 	WorkingSetBytes *UInt64Value `protobuf:"bytes,2,opt,name=working_set_bytes,json=workingSetBytes,proto3" json:"working_set_bytes,omitempty"`
-	// Available memory for use.  This is defined as the memory limit = workingSetBytes.
+	// Available memory for use. This is defined as the memory limit - workingSetBytes.
 	AvailableBytes *UInt64Value `protobuf:"bytes,3,opt,name=available_bytes,json=availableBytes,proto3" json:"available_bytes,omitempty"`
 	// Total memory in use. This includes all memory regardless of when it was accessed.
 	UsageBytes *UInt64Value `protobuf:"bytes,4,opt,name=usage_bytes,json=usageBytes,proto3" json:"usage_bytes,omitempty"`
@@ -8472,7 +8463,8 @@ type RuntimeServiceClient interface {
 	// StopContainer stops a running container with a grace period (i.e., timeout).
 	// This call is idempotent, and must not return an error if the container has
 	// already been stopped.
-	// TODO: what must the runtime do after the grace period is reached?
+	// The runtime must forcibly kill the container after the grace period is
+	// reached.
 	StopContainer(ctx context.Context, in *StopContainerRequest, opts ...grpc.CallOption) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the
 	// container must be forcibly removed.
@@ -8774,7 +8766,8 @@ type RuntimeServiceServer interface {
 	// StopContainer stops a running container with a grace period (i.e., timeout).
 	// This call is idempotent, and must not return an error if the container has
 	// already been stopped.
-	// TODO: what must the runtime do after the grace period is reached?
+	// The runtime must forcibly kill the container after the grace period is
+	// reached.
 	StopContainer(context.Context, *StopContainerRequest) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the
 	// container must be forcibly removed.
