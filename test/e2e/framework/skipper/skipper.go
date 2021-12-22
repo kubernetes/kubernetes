@@ -272,16 +272,6 @@ func SkipIfAppArmorNotSupported() {
 	SkipUnlessNodeOSDistroIs(AppArmorDistros...)
 }
 
-// RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
-func RunIfContainerRuntimeIs(runtimes ...string) {
-	for _, containerRuntime := range runtimes {
-		if containerRuntime == framework.TestContext.ContainerRuntime {
-			return
-		}
-	}
-	skipInternalf(1, "Skipped because container runtime %q is not in %s", framework.TestContext.ContainerRuntime, runtimes)
-}
-
 // RunIfSystemSpecNameIs runs if the system spec name is included in the names.
 func RunIfSystemSpecNameIs(names ...string) {
 	for _, name := range names {

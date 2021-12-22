@@ -76,7 +76,7 @@ var (
 	User_NTAuthoritySystem       = "NT AUTHORITY\\SYSTEM"
 )
 
-var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
+var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})

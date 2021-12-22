@@ -1705,32 +1705,29 @@
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message as empty when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    log and container exits successfully without an error. When container is terminated,
-    terminationMessage MUST have no content as container succeed. [Excluded:WindowsDocker]:
-    Cannot mount files in Windows Containers created by Docker.'
+    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+  description: Create a pod with an container. Container's output is recorded in log
+    and container exits successfully without an error. When container is terminated,
+    terminationMessage MUST have no content as container succeed.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from file of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message from file when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    a file and the container exits successfully without an error. When container is
-    terminated, terminationMessage MUST match with the content from file. [Excluded:WindowsDocker]:
-    Cannot mount files in Windows Containers created by Docker.'
+    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+  description: Create a pod with an container. Container's output is recorded in a
+    file and the container exits successfully without an error. When container is
+    terminated, terminationMessage MUST match with the content from file.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from container's log output of
     failing container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError
-    is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    log and container exits with an error. When container is terminated, termination
-    message MUST match the expected output recorded from container''s log. [Excluded:WindowsDocker]:
-    Cannot mount files in Windows Containers created by Docker.'
+    is set [NodeConformance] [Conformance]'
+  description: Create a pod with an container. Container's output is recorded in log
+    and container exits with an error. When container is terminated, termination message
+    MUST match the expected output recorded from container's log.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
@@ -1743,37 +1740,37 @@
     accordingly.
   release: v1.13
   file: test/e2e/common/node/runtime.go
-- testname: Docker containers, with arguments
-  codename: '[sig-node] Docker Containers should be able to override the image''s
-    default arguments (docker cmd) [NodeConformance] [Conformance]'
-  description: Default command and  from the docker image entrypoint MUST be used
+- testname: Containers, with arguments
+  codename: '[sig-node] Containers should be able to override the image''s default
+    arguments (container cmd) [NodeConformance] [Conformance]'
+  description: Default command and  from the container image entrypoint MUST be used
     when Pod does not specify the container command but the arguments from Pod spec
     MUST override when specified.
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
-- testname: Docker containers, with command
-  codename: '[sig-node] Docker Containers should be able to override the image''s
-    default command (docker entrypoint) [NodeConformance] [Conformance]'
-  description: Default command from the docker image entrypoint MUST NOT be used when
-    Pod specifies the container command.  Command from Pod spec MUST override the
-    command in the image.
+  file: test/e2e/common/node/containers.go
+- testname: Containers, with command
+  codename: '[sig-node] Containers should be able to override the image''s default
+    command (container entrypoint) [NodeConformance] [Conformance]'
+  description: Default command from the container image entrypoint MUST NOT be used
+    when Pod specifies the container command.  Command from Pod spec MUST override
+    the command in the image.
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
-- testname: Docker containers, with command and arguments
-  codename: '[sig-node] Docker Containers should be able to override the image''s
-    default command and arguments [NodeConformance] [Conformance]'
-  description: Default command and arguments from the docker image entrypoint MUST
+  file: test/e2e/common/node/containers.go
+- testname: Containers, with command and arguments
+  codename: '[sig-node] Containers should be able to override the image''s default
+    command and arguments [NodeConformance] [Conformance]'
+  description: Default command and arguments from the container image entrypoint MUST
     NOT be used when Pod specifies the container command and arguments.  Command and
     arguments from Pod spec MUST override the command and arguments in the image.
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
-- testname: Docker containers, without command and arguments
-  codename: '[sig-node] Docker Containers should use the image defaults if command
-    and args are blank [NodeConformance] [Conformance]'
-  description: Default command and arguments from the docker image entrypoint MUST
+  file: test/e2e/common/node/containers.go
+- testname: Containers, without command and arguments
+  codename: '[sig-node] Containers should use the image defaults if command and args
+    are blank [NodeConformance] [Conformance]'
+  description: Default command and arguments from the container image entrypoint MUST
     be used when Pod does not specify the container command
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
+  file: test/e2e/common/node/containers.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide container''s limits.cpu/memory
     and requests.cpu/memory as env vars [NodeConformance] [Conformance]'
@@ -3064,46 +3061,38 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod [Excluded:WindowsDocker] [Conformance]'
+    configmap pod [Conformance]'
   description: Containers in a pod can read content from a configmap mounted volume
-    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
-    since Docker does not support creating individual file mounts for containers on
-    Windows.
+    which was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod with mountPath of existing file [Excluded:WindowsDocker] [Conformance]'
+    configmap pod with mountPath of existing file [Conformance]'
   description: Containers in a pod can read content from a configmap mounted volume
     which was configured with a subpath and also using a mountpath that is a specific
-    file. This test is marked [Excluded:WindowsDocker] since Docker does not support
-    creating individual file mounts for containers on Windows.
+    file.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a downwardAPI volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    downward pod [Excluded:WindowsDocker] [Conformance]'
+    downward pod [Conformance]'
   description: Containers in a pod can read content from a downwardAPI mounted volume
-    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
-    since Docker does not support creating individual file mounts for containers on
-    Windows.
+    which was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a projected volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    projected pod [Excluded:WindowsDocker] [Conformance]'
+    projected pod [Conformance]'
   description: Containers in a pod can read content from a projected mounted volume
-    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
-    since Docker does not support creating individual file mounts for containers on
-    Windows.
+    which was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a secret volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    secret pod [Excluded:WindowsDocker] [Conformance]'
+    secret pod [Conformance]'
   description: Containers in a pod can read content from a secret mounted volume which
-    was configured with a subpath. This test is marked [Excluded:WindowsDocker] since
-    Docker does not support creating individual file mounts for containers on Windows.
+    was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 

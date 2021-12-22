@@ -231,7 +231,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			framework.ExpectNoError(err, "unable to apply fake resource to %v", testNodeName)
 
 			// Register a runtimeClass with overhead set as 25% of the available beard-seconds
-			handler = e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
+			handler = e2enode.PreconfiguredRuntimeClassHandler
 
 			rc := &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: handler},
@@ -263,7 +263,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			}
 
 			// remove RuntimeClass
-			cs.NodeV1beta1().RuntimeClasses().Delete(context.TODO(), e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime), metav1.DeleteOptions{})
+			cs.NodeV1beta1().RuntimeClasses().Delete(context.TODO(), e2enode.PreconfiguredRuntimeClassHandler, metav1.DeleteOptions{})
 		})
 
 		ginkgo.It("verify pod overhead is accounted for", func() {
