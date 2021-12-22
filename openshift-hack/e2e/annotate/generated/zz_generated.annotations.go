@@ -737,7 +737,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] ClusterDns [Feature:Example] should create pod that uses dns": "should create pod that uses dns [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Conntrack should be able to preserve UDP traffic when initial unready endpoints get ready": "should be able to preserve UDP traffic when initial unready endpoints get ready [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] Conntrack should be able to preserve UDP traffic when initial unready endpoints get ready": "should be able to preserve UDP traffic when initial unready endpoints get ready [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service": "should be able to preserve UDP traffic when server pod cycles for a ClusterIP service [Suite:openshift/conformance/parallel] [Suite:k8s]",
 

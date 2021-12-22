@@ -110,6 +110,9 @@ var (
 			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
 
 			`Topology Hints should distribute endpoints evenly`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=2034958
+			`\[sig-network\] Conntrack should be able to preserve UDP traffic when initial unready endpoints get ready`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
