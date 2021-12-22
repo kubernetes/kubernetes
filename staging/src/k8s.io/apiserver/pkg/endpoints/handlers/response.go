@@ -247,6 +247,7 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	case groupVersion == metav1.SchemeGroupVersion:
@@ -267,6 +268,7 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	default:
