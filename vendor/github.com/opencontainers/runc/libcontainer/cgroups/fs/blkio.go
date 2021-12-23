@@ -1,10 +1,7 @@
-// +build linux
-
 package fs
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,8 +20,8 @@ func (s *BlkioGroup) Name() string {
 	return "blkio"
 }
 
-func (s *BlkioGroup) Apply(path string, d *cgroupData) error {
-	return join(path, d.pid)
+func (s *BlkioGroup) Apply(path string, _ *configs.Resources, pid int) error {
+	return apply(path, pid)
 }
 
 func (s *BlkioGroup) Set(path string, r *configs.Resources) error {
@@ -131,19 +128,19 @@ func getBlkioStat(dir, file string) ([]cgroups.BlkioStatEntry, error) {
 				// skip total line
 				continue
 			} else {
-				return nil, fmt.Errorf("Invalid line found while parsing %s/%s: %s", dir, file, sc.Text())
+				return nil, malformedLine(dir, file, sc.Text())
 			}
 		}
 
 		v, err := strconv.ParseUint(fields[0], 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, &parseError{Path: dir, File: file, Err: err}
 		}
 		major := v
 
 		v, err = strconv.ParseUint(fields[1], 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, &parseError{Path: dir, File: file, Err: err}
 		}
 		minor := v
 
@@ -155,9 +152,12 @@ func getBlkioStat(dir, file string) ([]cgroups.BlkioStatEntry, error) {
 		}
 		v, err = strconv.ParseUint(fields[valueField], 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, &parseError{Path: dir, File: file, Err: err}
 		}
 		blkioStats = append(blkioStats, cgroups.BlkioStatEntry{Major: major, Minor: minor, Op: op, Value: v})
+	}
+	if err := sc.Err(); err != nil {
+		return nil, &parseError{Path: dir, File: file, Err: err}
 	}
 
 	return blkioStats, nil

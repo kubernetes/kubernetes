@@ -30,8 +30,7 @@ import (
 	"time"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -380,13 +379,10 @@ func createManager(containerName string) (cgroups.Manager, error) {
 		Resources: &configs.Resources{
 			SkipDevices: true,
 		},
+		Systemd: false,
 	}
 
-	if cgroups.IsCgroup2UnifiedMode() {
-		return cgroupfs2.NewManager(cg, "", false)
-
-	}
-	return cgroupfs.NewManager(cg, nil, false), nil
+	return manager.New(cg)
 }
 
 type KernelTunableBehavior string

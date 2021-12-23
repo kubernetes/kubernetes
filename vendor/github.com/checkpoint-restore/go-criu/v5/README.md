@@ -16,7 +16,7 @@ The following example would print the version of CRIU:
 import (
 	"log"
 
-	"github.com/checkpoint/restore/go-criu/v5"
+	"github.com/checkpoint-restore/go-criu/v5"
 )
 
 func main() {
@@ -50,6 +50,7 @@ The following table shows the relation between go-criu and criu versions:
 
 | Major version  | Latest release | CRIU version |
 | -------------- | -------------- | ------------ |
+| v5             | 5.2.0          | 3.16         |
 | v5             | 5.0.0          | 3.15         |
 | v4             | 4.1.0          | 3.14         |
 

@@ -1,5 +1,3 @@
-// +build linux
-
 package systemd
 
 import (
@@ -26,12 +24,25 @@ type legacyManager struct {
 	dbus    *dbusConnManager
 }
 
-func NewLegacyManager(cg *configs.Cgroup, paths map[string]string) cgroups.Manager {
+func NewLegacyManager(cg *configs.Cgroup, paths map[string]string) (cgroups.Manager, error) {
+	if cg.Rootless {
+		return nil, errors.New("cannot use rootless systemd cgroups manager on cgroup v1")
+	}
+	if cg.Resources != nil && cg.Resources.Unified != nil {
+		return nil, cgroups.ErrV1NoUnified
+	}
+	if paths == nil {
+		var err error
+		paths, err = initPaths(cg)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &legacyManager{
 		cgroups: cg,
 		paths:   paths,
 		dbus:    newDbusConnManager(false),
-	}
+	}, nil
 }
 
 type subsystem interface {
@@ -59,6 +70,7 @@ var legacySubsystems = []subsystem{
 	&fs.NetPrioGroup{},
 	&fs.NetClsGroup{},
 	&fs.NameGroup{GroupName: "name=systemd"},
+	&fs.RdmaGroup{},
 }
 
 func genV1ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
@@ -100,6 +112,53 @@ func genV1ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]syst
 	return properties, nil
 }
 
+// initPaths figures out and returns paths to cgroups.
+func initPaths(c *configs.Cgroup) (map[string]string, error) {
+	slice := "system.slice"
+	if c.Parent != "" {
+		var err error
+		slice, err = ExpandSlice(c.Parent)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	unit := getUnitName(c)
+
+	paths := make(map[string]string)
+	for _, s := range legacySubsystems {
+		subsystemPath, err := getSubsystemPath(slice, unit, s.Name())
+		if err != nil {
+			// Even if it's `not found` error, we'll return err
+			// because devices cgroup is hard requirement for
+			// container security.
+			if s.Name() == "devices" {
+				return nil, err
+			}
+			// Don't fail if a cgroup hierarchy was not found, just skip this subsystem
+			if cgroups.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		paths[s.Name()] = subsystemPath
+	}
+
+	// If systemd is using cgroups-hybrid mode then add the slice path of
+	// this container to the paths so the following process executed with
+	// "runc exec" joins that cgroup as well.
+	if cgroups.IsCgroup2HybridMode() {
+		// "" means cgroup-hybrid path
+		cgroupsHybridPath, err := getSubsystemPath(slice, unit, "")
+		if err != nil && cgroups.IsNotFound(err) {
+			return nil, err
+		}
+		paths[""] = cgroupsHybridPath
+	}
+
+	return paths, nil
+}
+
 func (m *legacyManager) Apply(pid int) error {
 	var (
 		c          = m.cgroups
@@ -108,27 +167,8 @@ func (m *legacyManager) Apply(pid int) error {
 		properties []systemdDbus.Property
 	)
 
-	if c.Resources.Unified != nil {
-		return cgroups.ErrV1NoUnified
-	}
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if c.Paths != nil {
-		paths := make(map[string]string)
-		cgMap, err := cgroups.ParseCgroupFile("/proc/self/cgroup")
-		if err != nil {
-			return err
-		}
-		// XXX(kolyshkin@): why this check is needed?
-		for name, path := range c.Paths {
-			if _, ok := cgMap[name]; ok {
-				paths[name] = path
-			}
-		}
-		m.paths = paths
-		return cgroups.EnterPid(m.paths, pid)
-	}
 
 	if c.Parent != "" {
 		slice = c.Parent
@@ -136,23 +176,19 @@ func (m *legacyManager) Apply(pid int) error {
 
 	properties = append(properties, systemdDbus.PropDescription("libcontainer container "+c.Name))
 
-	// if we create a slice, the parent is defined via a Wants=
 	if strings.HasSuffix(unitName, ".slice") {
+		// If we create a slice, the parent is defined via a Wants=.
 		properties = append(properties, systemdDbus.PropWants(slice))
 	} else {
-		// otherwise, we use Slice=
+		// Otherwise it's a scope, which we put into a Slice=.
 		properties = append(properties, systemdDbus.PropSlice(slice))
+		// Assume scopes always support delegation (supported since systemd v218).
+		properties = append(properties, newProp("Delegate", true))
 	}
 
 	// only add pid if its valid, -1 is used w/ general slice creation.
 	if pid != -1 {
 		properties = append(properties, newProp("PIDs", []uint32{uint32(pid)}))
-	}
-
-	// Check if we can delegate. This is only supported on systemd versions 218 and above.
-	if !strings.HasSuffix(unitName, ".slice") {
-		// Assume scopes always support delegation.
-		properties = append(properties, newProp("Delegate", true))
 	}
 
 	// Always enable accounting, this gets us the same behaviour as the fs implementation,
@@ -174,26 +210,6 @@ func (m *legacyManager) Apply(pid int) error {
 		return err
 	}
 
-	paths := make(map[string]string)
-	for _, s := range legacySubsystems {
-		subsystemPath, err := getSubsystemPath(m.cgroups, s.Name())
-		if err != nil {
-			// Even if it's `not found` error, we'll return err
-			// because devices cgroup is hard requirement for
-			// container security.
-			if s.Name() == "devices" {
-				return err
-			}
-			// Don't fail if a cgroup hierarchy was not found, just skip this subsystem
-			if cgroups.IsNotFound(err) {
-				continue
-			}
-			return err
-		}
-		paths[s.Name()] = subsystemPath
-	}
-	m.paths = paths
-
 	if err := m.joinCgroups(pid); err != nil {
 		return err
 	}
@@ -202,9 +218,6 @@ func (m *legacyManager) Apply(pid int) error {
 }
 
 func (m *legacyManager) Destroy() error {
-	if m.cgroups.Paths != nil {
-		return nil
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -254,7 +267,7 @@ func (m *legacyManager) joinCgroups(pid int) error {
 	return nil
 }
 
-func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
+func getSubsystemPath(slice, unit, subsystem string) (string, error) {
 	mountpoint, err := cgroups.FindCgroupMountpoint("", subsystem)
 	if err != nil {
 		return "", err
@@ -267,17 +280,7 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 	// if pid 1 is systemd 226 or later, it will be in init.scope, not the root
 	initPath = strings.TrimSuffix(filepath.Clean(initPath), "init.scope")
 
-	slice := "system.slice"
-	if c.Parent != "" {
-		slice = c.Parent
-	}
-
-	slice, err = ExpandSlice(slice)
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(mountpoint, initPath, slice, getUnitName(c)), nil
+	return filepath.Join(mountpoint, initPath, slice, unit), nil
 }
 
 func (m *legacyManager) Freeze(state configs.FreezerState) error {
@@ -399,9 +402,7 @@ func (m *legacyManager) freezeBeforeSet(unitName string, r *configs.Resources) (
 }
 
 func (m *legacyManager) Set(r *configs.Resources) error {
-	// If Paths are set, then we are just joining cgroups paths
-	// and there is no need to set any values.
-	if m.cgroups.Paths != nil {
+	if r == nil {
 		return nil
 	}
 	if r.Unified != nil {

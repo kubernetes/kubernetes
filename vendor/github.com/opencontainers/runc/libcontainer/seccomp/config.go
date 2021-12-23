@@ -2,6 +2,7 @@ package seccomp
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
@@ -16,13 +17,36 @@ var operators = map[string]configs.Operator{
 	"SCMP_CMP_MASKED_EQ": configs.MaskEqualTo,
 }
 
+// KnownOperators returns the list of the known operations.
+// Used by `runc features`.
+func KnownOperators() []string {
+	var res []string
+	for k := range operators {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
+}
+
 var actions = map[string]configs.Action{
-	"SCMP_ACT_KILL":  configs.Kill,
-	"SCMP_ACT_ERRNO": configs.Errno,
-	"SCMP_ACT_TRAP":  configs.Trap,
-	"SCMP_ACT_ALLOW": configs.Allow,
-	"SCMP_ACT_TRACE": configs.Trace,
-	"SCMP_ACT_LOG":   configs.Log,
+	"SCMP_ACT_KILL":   configs.Kill,
+	"SCMP_ACT_ERRNO":  configs.Errno,
+	"SCMP_ACT_TRAP":   configs.Trap,
+	"SCMP_ACT_ALLOW":  configs.Allow,
+	"SCMP_ACT_TRACE":  configs.Trace,
+	"SCMP_ACT_LOG":    configs.Log,
+	"SCMP_ACT_NOTIFY": configs.Notify,
+}
+
+// KnownActions returns the list of the known actions.
+// Used by `runc features`.
+func KnownActions() []string {
+	var res []string
+	for k := range actions {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
 }
 
 var archs = map[string]string{
@@ -44,6 +68,17 @@ var archs = map[string]string{
 	"SCMP_ARCH_S390X":       "s390x",
 }
 
+// KnownArchs returns the list of the known archs.
+// Used by `runc features`.
+func KnownArchs() []string {
+	var res []string
+	for k := range archs {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
+}
+
 // ConvertStringToOperator converts a string into a Seccomp comparison operator.
 // Comparison operators use the names they are assigned by Libseccomp's header.
 // Attempting to convert a string that is not a valid operator results in an
@@ -56,9 +91,7 @@ func ConvertStringToOperator(in string) (configs.Operator, error) {
 }
 
 // ConvertStringToAction converts a string into a Seccomp rule match action.
-// Actions use the names they are assigned in Libseccomp's header, though some
-// (notable, SCMP_ACT_TRACE) are not available in this implementation and will
-// return errors.
+// Actions use the names they are assigned in Libseccomp's header.
 // Attempting to convert a string that is not a valid action results in an
 // error.
 func ConvertStringToAction(in string) (configs.Action, error) {

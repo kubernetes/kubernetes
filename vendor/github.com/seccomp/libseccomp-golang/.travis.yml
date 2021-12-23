@@ -1,0 +1,57 @@
+# Travis CI configuration for libseccomp-golang
+
+# https://docs.travis-ci.com/user/reference/bionic
+# https://wiki.ubuntu.com/Releases
+
+dist: bionic
+sudo: false
+
+notifications:
+  email:
+    on_success: always
+    on_failure: always
+
+arch:
+  - amd64
+
+os:
+  - linux
+
+language: go
+
+jobs:
+  include:
+    - name: "last libseccomp 2.5.0"
+      env:
+      - SECCOMP_VER=2.5.0
+      - SECCOMP_SHA256SUM=1ffa7038d2720ad191919816db3479295a4bcca1ec14e02f672539f4983014f3
+    - name: "compat libseccomp 2.4.4"
+      env:
+      - SECCOMP_VER=2.4.4
+      - SECCOMP_SHA256SUM=4e79738d1ef3c9b7ca9769f1f8b8d84fc17143c2c1c432e53b9c64787e0ff3eb
+    - name: "compat libseccomp 2.2.1"
+      env:
+      - SECCOMP_VER=2.2.1
+      - SECCOMP_SHA256SUM=0ba1789f54786c644af54cdffc9fd0dd0a8bb2b2ee153933f658855d2851a740
+
+addons:
+  apt:
+    packages:
+      - build-essential
+      - astyle
+      - golint
+      - gperf
+
+install:
+  - go get -u golang.org/x/lint/golint
+
+# run all of the tests independently, fail if any of the tests error
+script:
+  - wget https://github.com/seccomp/libseccomp/releases/download/v$SECCOMP_VER/libseccomp-$SECCOMP_VER.tar.gz
+  - echo $SECCOMP_SHA256SUM libseccomp-$SECCOMP_VER.tar.gz | sha256sum -c
+  - tar xf libseccomp-$SECCOMP_VER.tar.gz
+  - pushd libseccomp-$SECCOMP_VER && ./configure --prefix=/opt/libseccomp-$SECCOMP_VER && make && sudo make install && popd
+  - make check-syntax
+  - make lint
+  - PKG_CONFIG_PATH=/opt/libseccomp-$SECCOMP_VER/lib/pkgconfig LD_LIBRARY_PATH=/opt/libseccomp-$SECCOMP_VER/lib make vet
+  - PKG_CONFIG_PATH=/opt/libseccomp-$SECCOMP_VER/lib/pkgconfig LD_LIBRARY_PATH=/opt/libseccomp-$SECCOMP_VER/lib make test
