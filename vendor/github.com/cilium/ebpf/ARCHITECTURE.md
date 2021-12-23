@@ -57,7 +57,7 @@ Objects
 loading a spec will fail because the kernel is too old, or a feature is not
 enabled. There are multiple ways the library deals with that:
 
-* Fallback: older kernels don't allowing naming programs and maps. The library
+* Fallback: older kernels don't allow naming programs and maps. The library
   automatically detects support for names, and omits them during load if
   necessary. This works since name is primarily a debug aid.
 
@@ -68,7 +68,7 @@ enabled. There are multiple ways the library deals with that:
 Once program and map objects are loaded they expose the kernel's low-level API,
 e.g. `NextKey`. Often this API is awkward to use in Go, so there are safer
 wrappers on top of the low-level API, like `MapIterator`. The low-level API is
-useful as an out when our higher-level API doesn't support a particular use case.
+useful when our higher-level API doesn't support a particular use case.
 
 Links
 ---

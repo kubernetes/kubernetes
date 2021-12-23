@@ -87,19 +87,19 @@ func (c *Criu) sendAndRecv(reqB []byte) ([]byte, int, error) {
 }
 
 func (c *Criu) doSwrk(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy Notify) error {
-	resp, err := c.doSwrkWithResp(reqType, opts, nfy)
+	resp, err := c.doSwrkWithResp(reqType, opts, nfy, nil)
 	if err != nil {
 		return err
 	}
 	respType := resp.GetType()
 	if respType != reqType {
-		return errors.New("unexpected responce")
+		return errors.New("unexpected CRIU RPC response")
 	}
 
 	return nil
 }
 
-func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy Notify) (*rpc.CriuResp, error) {
+func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy Notify, features *rpc.CriuFeatures) (*rpc.CriuResp, error) {
 	var resp *rpc.CriuResp
 
 	req := rpc.CriuReq{
@@ -109,6 +109,10 @@ func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy N
 
 	if nfy != nil {
 		opts.NotifyScripts = proto.Bool(true)
+	}
+
+	if features != nil {
+		req.Features = features
 	}
 
 	if c.swrkCmd == nil {
@@ -209,7 +213,7 @@ func (c *Criu) StartPageServer(opts *rpc.CriuOpts) error {
 
 // StartPageServerChld starts the page server and returns PID and port
 func (c *Criu) StartPageServerChld(opts *rpc.CriuOpts) (int, int, error) {
-	resp, err := c.doSwrkWithResp(rpc.CriuReqType_PAGE_SERVER_CHLD, opts, nil)
+	resp, err := c.doSwrkWithResp(rpc.CriuReqType_PAGE_SERVER_CHLD, opts, nil, nil)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -220,7 +224,7 @@ func (c *Criu) StartPageServerChld(opts *rpc.CriuOpts) (int, int, error) {
 // GetCriuVersion executes the VERSION RPC call and returns the version
 // as an integer. Major * 10000 + Minor * 100 + SubLevel
 func (c *Criu) GetCriuVersion() (int, error) {
-	resp, err := c.doSwrkWithResp(rpc.CriuReqType_VERSION, nil, nil)
+	resp, err := c.doSwrkWithResp(rpc.CriuReqType_VERSION, nil, nil, nil)
 	if err != nil {
 		return 0, err
 	}

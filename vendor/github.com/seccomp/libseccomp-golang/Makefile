@@ -18,8 +18,14 @@ fix-syntax:
 vet:
 	go vet -v
 
+# Previous bugs have made the tests freeze until the timeout. Golang default
+# timeout for tests is 10 minutes, which is too long, considering current tests
+# can be executed in less than 1 second. Reduce the timeout, so problems can
+# be noticed earlier in the CI.
+TEST_TIMEOUT=10s
+
 test:
-	go test -v
+	go test -v -timeout $(TEST_TIMEOUT)
 
 lint:
 	@$(if $(shell which golint),true,$(error "install golint and include it in your PATH"))

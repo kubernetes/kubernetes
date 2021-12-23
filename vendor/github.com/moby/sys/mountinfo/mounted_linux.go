@@ -16,9 +16,6 @@ func mountedByOpenat2(path string) (bool, error) {
 		Flags: unix.O_PATH | unix.O_CLOEXEC,
 	})
 	if err != nil {
-		if err == unix.ENOENT { // not a mount
-			return false, nil
-		}
 		return false, &os.PathError{Op: "openat2", Path: dir, Err: err}
 	}
 	fd, err := unix.Openat2(dirfd, last, &unix.OpenHow{
@@ -26,20 +23,22 @@ func mountedByOpenat2(path string) (bool, error) {
 		Resolve: unix.RESOLVE_NO_XDEV,
 	})
 	_ = unix.Close(dirfd)
-	switch err {
+	switch err { //nolint:errorlint // unix errors are bare
 	case nil: // definitely not a mount
 		_ = unix.Close(fd)
 		return false, nil
 	case unix.EXDEV: // definitely a mount
 		return true, nil
-	case unix.ENOENT: // not a mount
-		return false, nil
 	}
 	// not sure
 	return false, &os.PathError{Op: "openat2", Path: path, Err: err}
 }
 
 func mounted(path string) (bool, error) {
+	path, err := normalizePath(path)
+	if err != nil {
+		return false, err
+	}
 	// Try a fast path, using openat2() with RESOLVE_NO_XDEV.
 	mounted, err := mountedByOpenat2(path)
 	if err == nil {
