@@ -26,7 +26,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -153,14 +152,6 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 
 	ns := framework.CreateTestingNamespace(namespaceName, server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
-
-	backupHandlers := runtime.ErrorHandlers
-	runtime.ErrorHandlers = append(runtime.ErrorHandlers, func(e error) {
-		t.Fatalf("Failed with error: %v", e)
-	})
-	defer func() {
-		runtime.ErrorHandlers = backupHandlers
-	}()
 
 	cjClient := clientSet.BatchV1().CronJobs(ns.Name)
 
