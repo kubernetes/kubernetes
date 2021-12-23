@@ -826,6 +826,19 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 			return "", err
 		}
 		return hostIPs[0].String(), nil
+	case "status.hostIPs":
+		if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
+			return "", nil
+		}
+		hostIPs, err := kl.getHostIPsAnyWay()
+		if err != nil {
+			return "", err
+		}
+		ips := make([]string, 0, len(hostIPs))
+		for _, ip := range hostIPs {
+			ips = append(ips, ip.String())
+		}
+		return strings.Join(ips, ","), nil
 	case "status.podIP":
 		return podIP, nil
 	case "status.podIPs":
