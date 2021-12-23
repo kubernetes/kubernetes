@@ -28,9 +28,8 @@ import (
 	"time"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
+	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
@@ -42,14 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-// libcontainerCgroupManagerType defines how to interface with libcontainer
-type libcontainerCgroupManagerType string
-
 const (
-	// libcontainerCgroupfs means use libcontainer with cgroupfs
-	libcontainerCgroupfs libcontainerCgroupManagerType = "cgroupfs"
-	// libcontainerSystemd means use libcontainer with systemd
-	libcontainerSystemd libcontainerCgroupManagerType = "systemd"
 	// systemdSuffix is the cgroup name suffix for systemd
 	systemdSuffix string = ".slice"
 	// MemoryMin is memory.min for cgroup v2
@@ -133,39 +125,6 @@ func IsSystemdStyleName(name string) bool {
 	return strings.HasSuffix(name, systemdSuffix)
 }
 
-// libcontainerAdapter provides a simplified interface to libcontainer based on libcontainer type.
-type libcontainerAdapter struct {
-	// cgroupManagerType defines how to interface with libcontainer
-	cgroupManagerType libcontainerCgroupManagerType
-}
-
-// newLibcontainerAdapter returns a configured libcontainerAdapter for specified manager.
-// it does any initialization required by that manager to function.
-func newLibcontainerAdapter(cgroupManagerType libcontainerCgroupManagerType) *libcontainerAdapter {
-	return &libcontainerAdapter{cgroupManagerType: cgroupManagerType}
-}
-
-// newManager returns an implementation of cgroups.Manager
-func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup, paths map[string]string) (libcontainercgroups.Manager, error) {
-	switch l.cgroupManagerType {
-	case libcontainerCgroupfs:
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			return cgroupfs2.NewManager(cgroups, paths["memory"], false)
-		}
-		return cgroupfs.NewManager(cgroups, paths, false), nil
-	case libcontainerSystemd:
-		// this means you asked systemd to manage cgroups, but systemd was not on the host, so all you can do is panic...
-		if !cgroupsystemd.IsRunningSystemd() {
-			panic("systemd cgroup manager not available")
-		}
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			return cgroupsystemd.NewUnifiedManager(cgroups, paths["memory"], false), nil
-		}
-		return cgroupsystemd.NewLegacyManager(cgroups, paths), nil
-	}
-	return nil, fmt.Errorf("invalid cgroup manager configuration")
-}
-
 // CgroupSubsystems holds information about the mounted cgroup subsystems
 type CgroupSubsystems struct {
 	// Cgroup subsystem mounts.
@@ -180,13 +139,14 @@ type CgroupSubsystems struct {
 // cgroupManagerImpl implements the CgroupManager interface.
 // Its a stateless object which can be used to
 // update,create or delete any number of cgroups
-// It uses the Libcontainer raw fs cgroup manager for cgroup management.
+// It relies on runc/libcontainer cgroup managers.
 type cgroupManagerImpl struct {
 	// subsystems holds information about all the
 	// mounted cgroup subsystems on the node
 	subsystems *CgroupSubsystems
-	// simplifies interaction with libcontainer and its cgroup managers
-	adapter *libcontainerAdapter
+
+	// useSystemd tells if systemd cgroup manager should be used.
+	useSystemd bool
 }
 
 // Make sure that cgroupManagerImpl implements the CgroupManager interface
@@ -194,20 +154,16 @@ var _ CgroupManager = &cgroupManagerImpl{}
 
 // NewCgroupManager is a factory method that returns a CgroupManager
 func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
-	managerType := libcontainerCgroupfs
-	if cgroupDriver == string(libcontainerSystemd) {
-		managerType = libcontainerSystemd
-	}
 	return &cgroupManagerImpl{
 		subsystems: cs,
-		adapter:    newLibcontainerAdapter(managerType),
+		useSystemd: cgroupDriver == "systemd",
 	}
 }
 
 // Name converts the cgroup to the driver specific value in cgroupfs form.
 // This always returns a valid cgroupfs path even when systemd driver is in use!
 func (m *cgroupManagerImpl) Name(name CgroupName) string {
-	if m.adapter.cgroupManagerType == libcontainerSystemd {
+	if m.useSystemd {
 		return name.ToSystemd()
 	}
 	return name.ToCgroupfs()
@@ -215,7 +171,7 @@ func (m *cgroupManagerImpl) Name(name CgroupName) string {
 
 // CgroupName converts the literal cgroupfs name on the host to an internal identifier.
 func (m *cgroupManagerImpl) CgroupName(name string) CgroupName {
-	if m.adapter.cgroupManagerType == libcontainerSystemd {
+	if m.useSystemd {
 		return ParseSystemdToCgroupName(name)
 	}
 	return ParseCgroupfsToCgroupName(name)
@@ -239,14 +195,16 @@ func (m *cgroupManagerImpl) buildCgroupUnifiedPath(name CgroupName) string {
 
 // libctCgroupConfig converts CgroupConfig to libcontainer's Cgroup config.
 func (m *cgroupManagerImpl) libctCgroupConfig(in *CgroupConfig, needResources bool) *libcontainerconfigs.Cgroup {
-	config := &libcontainerconfigs.Cgroup{}
+	config := &libcontainerconfigs.Cgroup{
+		Systemd: m.useSystemd,
+	}
 	if needResources {
 		config.Resources = m.toResources(in.ResourceParameters)
 	} else {
 		config.Resources = &libcontainerconfigs.Resources{}
 	}
 
-	if m.adapter.cgroupManagerType == libcontainerCgroupfs {
+	if !config.Systemd {
 		// For fs cgroup manager, we can either set Path or Name and Parent.
 		// Setting Path is easier.
 		config.Path = in.Name.ToCgroupfs()
@@ -335,11 +293,8 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 		metrics.CgroupManagerDuration.WithLabelValues("destroy").Observe(metrics.SinceInSeconds(start))
 	}()
 
-	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
-
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, false)
-
-	manager, err := m.adapter.newManager(libcontainerCgroupConfig, cgroupPaths)
+	manager, err := manager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
 	}
@@ -463,7 +418,7 @@ func (m *cgroupManagerImpl) maybeSetHugetlb(resourceConfig *ResourceConfig, reso
 		pageSizes.Insert(sizeString)
 	}
 	// for each page size omitted, limit to 0
-	for _, pageSize := range cgroupfs.HugePageSizes {
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
 		if pageSizes.Has(pageSize) {
 			continue
 		}
@@ -482,16 +437,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
-
-	unified := libcontainercgroups.IsCgroup2UnifiedMode()
-	var paths map[string]string
-	if unified {
-		libcontainerCgroupConfig.Path = m.Name(cgroupConfig.Name)
-	} else {
-		paths = m.buildCgroupPaths(cgroupConfig.Name)
-	}
-
-	manager, err := m.adapter.newManager(libcontainerCgroupConfig, paths)
+	manager, err := manager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup manager: %v", err)
 	}
@@ -506,9 +452,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
-
-	// get the manager with the specified cgroup configuration
-	manager, err := m.adapter.newManager(libcontainerCgroupConfig, nil)
+	manager, err := manager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
 	}
