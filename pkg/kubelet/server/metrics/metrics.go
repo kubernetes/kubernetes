@@ -64,6 +64,19 @@ var (
 		},
 		[]string{"method", "path", "server_type", "long_running"},
 	)
+	// VolumeStatCalDuration tracks the duration in seconds to calculate volume stats.
+	// this metric is mainly for comparison between fsquota monitoring and `du` for disk usage.
+	VolumeStatCalDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      "volume_stat_cal_duration_seconds",
+			Help:      "Duration in seconds to calculate volume stats",
+			// Use DefBuckets for now, will customize the buckets if necessary.
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{},
+	)
 )
 
 var registerMetrics sync.Once
@@ -74,6 +87,7 @@ func Register() {
 		legacyregistry.MustRegister(HTTPRequests)
 		legacyregistry.MustRegister(HTTPRequestsDuration)
 		legacyregistry.MustRegister(HTTPInflightRequests)
+		legacyregistry.MustRegister(VolumeStatCalDuration)
 	})
 }
 

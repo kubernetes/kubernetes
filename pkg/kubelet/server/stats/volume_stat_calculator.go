@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -133,7 +134,13 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 	var ephemeralStats []stats.VolumeStats
 	var persistentStats []stats.VolumeStats
 	for name, v := range metricVolumes {
-		metric, err := v.GetMetrics()
+		metric, err := func() (*volume.Metrics, error) {
+			startTime := time.Now()
+			defer func() {
+				servermetrics.VolumeStatCalDuration.WithLabelValues().Observe(servermetrics.SinceInSeconds(startTime))
+			}()
+			return v.GetMetrics()
+		}()
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
 			if !volume.IsNotSupported(err) {
