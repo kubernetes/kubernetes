@@ -401,24 +401,6 @@ func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
 	return buffer.Bytes()
 }
 
-// truncatePodHostnameIfNeeded truncates the pod hostname if it's longer than 63 chars.
-func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
-	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
-	const hostnameMaxLen = 63
-	if len(hostname) <= hostnameMaxLen {
-		return hostname, nil
-	}
-	truncated := hostname[:hostnameMaxLen]
-	klog.ErrorS(nil, "Hostname for pod was too long, truncated it", "podName", podName, "hostnameMaxLen", hostnameMaxLen, "truncatedHostname", truncated)
-	// hostname should not end with '-' or '.'
-	truncated = strings.TrimRight(truncated, "-.")
-	if len(truncated) == 0 {
-		// This should never happen.
-		return "", fmt.Errorf("hostname for pod %q was invalid: %q", podName, hostname)
-	}
-	return truncated, nil
-}
-
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
 	return kl.usernsManager.GetOrCreateUserNamespaceMappings(pod)
@@ -433,17 +415,13 @@ func (kl *Kubelet) getHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
-	hostname := pod.Name
-	if len(pod.Spec.Hostname) > 0 {
-		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
-			return "", "", fmt.Errorf("pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
+	hostname := pod.Spec.Hostname
+	if len(hostname) > 0 {
+		if msgs := utilvalidation.IsDNS1123Label(hostname); len(msgs) != 0 {
+			return "", "", fmt.Errorf("pod hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
 		}
-		hostname = pod.Spec.Hostname
-	}
-
-	hostname, err := truncatePodHostnameIfNeeded(pod.Name, hostname)
-	if err != nil {
-		return "", "", err
+	} else {
+		hostname = podutil.HostnameFromPodName(pod.Name)
 	}
 
 	hostDomain := ""

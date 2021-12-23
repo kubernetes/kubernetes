@@ -18,6 +18,7 @@ package pod
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -383,4 +384,27 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 	status.Conditions[conditionIndex] = *condition
 	// Return true if one of the fields have changed.
 	return !isEqual
+}
+
+// HostnameFromPodName produces a value which can be used as a hostname (e.g. in
+// Pod.spec.hostname) from the pod's name.  For historical reasons, Pod names
+// are DNS subdomains, but hostnames are DNS labels.
+func HostnameFromPodName(podName string) string {
+	hostname := podName
+
+	// Convert dots to dashes.
+	if strings.Contains(hostname, ".") {
+		hostname = strings.ReplaceAll(hostname, ".", "-")
+	}
+
+	// Cap at 63 chars (spec says 64 bytes: 63 + NUL).
+	const hostnameMaxLen = 63
+	if len(hostname) > hostnameMaxLen {
+		hostname = hostname[:hostnameMaxLen]
+	}
+
+	// Must not end with '-'.
+	hostname = strings.TrimRight(hostname, "-")
+
+	return hostname
 }

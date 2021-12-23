@@ -1510,7 +1510,12 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 					if completionIndex != unknownCompletionIndex {
 						template = podTemplate.DeepCopy()
 						addCompletionIndexAnnotation(template, completionIndex)
-						template.Spec.Hostname = fmt.Sprintf("%s-%d", job.Name, completionIndex)
+						hostname := podutil.HostnameFromPodName(job.Name)
+						const maxlen = 63 - 6 - 1 // 6 places for the index, 1 for the dash
+						if len(hostname) > maxlen {
+							hostname = hostname[:maxlen]
+						}
+						template.Spec.Hostname = fmt.Sprintf("%s-%d", hostname, completionIndex)
 						generateName = podGenerateNameWithIndex(job.Name, completionIndex)
 					}
 					defer wait.Done()

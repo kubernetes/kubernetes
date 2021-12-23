@@ -968,3 +968,51 @@ func TestIsContainersReadyConditionTrue(t *testing.T) {
 		assert.Equal(t, test.expected, isContainersReady, test.desc)
 	}
 }
+
+func TestHostnameFromPodName(t *testing.T) {
+	for c, test := range map[string]struct {
+		input  string
+		output string
+	}{
+		"dns-label-short": {
+			input:  "pod-name",
+			output: "pod-name",
+		},
+		"dns-label-short-trailing-dash": {
+			input:  "pod-name-",
+			output: "pod-name",
+		},
+		"dns-label-long": {
+			input:  strings.Repeat("x", 64),
+			output: strings.Repeat("x", 63),
+		},
+		"dns-label-long-trailing-dash": {
+			input:  strings.Repeat("x", 62) + "-suffix",
+			output: strings.Repeat("x", 62),
+		},
+		"long-trailing-dashes": {
+			input:  "x" + strings.Repeat("-", 62),
+			output: "x",
+		},
+		"dns-subdomain-short": {
+			input:  "test.pod.hostname",
+			output: "test-pod-hostname",
+		},
+		"dns-subdomain-short-trailing-dot": {
+			input:  "test.pod.hostname.",
+			output: "test-pod-hostname",
+		},
+		"dns-subdomain-long": {
+			input:  strings.Repeat("x", 32) + "." + strings.Repeat("y", 32),
+			output: strings.Repeat("x", 32) + "-" + strings.Repeat("y", 30),
+		},
+		"dns-subdomain-long-trailing-dot": {
+			input:  strings.Repeat("x", 32) + "." + strings.Repeat("y", 29) + ".suffix",
+			output: strings.Repeat("x", 32) + "-" + strings.Repeat("y", 29),
+		},
+	} {
+		t.Logf("TestCase: %q", c)
+		output := HostnameFromPodName(test.input)
+		assert.Equal(t, test.output, output)
+	}
+}

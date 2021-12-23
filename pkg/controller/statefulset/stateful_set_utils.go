@@ -384,7 +384,7 @@ func updateStorage(set *apps.StatefulSet, pod *v1.Pod) {
 func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	updateIdentity(set, pod)
 	// Set these immutable fields only on initial Pod creation, not updates.
-	pod.Spec.Hostname = pod.Name
+	pod.Spec.Hostname = podutil.HostnameFromPodName(pod.Name)
 	pod.Spec.Subdomain = set.Spec.ServiceName
 }
 

@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
+	podv1util "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -758,7 +759,7 @@ func seccompFieldForAnnotation(annotation string) *api.SeccompProfile {
 func setDefaultHostname(pod *api.Pod) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodHostnameWhenSubdomain) {
 		if pod.Spec.Subdomain != "" && pod.Spec.Hostname == "" {
-			pod.Spec.Hostname = pod.Name
+			pod.Spec.Hostname = podv1util.HostnameFromPodName(pod.Name)
 		}
 	}
 }
