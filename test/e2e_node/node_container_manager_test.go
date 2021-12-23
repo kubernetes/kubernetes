@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -69,7 +69,6 @@ var _ = SIGDescribe("Node Container Manager [Serial]", func() {
 			framework.ExpectNoError(runTest(f))
 		})
 	})
-
 })
 
 func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
