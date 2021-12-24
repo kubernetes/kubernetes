@@ -1,11 +1,10 @@
 package reference
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/docker/distribution/digestset"
+	"github.com/distribution/distribution/v3/digestset"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -42,7 +41,7 @@ func ParseNormalizedNamed(s string) (Named, error) {
 		remoteName = remainder
 	}
 	if strings.ToLower(remoteName) != remoteName {
-		return nil, errors.New("invalid reference format: repository name must be lowercase")
+		return nil, fmt.Errorf("invalid reference format: repository name (%s) must be lowercase", remoteName)
 	}
 
 	ref, err := Parse(domain + "/" + remainder)
@@ -90,7 +89,7 @@ func ParseDockerRef(ref string) (Named, error) {
 // needs to be already validated before.
 func splitDockerDomain(name string) (domain, remainder string) {
 	i := strings.IndexRune(name, '/')
-	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost") {
+	if i == -1 || (!strings.ContainsAny(name[:i], ".:") && name[:i] != "localhost" && strings.ToLower(name[:i]) == name[:i]) {
 		domain, remainder = defaultDomain, name
 	} else {
 		domain, remainder = name[:i], name[i+1:]

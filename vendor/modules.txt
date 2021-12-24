@@ -3,7 +3,7 @@
 bitbucket.org/bertimus9/systemstat
 # cloud.google.com/go v0.81.0 => cloud.google.com/go v0.81.0
 cloud.google.com/go/compute/metadata
-# github.com/Azure/azure-sdk-for-go v55.0.0+incompatible => github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
+# github.com/Azure/azure-sdk-for-go v56.3.0+incompatible => github.com/Azure/azure-sdk-for-go v56.3.0+incompatible
 ## explicit
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
 github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry
@@ -18,11 +18,11 @@ github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
 # github.com/Azure/go-autorest v14.2.0+incompatible => github.com/Azure/go-autorest v14.2.0+incompatible
 github.com/Azure/go-autorest
-# github.com/Azure/go-autorest/autorest v0.11.18 => github.com/Azure/go-autorest/autorest v0.11.18
+# github.com/Azure/go-autorest/autorest v0.11.20 => github.com/Azure/go-autorest/autorest v0.11.20
 ## explicit
 github.com/Azure/go-autorest/autorest
 github.com/Azure/go-autorest/autorest/azure
-# github.com/Azure/go-autorest/autorest/adal v0.9.13 => github.com/Azure/go-autorest/autorest/adal v0.9.13
+# github.com/Azure/go-autorest/autorest/adal v0.9.15 => github.com/Azure/go-autorest/autorest/adal v0.9.15
 ## explicit
 github.com/Azure/go-autorest/autorest/adal
 # github.com/Azure/go-autorest/autorest/date v0.3.0 => github.com/Azure/go-autorest/autorest/date v0.3.0
@@ -218,10 +218,12 @@ github.com/cyphar/filepath-securejoin
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 github.com/daviddengcn/go-colortext
+# github.com/distribution/distribution/v3 v3.0.0-20211221201123-6a977a5a754b => github.com/distribution/distribution/v3 v3.0.0-20211221201123-6a977a5a754b
+## explicit
+github.com/distribution/distribution/v3/digestset
+github.com/distribution/distribution/v3/reference
 # github.com/docker/distribution v2.8.1+incompatible => github.com/docker/distribution v2.8.1+incompatible
 ## explicit
-github.com/docker/distribution/digestset
-github.com/docker/distribution/reference
 # github.com/docker/go-units v0.4.0 => github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
@@ -303,6 +305,8 @@ github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
+# github.com/golang-jwt/jwt/v4 v4.0.0 => github.com/golang-jwt/jwt/v4 v4.0.0
+github.com/golang-jwt/jwt/v4
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da => github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
@@ -2427,11 +2431,11 @@ sigs.k8s.io/yaml
 # cloud.google.com/go/bigquery => cloud.google.com/go/bigquery v1.8.0
 # cloud.google.com/go/storage => cloud.google.com/go/storage v1.10.0
 # dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
-# github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
+# github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v56.3.0+incompatible
 # github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
 # github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.18
-# github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.13
+# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.20
+# github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.15
 # github.com/Azure/go-autorest/autorest/date => github.com/Azure/go-autorest/autorest/date v0.3.0
 # github.com/Azure/go-autorest/autorest/mocks => github.com/Azure/go-autorest/autorest/mocks v0.4.1
 # github.com/Azure/go-autorest/autorest/to => github.com/Azure/go-autorest/autorest/to v0.4.0
@@ -2449,6 +2453,7 @@ sigs.k8s.io/yaml
 # github.com/OneOfOne/xxhash => github.com/OneOfOne/xxhash v1.2.2
 # github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.1
 # github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
+# github.com/Shopify/logrus-bugsnag => github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d
 # github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
 # github.com/antihax/optional => github.com/antihax/optional v1.0.0
 # github.com/antlr/antlr4/runtime/Go/antlr => github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e
@@ -2459,9 +2464,14 @@ sigs.k8s.io/yaml
 # github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.38.49
 # github.com/benbjohnson/clock => github.com/benbjohnson/clock v1.1.0
 # github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
+# github.com/bitly/go-simplejson => github.com/bitly/go-simplejson v0.5.0
 # github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible
 # github.com/blang/semver/v4 => github.com/blang/semver/v4 v4.0.0
 # github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
+# github.com/bshuster-repo/logrus-logstash-hook => github.com/bshuster-repo/logrus-logstash-hook v1.0.0
+# github.com/bugsnag/bugsnag-go => github.com/bugsnag/bugsnag-go v0.0.0-20141110184014-b1d153021fcd
+# github.com/bugsnag/osext => github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b
+# github.com/bugsnag/panicwrap => github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0
 # github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
 # github.com/certifi/gocertifi => github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054
 # github.com/cespare/xxhash => github.com/cespare/xxhash v1.1.0
@@ -2497,11 +2507,16 @@ sigs.k8s.io/yaml
 # github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.3
 # github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
 # github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
+# github.com/denverdino/aliyungo => github.com/denverdino/aliyungo v0.0.0-20190125010748-a747050bb1ba
+# github.com/distribution/distribution/v3 => github.com/distribution/distribution/v3 v3.0.0-20211221201123-6a977a5a754b
 # github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
 # github.com/docker/distribution => github.com/docker/distribution v2.8.1+incompatible
 # github.com/docker/docker => github.com/docker/docker v20.10.12+incompatible
 # github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
+# github.com/docker/go-events => github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
+# github.com/docker/go-metrics => github.com/docker/go-metrics v0.0.1
 # github.com/docker/go-units => github.com/docker/go-units v0.4.0
+# github.com/docker/libtrust => github.com/docker/libtrust v0.0.0-20150114040149-fa567046d9b1
 # github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 # github.com/dustin/go-humanize => github.com/dustin/go-humanize v1.0.0
 # github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
@@ -2537,12 +2552,14 @@ sigs.k8s.io/yaml
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.6
 # github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
 # github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+# github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.0.0
 # github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 # github.com/golang/glog => github.com/golang/glog v1.0.0
 # github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 # github.com/golang/mock => github.com/golang/mock v1.6.0
 # github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
+# github.com/gomodule/redigo => github.com/gomodule/redigo v1.8.2
 # github.com/google/btree => github.com/google/btree v1.0.1
 # github.com/google/cadvisor => github.com/google/cadvisor v0.44.0
 # github.com/google/cel-go => github.com/google/cel-go v0.10.1
@@ -2558,6 +2575,7 @@ sigs.k8s.io/yaml
 # github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.5
 # github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 # github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00
+# github.com/gorilla/handlers => github.com/gorilla/handlers v1.5.1
 # github.com/gorilla/mux => github.com/gorilla/mux v1.8.0
 # github.com/gorilla/websocket => github.com/gorilla/websocket v1.4.2
 # github.com/gregjones/httpcache => github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
@@ -2597,6 +2615,7 @@ sigs.k8s.io/yaml
 # github.com/mistifyio/go-zfs => github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
 # github.com/mitchellh/go-wordwrap => github.com/mitchellh/go-wordwrap v1.0.0
 # github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.4.1
+# github.com/mitchellh/osext => github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f
 # github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
 # github.com/moby/spdystream => github.com/moby/spdystream v0.2.0
 # github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.6.0
@@ -2611,6 +2630,7 @@ sigs.k8s.io/yaml
 # github.com/mvdan/xurls => github.com/mvdan/xurls v1.1.0
 # github.com/mwitkow/go-conntrack => github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f
 # github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
+# github.com/ncw/swift => github.com/ncw/swift v1.0.47
 # github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 # github.com/nxadm/tail => github.com/nxadm/tail v1.4.4
 # github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
@@ -2663,6 +2683,9 @@ sigs.k8s.io/yaml
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 # github.com/xlab/treeprint => github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca
 # github.com/yuin/goldmark => github.com/yuin/goldmark v1.4.1
+# github.com/yvasiyarov/go-metrics => github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43
+# github.com/yvasiyarov/gorelic => github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50
+# github.com/yvasiyarov/newrelic_platform_go => github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f
 # go.etcd.io/bbolt => go.etcd.io/bbolt v1.3.6
 # go.etcd.io/etcd/api/v3 => go.etcd.io/etcd/api/v3 v3.5.1
 # go.etcd.io/etcd/client/pkg/v3 => go.etcd.io/etcd/client/pkg/v3 v3.5.1
@@ -2709,6 +2732,7 @@ sigs.k8s.io/yaml
 # gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 # google.golang.org/api => google.golang.org/api v0.46.0
 # google.golang.org/appengine => google.golang.org/appengine v1.6.7
+# google.golang.org/cloud => google.golang.org/cloud v0.0.0-20151119220103-975617b05ea8
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368
 # google.golang.org/grpc => google.golang.org/grpc v1.40.0
 # google.golang.org/protobuf => google.golang.org/protobuf v1.27.1

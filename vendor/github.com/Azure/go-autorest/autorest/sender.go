@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/go-autorest/logger"
 	"github.com/Azure/go-autorest/tracing"
 )
 
@@ -271,6 +272,7 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 				if err == nil {
 					return resp, err
 				}
+				logger.Instance.Writef(logger.LogError, "DoRetryForAttempts: received error for attempt %d: %v\n", attempt+1, err)
 				if !DelayForBackoff(backoff, attempt, r.Context().Done()) {
 					return nil, r.Context().Err()
 				}
@@ -324,6 +326,9 @@ func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempt
 		// resp and err will both have a value, so in this case we don't want to retry as it will never succeed.
 		if err == nil && !ResponseHasStatusCode(resp, codes...) || IsTokenRefreshError(err) {
 			return resp, err
+		}
+		if err != nil {
+			logger.Instance.Writef(logger.LogError, "DoRetryForStatusCodes: received error for attempt %d: %v\n", attempt+1, err)
 		}
 		delayed := DelayWithRetryAfter(resp, r.Context().Done())
 		// if this was a 429 set the delay cap as specified.
@@ -391,6 +396,7 @@ func DoRetryForDuration(d time.Duration, backoff time.Duration) SendDecorator {
 				if err == nil {
 					return resp, err
 				}
+				logger.Instance.Writef(logger.LogError, "DoRetryForDuration: received error for attempt %d: %v\n", attempt+1, err)
 				if !DelayForBackoff(backoff, attempt, r.Context().Done()) {
 					return nil, r.Context().Err()
 				}
@@ -438,6 +444,7 @@ func DelayForBackoffWithCap(backoff, cap time.Duration, attempt int, cancel <-ch
 	if cap > 0 && d > cap {
 		d = cap
 	}
+	logger.Instance.Writef(logger.LogInfo, "DelayForBackoffWithCap: sleeping for %s\n", d)
 	select {
 	case <-time.After(d):
 		return true

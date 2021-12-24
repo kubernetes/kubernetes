@@ -9,7 +9,11 @@ var (
 
 	// separatorRegexp defines the separators allowed to be embedded in name
 	// components. This allow one period, one or two underscore and multiple
-	// dashes.
+	// dashes. Repeated dashes and underscores are intentionally treated
+	// differently. In order to support valid hostnames as name components,
+	// supporting repeated dash was added. Additionally double underscore is
+	// now allowed as a separator to loosen the restriction for previously
+	// supported names.
 	separatorRegexp = match(`(?:[._]|__|[-]*)`)
 
 	// nameComponentRegexp restricts registry path component names to start
