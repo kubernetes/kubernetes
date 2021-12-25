@@ -37,6 +37,15 @@ func (a *attacherDefaults) Attach(spec *volume.Spec, hostName types.NodeName) (s
 // WaitForAttach is part of the volume.Attacher interface
 func (a *attacherDefaults) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	klog.Warning(logPrefix(a.plugin.flexVolumePlugin), "using default WaitForAttach for volume ", spec.Name(), ", device ", devicePath)
+	_, err := getFSType(spec)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = getReadOnly(spec)
+	if err != nil {
+		return "", err
+	}
 	return devicePath, nil
 }
 
