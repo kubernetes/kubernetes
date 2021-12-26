@@ -1330,6 +1330,8 @@ k8s.io/gengo/generator
 k8s.io/gengo/namer
 k8s.io/gengo/parser
 k8s.io/gengo/types
+# k8s.io/gengo/v2 v2.0.0 => gengo-v2
+## explicit; go 1.21
 # k8s.io/klog/v2 v2.110.1
 ## explicit; go 1.13
 k8s.io/klog/v2

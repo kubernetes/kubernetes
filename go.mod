@@ -111,6 +111,7 @@ require (
 	k8s.io/dynamic-resource-allocation v0.0.0
 	k8s.io/endpointslice v0.0.0
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
+	k8s.io/gengo/v2 v2.0.0
 	k8s.io/klog/v2 v2.110.1
 	k8s.io/kms v0.0.0
 	k8s.io/kube-aggregator v0.0.0
@@ -264,6 +265,7 @@ replace (
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/dynamic-resource-allocation => ./staging/src/k8s.io/dynamic-resource-allocation
 	k8s.io/endpointslice => ./staging/src/k8s.io/endpointslice
+	k8s.io/gengo/v2 => ./gengo-v2
 	k8s.io/kms => ./staging/src/k8s.io/kms
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
