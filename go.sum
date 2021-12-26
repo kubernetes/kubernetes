@@ -107,8 +107,8 @@ github.com/containerd/cgroups v1.0.1 h1:iJnMvco9XGvKUvNQkv88bE4uJXxRQH18efbKo9w5
 github.com/containerd/cgroups v1.0.1/go.mod h1:0SJrPIenamHDcZhEcJMNBB85rHcUsw4f25ZfBiPYRkU=
 github.com/containerd/console v1.0.2 h1:Pi6D+aZXM+oUw1czuKgH5IJ+y0jhYcwBJfx5/Ghn9dE=
 github.com/containerd/console v1.0.2/go.mod h1:ytZPjGgY2oeTkAONYafi2kSj0aYggsf8acV1PGKCbzQ=
-github.com/containerd/containerd v1.4.11 h1:QCGOUN+i70jEEL/A6JVIbhy4f4fanzAzSR4kNG7SlcE=
-github.com/containerd/containerd v1.4.11/go.mod h1:bC6axHOhabU15QhwfG7w5PipXdVtMXFTttgp+kVtyUA=
+github.com/containerd/containerd v1.4.12 h1:V+SHzYmhng/iju6M5nFrpTTusrhidoxKTwdwLw+u4c4=
+github.com/containerd/containerd v1.4.12/go.mod h1:bC6axHOhabU15QhwfG7w5PipXdVtMXFTttgp+kVtyUA=
 github.com/containerd/continuity v0.1.0/go.mod h1:ICJu0PwR54nI0yPEnJ6jcS+J7CZAUXrLh8lPo2knzsM=
 github.com/containerd/fifo v1.0.0/go.mod h1:ocF/ME1SX5b1AOlWi9r677YJmCPSwwWnQ9O123vzpE4=
 github.com/containerd/go-runc v1.0.0/go.mod h1:cNU0ZbCgCQVZK4lgG3P+9tn9/PaJNmoDXPpoJhDR+Ok=
@@ -217,8 +217,8 @@ github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e h1:KhcknUwkWHKZ
 github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e/go.mod h1:0AA//k/eakGydO4jKRoRL2j92ZKSzTgj9tclaCrvXHk=
 github.com/google/btree v1.0.1 h1:gK4Kx5IaGY9CD5sPJ36FHiBJ6ZXl0kilRiiCj+jdYp4=
 github.com/google/btree v1.0.1/go.mod h1:xXMiIv4Fb/0kKde4SpL7qlzvu5cMJDRkFDxJfI9uaxA=
-github.com/google/cadvisor v0.43.0 h1:z0ULgYPKZ7L/c7Zjq+ZD6ltklWwYdCSvBMgSjNC/hGo=
-github.com/google/cadvisor v0.43.0/go.mod h1:+RdMSbc3FVr5NYCD2dOEJy/LI0jYJ/0xJXkzWXEyiFQ=
+github.com/google/cadvisor v0.43.1-0.20211226151123-0c34eeae8411 h1:Gl5xPovILSxdwdI4xVFbA2adbSssXH/LkA4AxvuGlAE=
+github.com/google/cadvisor v0.43.1-0.20211226151123-0c34eeae8411/go.mod h1:D0nZzVGoKDjwb8D+UVhdYccbE1MzRoGrQpyJfgf83NY=
 github.com/google/cel-go v0.9.0 h1:u1hg7lcZ/XWw2d3aV1jFS30ijQQ6q0/h1C2ZBeBD1gY=
 github.com/google/cel-go v0.9.0/go.mod h1:U7ayypeSkw23szu4GaQTPJGx66c20mx8JklMSxrmI1w=
 github.com/google/cel-spec v0.6.0/go.mod h1:Nwjgxy5CbjlPrtCWjeDjUyKMl8w41YBYGjsyDdqk0xA=

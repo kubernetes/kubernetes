@@ -42,7 +42,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/cadvisor v0.43.0
+	github.com/google/cadvisor v0.43.1-0.20211226151123-0c34eeae8411
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
@@ -200,7 +200,7 @@ replace (
 	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.5.0
 	github.com/containerd/cgroups => github.com/containerd/cgroups v1.0.1
 	github.com/containerd/console => github.com/containerd/console v1.0.2
-	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+	github.com/containerd/containerd => github.com/containerd/containerd v1.4.12
 	github.com/containerd/continuity => github.com/containerd/continuity v0.1.0
 	github.com/containerd/fifo => github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-runc => github.com/containerd/go-runc v1.0.0
@@ -264,7 +264,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/google/cadvisor v0.43.0
+	github.com/google/cadvisor => github.com/google/cadvisor v0.43.1-0.20211226151123-0c34eeae8411
 	github.com/google/cel-go => github.com/google/cel-go v0.9.0
 	github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
