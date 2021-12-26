@@ -253,6 +253,7 @@ replace (
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/dynamic-resource-allocation => ./staging/src/k8s.io/dynamic-resource-allocation
 	k8s.io/endpointslice => ./staging/src/k8s.io/endpointslice
+	k8s.io/gengo/v2 => ./gengo-v2
 	k8s.io/kms => ./staging/src/k8s.io/kms
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager

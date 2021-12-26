@@ -1442,3 +1442,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# k8s.io/gengo/v2 => ./gengo-v2
