@@ -998,6 +998,11 @@ type NFSVolumeSource struct {
 	// the NFS export to be mounted with read-only permissions
 	// +optional
 	ReadOnly bool
+        
+        // MountOptions defines mount option used in pod inline.
+	// the NFS server will read the mountoptions from the nfs client side.
+	// +optional
+	MountOptions []string
 }
 
 // QuobyteVolumeSource represents a Quobyte mount that lasts the lifetime of a pod.
