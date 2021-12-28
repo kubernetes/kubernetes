@@ -122,6 +122,12 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 	if err != nil {
 		return nil, err
 	}
+	mo := util.MountOptionFromSpec(spec)
+	if len(mo) == 0 {
+		for _, moFromInline := range source.MountOptions {
+			mo = append(mo, moFromInline)
+		}
+	}
 	return &nfsMounter{
 		nfs: &nfs{
 			volName:         spec.Name(),
@@ -133,7 +139,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 		server:       getServerFromSource(source),
 		exportPath:   source.Path,
 		readOnly:     readOnly,
-		mountOptions: util.MountOptionFromSpec(spec),
+		mountOptions: mo,
 	}, nil
 }
 

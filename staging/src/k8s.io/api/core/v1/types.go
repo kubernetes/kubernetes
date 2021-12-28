@@ -1241,6 +1241,11 @@ type NFSVolumeSource struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	
+	// MountOptions defines mount option used in pod inline.
+	// the NFS server will read the mountoptions from the nfs client side.
+	// +optional
+	MountOptions []string
 }
 
 // Represents an ISCSI disk.

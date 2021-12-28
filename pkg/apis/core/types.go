@@ -999,7 +999,7 @@ type NFSVolumeSource struct {
 	// +optional
 	ReadOnly bool
         
-        // MountOptions defines mount option used in pod inline.
+	// MountOptions defines mount option used in pod inline.
 	// the NFS server will read the mountoptions from the nfs client side.
 	// +optional
 	MountOptions []string
