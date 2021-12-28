@@ -261,7 +261,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 				return
 			}
 
-			name, err := getNodeNameFromKubeletConfig(tmpdir)
+			name, err := getNodeNameFromKubeletConfig(kubeconfigPath)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getNodeRegistration: %v", err)
 				return
@@ -338,7 +338,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			}
 
 			cfg := &kubeadmapi.InitConfiguration{}
-			err = getNodeRegistration(tmpdir, client, &cfg.NodeRegistration)
+			err = GetNodeRegistration(cfgPath, client, &cfg.NodeRegistration)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getNodeRegistration: %v", err)
 				return

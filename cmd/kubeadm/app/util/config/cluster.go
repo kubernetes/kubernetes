@@ -97,7 +97,8 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	// get nodes specific information as well
 	if !newControlPlane {
 		// gets the nodeRegistration for the current from the node object
-		if err := getNodeRegistration(kubeconfigDir, client, &initcfg.NodeRegistration); err != nil {
+		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
+		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 		// gets the APIEndpoint for the current node
@@ -117,10 +118,10 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	return initcfg, nil
 }
 
-// getNodeRegistration returns the nodeRegistration for the current node
-func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
+// GetNodeRegistration returns the nodeRegistration for the current node
+func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
 	// gets the name of the current node
-	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigDir)
+	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigFile)
 	if err != nil {
 		return errors.Wrap(err, "failed to get node name from kubelet config")
 	}
@@ -149,9 +150,8 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 // getNodeNameFromKubeletConfig gets the node name from a kubelet config file
 // TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
 //       information in the local kubelet config.yaml
-func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
+func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 	// loads the kubelet.conf file
-	fileName := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
 	config, err := clientcmd.LoadFromFile(fileName)
 	if err != nil {
 		return "", err

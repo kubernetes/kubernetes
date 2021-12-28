@@ -34,4 +34,5 @@ type Data interface {
 	Client() clientset.Interface
 	IgnorePreflightErrors() sets.String
 	PatchesDir() string
+	KubeConfigPath() string
 }
