@@ -151,48 +151,39 @@ func (t probeType) String() string {
 }
 
 func (m *manager) AddPod(pod *v1.Pod) {
-	m.workerLock.Lock()
-	defer m.workerLock.Unlock()
-
+	localWorkers := make(map[probeKey]*worker)
 	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
 
 		if c.StartupProbe != nil {
 			key.probeType = startup
-			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Startup probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
-			}
-			w := newWorker(m, startup, pod, c)
-			m.workers[key] = w
-			go w.run()
+			localWorkers[key] = newWorker(m, startup, pod, c)
 		}
 
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
-			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Readiness probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
-			}
-			w := newWorker(m, readiness, pod, c)
-			m.workers[key] = w
-			go w.run()
+			localWorkers[key] = newWorker(m, readiness, pod, c)
 		}
 
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
-			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Liveness probe already exists for container",
-					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
-			}
-			w := newWorker(m, liveness, pod, c)
-			m.workers[key] = w
-			go w.run()
+			localWorkers[key] = newWorker(m, liveness, pod, c)
 		}
+	}
+
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+
+	for key, worker := range localWorkers {
+		if _, ok := m.workers[key]; ok {
+			klog.ErrorS(nil, "probe already exists for container",
+				"pod", klog.KObj(pod), "containerName", key.containerName,
+				"probeType", key.probeType.String())
+			return
+		}
+		m.workers[key] = worker
+		go worker.run()
 	}
 }
 
