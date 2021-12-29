@@ -285,6 +285,50 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.Equal(cdc.invalidateCalls, 2, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
 }
 
+func TestDeferredDiscoveryRESTMapperKindForFindFirst_CacheMiss(t *testing.T) {
+	assert := assert.New(t)
+
+	cdc := fakeCachedDiscoveryInterface{fresh: false}
+	m := NewDeferredDiscoveryRESTMapper(&cdc)
+	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
+	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
+
+	gvk, err := m.KindForFindFirst(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "foo",
+	})
+	assert.NoError(err)
+	assert.True(cdc.fresh, "should be fresh after a cache-miss")
+	assert.Equal(cdc.invalidateCalls, 1, "should have called Invalidate() once")
+	assert.Equal(gvk.Kind, "Foo")
+
+	gvk, err = m.KindForFindFirst(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "foo",
+	})
+	assert.NoError(err)
+	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again")
+
+	gvk, err = m.KindForFindFirst(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "bar",
+	})
+	assert.Error(err)
+	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
+
+	cdc.fresh = false
+	gvk, err = m.KindForFindFirst(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "bar",
+	})
+	assert.Error(err)
+	assert.Equal(cdc.invalidateCalls, 2, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
+}
+
 func TestGetAPIGroupResources(t *testing.T) {
 	type Test struct {
 		name string

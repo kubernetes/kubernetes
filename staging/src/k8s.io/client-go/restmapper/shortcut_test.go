@@ -194,8 +194,67 @@ func TestKindFor(t *testing.T) {
 	}
 }
 
+func TestKindForFindFirst(t *testing.T) {
+	tests := []struct {
+		in       schema.GroupVersionResource
+		expected schema.GroupVersionResource
+		srvRes   []*metav1.APIResourceList
+	}{
+		{
+			in:       schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "sc"},
+			expected: schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "storageclasses"},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "storage.k8s.io/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "storageclasses",
+							ShortNames: []string{"sc"},
+						},
+					},
+				},
+			},
+		},
+		{
+			in:       schema.GroupVersionResource{Group: "", Version: "", Resource: "sc"},
+			expected: schema.GroupVersionResource{Group: "storage.k8s.io", Version: "", Resource: "storageclasses"},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "storage.k8s.io/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "storageclasses",
+							ShortNames: []string{"sc"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		ds := &fakeDiscoveryClient{}
+		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
+			return test.srvRes, nil
+		}
+
+		delegate := &fakeRESTMapper{}
+		mapper := NewShortcutExpander(delegate, ds).(meta.FirstFindableRESTMapper)
+
+		mapper.KindForFindFirst(test.in)
+		if delegate.kindForInput != test.expected {
+			t.Errorf("%d: unexpected data returned %#v, expected %#v", i, delegate.kindForInput, test.expected)
+		}
+	}
+}
+
 type fakeRESTMapper struct {
 	kindForInput schema.GroupVersionResource
+}
+
+func (f *fakeRESTMapper) KindForFindFirst(resources ...schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	f.kindForInput = resources[0]
+	return schema.GroupVersionKind{}, nil
 }
 
 func (f *fakeRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {

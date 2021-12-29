@@ -141,3 +141,13 @@ type ResettableRESTMapper interface {
 	RESTMapper
 	Reset()
 }
+
+// FirstFindableRESTMapper is a RESTMapper which is capable of finding exact match within
+// multiple partial resources.
+type FirstFindableRESTMapper interface {
+	RESTMapper
+
+	// KindForFindFirst takes multiple partial resources and returns exact match whenever it finds.
+	// Order is important for this function because it returns whenever it finds.
+	KindForFindFirst(resources ...schema.GroupVersionResource) (schema.GroupVersionKind, error)
+}

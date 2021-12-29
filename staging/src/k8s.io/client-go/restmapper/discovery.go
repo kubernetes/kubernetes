@@ -208,6 +208,30 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 	return d.delegate, nil
 }
 
+// KindForFindFirst finds the exact match within given partial resources.
+// Order is important and it is expected because it returns whenever it finds.
+func (d *DeferredDiscoveryRESTMapper) KindForFindFirst(resources ...schema.GroupVersionResource) (gvk schema.GroupVersionKind, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return schema.GroupVersionKind{}, err
+	}
+
+	for _, resource := range resources {
+		gvk, err = del.KindFor(resource)
+		if err == nil {
+			return
+		}
+	}
+
+	if !d.cl.Fresh() {
+		d.Reset()
+
+		gvk, err = d.KindForFindFirst(resources...)
+	}
+
+	return
+}
+
 // Reset resets the internally cached Discovery information and will
 // cause the next mapping request to re-discover.
 func (d *DeferredDiscoveryRESTMapper) Reset() {
@@ -336,3 +360,4 @@ func (d *DeferredDiscoveryRESTMapper) String() string {
 
 // Make sure it satisfies the interface
 var _ meta.ResettableRESTMapper = &DeferredDiscoveryRESTMapper{}
+var _ meta.FirstFindableRESTMapper = &DeferredDiscoveryRESTMapper{}

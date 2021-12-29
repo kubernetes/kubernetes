@@ -750,11 +750,29 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 	}
 
 	if fullySpecifiedGVR != nil {
-		gvk, _ = restMapper.KindFor(*fullySpecifiedGVR)
-	}
-	if gvk.Empty() {
+		if m, ok := restMapper.(meta.FirstFindableRESTMapper); ok {
+			gvk, err = m.KindForFindFirst(*fullySpecifiedGVR, groupResource.WithVersion(""))
+			if err != nil {
+				// Although this restMapper is implemented in FirstFindableRESTMapper,
+				// internal restMapper might still not implement FirstFindableRESTMapper.
+				// we can move on with the traditional check.
+				gvk, _ = restMapper.KindFor(*fullySpecifiedGVR)
+
+				if gvk.Empty() {
+					gvk, _ = restMapper.KindFor(groupResource.WithVersion(""))
+				}
+			}
+		} else {
+			gvk, _ = restMapper.KindFor(*fullySpecifiedGVR)
+
+			if gvk.Empty() {
+				gvk, _ = restMapper.KindFor(groupResource.WithVersion(""))
+			}
+		}
+	} else {
 		gvk, _ = restMapper.KindFor(groupResource.WithVersion(""))
 	}
+
 	if !gvk.Empty() {
 		return restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	}

@@ -138,11 +138,19 @@ func (o *ExplainOptions) Run(args []string) error {
 		}
 	}
 
-	gvk, _ := o.Mapper.KindFor(fullySpecifiedGVR)
-	if gvk.Empty() {
-		gvk, err = o.Mapper.KindFor(fullySpecifiedGVR.GroupResource().WithVersion(""))
+	var gvk schema.GroupVersionKind
+	if m, ok := o.Mapper.(meta.FirstFindableRESTMapper); ok {
+		gvk, err = m.KindForFindFirst(fullySpecifiedGVR, fullySpecifiedGVR.GroupResource().WithVersion(""))
 		if err != nil {
 			return err
+		}
+	} else {
+		gvk, _ = o.Mapper.KindFor(fullySpecifiedGVR)
+		if gvk.Empty() {
+			gvk, err = o.Mapper.KindFor(fullySpecifiedGVR.GroupResource().WithVersion(""))
+			if err != nil {
+				return err
+			}
 		}
 	}
 

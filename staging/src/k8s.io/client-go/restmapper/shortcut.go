@@ -17,6 +17,7 @@ limitations under the License.
 package restmapper
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -35,10 +36,23 @@ type shortcutExpander struct {
 }
 
 var _ meta.ResettableRESTMapper = shortcutExpander{}
+var _ meta.FirstFindableRESTMapper = shortcutExpander{}
 
 // NewShortcutExpander wraps a restmapper in a layer that expands shortcuts found via discovery
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) meta.RESTMapper {
 	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}
+}
+
+func (e shortcutExpander) KindForFindFirst(resources ...schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	if m, ok := e.RESTMapper.(meta.FirstFindableRESTMapper); ok {
+		var rs []schema.GroupVersionResource
+		for _, resource := range resources {
+			rs = append(rs, e.expandResourceShortcut(resource))
+		}
+		return m.KindForFindFirst(rs...)
+	}
+
+	return schema.GroupVersionKind{}, fmt.Errorf("FirstFindableRESTMapper is not implemented for this RESTMapper")
 }
 
 // KindFor fulfills meta.RESTMapper
