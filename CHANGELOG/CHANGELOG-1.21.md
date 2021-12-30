@@ -411,25 +411,25 @@ filename | sha512 hash
 
 ### Feature
 
-- Kubernetes is now built with Golang 1.16.10 (#106224, @cpanato) [SIG Cloud Provider, Instrumentation, Release and Testing]
+- Kubernetes is now built with Golang 1.16.10 ([#106224](https://github.com/kubernetes/kubernetes/pull/106224), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
 - Update debian-base, debian-iptables, setcap images to pick up CVE fixes
   - Debian-base to v1.9.0
   - Debian-iptables to v1.6.7
-  - setcap to v2.0.4 (#106147, @cpanato) [SIG Release and Testing]
+  - setcap to v2.0.4 ([#106147](https://github.com/kubernetes/kubernetes/pull/106147), [@cpanato](https://github.com/cpanato)) [SIG Release and Testing]
 
 ### Failing Test
 
-- Fixes hostpath storage e2e tests within SELinux enabled env (#105787, @Elbehery) [SIG Testing]
+- Fixes hostpath storage e2e tests within SELinux enabled env ([#105787](https://github.com/kubernetes/kubernetes/pull/105787), [@Elbehery](https://github.com/Elbehery)) [SIG Testing]
 
 ### Bug or Regression
 
-- EndpointSlice Mirroring controller now cleans up managed EndpointSlices when a Service selector is added (#106135, @robscott) [SIG Apps, Network and Testing]
-- Fix a bug that `--disabled-metrics` doesn't function well. (#106391, @Huang-Wei) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
-- Fix a panic in kubectl when creating secrets with an improper output type (#106354, @lauchokyip) [SIG CLI]
-- Fix concurrent map access causing panics when logging timed-out API calls. (#106113, @marseel) [SIG API Machinery]
+- EndpointSlice Mirroring controller now cleans up managed EndpointSlices when a Service selector is added ([#106135](https://github.com/kubernetes/kubernetes/pull/106135), [@robscott](https://github.com/robscott)) [SIG Apps, Network and Testing]
+- Fix a bug that `--disabled-metrics` doesn't function well. ([#106391](https://github.com/kubernetes/kubernetes/pull/106391), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
+- Fix a panic in kubectl when creating secrets with an improper output type ([#106354](https://github.com/kubernetes/kubernetes/pull/106354), [@lauchokyip](https://github.com/lauchokyip)) [SIG CLI]
+- Fix concurrent map access causing panics when logging timed-out API calls. ([#106113](https://github.com/kubernetes/kubernetes/pull/106113), [@marseel](https://github.com/marseel)) [SIG API Machinery]
 - Fixed very rare volume corruption when a pod is deleted while kubelet is offline.
-  Retry FibreChannel devices cleanup after error to ensure FC device is detached before it can be used on another node. (#102656, @jsafrane) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Storage]
-- Support more than 100 disk mounts on Windows (#105673, @andyzhangx) [SIG Storage and Windows]
+  Retry FibreChannel devices cleanup after error to ensure FC device is detached before it can be used on another node. ([#102656](https://github.com/kubernetes/kubernetes/pull/102656), [@jsafrane](https://github.com/jsafrane)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Storage]
+- Support more than 100 disk mounts on Windows ([#105673](https://github.com/kubernetes/kubernetes/pull/105673), [@andyzhangx](https://github.com/andyzhangx)) [SIG Storage and Windows]
 
 ## Dependencies
 
@@ -499,28 +499,28 @@ filename | sha512 hash
 
 ### API Change
 
-- Kube-apiserver: Fixes handling of CRD schemas containing literal null values in enums (#104989, @liggitt) [SIG API Machinery, Apps and Network]
+- Kube-apiserver: Fixes handling of CRD schemas containing literal null values in enums ([#104989](https://github.com/kubernetes/kubernetes/pull/104989), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, Apps and Network]
 
 ### Feature
 
-- Kubernetes is now built with Golang 1.16.9 (#105672, @cpanato) [SIG Cloud Provider, Instrumentation, Release and Testing]
+- Kubernetes is now built with Golang 1.16.9 ([#105672](https://github.com/kubernetes/kubernetes/pull/105672), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
 
 ### Failing Test
 
-- Backport: e2e.test now uses the secure port to retrieve metrics data to ensure compatibility with 1.21 and 1.22 (for upgrade tests) (#104328, @pohly) [SIG API Machinery, Instrumentation, Storage and Testing]
+- Backport: e2e.test now uses the secure port to retrieve metrics data to ensure compatibility with 1.21 and 1.22 (for upgrade tests) ([#104328](https://github.com/kubernetes/kubernetes/pull/104328), [@pohly](https://github.com/pohly)) [SIG API Machinery, Instrumentation, Storage and Testing]
 
 ### Bug or Regression
 
 - Aggregate errors when putting vmss
-  fix: consolidate logs for instance not found error (#105365, @nilo19) [SIG Cloud Provider]
-- Allow CSI drivers to just run offline expansion tests (#102740, @gnufied) [SIG Storage and Testing]
-- Bump klog to v2.9.0, fixing log lines that render as byte arrays (#105407, @ehashman) [SIG Architecture, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Storage]
-- Fix overriding logs files on reboot. (#105614, @rphillips) [SIG Node]
-- Fix winkernel kube-proxy to only use dual stack when host and networking supports it (#101047, @jsturtevant) [SIG Network and Windows]
-- Fix: ignore not a VMSS error for VMAS nodes in EnsureBackendPoolDeleted. (#105402, @ialidzhikov) [SIG Cloud Provider]
-- Fix: ignore the case when updating Azure tags (#104686, @nilo19) [SIG Cloud Provider]
-- Revert PR #102925 which introduced unexpected scheduling behavior based on balanced resource allocation (#105238, @damemi) [SIG Scheduling]
-- Updates golang.org/x/text to v0.3.6 to fix CVE-2020-28852 (#102601, @jonesbr17) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node and Storage]
+  fix: consolidate logs for instance not found error ([#105365](https://github.com/kubernetes/kubernetes/pull/105365), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
+- Allow CSI drivers to just run offline expansion tests ([#102740](https://github.com/kubernetes/kubernetes/pull/102740), [@gnufied](https://github.com/gnufied)) [SIG Storage and Testing]
+- Bump klog to v2.9.0, fixing log lines that render as byte arrays ([#105407](https://github.com/kubernetes/kubernetes/pull/105407), [@ehashman](https://github.com/ehashman)) [SIG Architecture, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Storage]
+- Fix overriding logs files on reboot. ([#105614](https://github.com/kubernetes/kubernetes/pull/105614), [@rphillips](https://github.com/rphillips)) [SIG Node]
+- Fix winkernel kube-proxy to only use dual stack when host and networking supports it ([#101047](https://github.com/kubernetes/kubernetes/pull/101047), [@jsturtevant](https://github.com/jsturtevant)) [SIG Network and Windows]
+- Fix: ignore not a VMSS error for VMAS nodes in EnsureBackendPoolDeleted. ([#105402](https://github.com/kubernetes/kubernetes/pull/105402), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG Cloud Provider]
+- Fix: ignore the case when updating Azure tags ([#104686](https://github.com/kubernetes/kubernetes/pull/104686), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
+- Revert PR #102925 which introduced unexpected scheduling behavior based on balanced resource allocation ([#105238](https://github.com/kubernetes/kubernetes/pull/105238), [@damemi](https://github.com/damemi)) [SIG Scheduling]
+- Updates golang.org/x/text to v0.3.6 to fix CVE-2020-28852 ([#102601](https://github.com/kubernetes/kubernetes/pull/102601), [@jonesbr17](https://github.com/jonesbr17)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node and Storage]
 
 ## Dependencies
 

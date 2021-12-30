@@ -377,26 +377,26 @@ filename | sha512 hash
 
 ### Feature
 
-- Kubernetes is now built with Golang 1.16.10 (#106223, @cpanato) [SIG Cloud Provider, Instrumentation, Release and Testing]
+- Kubernetes is now built with Golang 1.16.10 ([#106223](https://github.com/kubernetes/kubernetes/pull/106223), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
 - Update debian-base, debian-iptables, setcap images to pick up CVE fixes
   - Debian-base to v1.9.0
   - Debian-iptables to v1.6.7
-  - setcap to v2.0.4 (#106143, @cpanato) [SIG Release and Testing]
+  - setcap to v2.0.4 ([#106143](https://github.com/kubernetes/kubernetes/pull/106143), [@cpanato](https://github.com/cpanato)) [SIG Release and Testing]
 
 ### Failing Test
 
-- Fixes hostpath storage e2e tests within SELinux enabled env (#105786, @Elbehery) [SIG Testing]
+- Fixes hostpath storage e2e tests within SELinux enabled env ([#105786](https://github.com/kubernetes/kubernetes/pull/105786), [@Elbehery](https://github.com/Elbehery)) [SIG Testing]
 
 ### Bug or Regression
 
-- EndpointSlice Mirroring controller now cleans up managed EndpointSlices when a Service selector is added (#106132, @robscott) [SIG Apps, Network and Testing]
-- Fix a bug that `--disabled-metrics` doesn't function well. (#105793, @Huang-Wei) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
-- Fix a panic in kubectl when creating secrets with an improper output type (#106356, @lauchokyip) [SIG CLI]
-- Fix concurrent map access causing panics when logging timed-out API calls. (#106112, @marseel) [SIG API Machinery]
-- Fix kube-proxy regression on UDP services because the logic to detect stale connections was not considering if the endpoint was ready. (#106239, @aojea) [SIG Network and Testing]
-- Fix scoring for NodeResourcesBalancedAllocation plugins when nodes have containers with no requests. (#106081, @ahmad-diaa) [SIG Scheduling]
-- Support more than 100 disk mounts on Windows (#105673, @andyzhangx) [SIG Storage and Windows]
-- The --leader-elect* CLI args are now honored correctly in scheduler. (#106130, @Huang-Wei) [SIG Scheduling]
+- EndpointSlice Mirroring controller now cleans up managed EndpointSlices when a Service selector is added ([#106132](https://github.com/kubernetes/kubernetes/pull/106132), [@robscott](https://github.com/robscott)) [SIG Apps, Network and Testing]
+- Fix a bug that `--disabled-metrics` doesn't function well. ([#105793](https://github.com/kubernetes/kubernetes/pull/105793), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
+- Fix a panic in kubectl when creating secrets with an improper output type ([#106356](https://github.com/kubernetes/kubernetes/pull/106356), [@lauchokyip](https://github.com/lauchokyip)) [SIG CLI]
+- Fix concurrent map access causing panics when logging timed-out API calls. ([#106112](https://github.com/kubernetes/kubernetes/pull/106112), [@marseel](https://github.com/marseel)) [SIG API Machinery]
+- Fix kube-proxy regression on UDP services because the logic to detect stale connections was not considering if the endpoint was ready. ([#106239](https://github.com/kubernetes/kubernetes/pull/106239), [@aojea](https://github.com/aojea)) [SIG Network and Testing]
+- Fix scoring for NodeResourcesBalancedAllocation plugins when nodes have containers with no requests. ([#106081](https://github.com/kubernetes/kubernetes/pull/106081), [@ahmad-diaa](https://github.com/ahmad-diaa)) [SIG Scheduling]
+- Support more than 100 disk mounts on Windows ([#105673](https://github.com/kubernetes/kubernetes/pull/105673), [@andyzhangx](https://github.com/andyzhangx)) [SIG Storage and Windows]
+- The --leader-elect* CLI args are now honored correctly in scheduler. ([#106130](https://github.com/kubernetes/kubernetes/pull/106130), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling]
 - The kube-proxy sync_proxy_rules_iptables_total metric now gives
   the correct number of rules, rather than being off by one.
   
@@ -413,8 +413,8 @@ filename | sha512 hash
       were not being used.
   
     - Chains for endpoints that won't be used are no longer output to
-      iptables, saving a bit of memory/time/cpu. (#106373, @aojea) [SIG Network]
-- Watch requests that are delegated to aggregated apiservers no longer reserve concurrency units (seats) in the API Priority and Fairness dispatcher for their entire duration. (#105827, @benluddy) [SIG API Machinery]
+      iptables, saving a bit of memory/time/cpu. ([#106373](https://github.com/kubernetes/kubernetes/pull/106373), [@aojea](https://github.com/aojea)) [SIG Network]
+- Watch requests that are delegated to aggregated apiservers no longer reserve concurrency units (seats) in the API Priority and Fairness dispatcher for their entire duration. ([#105827](https://github.com/kubernetes/kubernetes/pull/105827), [@benluddy](https://github.com/benluddy)) [SIG API Machinery]
 
 ## Dependencies
 
@@ -483,21 +483,21 @@ filename | sha512 hash
 
 ### API Change
 
-- Kube-apiserver: Fixes handling of CRD schemas containing literal null values in enums (#104988, @liggitt) [SIG API Machinery, Apps and Network]
+- Kube-apiserver: Fixes handling of CRD schemas containing literal null values in enums ([#104988](https://github.com/kubernetes/kubernetes/pull/104988), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, Apps and Network]
 
 ### Feature
 
-- Kubernetes is now built with Golang 1.16.9 (#105671, @cpanato) [SIG Cloud Provider, Instrumentation, Release and Testing]
+- Kubernetes is now built with Golang 1.16.9 ([#105671](https://github.com/kubernetes/kubernetes/pull/105671), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
 
 ### Bug or Regression
 
-- Fix: consolidate logs for instance not found error (#105366, @nilo19) [SIG Cloud Provider]
-- Fix: ignore not a VMSS error for VMAS nodes in EnsureBackendPoolDeleted. (#105400, @ialidzhikov) [SIG Cloud Provider]
-- Fixes a regression on Kubelet restart and pod statuses. (#105560, @rphillips) [SIG Node and Testing]
-- Fixes kubelet memory regression in 1.22 (#105452, @liggitt) [SIG Node]
-- Fixes the kubelet's ability to restart static pods (#105075, @rphillips) [SIG Node and Testing]
-- Kube-proxy(ipvs mode) : delete stale conntrack UDP entries for loadbalancer ingress IP. (#105650, @VivekThrivikraman-est) [SIG Network]
-- Release-note Removed error message label from kubelet_started_pods_errors_total metric (#105213, @yxxhero) [SIG Instrumentation and Node]
+- Fix: consolidate logs for instance not found error ([#105366](https://github.com/kubernetes/kubernetes/pull/105366), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
+- Fix: ignore not a VMSS error for VMAS nodes in EnsureBackendPoolDeleted. ([#105400](https://github.com/kubernetes/kubernetes/pull/105400), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG Cloud Provider]
+- Fixes a regression on Kubelet restart and pod statuses. ([#105560](https://github.com/kubernetes/kubernetes/pull/105560), [@rphillips](https://github.com/rphillips)) [SIG Node and Testing]
+- Fixes kubelet memory regression in 1.22 ([#105452](https://github.com/kubernetes/kubernetes/pull/105452), [@liggitt](https://github.com/liggitt)) [SIG Node]
+- Fixes the kubelet's ability to restart static pods ([#105075](https://github.com/kubernetes/kubernetes/pull/105075), [@rphillips](https://github.com/rphillips)) [SIG Node and Testing]
+- Kube-proxy(ipvs mode) : delete stale conntrack UDP entries for loadbalancer ingress IP. ([#105650](https://github.com/kubernetes/kubernetes/pull/105650), [@VivekThrivikraman-est](https://github.com/VivekThrivikraman-est)) [SIG Network]
+- Release-note Removed error message label from kubelet_started_pods_errors_total metric ([#105213](https://github.com/kubernetes/kubernetes/pull/105213), [@yxxhero](https://github.com/yxxhero)) [SIG Instrumentation and Node]
 
 ## Dependencies
 

@@ -506,17 +506,17 @@ filename | sha512 hash
 
 - Update debian-base, debian-iptables, setcap images to pick up CVE fixes
   - Debian-base to v1.9.0
-  - Debian-iptables to v1.6.7 (#106148, @cpanato) [SIG Release and Testing]
+  - Debian-iptables to v1.6.7 ([#106148](https://github.com/kubernetes/kubernetes/pull/106148), [@cpanato](https://github.com/cpanato)) [SIG Release and Testing]
 
 ### Failing Test
 
-- Fixes hostpath storage e2e tests within SELinux enabled env (#105788, @Elbehery) [SIG Testing]
+- Fixes hostpath storage e2e tests within SELinux enabled env ([#105788](https://github.com/kubernetes/kubernetes/pull/105788), [@Elbehery](https://github.com/Elbehery)) [SIG Testing]
 
 ### Bug or Regression
 
-- EndpointSlice Mirroring controller now cleans up managed EndpointSlices when a Service selector is added (#106136, @robscott) [SIG Apps, Network and Testing]
-- Fix concurrent map access causing panics when logging timed-out API calls. (#106124, @marseel) [SIG API Machinery]
-- Support more than 100 disk mounts on Windows (#105673, @andyzhangx) [SIG Storage and Windows]
+- EndpointSlice Mirroring controller now cleans up managed EndpointSlices when a Service selector is added ([#106136](https://github.com/kubernetes/kubernetes/pull/106136), [@robscott](https://github.com/robscott)) [SIG Apps, Network and Testing]
+- Fix concurrent map access causing panics when logging timed-out API calls. ([#106124](https://github.com/kubernetes/kubernetes/pull/106124), [@marseel](https://github.com/marseel)) [SIG API Machinery]
+- Support more than 100 disk mounts on Windows ([#105673](https://github.com/kubernetes/kubernetes/pull/105673), [@andyzhangx](https://github.com/andyzhangx)) [SIG Storage and Windows]
 
 ## Dependencies
 
@@ -584,20 +584,20 @@ filename | sha512 hash
 
 ### API Change
 
-- Kube-apiserver: Fixes handling of CRD schemas containing literal null values in enums (#104990, @liggitt) [SIG API Machinery, Apps and Network]
+- Kube-apiserver: Fixes handling of CRD schemas containing literal null values in enums ([#104990](https://github.com/kubernetes/kubernetes/pull/104990), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, Apps and Network]
 
 ### Bug or Regression
 
-- Detach volumes from vSphere nodes not tracked by attach-detach controller (#104910, @gnufied) [SIG Cloud Provider and Storage]
-- Fix: consolidate logs for instance not found error (#105364, @nilo19) [SIG Cloud Provider]
-- Fix: ignore not a VMSS error for VMAS nodes in EnsureBackendPoolDeleted. (#105404, @ialidzhikov) [SIG Cloud Provider]
-- Fix: ignore the case when updating Azure tags (#104687, @nilo19) [SIG Cloud Provider]
-- Revert PR #102925 which introduced unexpected scheduling behavior based on balanced resource allocation (#105239, @damemi) [SIG Scheduling]
-- Updates golang.org/x/text to v0.3.6 to fix CVE-2020-28852 (#102602, @jonesbr17) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Node]
+- Detach volumes from vSphere nodes not tracked by attach-detach controller ([#104910](https://github.com/kubernetes/kubernetes/pull/104910), [@gnufied](https://github.com/gnufied)) [SIG Cloud Provider and Storage]
+- Fix: consolidate logs for instance not found error ([#105364](https://github.com/kubernetes/kubernetes/pull/105364), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
+- Fix: ignore not a VMSS error for VMAS nodes in EnsureBackendPoolDeleted. ([#105404](https://github.com/kubernetes/kubernetes/pull/105404), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG Cloud Provider]
+- Fix: ignore the case when updating Azure tags ([#104687](https://github.com/kubernetes/kubernetes/pull/104687), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
+- Revert PR #102925 which introduced unexpected scheduling behavior based on balanced resource allocation ([#105239](https://github.com/kubernetes/kubernetes/pull/105239), [@damemi](https://github.com/damemi)) [SIG Scheduling]
+- Updates golang.org/x/text to v0.3.6 to fix CVE-2020-28852 ([#102602](https://github.com/kubernetes/kubernetes/pull/102602), [@jonesbr17](https://github.com/jonesbr17)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Node]
 
 ### Other (Cleanup or Flake)
 
-- Allow CSI drivers to just run offline expansion tests (#102665, @gnufied) [SIG Storage and Testing]
+- Allow CSI drivers to just run offline expansion tests ([#102665](https://github.com/kubernetes/kubernetes/pull/102665), [@gnufied](https://github.com/gnufied)) [SIG Storage and Testing]
 
 ## Dependencies
 
