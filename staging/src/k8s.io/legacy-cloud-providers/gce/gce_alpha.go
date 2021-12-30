@@ -23,6 +23,10 @@ const (
 	// AlphaFeatureILBSubsets allows InternalLoadBalancer services to include a subset
 	// of cluster nodes as backends instead of all nodes.
 	AlphaFeatureILBSubsets = "ILBSubsets"
+
+	// AlphaFeatureNetLBRbs enabled L4 Regional Backend Services and
+	// disables instance group management in service controller
+	AlphaFeatureNetLBRbs = "NetLB_RBS"
 )
 
 // AlphaFeatureGate contains a mapping of alpha features to whether they are enabled

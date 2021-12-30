@@ -625,11 +625,21 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	klog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), g.region)
 	var igLinks []string
 	for zone, nodes := range zonedNodes {
-		igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
-		if err != nil {
-			return []string{}, err
+		if g.AlphaFeatureGate.Enabled(AlphaFeatureNetLBRbs) {
+			igs, err := g.FilterInstanceGroupsByName(name, zone)
+			if err != nil {
+				return []string{}, err
+			}
+			for _, ig := range igs {
+				igLinks = append(igLinks, ig.SelfLink)
+			}
+		} else {
+			igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
+			if err != nil {
+				return []string{}, err
+			}
+			igLinks = append(igLinks, igLink)
 		}
-		igLinks = append(igLinks, igLink)
 	}
 
 	return igLinks, nil
