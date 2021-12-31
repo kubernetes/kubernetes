@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:xenial
+FROM ubuntu:focal
 
-RUN apt-get update && apt-get install -y netbase nfs-common=1:1.2.8-9ubuntu12 glusterfs-client=3.7.6-1ubuntu1
+# ubuntu-maintained glusterfs
+# RUN apt-get update && apt-get install -y netbase nfs-common=1:1.3.4-2.5ubuntu3.3 glusterfs-client=7.2-2build1
+
+# official distribution
+RUN apt-get update && apt-get install software-properties-common -y && add-apt-repository ppa:gluster/glusterfs-10 && apt-get update && apt-get install glusterfs-client -y
 
 ENTRYPOINT ["/bin/mount"]
