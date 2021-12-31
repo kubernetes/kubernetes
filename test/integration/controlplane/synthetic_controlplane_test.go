@@ -38,8 +38,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -141,6 +143,15 @@ func TestEmptyList(t *testing.T) {
 
 func initStatusForbiddenControlPlaneConfig() *controlplane.Config {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(
+		authauthenticator.RequestFunc(func(req *http.Request) (*authauthenticator.Response, bool, error) {
+			return &authauthenticator.Response{
+				User: &user.DefaultInfo{
+					Name:   "unprivileged",
+					Groups: []string{user.AllAuthenticated},
+				},
+			}, true, nil
+		}))
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	return controlPlaneConfig
 }
@@ -178,7 +189,7 @@ func TestStatus(t *testing.T) {
 			statusCode:         http.StatusForbidden,
 			reqPath:            "/apis",
 			reason:             "Forbidden",
-			message:            `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
+			message:            `forbidden: User "unprivileged" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
 			name:               "401",
