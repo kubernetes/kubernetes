@@ -178,7 +178,9 @@ func Test_ListKind(t *testing.T) {
 			"apiVersion": "group/version",
 			"kind":       "TheKindList",
 			"metadata": map[string]interface{}{
+				"continue":        "",
 				"resourceVersion": "",
+				"selfLink":        "",
 			},
 		},
 		Items: []unstructured.Unstructured{
