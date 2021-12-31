@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -165,10 +166,37 @@ func TestEnsureInternalInstanceGroupsLimit(t *testing.T) {
 	igName := makeInstanceGroupName(vals.ClusterID)
 	_, err = gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
-
 	instances, err := gce.ListInstancesInInstanceGroup(igName, vals.ZoneName, allInstances)
 	require.NoError(t, err)
 	assert.Equal(t, maxInstancesPerInstanceGroup, len(instances))
+}
+
+func TestEnsureMultipleInstanceGroups(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureNetLBRbs})
+
+	nodes, err  := createAndInsertNodes(gce, []string{"n1"}, vals.ZoneName)
+	require.NoError(t, err)
+
+	baseName := makeInstanceGroupName(vals.ClusterID)
+	clusterIGs := []string{baseName, baseName + "-1", baseName + "-2", baseName + "-3"}
+	for _, igName := range append(clusterIGs, "zz-another-ig", "k8s-ig--cluster2-id") {
+		ig := &compute.InstanceGroup{Name: igName}
+		err := gce.CreateInstanceGroup(ig, vals.ZoneName)
+		require.NoError(t, err)
+	}
+
+	igsFromCloud, err := gce.ensureInternalInstanceGroups(baseName, nodes)
+	require.NoError(t, err)
+	assert.Len(t, igsFromCloud, len(clusterIGs), "Incorrect number of Instance Groups")
+	sort.Strings(igsFromCloud)
+	for i, igName := range clusterIGs {
+		assert.True(t, strings.HasSuffix(igsFromCloud[i], igName))
+	}
 }
 
 func TestEnsureInternalLoadBalancer(t *testing.T) {

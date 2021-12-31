@@ -55,7 +55,7 @@ func (g *Cloud) DeleteInstanceGroup(name string, zone string) error {
 func (g *Cloud) FilterInstanceGroupsByName(name, zone string) ([]*compute.InstanceGroup, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
-	mc := newInstanceGroupMetricContext("list", zone)
+	mc := newInstanceGroupMetricContext("filter", zone)
 	v, err := g.c.InstanceGroups().List(ctx, zone, filter.Regexp("name", name))
 	return v, mc.Observe(err)
 }
