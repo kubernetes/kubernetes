@@ -81,6 +81,10 @@ func (attacher *iscsiAttacher) WaitForAttach(spec *volume.Spec, devicePath strin
 		klog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
 	}
+	exists, err := mount.PathExists(devicePath)
+	if !exists && err != nil {
+		return "", err
+	}
 	return attacher.manager.AttachDisk(*mounter)
 }
 
