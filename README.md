@@ -25,7 +25,7 @@ read the CNCF [announcement].
 
 ## To start using K8s
 
-See our documentation on [kubernetes.io].
+See our documentation at [kubernetes.io].
 
 Try our [interactive tutorial].
 
@@ -64,10 +64,10 @@ For the full story, head over to the [developer's documentation].
 
 ## Support
 
-If you need support, start with the [troubleshooting guide],
-and work your way through the process that we've outlined.
+If you need any support, start with the [troubleshooting guide],
+and work your way through the processes that we've outlined.
 
-That said, if you have questions, reach out to us
+With that said, if you have any questions, reach out to us
 [one way or another][communication].
 
 [announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
