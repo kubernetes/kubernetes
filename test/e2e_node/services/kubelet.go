@@ -280,27 +280,27 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, "--dynamic-config-dir", dynamicConfigDir)
 	}
 
-	//// Enable kubenet by default.
-	//cniBinDir, err := getCNIBinDirectory()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//cniConfDir, err := getCNIConfDirectory()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//cniCacheDir, err := getCNICacheDirectory()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//cmdArgs = append(cmdArgs,
-	//	"--network-plugin=kubenet",
-	//	"--cni-bin-dir", CNIBinDir,
-	//	"--cni-conf-dir", cniConfDir,
-	//	"--cni-cache-dir", cniCacheDir)
+	// Enable kubenet by default.
+	cniBinDir, err := getCNIBinDirectory()
+	if err != nil {
+		return nil, err
+	}
+
+	cniConfDir, err := getCNIConfDirectory()
+	if err != nil {
+		return nil, err
+	}
+
+	cniCacheDir, err := getCNICacheDirectory()
+	if err != nil {
+		return nil, err
+	}
+
+	cmdArgs = append(cmdArgs,
+		"--network-plugin=kubenet",
+		"--cni-bin-dir", cniBinDir,
+		"--cni-conf-dir", cniConfDir,
+		"--cni-cache-dir", cniCacheDir)
 
 	// Keep hostname override for convenience.
 	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
@@ -445,32 +445,32 @@ func createKubeconfigCWD() (string, error) {
 	return kubeconfigPath, nil
 }
 
-//// getCNIBinDirectory returns CNI directory.
-//func getCNIBinDirectory() (string, error) {
-//	cwd, err := os.Getwd()
-//	if err != nil {
-//		return "", err
-//	}
-//	return filepath.Join(cwd, "cni", "bin"), nil
-//}
-//
-//// getCNIConfDirectory returns CNI Configuration directory.
-//func getCNIConfDirectory() (string, error) {
-//	cwd, err := os.Getwd()
-//	if err != nil {
-//		return "", err
-//	}
-//	return filepath.Join(cwd, "cni", "net.d"), nil
-//}
-//
-//// getCNICacheDirectory returns CNI Cache directory.
-//func getCNICacheDirectory() (string, error) {
-//	cwd, err := os.Getwd()
-//	if err != nil {
-//		return "", err
-//	}
-//	return filepath.Join(cwd, "cni", "cache"), nil
-//}
+// getCNIBinDirectory returns CNI directory.
+func getCNIBinDirectory() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "cni", "bin"), nil
+}
+
+// getCNIConfDirectory returns CNI Configuration directory.
+func getCNIConfDirectory() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "cni", "net.d"), nil
+}
+
+// getCNICacheDirectory returns CNI Cache directory.
+func getCNICacheDirectory() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "cni", "cache"), nil
+}
 
 // getDynamicConfigDir returns the directory for dynamic Kubelet configuration
 func getDynamicConfigDir() (string, error) {

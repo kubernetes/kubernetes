@@ -200,9 +200,9 @@ start_kubelet --kubeconfig "${KUBELET_KUBECONFIG}" \
   --kubelet-cgroups=/kubelet \
   --system-cgroups=/system \
   --cgroup-root=/ \
-#  "--network-plugin=${NETWORK_PLUGIN}" \
-#  "--cni-conf-dir=${CNI_CONF_DIR}" \
-#  "--cni-bin-dir=${CNI_BIN_DIR}" \
+  "--network-plugin=${NETWORK_PLUGIN}" \
+  "--cni-conf-dir=${CNI_CONF_DIR}" \
+  "--cni-bin-dir=${CNI_BIN_DIR}" \
   --v=$log_level \
   --logtostderr
 
