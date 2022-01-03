@@ -322,7 +322,6 @@ func getPodInfoPath(podDir string) string {
 func writePodInfo(pod *v1.Pod, podDir string) error {
 	fileName := getPodInfoPath(podDir)
 	var buffer bytes.Buffer
-
 	podname := pod.ObjectMeta.Name
 	namespace := pod.ObjectMeta.Namespace
 	buffer.WriteString(fmt.Sprintf("%s\n%s\n", podname, namespace))
