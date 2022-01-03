@@ -18,9 +18,8 @@ package remote
 
 import (
 	"fmt"
-	"path/filepath"
-
 	"k8s.io/klog/v2"
+	"path/filepath"
 )
 
 // utils.go contains functions used across test suites.
@@ -48,8 +47,8 @@ const cniConfig = `{
 }
 `
 
-// Install the cni plugin and add basic bridge configuration to the
-// configuration directory.
+//Install the cni plugin and add basic bridge configuration to the
+//configuration directory.
 func setupCNI(host, workspace string) error {
 	klog.V(2).Infof("Install CNI on %q", host)
 	cniPath := filepath.Join(workspace, cniDirectory)

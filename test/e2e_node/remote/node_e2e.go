@@ -157,9 +157,9 @@ func getOSDistribution(host string) (string, error) {
 func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	// TODO(random-liu): Do this in cloud init after we remove containervm test.
-	if err := setupCNI(host, workspace); err != nil {
-		return "", err
-	}
+	//if err := setupCNI(host, workspace); err != nil {
+	//	return "", err
+	//}
 
 	// Configure iptables firewall rules
 	if err := configureFirewall(host); err != nil {

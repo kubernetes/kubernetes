@@ -407,7 +407,6 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	var dockerOptions *kubelet.DockerOptions
 	if s.ContainerRuntime == kubetypes.DockerContainerRuntime {
 		dockerOptions = &kubelet.DockerOptions{
-			DockerEndpoint:            s.DockerEndpoint,
 			RuntimeRequestTimeout:     s.RuntimeRequestTimeout.Duration,
 			ImagePullProgressDeadline: s.ImagePullProgressDeadline.Duration,
 		}
