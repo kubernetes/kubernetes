@@ -122,6 +122,12 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			}
 		}
 
+		// TODO: Temporary workaround. Remove in 1.25:
+		// https://github.com/kubernetes/kubeadm/issues/2426
+		if err := upgrade.UpdateKubeletDynamicEnvFileWithURLScheme(dryRun); err != nil {
+			return err
+		}
+
 		fmt.Println("[upgrade] The configuration for this node was successfully updated!")
 		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
 		return nil
