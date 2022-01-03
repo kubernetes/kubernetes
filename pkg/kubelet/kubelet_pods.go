@@ -328,7 +328,6 @@ func writePodInfo(pod *v1.Pod, podDir string) error {
 	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
 }
 
-
 // makeHostsMount makes the mountpoint for the hosts file that the containers
 // in a pod are injected with. podIPs is provided instead of podIP as podIPs
 // are present even if dual-stack feature flag is not enabled.
