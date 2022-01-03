@@ -166,11 +166,11 @@ func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
 		}
 	}(errorChan, w)
 
-	go func(errC chan error, waiter Waiter) {
+	go func(errC chan error) {
 		// This main goroutine sends whatever the f function returns (error or not) to the channel
 		// This in order to continue on success (nil error), or just fail if the function returns an error
 		errC <- f()
-	}(errorChan, w)
+	}(errorChan)
 
 	// This call is blocking until one of the goroutines sends to errorChan
 	return <-errorChan
