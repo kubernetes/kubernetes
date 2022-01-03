@@ -111,9 +111,9 @@ func validateHost(runtime string) error {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 
-	// Check runtime support. Currently only Docker is supported.
-	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q", runtime)
+	// Check runtime support. Currently only CRI is supported.
+	if runtime != kubetypes.RemoteContainerRuntime {
+		return fmt.Errorf("AppArmor is only enabled for 'remote' runtimes. Found: %q", runtime)
 	}
 
 	return nil
