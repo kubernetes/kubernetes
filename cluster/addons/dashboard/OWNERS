@@ -1,16 +1,13 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
-approvers:
-  - floreks
-  - maciaszczykm
-  - shu-mutou
-reviewers:
-  - floreks
-  - maciaszczykm
-  - shu-mutou
+approvers: []
+reviewers: []
 emeritus_approvers:
   - bryk
   - danielromlein
   - ianlewis
   - jeefy
   - rf232
+  - floreks
+  - maciaszczykm
+  - shu-mutou

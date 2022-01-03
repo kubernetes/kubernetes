@@ -3,8 +3,7 @@
 approvers:
   - derekwaynecarr
   - klueska
-reviewers:
-  - nolancon
+reviewers: []
 emeritus_approvers:
   - ConnorDoyle
   - lmdaly

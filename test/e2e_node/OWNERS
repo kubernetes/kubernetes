@@ -17,11 +17,7 @@ emeritus_approvers:
   - ConnorDoyle
 reviewers:
   - bart0sh
-  - bsdnet
   - endocrimes
-  - karan
-  - MHBauer
-  - vpickard
   - sig-node-reviewers
 labels:
   - sig/node

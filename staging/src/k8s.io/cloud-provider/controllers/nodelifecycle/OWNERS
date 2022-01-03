@@ -3,12 +3,12 @@
 approvers:
   - thockin
   - luxas
-  - wlan0
   - andrewsykim
 reviewers:
   - thockin
   - luxas
-  - wlan0
   - andrewsykim
 labels:
   - sig/cloud-provider
+emeritus_approvers:
+  - wlan0

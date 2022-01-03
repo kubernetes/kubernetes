@@ -2,12 +2,12 @@
 
 approvers:
   - sig-instrumentation-approvers
-  - x13n
 emeritus_approvers:
   - fabxc
   - piosz
   - fgrzadkowski
   - kawych
+  - x13n
 reviewers:
   - sig-instrumentation-reviewers
 labels:

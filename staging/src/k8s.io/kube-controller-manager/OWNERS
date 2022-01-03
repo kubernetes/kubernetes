@@ -5,11 +5,11 @@ approvers:
   - luxas
   - mtaufen
   - sttts
-  - stewart-yu
 reviewers:
   - deads2k
   - luxas
   - mtaufen
   - sttts
-  - stewart-yu
   - cheftako
+emeritus_approvers:
+  - stewart-yu

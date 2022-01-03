@@ -3,7 +3,6 @@
 approvers:
   - mikedanese
   - dims
-  - wlan0
   - andrewsykim
   - cheftako
 reviewers:
@@ -12,7 +11,6 @@ reviewers:
   - derekwaynecarr
   - mikedanese
   - liggitt
-  - pmorie
   - sttts
   - dchen1107
   - saad-ali
@@ -22,9 +20,10 @@ reviewers:
   - dims
   - freehan
   - jingxu97
-  - wlan0
   - cheftako
   - andrewsykim
 labels:
   - sig/cloud-provider
   - area/cloudprovider
+emeritus_approvers:
+  - wlan0

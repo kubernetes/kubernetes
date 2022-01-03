@@ -10,5 +10,4 @@ reviewers:
 labels:
   - sig/storage
 emeritus_reviewers:
-  - jeffvance
   - saad-ali

@@ -1,7 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - pmorie
   - saad-ali
   - thockin
 reviewers:
@@ -9,4 +8,5 @@ reviewers:
   - jsafrane
   - jingxu97
   - msau42
-  - dixudx
+emeritus_approvers:
+  - pmorie

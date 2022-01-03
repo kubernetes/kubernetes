@@ -2,9 +2,10 @@
 
 approvers:
   - sig-instrumentation-approvers
-  - x13n
 reviewers:
   - sig-instrumentation-reviewers
 labels:
   - area/provider/gcp
   - sig/instrumentation
+emeritus_approvers:
+  - x13n

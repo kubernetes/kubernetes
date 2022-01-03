@@ -1,18 +1,13 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - ddebroy
   - marosset
   - jayunit100
   - jsturtevant
   - ravisantoshgudimetla
 reviewers:
-  - adelina-t
   - chewong
-  - dineshgovindasamy
   - feiskyer
-  - ksubrmnn
-  - madhanrm
   - jayunit100
   - jsturtevant
   - yujuhong
@@ -22,5 +17,6 @@ emeritus_approvers:
   - michmike
   - dchen1107
   - patricklang
+  - ddebroy
 labels:
   - sig/windows

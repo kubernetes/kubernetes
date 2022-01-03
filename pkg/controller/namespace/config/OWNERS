@@ -4,11 +4,11 @@ approvers:
   - luxas
   - mtaufen
   - sttts
-  - stewart-yu
 reviewers:
   - api-reviewers
   - deads2k
   - luxas
   - mtaufen
   - sttts
+emeritus_approvers:
   - stewart-yu

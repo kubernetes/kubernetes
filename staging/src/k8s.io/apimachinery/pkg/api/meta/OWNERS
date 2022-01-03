@@ -5,7 +5,6 @@ reviewers:
   - smarterclayton
   - wojtek-t
   - deads2k
-  - brendandburns
   - derekwaynecarr
   - caesarxuchao
   - mikedanese
@@ -13,5 +12,3 @@ reviewers:
   - janetkuo
   - ncdc
   - dims
-  - resouer
-  - mfojtik

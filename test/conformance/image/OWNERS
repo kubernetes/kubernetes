@@ -1,22 +1,19 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - timothysc
   - dims
   - spiffxp
   - neolit123
   - bentheelder
-  - brahmaroutu
-  - stevesloka
   - johnSchnake
 approvers:
-  - timothysc
   - dims
   - spiffxp
   - neolit123
   - bentheelder
 emeritus_approvers:
   - ixdy
+  - timothysc
 labels:
   - sig/release
   - sig/testing
