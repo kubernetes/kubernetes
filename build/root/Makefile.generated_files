@@ -95,8 +95,9 @@ FORCE:
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all *.go dirs)
 endif
+ALL_GO_DIRS_CACHE := $(META_DIR)/all_go_dirs.mk
 ALL_GO_DIRS := $(shell                                                   \
-    hack/make-rules/helpers/cache_go_dirs.sh $(META_DIR)/all_go_dirs.mk  \
+    hack/make-rules/helpers/cache_go_dirs.sh $(ALL_GO_DIRS_CACHE)  \
 )
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** found $(shell echo $(ALL_GO_DIRS) | wc -w) *.go dirs)
@@ -107,9 +108,19 @@ endif
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s: tags)
 endif
+ALL_K8S_TAG_FILES_CACHE := $(META_DIR)/all_k8s_tag_files.mk
 ALL_K8S_TAG_FILES := $(shell                             \
-    find $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
+    AGDC=$$(cat $(ALL_GO_DIRS_CACHE)); \
+    if [[ -f "$(ALL_K8S_TAG_FILES_CACHE)" ]]; then \
+        N=$$(find $$AGDC -maxdepth 1 -type f -name \*.go -not -name $(GENERATED_FILE_PREFIX)\*.go -newer "$(ALL_K8S_TAG_FILES_CACHE)" -print -quit | wc -l);  \
+        if [[ "$${N}" == 0 ]]; then \
+            cat "$(ALL_K8S_TAG_FILES_CACHE)"; \
+            exit; \
+        fi \
+     fi; \
+     find $$AGDC -maxdepth 1 -type f -name \*.go -not -name $(GENERATED_FILE_PREFIX)\*.go \
         | xargs grep --color=never -l '^// *+k8s:'       \
+        | tee "$(ALL_K8S_TAG_FILES_CACHE)" \
 )
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** found $(shell echo $(ALL_K8S_TAG_FILES) | wc -w) +k8s: tagged files)
