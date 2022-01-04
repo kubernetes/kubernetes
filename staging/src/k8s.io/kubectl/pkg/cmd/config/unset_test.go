@@ -105,6 +105,36 @@ func TestUnsetUnexistConfig(t *testing.T) {
 
 }
 
+func TestUnsetAuthProviderInfo(t *testing.T) {
+	authProviderConfig := clientcmdapi.AuthProviderConfig{
+		Name: "foo",
+		Config: map[string]string{"refresh-token": "testestestest"},
+	}
+	conf := clientcmdapi.Config{
+		Kind:       "Config",
+		APIVersion: "v1",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube":   {Server: "https://192.168.99.100:8443"},
+			"my-cluster": {Server: "https://192.168.0.1:3434"},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
+			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
+		},
+		CurrentContext: "minikube",
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"foo": {AuthProvider: &authProviderConfig},
+		},
+	}
+	test := unsetConfigTest{
+		description: "Testing for kubectl config unset auth-provider configurations",
+		config:      conf,
+		args:        []string{"users.foo.auth-provider.foo.refresh-token"},
+		expected:    `Property "users.foo.auth-provider.foo.refresh-token" unset.` + "\n",
+	}
+	test.run(t)
+}
+
 func (test unsetConfigTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
