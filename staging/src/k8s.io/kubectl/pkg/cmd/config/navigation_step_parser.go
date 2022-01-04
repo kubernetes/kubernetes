@@ -76,6 +76,29 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			steps = append(steps, navigationStep{nextPart, fieldType})
 			currPartIndex += len(strings.Split(nextPart, "."))
 			currType = fieldType
+
+		case reflect.Ptr:
+			// Similar to the modifyConfig function, because we can't easily walk the AuthProviderConfig or ExecConfig types we must manually work with them
+			switch currType {
+			case reflect.TypeOf(&clientcmdapi.AuthProviderConfig{}):
+				steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
+				currPartIndex += 1
+
+				// If we have a part after the auth provider name we need to add it. There should only ever be at most one part after this.
+				// If there is not nothing happens because just unsetting the name is pointless.
+				nextPart := strings.Join(individualParts[currPartIndex:], ".")
+				if len(strings.Split(nextPart, ".")) > 1 {
+					steps = append(steps, navigationStep{individualParts[currPartIndex+1], reflect.TypeOf(map[string]string{})})
+					currPartIndex += 1
+				}
+
+			case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
+				return nil, fmt.Errorf("found ExecConfig")
+
+			default:
+				return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
+			}
+
 		default:
 			return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
 		}

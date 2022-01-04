@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -256,7 +257,37 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 		return fmt.Errorf("unable to locate path %#v under %v", currStep, actualCurrValue)
 
+	case reflect.Ptr:
+		// Similar to the navigation step parser, because we can't easily work with the AuthProviderConfig or ExecConfig structs we work with them manually
+		switch actualCurrValue.Type() {
+		case reflect.TypeOf(&clientcmdapi.AuthProviderConfig{}):
+			// Since unsetting just the name of the auth-provider is pointless return error
+			if !steps.moreStepsRemaining() && unset {
+				return fmt.Errorf("cannot unset the name of auth-provider, must update or unset auth-provider itself")
+			}
+
+			newActualCurrValue := actualCurrValue.Elem()
+			currFieldValue := newActualCurrValue.Field(1)
+
+			if unset {
+				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
+			}
+
+			mapKey := reflect.ValueOf(currStep.stepValue)
+			newMapValue := reflect.ValueOf(propertyValue)
+
+			currFieldValue.SetMapIndex(mapKey, newMapValue)
+
+			return nil
+
+		case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
+			return fmt.Errorf("found ExecConfig")
+
+		default:
+			return fmt.Errorf("unable to parse one or more field types of %v", actualCurrValue.Type())
+		}
+
 	}
 
-	panic(fmt.Errorf("unrecognized type: %v", actualCurrValue))
+	panic(fmt.Errorf("unrecognized type: %v\nwanted: %v", actualCurrValue, actualCurrValue.Kind()))
 }
