@@ -434,7 +434,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
 		schedulingrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
-		flowcontrolrest.RESTStorageProvider{},
+		flowcontrolrest.RESTStorageProvider{InformerFactory: c.GenericConfig.SharedInformerFactory},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.StorageProvider{},
