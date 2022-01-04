@@ -29,7 +29,7 @@ import (
 
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
-	IsDocker() bool
+	Socket() string
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
 	RemoveContainers(containers []string) error
@@ -43,52 +43,24 @@ type CRIRuntime struct {
 	criSocket string
 }
 
-// DockerRuntime is a struct that interfaces with the Docker daemon
-type DockerRuntime struct {
-	exec utilsexec.Interface
-}
-
 // NewContainerRuntime sets up and returns a ContainerRuntime struct
 func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (ContainerRuntime, error) {
-	var toolName string
-	var runtime ContainerRuntime
-
-	if criSocket != constants.DefaultDockerCRISocket {
-		toolName = "crictl"
-		runtime = &CRIRuntime{execer, criSocket}
-	} else {
-		toolName = "docker"
-		runtime = &DockerRuntime{execer}
-	}
-
+	toolName := "crictl"
+	runtime := &CRIRuntime{execer, criSocket}
 	if _, err := execer.LookPath(toolName); err != nil {
-		return nil, errors.Wrapf(err, "%s is required for container runtime", toolName)
+		return nil, errors.Wrapf(err, "%s is required by the container runtime", toolName)
 	}
-
 	return runtime, nil
 }
 
-// IsDocker returns true if the runtime is docker
-func (runtime *CRIRuntime) IsDocker() bool {
-	return false
-}
-
-// IsDocker returns true if the runtime is docker
-func (runtime *DockerRuntime) IsDocker() bool {
-	return true
+// Socket returns the CRI socket endpoint
+func (runtime *CRIRuntime) Socket() string {
+	return runtime.criSocket
 }
 
 // IsRunning checks if runtime is running
 func (runtime *CRIRuntime) IsRunning() error {
 	if out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "info").CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "container runtime is not running: output: %s, error", string(out))
-	}
-	return nil
-}
-
-// IsRunning checks if runtime is running
-func (runtime *DockerRuntime) IsRunning() error {
-	if out, err := runtime.exec.Command("docker", "info").CombinedOutput(); err != nil {
 		return errors.Wrapf(err, "container runtime is not running: output: %s, error", string(out))
 	}
 	return nil
@@ -105,12 +77,6 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 	return pods, nil
 }
 
-// ListKubeContainers lists running k8s containers
-func (runtime *DockerRuntime) ListKubeContainers() ([]string, error) {
-	output, err := runtime.exec.Command("docker", "ps", "-a", "--filter", "name=k8s_", "-q").CombinedOutput()
-	return strings.Fields(string(output)), err
-}
-
 // RemoveContainers removes running k8s pods
 func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
@@ -121,24 +87,6 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 			errs = append(errs, errors.Wrapf(err, "failed to stop running pod %s: output: %s, error", container, string(out)))
 		} else {
 			out, err = runtime.exec.Command("crictl", "-r", runtime.criSocket, "rmp", container).CombinedOutput()
-			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
-			}
-		}
-	}
-	return errorsutil.NewAggregate(errs)
-}
-
-// RemoveContainers removes running containers
-func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
-	errs := []error{}
-	for _, container := range containers {
-		out, err := runtime.exec.Command("docker", "stop", container).CombinedOutput()
-		if err != nil {
-			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, errors.Wrapf(err, "failed to stop running container %s: output: %s, error", container, string(out)))
-		} else {
-			out, err = runtime.exec.Command("docker", "rm", "--volumes", container).CombinedOutput()
 			if err != nil {
 				errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
 			}
@@ -160,28 +108,9 @@ func (runtime *CRIRuntime) PullImage(image string) error {
 	return errors.Wrapf(err, "output: %s, error", out)
 }
 
-// PullImage pulls the image
-func (runtime *DockerRuntime) PullImage(image string) error {
-	var err error
-	var out []byte
-	for i := 0; i < constants.PullImageRetry; i++ {
-		out, err = runtime.exec.Command("docker", "pull", image).CombinedOutput()
-		if err == nil {
-			return nil
-		}
-	}
-	return errors.Wrapf(err, "output: %s, error", out)
-}
-
 // ImageExists checks to see if the image exists on the system
 func (runtime *CRIRuntime) ImageExists(image string) (bool, error) {
 	err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "inspecti", image).Run()
-	return err == nil, nil
-}
-
-// ImageExists checks to see if the image exists on the system
-func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
-	err := runtime.exec.Command("docker", "inspect", image).Run()
 	return err == nil, nil
 }
 

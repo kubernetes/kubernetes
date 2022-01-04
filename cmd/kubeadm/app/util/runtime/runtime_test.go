@@ -40,32 +40,25 @@ func TestNewContainerRuntime(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "", errors.Errorf("%s not found", cmd) },
 	}
 	cases := []struct {
-		name      string
-		execer    fakeexec.FakeExec
-		criSocket string
-		isDocker  bool
-		isError   bool
+		name    string
+		execer  fakeexec.FakeExec
+		isError bool
 	}{
-		{"valid: default cri socket", execLookPathOK, constants.DefaultDockerCRISocket, true, false},
-		{"valid: cri-o socket url", execLookPathOK, "unix:///var/run/crio/crio.sock", false, false},
-		{"invalid: no crictl", execLookPathErr, "unix:///var/run/crio/crio.sock", false, true},
+		{"valid: crictl present", execLookPathOK, false},
+		{"invalid: no crictl", execLookPathErr, true},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			runtime, err := NewContainerRuntime(&tc.execer, tc.criSocket)
+			_, err := NewContainerRuntime(&tc.execer, "unix:///some/socket.sock")
 			if err != nil {
 				if !tc.isError {
-					t.Fatalf("unexpected NewContainerRuntime error. criSocket: %s, error: %v", tc.criSocket, err)
+					t.Fatalf("unexpected NewContainerRuntime error. error: %v", err)
 				}
 				return // expected error occurs, impossible to test runtime further
 			}
 			if tc.isError && err == nil {
-				t.Fatalf("unexpected NewContainerRuntime success. criSocket: %s", tc.criSocket)
-			}
-			isDocker := runtime.IsDocker()
-			if tc.isDocker != isDocker {
-				t.Fatalf("unexpected isDocker() result %v for the criSocket %s", isDocker, tc.criSocket)
+				t.Fatal("unexpected NewContainerRuntime success")
 			}
 		})
 	}
