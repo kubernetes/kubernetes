@@ -52,7 +52,7 @@ type Attributes interface {
 	IsDryRun() bool
 	// GetObject is the object from the incoming request prior to default values being applied
 	GetObject() runtime.Object
-	// GetOldObject is the existing object. Only populated for UPDATE requests.
+	// GetOldObject is the existing object. Only populated for UPDATE and DELETE requests.
 	GetOldObject() runtime.Object
 	// GetKind is the type of object being manipulated.  For example: Pod
 	GetKind() schema.GroupVersionKind
