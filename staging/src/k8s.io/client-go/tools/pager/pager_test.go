@@ -76,6 +76,10 @@ func (p *testPager) PagedList(ctx context.Context, options metav1.ListOptions) (
 		p.t.Errorf("invariant violated, specifying resource version (%s) is not allowed when using continue (%s).", options.ResourceVersion, options.Continue)
 		return nil, fmt.Errorf("invariant violated")
 	}
+	if options.Continue != "" && options.ResourceVersionMatch != "" {
+		p.t.Errorf("invariant violated, specifying resource version match type (%s) is not allowed when using continue (%s).", options.ResourceVersionMatch, options.Continue)
+		return nil, fmt.Errorf("invariant violated")
+	}
 	var list metainternalversion.List
 	total := options.Limit
 	if total == 0 {
@@ -198,6 +202,13 @@ func TestListPager_List(t *testing.T) {
 			name:      "two pages with resourceVersion",
 			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
 			args:      args{options: metav1.ListOptions{ResourceVersion: "rv:10"}},
+			want:      list(11, "rv:20"),
+			wantPaged: true,
+		},
+		{
+			name:      "two pages with resourceVersion and resourceVersionMatch",
+			fields:    fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
+			args:      args{options: metav1.ListOptions{ResourceVersion: "rv:10", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}},
 			want:      list(11, "rv:20"),
 			wantPaged: true,
 		},
