@@ -597,9 +597,12 @@ func TestServiceDefaultOnRead(t *testing.T) {
 			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 			svctest.SetIPFamilies(api.IPv4Protocol)),
 	}, {
-		name:   "external name",
-		input:  makeServiceList(svctest.SetTypeExternalName),
-		expect: makeServiceList(svctest.SetTypeExternalName),
+		name:  "external name",
+		input: makeServiceList(svctest.SetTypeExternalName),
+		expect: makeServiceList(svctest.SetTypeExternalName, func(svc *api.Service) {
+			// we now drop internalTrafficPolicy on read when Type=ExternalName
+			svc.Spec.InternalTrafficPolicy = nil
+		}),
 	}, {
 		name:  "dual v4v6",
 		input: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1", "2000::1")),
@@ -678,6 +681,9 @@ func TestServiceDefaultOnRead(t *testing.T) {
 			}
 			if want, got := exp.Spec.IPFamilies, svc.Spec.IPFamilies; !reflect.DeepEqual(want, got) {
 				t.Errorf("ipFamilies: expected %v, got %v", want, got)
+			}
+			if want, got := fmtInternalTrafficPolicy(exp.Spec.InternalTrafficPolicy), fmtInternalTrafficPolicy(svc.Spec.InternalTrafficPolicy); want != got {
+				t.Errorf("internalTrafficPolicy: expected %v, got %v", want, got)
 			}
 		})
 	}
@@ -1237,6 +1243,13 @@ func proveHealthCheckNodePortDeallocated(t *testing.T, storage *wrapperRESTForTe
 //
 
 func fmtIPFamilyPolicy(pol *api.IPFamilyPolicyType) string {
+	if pol == nil {
+		return "<nil>"
+	}
+	return string(*pol)
+}
+
+func fmtInternalTrafficPolicy(pol *api.ServiceInternalTrafficPolicyType) string {
 	if pol == nil {
 		return "<nil>"
 	}
