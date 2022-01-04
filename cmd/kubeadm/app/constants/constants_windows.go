@@ -20,6 +20,14 @@ limitations under the License.
 package constants
 
 const (
-	// DefaultDockerCRISocket defines the default Docker CRI socket
-	DefaultDockerCRISocket = "npipe:////./pipe/docker_engine"
+	// CRISocketContainerd is the containerd CRI endpoint
+	CRISocketContainerd = "npipe:////./pipe/containerd-containerd"
+	// CRISocketCRIO is the cri-o CRI endpoint
+	// NOTE: this is a placeholder as CRI-O does not support Windows
+	CRISocketCRIO = "npipe:////./pipe/cri-o"
+	// CRISocketDocker is the cri-dockerd CRI endpoint
+	CRISocketDocker = "npipe:////./pipe/cri-dockerd"
+
+	// DefaultCRISocket defines the default CRI socket
+	DefaultCRISocket = CRISocketContainerd
 )

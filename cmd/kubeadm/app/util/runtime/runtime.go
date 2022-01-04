@@ -124,7 +124,7 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 
 	if isSocket(dockerSocket) {
 		// the path in dockerSocket is not CRI compatible, hence we should replace it with a CRI compatible socket
-		foundCRISockets = append(foundCRISockets, constants.DefaultDockerCRISocket)
+		foundCRISockets = append(foundCRISockets, constants.DefaultCRISocket)
 	} else if isSocket(containerdSocket) {
 		// Docker 18.09 gets bundled together with containerd, thus having both dockerSocket and containerdSocket present.
 		// For compatibility reasons, we use the containerd socket only if Docker is not detected.
@@ -140,7 +140,7 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 	switch len(foundCRISockets) {
 	case 0:
 		// Fall back to Docker if no CRI is detected, we can error out later on if we need it
-		return constants.DefaultDockerCRISocket, nil
+		return constants.DefaultCRISocket, nil
 	case 1:
 		// Precisely one CRI found, use that
 		return foundCRISockets[0], nil

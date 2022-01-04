@@ -84,6 +84,8 @@ func runCleanupNode(c workflow.RunData) error {
 		klog.Warningf("[reset] Failed to remove containers: %v\n", err)
 	}
 
+	// TODO: remove the dockershim directory cleanup in 1.25
+	// https://github.com/kubernetes/kubeadm/issues/2626
 	r.AddDirsToClean("/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories

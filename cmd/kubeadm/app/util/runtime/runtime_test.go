@@ -89,11 +89,6 @@ func TestIsRunning(t *testing.T) {
 		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	dockerExecer := fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/docker", nil },
-	}
-
 	cases := []struct {
 		name      string
 		criSocket string
@@ -102,8 +97,6 @@ func TestIsRunning(t *testing.T) {
 	}{
 		{"valid: CRI-O is running", "unix:///var/run/crio/crio.sock", criExecer, false},
 		{"invalid: CRI-O is not running", "unix:///var/run/crio/crio.sock", criExecer, true},
-		{"valid: docker is running", constants.DefaultDockerCRISocket, dockerExecer, false},
-		{"invalid: docker is not running", constants.DefaultDockerCRISocket, dockerExecer, true},
 	}
 
 	for _, tc := range cases {
@@ -143,7 +136,6 @@ func TestListKubeContainers(t *testing.T) {
 	}{
 		{"valid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", false},
 		{"invalid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", true},
-		{"valid: list containers using docker", constants.DefaultDockerCRISocket, false},
 	}
 
 	for _, tc := range cases {
@@ -197,9 +189,6 @@ func TestRemoveContainers(t *testing.T) {
 		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, false}, // Test case 1
 		{"invalid: CRI rmp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
 		{"invalid: CRI stopp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
-		{"valid: remove containers using docker", constants.DefaultDockerCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, false},
-		{"invalid: docker rm failure", constants.DefaultDockerCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, true},
-		{"invalid: docker stop failure", constants.DefaultDockerCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, true},
 	}
 
 	for _, tc := range cases {
@@ -252,8 +241,6 @@ func TestPullImage(t *testing.T) {
 	}{
 		{"valid: pull image using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
 		{"invalid: CRI pull error", "unix:///var/run/crio/crio.sock", "image2", true},
-		{"valid: pull image using docker", constants.DefaultDockerCRISocket, "image1", false},
-		{"invalid: docker pull error", constants.DefaultDockerCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {
@@ -295,9 +282,7 @@ func TestImageExists(t *testing.T) {
 		result    bool
 	}{
 		{"valid: test if image exists using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
-		{"invalid: CRI inspecti failure", "unix:///var/run/crio/crio.sock", "image2", true},
-		{"valid: test if image exists using docker", constants.DefaultDockerCRISocket, "image1", false},
-		{"invalid: docker inspect failure", constants.DefaultDockerCRISocket, "image2", true},
+		{"invalid: CRI inspect failure", "unix:///var/run/crio/crio.sock", "image2", true},
 	}
 
 	for _, tc := range cases {
@@ -388,22 +373,16 @@ func TestDetectCRISocketImpl(t *testing.T) {
 		expectedSocket  string
 	}{
 		{
-			name:            "No existing sockets, use Docker",
+			name:            "No existing sockets, use default",
 			existingSockets: []string{},
 			expectedError:   false,
-			expectedSocket:  constants.DefaultDockerCRISocket,
+			expectedSocket:  constants.DefaultCRISocket,
 		},
 		{
 			name:            "One valid CRI socket leads to success",
 			existingSockets: []string{"unix:///var/run/crio/crio.sock"},
 			expectedError:   false,
 			expectedSocket:  "unix:///var/run/crio/crio.sock",
-		},
-		{
-			name:            "Correct Docker CRI socket is returned",
-			existingSockets: []string{"unix:///var/run/docker.sock"},
-			expectedError:   false,
-			expectedSocket:  constants.DefaultDockerCRISocket,
 		},
 		{
 			name: "CRI and Docker sockets lead to an error",
@@ -420,10 +399,10 @@ func TestDetectCRISocketImpl(t *testing.T) {
 				"unix:///run/containerd/containerd.sock",
 			},
 			expectedError:  false,
-			expectedSocket: constants.DefaultDockerCRISocket,
+			expectedSocket: constants.DefaultCRISocket,
 		},
 		{
-			name: "A couple of CRI sockets lead to an error",
+			name: "Multiple CRI sockets lead to an error",
 			existingSockets: []string{
 				"unix:///var/run/crio/crio.sock",
 				"unix:///run/containerd/containerd.sock",
