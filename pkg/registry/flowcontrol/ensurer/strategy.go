@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -176,7 +176,7 @@ func (s *strategy) ShouldUpdate(current, bootstrap configurationObject) (runtime
 // shouldUpdateSpec inspects the auto-update annotation key and generation field to determine
 // whether the configurationWrapper object should be auto-updated.
 func shouldUpdateSpec(accessor metav1.Object) bool {
-	value, _ := accessor.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]
+	value, _ := accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]
 	if autoUpdate, err := strconv.ParseBool(value); err == nil {
 		return autoUpdate
 	}
@@ -196,7 +196,7 @@ func shouldUpdateSpec(accessor metav1.Object) bool {
 // shouldUpdateAnnotation determines whether the current value of the auto-update annotation
 // key matches the desired value.
 func shouldUpdateAnnotation(accessor metav1.Object, desired bool) bool {
-	if value, ok := accessor.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]; ok {
+	if value, ok := accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]; ok {
 		if current, err := strconv.ParseBool(value); err == nil && current == desired {
 			return false
 		}
@@ -211,7 +211,7 @@ func setAutoUpdateAnnotation(accessor metav1.Object, autoUpdate bool) {
 		accessor.SetAnnotations(map[string]string{})
 	}
 
-	accessor.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
+	accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
 }
 
 // ensureConfiguration ensures the boostrap configurationWrapper on the cluster based on the specified strategy.
@@ -265,7 +265,7 @@ func removeConfiguration(wrapper configurationWrapper, name string) error {
 		return fmt.Errorf("failed to retrieve the %s, will retry later name=%q error=%w", wrapper.TypeName(), name, err)
 	}
 
-	value := current.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]
+	value := current.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]
 	autoUpdate, err := strconv.ParseBool(value)
 	if err != nil {
 		klog.ErrorS(err, fmt.Sprintf("Skipping deletion of the %s", wrapper.TypeName()), "name", name)
@@ -308,7 +308,7 @@ func getRemoveCandidate(bootstrap sets.String, current []metav1.Object) []string
 	candidates := make([]string, 0)
 	for i := range current {
 		object := current[i]
-		if _, ok := object.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]; !ok {
+		if _, ok := object.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]; !ok {
 			// the configuration object does not have the annotation key
 			continue
 		}
