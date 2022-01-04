@@ -116,7 +116,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 	/*
 	   Release: v1.21
-	   Testname: CronJob FrobidConcurrent
+	   Testname: CronJob ForbidConcurrent
 	   Description: CronJob MUST support ForbidConcurrent policy, allowing to run single, previous job at the time.
 	*/
 	framework.ConformanceIt("should not schedule new jobs when ForbidConcurrent [Slow]", func() {

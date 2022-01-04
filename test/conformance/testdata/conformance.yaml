@@ -588,7 +588,7 @@
   description: CronJob MUST support suspension, which suppresses creation of new jobs.
   release: v1.21
   file: test/e2e/apps/cronjob.go
-- testname: CronJob FrobidConcurrent
+- testname: CronJob ForbidConcurrent
   codename: '[sig-apps] CronJob should not schedule new jobs when ForbidConcurrent
     [Slow] [Conformance]'
   description: CronJob MUST support ForbidConcurrent policy, allowing to run single,
