@@ -597,12 +597,9 @@ func TestServiceDefaultOnRead(t *testing.T) {
 			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 			svctest.SetIPFamilies(api.IPv4Protocol)),
 	}, {
-		name:  "external name",
-		input: makeServiceList(svctest.SetTypeExternalName),
-		expect: makeServiceList(svctest.SetTypeExternalName, func(svc *api.Service) {
-			// we now drop internalTrafficPolicy on read when Type=ExternalName
-			svc.Spec.InternalTrafficPolicy = nil
-		}),
+		name:   "external name",
+		input:  makeServiceList(svctest.SetTypeExternalName, svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)),
+		expect: makeServiceList(svctest.SetTypeExternalName),
 	}, {
 		name:  "dual v4v6",
 		input: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1", "2000::1")),
@@ -11391,31 +11388,16 @@ func TestFeatureInternalTrafficPolicy(t *testing.T) {
 	}
 
 	testCases := []cudTestCase{{
-		name: "ExternalName_policy:none-ExternalName_policy:Local",
+		name: "ExternalName_policy:none-ExternalName_policy:none",
 		create: svcTestCase{
 			svc: svctest.MakeService("foo",
 				svctest.SetTypeExternalName),
-			prove: prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
+			prove: prove(proveITP("")),
 		},
 		update: svcTestCase{
 			svc: svctest.MakeService("foo",
-				svctest.SetTypeExternalName,
-				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
-			prove: prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
-		},
-	}, {
-		name: "ExternalName_policy:Cluster-ExternalName_policy:Local",
-		create: svcTestCase{
-			svc: svctest.MakeService("foo",
-				svctest.SetTypeExternalName,
-				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)),
-			prove: prove(proveITP(api.ServiceInternalTrafficPolicyCluster)),
-		},
-		update: svcTestCase{
-			svc: svctest.MakeService("foo",
-				svctest.SetTypeExternalName,
-				svctest.SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyLocal)),
-			prove: prove(proveITP(api.ServiceInternalTrafficPolicyLocal)),
+				svctest.SetTypeExternalName),
+			prove: prove(proveITP("")),
 		},
 	}, {
 		name: "ClusterIP_policy:none-ClusterIP_policy:Local",
