@@ -107,12 +107,11 @@ state of the cluster through the apiserver and makes changes attempting to move 
 current state towards the desired state. Examples of controllers that ship with
 Kubernetes today are the replication controller, endpoints controller, namespace
 controller, and serviceaccounts controller.`,
-		PersistentPreRunE: func(*cobra.Command, []string) error {
+		PersistentPreRun: func(*cobra.Command, []string) {
 			// silence client-go warnings.
 			// kube-controller-manager generically watches APIs (including deprecated ones),
 			// and CI ensures it works properly against matching kube-apiserver versions.
 			restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
-			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
