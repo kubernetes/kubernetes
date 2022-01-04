@@ -25,11 +25,6 @@ import (
 	winio "github.com/Microsoft/go-winio"
 )
 
-const (
-	dockerSocket     = "npipe:////./pipe/docker_engine"         // The Docker socket is not CRI compatible
-	containerdSocket = "npipe:////./pipe/containerd-containerd" // Proposed containerd named pipe for Windows
-)
-
 // isExistingSocket checks if path exists and is domain socket
 func isExistingSocket(path string) bool {
 	u, err := url.Parse(path)

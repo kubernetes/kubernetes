@@ -27,6 +27,13 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+// defaultKnownCRISockets holds the set of known CRI endpoints
+var defaultKnownCRISockets = []string{
+	constants.CRISocketContainerd,
+	constants.CRISocketCRIO,
+	constants.CRISocketDocker,
+}
+
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
 	Socket() string
@@ -115,21 +122,8 @@ func (runtime *CRIRuntime) ImageExists(image string) (bool, error) {
 }
 
 // detectCRISocketImpl is separated out only for test purposes, DON'T call it directly, use DetectCRISocket instead
-func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
+func detectCRISocketImpl(isSocket func(string) bool, knownCRISockets []string) (string, error) {
 	foundCRISockets := []string{}
-	knownCRISockets := []string{
-		// Docker and containerd sockets are special cased below, hence not to be included here
-		"unix:///var/run/crio/crio.sock",
-	}
-
-	if isSocket(dockerSocket) {
-		// the path in dockerSocket is not CRI compatible, hence we should replace it with a CRI compatible socket
-		foundCRISockets = append(foundCRISockets, constants.DefaultCRISocket)
-	} else if isSocket(containerdSocket) {
-		// Docker 18.09 gets bundled together with containerd, thus having both dockerSocket and containerdSocket present.
-		// For compatibility reasons, we use the containerd socket only if Docker is not detected.
-		foundCRISockets = append(foundCRISockets, containerdSocket)
-	}
 
 	for _, socket := range knownCRISockets {
 		if isSocket(socket) {
@@ -139,18 +133,20 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 
 	switch len(foundCRISockets) {
 	case 0:
-		// Fall back to Docker if no CRI is detected, we can error out later on if we need it
+		// Fall back to the default socket if no CRI is detected, we can error out later on if we need it
 		return constants.DefaultCRISocket, nil
 	case 1:
 		// Precisely one CRI found, use that
 		return foundCRISockets[0], nil
 	default:
 		// Multiple CRIs installed?
-		return "", errors.Errorf("Found multiple CRI sockets, please use --cri-socket to select one: %s", strings.Join(foundCRISockets, ", "))
+		return "", errors.Errorf("Found multiple CRI endpoints on the host. Please define which one do you wish "+
+			"to use by setting the 'criSocket' field in the kubeadm configuration file: %s",
+			strings.Join(foundCRISockets, ", "))
 	}
 }
 
 // DetectCRISocket uses a list of known CRI sockets to detect one. If more than one or none is discovered, an error is returned.
 func DetectCRISocket() (string, error) {
-	return detectCRISocketImpl(isExistingSocket)
+	return detectCRISocketImpl(isExistingSocket, defaultKnownCRISockets)
 }

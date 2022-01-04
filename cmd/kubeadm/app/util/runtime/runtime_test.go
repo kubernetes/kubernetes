@@ -380,32 +380,15 @@ func TestDetectCRISocketImpl(t *testing.T) {
 		},
 		{
 			name:            "One valid CRI socket leads to success",
-			existingSockets: []string{"unix:///var/run/crio/crio.sock"},
+			existingSockets: []string{"unix:///foo/bar.sock"},
 			expectedError:   false,
-			expectedSocket:  "unix:///var/run/crio/crio.sock",
-		},
-		{
-			name: "CRI and Docker sockets lead to an error",
-			existingSockets: []string{
-				"unix:///var/run/docker.sock",
-				"unix:///var/run/crio/crio.sock",
-			},
-			expectedError: true,
-		},
-		{
-			name: "Docker and containerd lead to Docker being used",
-			existingSockets: []string{
-				"unix:///var/run/docker.sock",
-				"unix:///run/containerd/containerd.sock",
-			},
-			expectedError:  false,
-			expectedSocket: constants.DefaultCRISocket,
+			expectedSocket:  "unix:///foo/bar.sock",
 		},
 		{
 			name: "Multiple CRI sockets lead to an error",
 			existingSockets: []string{
-				"unix:///var/run/crio/crio.sock",
-				"unix:///run/containerd/containerd.sock",
+				"unix:///foo/bar.sock",
+				"unix:///foo/baz.sock",
 			},
 			expectedError: true,
 		},
@@ -419,9 +402,9 @@ func TestDetectCRISocketImpl(t *testing.T) {
 						return true
 					}
 				}
-
 				return false
-			})
+			}, test.existingSockets)
+
 			if (err != nil) != test.expectedError {
 				t.Fatalf("detectCRISocketImpl returned unexpected result\n\tExpected error: %t\n\tGot error: %t", test.expectedError, err != nil)
 			}
