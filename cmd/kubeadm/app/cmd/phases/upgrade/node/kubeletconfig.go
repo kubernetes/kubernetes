@@ -20,15 +20,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 
+	"k8s.io/klog/v2"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
@@ -85,6 +92,40 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 				return errors.Wrap(err, "error printing files on dryrun")
 			}
 			return nil
+		}
+
+		// Handle a missing URL scheme in the Node CRI socket.
+		// Older versions of kubeadm tolerate CRI sockets without URL schemes (/var/run/foo without unix://).
+		// During "upgrade node" for worker nodes the cfg.NodeRegistration would be left empty.
+		// This requires to call GetNodeRegistration on demand and fetch the node name and CRI socket.
+		// If the NodeRegistration (nro) contains a socket without a URL scheme, update it.
+		//
+		// TODO: this workaround can be removed in 1.25 once all user node sockets have a URL scheme:
+		// https://github.com/kubernetes/kubeadm/issues/2426
+		var nro *kubeadmapi.NodeRegistrationOptions
+		var missingURLScheme bool
+		if !dryRun {
+			if err := configutil.GetNodeRegistration(data.KubeConfigPath(), data.Client(), nro); err != nil {
+				return errors.Wrap(err, "could not retrieve the node registration options for this node")
+			}
+			missingURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme)
+		}
+		if missingURLScheme {
+			if !dryRun {
+				newSocket := kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + nro.CRISocket
+				klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with URL scheme %q", nro.Name, newSocket)
+				if err := patchnodephase.AnnotateCRISocket(data.Client(), nro.Name, newSocket); err != nil {
+					return errors.Wrapf(err, "error updating the CRI socket for Node %q", nro.Name)
+				}
+			} else {
+				fmt.Println("[dryrun] would update the node CRI socket path to include an URL scheme")
+			}
+		}
+
+		// TODO: Temporary workaround. Remove in 1.25:
+		// https://github.com/kubernetes/kubeadm/issues/2426
+		if err := upgrade.UpdateKubeletDynamicEnvFileWithURLScheme(dryRun); err != nil {
+			return err
 		}
 
 		fmt.Println("[upgrade] The configuration for this node was successfully updated!")

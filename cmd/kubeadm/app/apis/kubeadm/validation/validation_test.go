@@ -111,7 +111,7 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		// test cases for criSocket are covered in TestValidateSocketPath
 	}
 	for _, rt := range tests {
-		nro := kubeadmapi.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: "/some/path"}
+		nro := kubeadmapi.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: "unix:///some/path"}
 		actual := ValidateNodeRegistrationOptions(&nro, field.NewPath("nodeRegistration"))
 		actualErrors := len(actual) > 0
 		if actualErrors != rt.expectedErrors {
@@ -448,7 +448,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -463,7 +463,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
 			}, false},
 		{"invalid missing node name",
 			&kubeadmapi.InitConfiguration{
@@ -493,7 +493,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
 			}, false},
 		{"valid InitConfiguration with IPv4 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -514,7 +514,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
 			}, true},
 		{"valid InitConfiguration using IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -534,7 +534,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
 			}, true},
 	}
 	for _, rt := range tests {
@@ -579,7 +579,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "/var/run/dockershim.sock",
+				CRISocket: "unix:///var/run/dockershim.sock",
 			},
 		}, true},
 		{&kubeadmapi.JoinConfiguration{ // Pass with JoinControlPlane
@@ -594,7 +594,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "/var/run/dockershim.sock",
+				CRISocket: "unix:///var/run/dockershim.sock",
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -615,7 +615,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "/var/run/dockershim.sock",
+				CRISocket: "unix:///var/run/dockershim.sock",
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -963,12 +963,11 @@ func TestValidateSocketPath(t *testing.T) {
 		criSocket      string
 		expectedErrors bool
 	}{
-		{name: "valid path", criSocket: "/some/path", expectedErrors: false},
-		{name: "valid socket url", criSocket: kubeadmapiv1.DefaultUrlScheme + "://" + "/some/path", expectedErrors: false},
-		{name: "unsupported url scheme", criSocket: "bla:///some/path", expectedErrors: true},
-		{name: "unparseable url", criSocket: ":::", expectedErrors: true},
-		{name: "invalid CRISocket (path is not absolute)", criSocket: "some/path", expectedErrors: true},
-		{name: "empty CRISocket (path is not absolute)", criSocket: "", expectedErrors: true},
+		{name: "valid socket URL", criSocket: kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + "/some/path", expectedErrors: false},
+		{name: "unsupported URL scheme", criSocket: "bla:///some/path", expectedErrors: true},
+		{name: "missing URL scheme", criSocket: "/some/path", expectedErrors: true},
+		{name: "unparseable URL", criSocket: ":::", expectedErrors: true},
+		{name: "empty CRISocket", criSocket: "", expectedErrors: true},
 	}
 	for _, tc := range tests {
 		actual := ValidateSocketPath(tc.criSocket, field.NewPath("criSocket"))
