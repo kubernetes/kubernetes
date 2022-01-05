@@ -49,7 +49,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.5.0
-	github.com/google/cadvisor v0.39.0
+	github.com/google/cadvisor v0.39.3
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
@@ -279,7 +279,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.0
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.0
-	github.com/google/cadvisor => github.com/google/cadvisor v0.39.0
+	github.com/google/cadvisor => github.com/google/cadvisor v0.39.3
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
