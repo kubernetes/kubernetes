@@ -1840,19 +1840,19 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 	local := v1.ServiceInternalTrafficPolicyLocal
 	testCases := []struct {
 		name                          string
-		expectedInternalTrafficPolicy v1.ServiceInternalTrafficPolicyType
+		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
 		svc                           v1.Service
 		featureGateOn                 bool
 	}{
 		{
 			name:                          "must set default internalTrafficPolicy",
-			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
+			expectedInternalTrafficPolicy: &cluster,
 			svc:                           v1.Service{},
 			featureGateOn:                 true,
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when it's cluster",
-			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
+			expectedInternalTrafficPolicy: &cluster,
 			svc: v1.Service{
 				Spec: v1.ServiceSpec{
 					InternalTrafficPolicy: &cluster,
@@ -1861,8 +1861,18 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 			featureGateOn: true,
 		},
 		{
+			name:                          "must not set default internalTrafficPolicy when type is ExternalName",
+			expectedInternalTrafficPolicy: nil,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeExternalName,
+				},
+			},
+			featureGateOn: true,
+		},
+		{
 			name:                          "must not set default internalTrafficPolicy when it's local",
-			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyLocal,
+			expectedInternalTrafficPolicy: &local,
 			svc: v1.Service{
 				Spec: v1.ServiceSpec{
 					InternalTrafficPolicy: &local,
@@ -1872,7 +1882,7 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when gate is disabled",
-			expectedInternalTrafficPolicy: "",
+			expectedInternalTrafficPolicy: nil,
 			svc:                           v1.Service{},
 			featureGateOn:                 false,
 		},
@@ -1883,14 +1893,8 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 			obj := roundTrip(t, runtime.Object(&test.svc))
 			svc := obj.(*v1.Service)
 
-			if test.expectedInternalTrafficPolicy == "" {
-				if svc.Spec.InternalTrafficPolicy != nil {
-					t.Fatalf("expected .spec.internalTrafficPolicy: null, got %v", *svc.Spec.InternalTrafficPolicy)
-				}
-			} else {
-				if *svc.Spec.InternalTrafficPolicy != test.expectedInternalTrafficPolicy {
-					t.Fatalf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, *svc.Spec.InternalTrafficPolicy)
-				}
+			if !reflect.DeepEqual(svc.Spec.InternalTrafficPolicy, test.expectedInternalTrafficPolicy) {
+				t.Errorf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, svc.Spec.InternalTrafficPolicy)
 			}
 		})
 	}
