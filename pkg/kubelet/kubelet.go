@@ -1522,7 +1522,7 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	defer klog.V(4).InfoS("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// Latency measurements for the main workflow are relative to the
-	// first time the pod was seen by the API server.
+	// first time the pod was seen by kubelet.
 	var firstSeenTime time.Time
 	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
 		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
@@ -1581,7 +1581,8 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	// Record the time it takes for the pod to become running.
+	// Record the time it takes for the pod to become running
+	// since kubelet first saw the pod if firstSeenTime is set.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok || existingStatus.Phase == v1.PodPending && apiPodStatus.Phase == v1.PodRunning &&
 		!firstSeenTime.IsZero() {
