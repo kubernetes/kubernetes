@@ -586,6 +586,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 	testNdotsOptionValue := "3"
 	testHostNameserver := "8.8.8.8"
 	testHostDomain := "host.domain"
+	testHostOption := "ndots:1"
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -594,24 +595,10 @@ func TestGetPodDNSCustom(t *testing.T) {
 		},
 	}
 
-	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\n", testHostNameserver, testHostDomain))
-	tmpfile, err := ioutil.TempFile("", "tmpResolvConf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tmpfile.Name())
-	if _, err := tmpfile.Write(resolvConfContent); err != nil {
-		t.Fatal(err)
-	}
-	if err := tmpfile.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{netutils.ParseIPSloppy(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
-
 	testCases := []struct {
 		desc              string
 		hostnetwork       bool
+		resolvConfContent string
 		dnsPolicy         v1.DNSPolicy
 		dnsConfig         *v1.PodDNSConfig
 		expectedDNSConfig *runtimeapi.DNSConfig
@@ -690,10 +677,109 @@ func TestGetPodDNSCustom(t *testing.T) {
 				Options:  []string{"ndots:3", "debug"},
 			},
 		},
+		{
+			desc:        "DNSClusterFirst (host network true) fallthrough to DNSDefault (no options in host conf)",
+			hostnetwork: true,
+			dnsPolicy:   v1.DNSClusterFirst,
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testHostNameserver},
+				Searches: []string{testHostDomain},
+			},
+		},
+		{
+			desc:              "DNSClusterFirst (host network true) fallthrough to DNSDefault",
+			hostnetwork:       true,
+			dnsPolicy:         v1.DNSClusterFirst,
+			resolvConfContent: fmt.Sprintf("nameserver %s\nsearch %s\noptions %s", testHostNameserver, testHostDomain, testHostOption),
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testHostNameserver},
+				Searches: []string{testHostDomain},
+				Options:  []string{testHostOption},
+			},
+		},
+		{
+			desc:        "DNSClusterFirst (host network false) (no options in host conf)",
+			hostnetwork: false,
+			dnsPolicy:   v1.DNSClusterFirst,
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testClusterNameserver},
+				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
+				Options:  defaultDNSOptions,
+			},
+		},
+		{
+			desc:              "DNSClusterFirst (host network false)",
+			hostnetwork:       false,
+			dnsPolicy:         v1.DNSClusterFirst,
+			resolvConfContent: fmt.Sprintf("nameserver %s\nsearch %s\noptions %s", testHostNameserver, testHostDomain, testHostOption),
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testClusterNameserver},
+				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
+				Options:  defaultDNSOptions,
+			},
+		},
+		{
+			desc:              "DNSClusterFirstWithHostNet without Pod DNSConfig should get default ndots option if no host options specified",
+			dnsPolicy:         v1.DNSClusterFirstWithHostNet,
+			resolvConfContent: fmt.Sprintf("nameserver %s\nsearch %s", testHostNameserver, testHostDomain),
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testClusterNameserver},
+				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
+				Options:  defaultDNSOptions,
+			},
+		},
+		{
+			desc:              "DNSClusterFirstWithHostNet without Pod DNSConfig should not inherit options from host",
+			hostnetwork:       true,
+			dnsPolicy:         v1.DNSClusterFirstWithHostNet,
+			resolvConfContent: fmt.Sprintf("nameserver %s\nsearch %s\noptions %s", testHostNameserver, testHostDomain, testHostOption),
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testClusterNameserver},
+				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
+				Options:  defaultDNSOptions,
+			},
+		},
+		{
+			desc:              "DNSDefault without Pod DNSConfig should inherit options from host",
+			dnsPolicy:         v1.DNSDefault,
+			resolvConfContent: fmt.Sprintf("nameserver %s\nsearch %s\noptions %s", testHostNameserver, testHostDomain, testHostOption),
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testHostNameserver},
+				Searches: []string{testHostDomain},
+				Options:  []string{testHostOption},
+			},
+		},
+		{
+			desc:              "DNSDefault without Pod DNSConfig, no options specified in host resolv conf",
+			resolvConfContent: fmt.Sprintf("nameserver %s\nsearch %s", testHostNameserver, testHostDomain),
+			dnsPolicy:         v1.DNSDefault,
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testHostNameserver},
+				Searches: []string{testHostDomain},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			resolvConfContent := fmt.Sprintf("nameserver %s\nsearch %s\n", testHostNameserver, testHostDomain)
+			if tc.resolvConfContent != "" {
+				resolvConfContent = tc.resolvConfContent
+			}
+			tmpfile, err := ioutil.TempFile("", "tmpResolvConf")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(tmpfile.Name())
+			if _, err := tmpfile.Write([]byte(resolvConfContent)); err != nil {
+				t.Fatal(err)
+			}
+			if err := tmpfile.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{netutils.ParseIPSloppy(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
+
 			testPod.Spec.HostNetwork = tc.hostnetwork
 			testPod.Spec.DNSConfig = tc.dnsConfig
 			testPod.Spec.DNSPolicy = tc.dnsPolicy
