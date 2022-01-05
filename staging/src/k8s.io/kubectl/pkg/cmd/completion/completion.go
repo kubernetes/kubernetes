@@ -17,6 +17,7 @@ limitations under the License.
 package completion
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -170,7 +171,7 @@ func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command
 }
 
 func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
-	zshHead := "#compdef kubectl\ncompdef _kubectl kubectl\n"
+	zshHead := fmt.Sprintf("#compdef %[1]s\ncompdef _%[1]s %[1]s\n", kubectl.Name())
 	out.Write([]byte(zshHead))
 
 	if len(boilerPlate) == 0 {
