@@ -412,6 +412,76 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	}
 }
 
+func TestPriorityQueue_Activate(t *testing.T) {
+	tests := []struct {
+		name                     string
+		qPodInfoInUnschedulableQ []*framework.QueuedPodInfo
+		qPodInfoInPodBackoffQ    []*framework.QueuedPodInfo
+		qPodInfoInActiveQ        []*framework.QueuedPodInfo
+		qPodInfoToActivate       *framework.QueuedPodInfo
+		want                     []*framework.QueuedPodInfo
+	}{
+		{
+			name:               "pod already in activeQ",
+			qPodInfoInActiveQ:  []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}},
+			qPodInfoToActivate: &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
+			want:               []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}}, // 1 already actived
+		},
+		{
+			name:               "pod not in unschedulableQ/podBackoffQ",
+			qPodInfoToActivate: &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
+			want:               []*framework.QueuedPodInfo{},
+		},
+		{
+			name:                     "pod in unschedulableQ",
+			qPodInfoInUnschedulableQ: []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}},
+			qPodInfoToActivate:       &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
+			want:                     []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}},
+		},
+		{
+			name:                  "pod in backoffQ",
+			qPodInfoInPodBackoffQ: []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}},
+			qPodInfoToActivate:    &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
+			want:                  []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var objs []runtime.Object
+			q := NewTestQueueWithObjects(context.Background(), newDefaultQueueSort(), objs)
+
+			// Prepare activeQ/unschedulableQ/podBackoffQ according to the table
+			for _, qPodInfo := range tt.qPodInfoInActiveQ {
+				q.activeQ.Add(qPodInfo)
+			}
+
+			for _, qPodInfo := range tt.qPodInfoInUnschedulableQ {
+				q.unschedulableQ.addOrUpdate(qPodInfo)
+			}
+
+			for _, qPodInfo := range tt.qPodInfoInPodBackoffQ {
+				q.podBackoffQ.Add(qPodInfo)
+			}
+
+			// Activate specific pod according to the table
+			q.Activate(map[string]*v1.Pod{"test_pod": tt.qPodInfoToActivate.PodInfo.Pod})
+
+			// Check the result after activation by the length of activeQ
+			if wantLen := len(tt.want); q.activeQ.Len() != wantLen {
+				t.Errorf("length compare: want %v, got %v", wantLen, q.activeQ.Len())
+			}
+
+			// Check if the specific pod exists in activeQ
+			for _, want := range tt.want {
+				if _, exist, _ := q.activeQ.Get(newQueuedPodInfoForLookup(want.PodInfo.Pod)); !exist {
+					t.Errorf("podInfo not exist in activeQ: want %v", want.PodInfo.Pod.Name)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 	tests := []struct {
 		name      string
