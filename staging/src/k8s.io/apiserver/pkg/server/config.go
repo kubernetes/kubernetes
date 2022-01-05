@@ -348,14 +348,14 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		ShutdownDelayDuration:       time.Duration(0),
 		// 1.5MB is the default client request size in bytes
 		// the etcd server should accept. See
-		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
+		// https://github.com/etcd-io/etcd/blob/release-3.5/server/embed/config.go#L57.
 		// A request body might be encoded in json, and is converted to
 		// proto when persisted in etcd, so we allow 2x as the largest size
 		// increase the "copy" operations in a json patch may cause.
 		JSONPatchMaxCopyBytes: int64(3 * 1024 * 1024),
 		// 1.5MB is the recommended client request size in byte
 		// the etcd server should accept. See
-		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
+		// https://github.com/etcd-io/etcd/blob/release-3.5/server/embed/config.go#L57.
 		// A request body might be encoded in json, and is converted to
 		// proto when persisted in etcd, so we allow 2x as the largest request
 		// body size to be accepted and decoded in a write request.

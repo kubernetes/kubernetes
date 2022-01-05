@@ -134,7 +134,7 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 	}, nil
 }
 
-// ClientCertAuthenticationOptions provides different options for client cert auth. You should use `GetClientVerifyOptionFn` to
+// ClientCertAuthenticationOptions provides different options for client cert auth. You should use `GetClientCAContentProvider` to
 // get the verify options for your authenticator.
 type ClientCertAuthenticationOptions struct {
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
@@ -146,7 +146,7 @@ type ClientCertAuthenticationOptions struct {
 	CAContentProvider dynamiccertificates.CAContentProvider
 }
 
-// GetClientVerifyOptionFn provides verify options for your authenticator while respecting the preferred order of verifiers.
+// GetClientCAContentProvider provides verify options for your authenticator while respecting the preferred order of verifiers.
 func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider() (dynamiccertificates.CAContentProvider, error) {
 	if s.CAContentProvider != nil {
 		return s.CAContentProvider, nil

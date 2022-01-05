@@ -341,7 +341,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 	return config, serviceResolver, pluginInitializers, nil
 }
 
-// BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
+// buildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
 func buildGenericConfig(
 	s *options.ServerRunOptions,
 	proxyTransport *http.Transport,
