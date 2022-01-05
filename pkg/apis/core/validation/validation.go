@@ -3236,9 +3236,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 		}
 		for i, search := range dnsConfig.Searches {
 			// it is fine to have a trailing dot
-			if strings.HasSuffix(search, ".") {
-				search = search[0 : len(search)-1]
-			}
+			search = strings.TrimSuffix(search, ".")
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
@@ -6380,7 +6378,7 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path,
 		}
 
 		// At present Windows Pods which contain HostProcess containers must also set HostNetwork.
-		if hostNetwork != true {
+		if !hostNetwork {
 			errMsg := "hostNetwork must be true if pod contains any hostProcess containers"
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("hostNetwork"), hostNetwork, errMsg))
 		}
