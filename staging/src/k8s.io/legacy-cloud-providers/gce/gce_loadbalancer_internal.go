@@ -654,8 +654,10 @@ func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
 
 	klog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
 	for _, z := range zones {
-		if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
-			return err
+		if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetLBRbs) {
+			if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
+				return err
+			}
 		}
 	}
 	return nil

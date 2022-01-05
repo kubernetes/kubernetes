@@ -553,6 +553,30 @@ func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
 }
 
+func TestSkipInstanceGroupDeletion(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	assert.NoError(t, err)
+
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureNetLBRbs})
+	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
+	assert.NoError(t, err)
+
+	igName := makeInstanceGroupName(vals.ClusterID)
+	ig, err := gce.GetInstanceGroup(igName, vals.ZoneName)
+	assert.NoError(t, err)
+	assert.NotNil(t, ig, "Instance group should not be deleted when flag 'NetLB_RBS' is present")
+}
+
 func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
 	t.Parallel()
 
