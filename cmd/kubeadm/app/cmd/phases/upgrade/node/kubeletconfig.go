@@ -102,8 +102,8 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		//
 		// TODO: this workaround can be removed in 1.25 once all user node sockets have a URL scheme:
 		// https://github.com/kubernetes/kubeadm/issues/2426
-		var nro *kubeadmapi.NodeRegistrationOptions
 		var missingURLScheme bool
+		nro := &kubeadmapi.NodeRegistrationOptions{}
 		if !dryRun {
 			if err := configutil.GetNodeRegistration(data.KubeConfigPath(), data.Client(), nro); err != nil {
 				return errors.Wrap(err, "could not retrieve the node registration options for this node")
