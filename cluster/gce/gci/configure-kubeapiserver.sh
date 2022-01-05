@@ -141,7 +141,7 @@ function start-kube-apiserver {
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
   params+=" --service-account-issuer=${SERVICEACCOUNT_ISSUER}"
-  params+=" --service-account-api-audiences=${SERVICEACCOUNT_ISSUER}"
+  params+=" --api-audiences=${SERVICEACCOUNT_ISSUER}"
   params+=" --service-account-signing-key-file=${SERVICEACCOUNT_KEY_PATH}"
 
   local audit_policy_config_mount=""
