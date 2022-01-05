@@ -140,7 +140,7 @@ func TestControllerSync(t *testing.T) {
 			// delete the corresponding volume from apiserver, and report latency metric
 			"5-5 - delete claim and delete volume report metric",
 			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
-				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
+				newVolumeArray("volume5-5", "10Gi", "uid5-5", "claim5-5", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
 			novolumes,
 			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
@@ -225,6 +225,18 @@ func TestControllerSync(t *testing.T) {
 				if err != nil {
 					return err
 				}
+
+				// Wait for the PVC to get fully processed. This avoids races between PV controller and DeleteClaimEvent
+				// below.
+				err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+					obj := ctrl.claims.List()[0]
+					claim := obj.(*v1.PersistentVolumeClaim)
+					return claim.Status.Phase == v1.ClaimLost, nil
+				})
+				if err != nil {
+					return err
+				}
+
 				// trying to remove the claim as well
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
@@ -324,6 +336,8 @@ func TestControllerSync(t *testing.T) {
 		fakeClaimWatch := watch.NewFake()
 		client.PrependWatchReactor("persistentvolumeclaims", core.DefaultWatchReactor(fakeClaimWatch, nil))
 		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
+		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFake(), nil))
+		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		ctrl, err := newTestController(client, informers, true)
