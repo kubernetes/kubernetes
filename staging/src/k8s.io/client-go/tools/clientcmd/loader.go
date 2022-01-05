@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/imdario/mergo"
+	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -413,51 +415,58 @@ func Load(data []byte) (*clientcmdapi.Config, error) {
 	return decoded.(*clientcmdapi.Config), nil
 }
 
-// WriteToFile serializes the config to yaml and writes it out to a file.  If not present, it creates the file with the mode 0600.  If it is present
-// it stomps the contents
-func WriteToFile(config clientcmdapi.Config, filename string) error {
+// WriteTo serializes the config to yaml and writes it out to `io.Writer`.
+func WriteTo(config clientcmdapi.Config, w io.Writer) error {
 	content, err := Write(config)
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(filename)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
-			return err
-		}
-	}
 
-	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
-		return err
-	}
-	return nil
+	_, err = w.Write(content)
+	return err
 }
 
-func lockFile(filename string) error {
-	// TODO: find a way to do this with actual file locks. Will
-	// probably need separate solution for windows and Linux.
-
-	// Make sure the dir exists before we try to create a lock file.
+// WriteToFile serializes the config to yaml and writes it out to a file.  If not present, it creates the file with the mode 0600.  If it is present
+// it stomps the contents
+func WriteToFile(config clientcmdapi.Config, filename string) error {
 	dir := filepath.Dir(filename)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err = os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
 	}
-	f, err := os.OpenFile(lockName(filename), os.O_CREATE|os.O_EXCL, 0)
+
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	f.Close()
-	return nil
+	defer f.Close()
+
+	return WriteTo(config, f)
 }
 
-func unlockFile(filename string) error {
-	return os.Remove(lockName(filename))
+// WriteToFileWithLock serializes the config to yaml and writes it out to a file with a platform-specific exclusive lock to prevent concurrent
+// write operations from multiple kubectl processes.
+func WriteToFileWithLock(config clientcmdapi.Config, filename string) error {
+	dir := filepath.Dir(filename)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	f, err := lockFile(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return WriteTo(config, f)
 }
 
-func lockName(filename string) string {
-	return filename + ".lock"
+// lockFile uses a platform-specific exclusive lock to prevent concurrent write operations from multiple kubectl processes.
+func lockFile(filename string) (io.WriteCloser, error) {
+	return fileutil.TryLockFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 }
 
 // Write serializes the config to yaml.

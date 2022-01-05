@@ -22,7 +22,6 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
-	"sort"
 
 	"k8s.io/klog/v2"
 
@@ -164,19 +163,6 @@ func NewDefaultPathOptions() *PathOptions {
 // that means that this code will only write into a single file.  If you want to relativizePaths, you must provide a fully qualified path in any
 // modified element.
 func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
-	if UseModifyConfigLock {
-		possibleSources := configAccess.GetLoadingPrecedence()
-		// sort the possible kubeconfig files so we always "lock" in the same order
-		// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
-		sort.Strings(possibleSources)
-		for _, filename := range possibleSources {
-			if err := lockFile(filename); err != nil {
-				return err
-			}
-			defer unlockFile(filename)
-		}
-	}
-
 	startingConfig, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
@@ -224,8 +210,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				}
 			}
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
-				return err
+			if UseModifyConfigLock {
+				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+					return err
+				}
+			} else {
+				if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -261,8 +253,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 
 	// actually persist config object changes
 	for destinationFile, configToWrite := range seenConfigs {
-		if err := WriteToFile(*configToWrite, destinationFile); err != nil {
-			return err
+		if UseModifyConfigLock {
+			if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+				return err
+			}
+		} else {
+			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -287,8 +285,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				}
 			}
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
-				return err
+			if UseModifyConfigLock {
+				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+					return err
+				}
+			} else {
+				if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -306,8 +310,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 			delete(configToWrite.Clusters, key)
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
-				return err
+			if UseModifyConfigLock {
+				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+					return err
+				}
+			} else {
+				if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -325,8 +335,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 			delete(configToWrite.Contexts, key)
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
-				return err
+			if UseModifyConfigLock {
+				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+					return err
+				}
+			} else {
+				if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -344,8 +360,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 			delete(configToWrite.AuthInfos, key)
 
-			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
-				return err
+			if UseModifyConfigLock {
+				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+					return err
+				}
+			} else {
+				if err := WriteToFile(*configToWrite, destinationFile); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -393,8 +415,14 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			return err
 		}
 		currConfig.CurrentContext = newCurrentContext
-		if err := WriteToFile(*currConfig, file); err != nil {
-			return err
+		if UseModifyConfigLock {
+			if err := WriteToFileWithLock(*currConfig, file); err != nil {
+				return err
+			}
+		} else {
+			if err := WriteToFile(*currConfig, file); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -408,8 +436,14 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 		}
 		config.CurrentContext = newCurrentContext
 
-		if err := WriteToFile(*config, destinationFile); err != nil {
-			return err
+		if UseModifyConfigLock {
+			if err := WriteToFileWithLock(*config, destinationFile); err != nil {
+				return err
+			}
+		} else {
+			if err := WriteToFile(*config, destinationFile); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -425,8 +459,14 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 
 			if len(currConfig.CurrentContext) > 0 {
 				currConfig.CurrentContext = newCurrentContext
-				if err := WriteToFile(*currConfig, file); err != nil {
-					return err
+				if UseModifyConfigLock {
+					if err := WriteToFileWithLock(*currConfig, file); err != nil {
+						return err
+					}
+				} else {
+					if err := WriteToFile(*currConfig, file); err != nil {
+						return err
+					}
 				}
 
 				return nil
@@ -451,8 +491,14 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 			return err
 		}
 		currConfig.Preferences = newPrefs
-		if err := WriteToFile(*currConfig, file); err != nil {
-			return err
+		if UseModifyConfigLock {
+			if err := WriteToFileWithLock(*currConfig, file); err != nil {
+				return err
+			}
+		} else {
+			if err := WriteToFile(*currConfig, file); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -466,8 +512,14 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
 			currConfig.Preferences = newPrefs
-			if err := WriteToFile(*currConfig, file); err != nil {
-				return err
+			if UseModifyConfigLock {
+				if err := WriteToFileWithLock(*currConfig, file); err != nil {
+					return err
+				}
+			} else {
+				if err := WriteToFile(*currConfig, file); err != nil {
+					return err
+				}
 			}
 
 			return nil

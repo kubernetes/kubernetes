@@ -639,19 +639,50 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 }
 
 func TestFileLocking(t *testing.T) {
-	f, _ := ioutil.TempFile("", "")
-	defer os.Remove(f.Name())
+	destinationFile, _ := ioutil.TempFile("", "")
+	destinationFile.Close()
+	defer os.Remove(destinationFile.Name())
 
-	err := lockFile(f.Name())
+	lock, err := lockFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error while locking file: %v", err)
 	}
-	defer unlockFile(f.Name())
+	defer lock.Close()
 
-	err = lockFile(f.Name())
+	_, err = lockFile(destinationFile.Name())
 	if err == nil {
 		t.Error("expected error while locking file.")
 	}
+}
+
+func TestFileLockingWithWriting(t *testing.T) {
+	destinationFile, _ := ioutil.TempFile("", "")
+	destinationFile.Close()
+	defer os.Remove(destinationFile.Name())
+
+	err := WriteToFileWithLock(testConfigAlfa, destinationFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error while locking file: %v", err)
+	}
+
+	b, err := ioutil.ReadFile(destinationFile.Name())
+	if err != nil {
+		t.Errorf("unable to read file after writing: %v", err)
+	}
+	if len(b) < 10 {
+		t.Errorf("expected config, got: %s", string(b))
+	}
+
+	lock, err := lockFile(destinationFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error while locking file: %v", err)
+	}
+
+	err = WriteToFileWithLock(testConfigAlfa, destinationFile.Name())
+	if err == nil {
+		t.Error("expected error while locking file.")
+	}
+	lock.Close()
 }
 
 func Example_noMergingOnExplicitPaths() {
