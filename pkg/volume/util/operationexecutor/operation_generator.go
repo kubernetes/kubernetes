@@ -513,9 +513,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}
 
 	mountVolumeFunc := func() volumetypes.OperationContext {
-		// Get mounter plugin
-		volumePlugin, err := og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
-
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
 
 		if err != nil {
