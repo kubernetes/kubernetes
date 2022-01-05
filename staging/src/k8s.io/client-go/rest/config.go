@@ -44,9 +44,11 @@ import (
 const (
 	DefaultQPS   float32 = 5.0
 	DefaultBurst int     = 10
+
+	DefaultNamespace string = "default"
 )
 
-var ErrNotInCluster = errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined, and service account file must exist")
+var ErrNotInCluster = errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
@@ -518,14 +520,6 @@ func InClusterConfig() (*Config, error) {
 	if len(host) == 0 || len(port) == 0 {
 		return nil, ErrNotInCluster
 	}
-	// check whether tokenFile exists
-	if _, err := os.Stat(tokenFile); os.IsNotExist(err) {
-		return nil, ErrNotInCluster
-	}
-	// check whether rootCAFile exists
-	if _, err := os.Stat(rootCAFile); os.IsNotExist(err) {
-		return nil, ErrNotInCluster
-	}
 
 	token, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
@@ -549,8 +543,10 @@ func InClusterConfig() (*Config, error) {
 	}, nil
 }
 
-// InClusterNamespace return the default namespace to be used
-// for namespaced API operations in the pod
+// InClusterNamespace return the default namespace to be used for namespaced API operations in the pod.
+// The `default` namespace will be returned if some error happens. It will return ErrNotInCluster
+// if called from a process not running in a kubernetes pod. The `default` namespace will also be returned
+// if the namespace read from service account namespace file is empty.
 func InClusterNamespace() (string, error) {
 	// This way assumes you've set the POD_NAMESPACE environment variable using the downward API.
 	// This check has to be done first for backwards compatibility with the way InClusterConfig was originally set up
@@ -560,14 +556,18 @@ func InClusterNamespace() (string, error) {
 	//return the namespace associated with the service account of the pod, if available
 	nsFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 	if _, err := os.Stat(nsFile); os.IsNotExist(err) {
-		return "", ErrNotInCluster
+		return DefaultNamespace, ErrNotInCluster
 	}
 	data, err := ioutil.ReadFile(nsFile)
 	if err != nil {
-		klog.Errorf("Expected to get namespace from %s, but got err: %v", nsFile, err)
-		return "", err
+		return DefaultNamespace, err
 	}
-	return strings.TrimSpace(string(data)), nil
+	ns := strings.TrimSpace(string(data))
+	// for compatibility, return default if the namespace is empty
+	if len(ns) == 0 {
+		ns = DefaultNamespace
+	}
+	return ns, nil
 }
 
 // IsConfigTransportTLS returns true if and only if the provided
