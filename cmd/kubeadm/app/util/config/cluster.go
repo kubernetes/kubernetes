@@ -183,8 +183,8 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 		return "", errors.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
 	}
 
-	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
-	// TODO: Support multiple certs here in order to be able to rotate certs
+	// Safely pick the first one because the sender's certificate must come first in the list.
+	// For details, see: https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
 	cert := certs[0]
 
 	// gets the node name from the certificate common name
