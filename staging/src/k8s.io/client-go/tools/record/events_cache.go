@@ -36,8 +36,9 @@ import (
 const (
 	maxLruCacheEntries = 4096
 
-	// if we see the same event that varies only by message
-	// more than 10 times in a 10 minute period, aggregate the event
+	// if we see the same event that varies only by message more than 10 times,
+	// and the maximum interval between any two adjacent events is below 10 minutes,
+	// then we aggregate the event
 	defaultAggregateMaxEvents         = 10
 	defaultAggregateIntervalInSeconds = 600
 
@@ -427,11 +428,11 @@ type EventCorrelateResult struct {
 // prior to interacting with the API server to record the event.
 //
 // The default behavior is as follows:
-//   * Aggregation is performed if a similar event is recorded 10 times
-//     in a 10 minute rolling interval.  A similar event is an event that varies only by
-//     the Event.Message field.  Rather than recording the precise event, aggregation
-//     will create a new event whose message reports that it has combined events with
-//     the same reason.
+//   * Aggregation is performed if a similar event is recorded more than 10 times,
+//     and the maximum interval between any two adjacent events is below 10 minutes.
+//     A similar event is an event that varies only by the Event.Message field.
+//     Rather than recording the precise event, aggregation will create a new event
+//     whose message reports that it has combined events with the same reason.
 //   * Events are incrementally counted if the exact same event is encountered multiple
 //     times.
 //   * A source may burst 25 events about an object, but has a refill rate budget
