@@ -25,13 +25,13 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-var _ = SIGDescribe("Docker Containers", func() {
+var _ = SIGDescribe("Containers", func() {
 	f := framework.NewDefaultFramework("containers")
 
 	/*
 		Release: v1.9
-		Testname: Docker containers, without command and arguments
-		Description: Default command and arguments from the docker image entrypoint MUST be used when Pod does not specify the container command
+		Testname: Containers, without command and arguments
+		Description: Default command and arguments from the container image entrypoint MUST be used when Pod does not specify the container command
 	*/
 	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name)
@@ -50,24 +50,24 @@ var _ = SIGDescribe("Docker Containers", func() {
 
 	/*
 		Release: v1.9
-		Testname: Docker containers, with arguments
-		Description: Default command and  from the docker image entrypoint MUST be used when Pod does not specify the container command but the arguments from Pod spec MUST override when specified.
+		Testname: Containers, with arguments
+		Description: Default command and  from the container image entrypoint MUST be used when Pod does not specify the container command but the arguments from Pod spec MUST override when specified.
 	*/
-	framework.ConformanceIt("should be able to override the image's default arguments (docker cmd) [NodeConformance]", func() {
+	framework.ConformanceIt("should be able to override the image's default arguments (container cmd) [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
 		f.TestContainerOutput("override arguments", pod, 0, []string{
 			"[/agnhost entrypoint-tester override arguments]",
 		})
 	})
 
-	// Note: when you override the entrypoint, the image's arguments (docker cmd)
+	// Note: when you override the entrypoint, the image's arguments (container cmd)
 	// are ignored.
 	/*
 		Release: v1.9
-		Testname: Docker containers, with command
-		Description: Default command from the docker image entrypoint MUST NOT be used when Pod specifies the container command.  Command from Pod spec MUST override the command in the image.
+		Testname: Containers, with command
+		Description: Default command from the container image entrypoint MUST NOT be used when Pod specifies the container command.  Command from Pod spec MUST override the command in the image.
 	*/
-	framework.ConformanceIt("should be able to override the image's default command (docker entrypoint) [NodeConformance]", func() {
+	framework.ConformanceIt("should be able to override the image's default command (container entrypoint) [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
@@ -78,8 +78,8 @@ var _ = SIGDescribe("Docker Containers", func() {
 
 	/*
 		Release: v1.9
-		Testname: Docker containers, with command and arguments
-		Description: Default command and arguments from the docker image entrypoint MUST NOT be used when Pod specifies the container command and arguments.  Command and arguments from Pod spec MUST override the command and arguments in the image.
+		Testname: Containers, with command and arguments
+		Description: Default command and arguments from the container image entrypoint MUST NOT be used when Pod specifies the container command and arguments.  Command and arguments from Pod spec MUST override the command and arguments in the image.
 	*/
 	framework.ConformanceIt("should be able to override the image's default command and arguments [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")

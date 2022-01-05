@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/user"
 	"sync"
 	"time"
@@ -117,21 +116,6 @@ type puller interface {
 	Name() string
 }
 
-type dockerPuller struct {
-}
-
-func (dp *dockerPuller) Name() string {
-	return "docker"
-}
-
-func (dp *dockerPuller) Pull(image string) ([]byte, error) {
-	// TODO(random-liu): Use docker client to get rid of docker binary dependency.
-	if exec.Command("docker", "inspect", "--type=image", image).Run() != nil {
-		return exec.Command("docker", "pull", image).CombinedOutput()
-	}
-	return nil, nil
-}
-
 type remotePuller struct {
 	imageService internalapi.ImageManagerService
 }
@@ -150,20 +134,13 @@ func (rp *remotePuller) Pull(image string) ([]byte, error) {
 }
 
 func getPuller() (puller, error) {
-	runtime := framework.TestContext.ContainerRuntime
-	switch runtime {
-	case "docker":
-		return &dockerPuller{}, nil
-	case "remote":
-		_, is, err := getCRIClient()
-		if err != nil {
-			return nil, err
-		}
-		return &remotePuller{
-			imageService: is,
-		}, nil
+	_, is, err := getCRIClient()
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("can't prepull images, unknown container runtime %q", runtime)
+	return &remotePuller{
+		imageService: is,
+	}, nil
 }
 
 // PrePullAllImages pre-fetches all images tests depend on so that we don't fail in an actual test.
