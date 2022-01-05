@@ -82,10 +82,8 @@ func (rw *pkiCertificateReadWriter) Read() (*x509.Certificate, error) {
 		return nil, errors.Wrapf(err, "failed to load existing certificate %s", rw.baseName)
 	}
 
-	if len(certs) != 1 {
-		return nil, errors.Errorf("wanted exactly one certificate, got %d", len(certs))
-	}
-
+	// Safely pick the first one because the sender's certificate must come first in the list.
+	// For details, see: https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
 	return certs[0], nil
 }
 
@@ -145,9 +143,9 @@ func (rw *kubeConfigReadWriter) Read() (*x509.Certificate, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load existing certificate %s", rw.baseName)
 	}
-	if len(caCerts) != 1 {
-		return nil, errors.Errorf("wanted exactly one certificate, got %d", len(caCerts))
-	}
+
+	// Safely pick the first one because the sender's certificate must come first in the list.
+	// For details, see: https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
 	rw.caCert = caCerts[0]
 
 	// get current context

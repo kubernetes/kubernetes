@@ -289,8 +289,8 @@ func TryLoadCertFromDisk(pkiPath, name string) (*x509.Certificate, error) {
 		return nil, errors.Wrapf(err, "couldn't load the certificate file %s", certificatePath)
 	}
 
-	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
-	// TODO: Support multiple certs here in order to be able to rotate certs
+	// Safely pick the first one because the sender's certificate must come first in the list.
+	// For details, see: https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
 	cert := certs[0]
 
 	return cert, nil
