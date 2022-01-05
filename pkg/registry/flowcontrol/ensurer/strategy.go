@@ -219,19 +219,27 @@ func ensureConfiguration(wrapper configurationWrapper, strategy ensureStrategy, 
 	name := bootstrap.GetName()
 	configurationType := strategy.Name()
 
-	current, err := wrapper.Get(bootstrap.GetName())
-	if err != nil {
+	var current configurationObject
+	var err error
+	for {
+		current, err = wrapper.Get(bootstrap.GetName())
+		if err == nil {
+			break
+		}
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 		}
 
 		// we always re-create a missing configuration object
-		if _, err := wrapper.Create(bootstrap); err != nil {
-			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+		if _, err = wrapper.Create(bootstrap); err == nil {
+			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", wrapper.TypeName()), "type", configurationType, "name", name)
+			return nil
 		}
 
-		klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", wrapper.TypeName()), "type", configurationType, "name", name)
-		return nil
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+		}
+		klog.V(5).InfoS(fmt.Sprintf("Something created the %s concurrently", wrapper.TypeName()), "type", configurationType, "name", name)
 	}
 
 	klog.V(5).InfoS(fmt.Sprintf("The %s already exists, checking whether it is up to date", wrapper.TypeName()), "type", configurationType, "name", name)
@@ -247,12 +255,17 @@ func ensureConfiguration(wrapper configurationWrapper, strategy ensureStrategy, 
 		return nil
 	}
 
-	if _, err := wrapper.Update(newObject); err != nil {
-		return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+	if _, err = wrapper.Update(newObject); err == nil {
+		klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", wrapper.TypeName(), configurationType, name, cmp.Diff(current, newObject))
+		return nil
 	}
 
-	klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", wrapper.TypeName(), configurationType, name, cmp.Diff(current, newObject))
-	return nil
+	if apierrors.IsConflict(err) {
+		klog.V(2).InfoS(fmt.Sprintf("Something updated the %s concurrently, I will check its spec later", wrapper.TypeName()), "type", configurationType, "name", name)
+		return nil
+	}
+
+	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 }
 
 func removeConfiguration(wrapper configurationWrapper, name string) error {
@@ -281,6 +294,7 @@ func removeConfiguration(wrapper configurationWrapper, name string) error {
 
 	if err := wrapper.Delete(name); err != nil {
 		if apierrors.IsNotFound(err) {
+			klog.V(5).InfoS(fmt.Sprintf("Something concurrently deleted the %s", wrapper.TypeName()), "name", name)
 			return nil
 		}
 
