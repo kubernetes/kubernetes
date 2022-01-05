@@ -275,6 +275,10 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 		mounts = append(mounts, *hostsMount)
 	}
+
+	if err := writePodInfo(pod, podDir); err != nil {
+		klog.V(3).Infof("write podInfo fails: %s, skip.", err)
+	}
 	return mounts, cleanupAction, nil
 }
 
@@ -307,6 +311,21 @@ func getEtcHostsPath(podDir string) string {
 	hostsFilePath := path.Join(podDir, "etc-hosts")
 	// Volume Mounts fail on Windows if it is not of the form C:/
 	return volumeutil.MakeAbsolutePath(runtime.GOOS, hostsFilePath)
+}
+
+// getPodInfoPath returns the path of the file that writes the pod basic informations.
+func getPodInfoPath(podDir string) string {
+	podInfoPath := path.Join(podDir, "podinfo")
+	return volumeutil.MakeAbsolutePath(runtime.GOOS, podInfoPath)
+}
+
+func writePodInfo(pod *v1.Pod, podDir string) error {
+	fileName := getPodInfoPath(podDir)
+	var buffer bytes.Buffer
+	podname := pod.ObjectMeta.Name
+	namespace := pod.ObjectMeta.Namespace
+	buffer.WriteString(fmt.Sprintf("%s\n%s\n", podname, namespace))
+	return ioutil.WriteFile(fileName, buffer.Bytes(), 0644)
 }
 
 // makeHostsMount makes the mountpoint for the hosts file that the containers
