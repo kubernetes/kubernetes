@@ -121,3 +121,68 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 }
+
+// Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy tests that converting a Service to Type=ExternalName
+// results in the internalTrafficPolicy field being dropped.This test exists due to historic reasons where the internalTrafficPolicy
+// field was being defaulted in older versions. New versions stop defauting the field and drop on read, but for compatibility reasons
+// we still accept the field.
+func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if *service.Spec.InternalTrafficPolicy != corev1.ServiceInternalTrafficPolicyCluster {
+		t.Error("service internalTrafficPolicy was not set for clusterIP Service")
+	}
+
+	newService := service.DeepCopy()
+	newService.Spec.Type = corev1.ServiceTypeExternalName
+	newService.Spec.ExternalName = "foo.bar.com"
+
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), newService, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("error getting service: %v", err)
+	}
+
+	if service.Spec.InternalTrafficPolicy != nil {
+		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting service: %v", err)
+	}
+
+	if service.Spec.InternalTrafficPolicy != nil {
+		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
+	}
+}
