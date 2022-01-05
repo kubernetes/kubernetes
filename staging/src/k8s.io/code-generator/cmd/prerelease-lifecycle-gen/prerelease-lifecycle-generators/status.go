@@ -23,11 +23,11 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/examples/set-gen/sets"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2/examples/set-gen/sets"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/klog/v2"
 )
@@ -260,6 +260,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
 					PackagePath: path,
 					HeaderText:  header,
+					Source:      pkg.SourcePath,
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
 							NewPrereleaseLifecycleGen(arguments.OutputFileBaseName, pkg.Path),
