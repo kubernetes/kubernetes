@@ -223,7 +223,7 @@ type HostInterface interface {
 	GetVersionInfo() (*cadvisorapi.VersionInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetRunningPods() ([]*v1.Pod, error)
-	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
+	RunInContainer(name string, uid types.UID, container string, cmd []string, timeout time.Duration) ([]byte, error)
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	ResyncInterval() time.Duration
@@ -827,7 +827,23 @@ func (s *Server) getRun(request *restful.Request, response *restful.Response) {
 
 	// For legacy reasons, run uses different query param than exec.
 	params.cmd = strings.Split(request.QueryParameter("cmd"), " ")
-	data, err := s.host.RunInContainer(kubecontainer.GetPodFullName(pod), params.podUID, params.containerName, params.cmd)
+
+	var timeout time.Duration
+	t := request.QueryParameter("timeoutSeconds")
+	if t == "" {
+		// if `timeout` is not found in query parameters, then set timeout to 0
+		// which means that there is no timeout limit
+		timeout = 0
+	} else {
+		i, err := strconv.Atoi(t)
+		if err != nil {
+			response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "timeout is invalid: %v"}`, err))
+			return
+		}
+		timeout = time.Duration(i) * time.Second
+	}
+
+	data, err := s.host.RunInContainer(kubecontainer.GetPodFullName(pod), params.podUID, params.containerName, params.cmd, timeout)
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
