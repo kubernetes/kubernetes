@@ -25,7 +25,6 @@ import (
 	"time"
 
 	api "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,11 +64,11 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 		client = fakeclient.NewSimpleClientset()
 	}
 
-	client.Tracker().Add(&v1.Node{
+	client.Tracker().Add(&api.Node{
 		ObjectMeta: meta.ObjectMeta{
 			Name: "fakeNode",
 		},
-		Spec: v1.NodeSpec{},
+		Spec: api.NodeSpec{},
 	})
 
 	// Start informer for CSIDrivers.
@@ -1094,11 +1093,11 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 
 			client := fakeclient.NewSimpleClientset(
 				getTestCSIDriver(test.driverName, nil, &test.canAttach, nil),
-				&v1.Node{
+				&api.Node{
 					ObjectMeta: meta.ObjectMeta{
 						Name: "fakeNode",
 					},
-					Spec: v1.NodeSpec{},
+					Spec: api.NodeSpec{},
 				},
 			)
 			factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
@@ -1221,11 +1220,11 @@ func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 
 			client := fakeclient.NewSimpleClientset(
-				&v1.Node{
+				&api.Node{
 					ObjectMeta: meta.ObjectMeta{
 						Name: "fakeNode",
 					},
-					Spec: v1.NodeSpec{},
+					Spec: api.NodeSpec{},
 				},
 			)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, tmpDir, client, ProbeVolumePlugins(), "fakeNode", nil, nil)
