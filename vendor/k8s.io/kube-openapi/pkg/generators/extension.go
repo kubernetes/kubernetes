@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/examples/set-gen/sets"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/examples/set-gen/sets"
+	"k8s.io/gengo/v2/types"
 )
 
 const extensionPrefix = "x-kubernetes-"
