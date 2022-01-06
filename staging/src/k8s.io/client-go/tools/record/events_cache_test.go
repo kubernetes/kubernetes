@@ -192,13 +192,25 @@ func TestEventCorrelator(t *testing.T) {
 			previousEvents:  makeEvents(defaultAggregateMaxEvents, duplicateEvent),
 			newEvent:        duplicateEvent,
 			expectedEvent:   setCount(duplicateEvent, defaultAggregateMaxEvents+1),
-			intervalSeconds: 30, // larger interval induces aggregation but not spam.
+			intervalSeconds: 5,
 		},
 		"the-same-event-is-spam-if-happens-too-frequently": {
-			previousEvents:  makeEvents(defaultSpamBurst+1, duplicateEvent),
+			previousEvents:  makeEvents(defaultSpamBurst, duplicateEvent),
 			newEvent:        duplicateEvent,
 			expectedSkip:    true,
-			intervalSeconds: 1,
+			intervalSeconds: 5,
+		},
+		"the-same-event-is-not-spam-if-happens-less-than-defaultSpamBurst": {
+			previousEvents:  makeEvents(defaultSpamBurst-1, duplicateEvent),
+			newEvent:        duplicateEvent,
+			expectedEvent:   setCount(duplicateEvent, defaultSpamBurst),
+			intervalSeconds: 5,
+		},
+		"the-same-event-is-not-spam-if-happens-less-than-defaultSpamQPS": {
+			previousEvents:  makeEvents(defaultSpamBurst, duplicateEvent),
+			newEvent:        duplicateEvent,
+			expectedEvent:   setCount(duplicateEvent, defaultSpamBurst+1),
+			intervalSeconds: 301, // defaultSpamQPS   = 1. / 300.
 		},
 		"create-many-unique-events": {
 			previousEvents:  makeUniqueEvents(30),
@@ -228,14 +240,26 @@ func TestEventCorrelator(t *testing.T) {
 			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents-1, similarEvent, similarEvent.Message),
 			newEvent:        similarEvent,
 			expectedEvent:   setCount(similarEvent, 1),
-			intervalSeconds: defaultAggregateIntervalInSeconds,
+			intervalSeconds: defaultAggregateIntervalInSeconds + 1,
+		},
+		"similar-events-whose-interval-is-defaultAggregateIntervalInSecondsMinusOneSecond-aggregate-event": {
+			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents-1, similarEvent, similarEvent.Message),
+			newEvent:        similarEvent,
+			expectedEvent:   setCount(aggregateEvent, 1),
+			intervalSeconds: defaultAggregateIntervalInSeconds - 1,
+		},
+		"similar-events-whose-interval-is-defaultAggregateIntervalInSecondsMinusOneSecond-should-count-the-aggregate": {
+			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents, similarEvent, similarEvent.Message),
+			newEvent:        similarEvent,
+			expectedEvent:   setCount(aggregateEvent, 2),
+			intervalSeconds: defaultAggregateIntervalInSeconds - 1,
 		},
 	}
 
 	for testScenario, testInput := range scenario {
 		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
-		clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
-		correlator := NewEventCorrelator(&clock)
+		clock := testclocks.NewFakePassiveClock(time.Now())
+		correlator := NewEventCorrelator(clock)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
 			now := metav1.NewTime(clock.Now())
@@ -249,6 +273,7 @@ func TestEventCorrelator(t *testing.T) {
 			if !result.Skip {
 				correlator.UpdateState(result.Event)
 			}
+			clock.SetTime(clock.Now().Add(eventInterval))
 		}
 
 		// update the input to current clock value
@@ -322,9 +347,9 @@ func TestEventSpamFilter(t *testing.T) {
 	}
 
 	for testDescription, testInput := range testCases {
-		c := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
+		clock := testclocks.NewFakePassiveClock(time.Now())
 		correlator := NewEventCorrelatorWithOptions(CorrelatorOptions{
-			Clock:       &c,
+			Clock:       clock,
 			SpamKeyFunc: testInput.spamKeyFunc,
 			BurstSize:   burstSize,
 		})
@@ -338,6 +363,7 @@ func TestEventSpamFilter(t *testing.T) {
 			correlator.UpdateState(result.Event)
 		}
 
+		clock.SetTime(clock.Now().Add(eventInterval))
 		result, err = correlator.EventCorrelate(&testInput.newEvent)
 		if err != nil {
 			t.Errorf("scenario %v: unexpected error correlating input event %v", testDescription, err)
