@@ -55,6 +55,7 @@ type RolloutHistoryOptions struct {
 	Resources        []string
 	Namespace        string
 	EnforceNamespace bool
+	LabelSelector    string
 
 	HistoryViewer    polymorphichelpers.HistoryViewerFunc
 	RESTClientGetter genericclioptions.RESTClientGetter
@@ -92,6 +93,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 	}
 
 	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "See the details, including podTemplate of the revision specified")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
@@ -141,6 +143,7 @@ func (o *RolloutHistoryOptions) Run() error {
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.LabelSelector).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
 		Latest().

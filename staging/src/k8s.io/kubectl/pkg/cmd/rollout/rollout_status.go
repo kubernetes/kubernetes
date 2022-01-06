@@ -66,6 +66,7 @@ type RolloutStatusOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 	BuilderArgs      []string
+	LabelSelector    string
 
 	Watch    bool
 	Revision int64
@@ -115,6 +116,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "Watch the status of the rollout until it's done.")
 	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before ending watch, zero means never. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 
 	return cmd
 }
@@ -163,6 +165,7 @@ func (o *RolloutStatusOptions) Run() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
+		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		SingleResourceType().
