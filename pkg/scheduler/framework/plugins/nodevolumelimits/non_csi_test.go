@@ -78,26 +78,27 @@ func TestEphemeralLimits(t *testing.T) {
 	conflictingClaim.OwnerReferences = nil
 
 	tests := []struct {
-		newPod           *v1.Pod
-		existingPods     []*v1.Pod
-		extraClaims      []v1.PersistentVolumeClaim
-		ephemeralEnabled bool
-		maxVols          int
-		test             string
-		wantStatus       *framework.Status
+		newPod              *v1.Pod
+		existingPods        []*v1.Pod
+		extraClaims         []v1.PersistentVolumeClaim
+		ephemeralEnabled    bool
+		maxVols             int
+		test                string
+		wantPreFilterStatus *framework.Status
+		wantFilterStatus    *framework.Status
 	}{
 		{
-			newPod:           ephemeralVolumePod,
-			ephemeralEnabled: true,
-			test:             "volume missing",
-			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
+			newPod:              ephemeralVolumePod,
+			ephemeralEnabled:    true,
+			test:                "volume missing",
+			wantPreFilterStatus: framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
 		},
 		{
-			newPod:           ephemeralVolumePod,
-			ephemeralEnabled: true,
-			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
-			test:             "volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
+			newPod:              ephemeralVolumePod,
+			ephemeralEnabled:    true,
+			extraClaims:         []v1.PersistentVolumeClaim{*conflictingClaim},
+			test:                "volume not owned",
+			wantPreFilterStatus: framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -112,7 +113,7 @@ func TestEphemeralLimits(t *testing.T) {
 			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
 			maxVols:          0,
 			test:             "volume unbound, exceeds limit",
-			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 	}
 
@@ -124,11 +125,17 @@ func TestEphemeralLimits(t *testing.T) {
 			p := newNonCSILimits(filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(filterName, driverName), getFakePVLister(filterName), append(getFakePVCLister(filterName), test.extraClaims...), fts)
 
 			state := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			if !reflect.DeepEqual(preFilterStatus, test.wantPreFilterStatus) {
+				t.Fatalf("status from PreFilter does not match: %v, want: %v", preFilterStatus, test.wantPreFilterStatus)
+			}
+			if !test.wantPreFilterStatus.IsSuccess() {
+				return
+			}
 
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.newPod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			filterStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.newPod, node)
+			if !reflect.DeepEqual(filterStatus, test.wantFilterStatus) {
+				t.Errorf("status from Filter does not match: %v, want: %v", filterStatus, test.wantFilterStatus)
 			}
 		})
 	}
@@ -310,13 +317,13 @@ func TestAzureDiskLimits(t *testing.T) {
 	}
 
 	tests := []struct {
-		newPod       *v1.Pod
-		existingPods []*v1.Pod
-		filterName   string
-		driverName   string
-		maxVols      int
-		test         string
-		wantStatus   *framework.Status
+		newPod           *v1.Pod
+		existingPods     []*v1.Pod
+		filterName       string
+		driverName       string
+		maxVols          int
+		test             string
+		wantFilterStatus *framework.Status
 	}{
 		{
 			newPod:       oneVolPod,
@@ -466,11 +473,14 @@ func TestAzureDiskLimits(t *testing.T) {
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{})
 
 			state := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			if !preFilterStatus.IsSuccess() {
+				t.Fatalf("pre filter should not return non-success status. got message: %v", preFilterStatus.Message())
+			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.newPod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if !reflect.DeepEqual(gotStatus, test.wantFilterStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantFilterStatus)
 			}
 		})
 	}
@@ -506,13 +516,13 @@ func TestCinderLimits(t *testing.T) {
 	}
 
 	tests := []struct {
-		newPod       *v1.Pod
-		existingPods []*v1.Pod
-		filterName   string
-		driverName   string
-		maxVols      int
-		test         string
-		wantStatus   *framework.Status
+		newPod           *v1.Pod
+		existingPods     []*v1.Pod
+		filterName       string
+		driverName       string
+		maxVols          int
+		test             string
+		wantFilterStatus *framework.Status
 	}{
 		{
 			newPod:       oneVolCinderPod,
@@ -522,12 +532,12 @@ func TestCinderLimits(t *testing.T) {
 			test:         "fits when node capacity >= new pod's Cinder volumes",
 		},
 		{
-			newPod:       oneVolCinderPod,
-			existingPods: []*v1.Pod{twoVolCinderPod},
-			filterName:   cinderVolumeFilterType,
-			maxVols:      2,
-			test:         "not fit when node capacity < new pod's Cinder volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           oneVolCinderPod,
+			existingPods:     []*v1.Pod{twoVolCinderPod},
+			filterName:       cinderVolumeFilterType,
+			maxVols:          2,
+			test:             "not fit when node capacity < new pod's Cinder volumes",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 	}
 
@@ -537,11 +547,14 @@ func TestCinderLimits(t *testing.T) {
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{})
 
 			state := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			if !preFilterStatus.IsSuccess() {
+				t.Fatalf("pre filter should not return non-success status. got message: %v", preFilterStatus.Message())
+			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.newPod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if !reflect.DeepEqual(gotStatus, test.wantFilterStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantFilterStatus)
 			}
 		})
 	}
@@ -748,13 +761,13 @@ func TestEBSLimits(t *testing.T) {
 	}
 
 	tests := []struct {
-		newPod       *v1.Pod
-		existingPods []*v1.Pod
-		filterName   string
-		driverName   string
-		maxVols      int
-		test         string
-		wantStatus   *framework.Status
+		newPod           *v1.Pod
+		existingPods     []*v1.Pod
+		filterName       string
+		driverName       string
+		maxVols          int
+		test             string
+		wantFilterStatus *framework.Status
 	}{
 		{
 			newPod:       oneVolPod,
@@ -765,13 +778,13 @@ func TestEBSLimits(t *testing.T) {
 			test:         "fits when node capacity >= new pod's EBS volumes",
 		},
 		{
-			newPod:       twoVolPod,
-			existingPods: []*v1.Pod{oneVolPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      2,
-			test:         "doesn't fit when node capacity < new pod's EBS volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           twoVolPod,
+			existingPods:     []*v1.Pod{oneVolPod},
+			filterName:       ebsVolumeFilterType,
+			driverName:       csilibplugins.AWSEBSInTreePluginName,
+			maxVols:          2,
+			test:             "doesn't fit when node capacity < new pod's EBS volumes",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       splitVolsPod,
@@ -806,13 +819,13 @@ func TestEBSLimits(t *testing.T) {
 			test:         "new pod's count ignores PVCs not backed by EBS volumes",
 		},
 		{
-			newPod:       twoVolPod,
-			existingPods: []*v1.Pod{oneVolPod, onePVCPod(ebsVolumeFilterType)},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      3,
-			test:         "existing pods' counts considers PVCs backed by EBS volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           twoVolPod,
+			existingPods:     []*v1.Pod{oneVolPod, onePVCPod(ebsVolumeFilterType)},
+			filterName:       ebsVolumeFilterType,
+			driverName:       csilibplugins.AWSEBSInTreePluginName,
+			maxVols:          3,
+			test:             "existing pods' counts considers PVCs backed by EBS volumes",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       twoVolPod,
@@ -831,13 +844,13 @@ func TestEBSLimits(t *testing.T) {
 			test:         "the same EBS volumes are not counted multiple times",
 		},
 		{
-			newPod:       onePVCPod(ebsVolumeFilterType),
-			existingPods: []*v1.Pod{oneVolPod, deletedPVCPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      1,
-			test:         "missing PVC is not counted towards the PV limit",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           onePVCPod(ebsVolumeFilterType),
+			existingPods:     []*v1.Pod{oneVolPod, deletedPVCPod},
+			filterName:       ebsVolumeFilterType,
+			driverName:       csilibplugins.AWSEBSInTreePluginName,
+			maxVols:          1,
+			test:             "missing PVC is not counted towards the PV limit",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
@@ -873,13 +886,13 @@ func TestEBSLimits(t *testing.T) {
 		},
 
 		{
-			newPod:       onePVCPod(ebsVolumeFilterType),
-			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      2,
-			test:         "pod with missing PV is counted towards the PV limit",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           onePVCPod(ebsVolumeFilterType),
+			existingPods:     []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:       ebsVolumeFilterType,
+			driverName:       csilibplugins.AWSEBSInTreePluginName,
+			maxVols:          2,
+			test:             "pod with missing PV is counted towards the PV limit",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
@@ -898,22 +911,22 @@ func TestEBSLimits(t *testing.T) {
 			test:         "two pods missing the same PV are counted towards the PV limit only once",
 		},
 		{
-			newPod:       anotherDeletedPVPod,
-			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      2,
-			test:         "two pods missing different PVs are counted towards the PV limit twice",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           anotherDeletedPVPod,
+			existingPods:     []*v1.Pod{oneVolPod, deletedPVPod},
+			filterName:       ebsVolumeFilterType,
+			driverName:       csilibplugins.AWSEBSInTreePluginName,
+			maxVols:          2,
+			test:             "two pods missing different PVs are counted towards the PV limit twice",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
-			newPod:       onePVCPod(ebsVolumeFilterType),
-			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      2,
-			test:         "pod with unbound PVC is counted towards the PV limit",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           onePVCPod(ebsVolumeFilterType),
+			existingPods:     []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:       ebsVolumeFilterType,
+			driverName:       csilibplugins.AWSEBSInTreePluginName,
+			maxVols:          2,
+			test:             "pod with unbound PVC is counted towards the PV limit",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
@@ -932,13 +945,13 @@ func TestEBSLimits(t *testing.T) {
 			test:         "the same unbound PVC in multiple pods is counted towards the PV limit only once",
 		},
 		{
-			newPod:       anotherUnboundPVCPod,
-			existingPods: []*v1.Pod{oneVolPod, unboundPVCPod},
-			filterName:   ebsVolumeFilterType,
-			driverName:   csilibplugins.AWSEBSInTreePluginName,
-			maxVols:      2,
-			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+			newPod:           anotherUnboundPVCPod,
+			existingPods:     []*v1.Pod{oneVolPod, unboundPVCPod},
+			filterName:       ebsVolumeFilterType,
+			driverName:       csilibplugins.AWSEBSInTreePluginName,
+			maxVols:          2,
+			test:             "two different unbound PVCs are counted towards the PV limit as two volumes",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 	}
 
@@ -948,11 +961,14 @@ func TestEBSLimits(t *testing.T) {
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{})
 
 			state := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			if !preFilterStatus.IsSuccess() {
+				t.Fatalf("pre filter should not return non-success status. got message: %v", preFilterStatus.Message())
+			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.newPod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if !reflect.DeepEqual(gotStatus, test.wantFilterStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantFilterStatus)
 			}
 		})
 	}
@@ -1134,13 +1150,13 @@ func TestGCEPDLimits(t *testing.T) {
 	}
 
 	tests := []struct {
-		newPod       *v1.Pod
-		existingPods []*v1.Pod
-		filterName   string
-		driverName   string
-		maxVols      int
-		test         string
-		wantStatus   *framework.Status
+		newPod           *v1.Pod
+		existingPods     []*v1.Pod
+		filterName       string
+		driverName       string
+		maxVols          int
+		test             string
+		wantFilterStatus *framework.Status
 	}{
 		{
 			newPod:       oneVolPod,
@@ -1290,11 +1306,14 @@ func TestGCEPDLimits(t *testing.T) {
 			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{})
 
 			state := framework.NewCycleState()
-			p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.newPod)
+			if !preFilterStatus.IsSuccess() {
+				t.Fatalf("pre filter should not return non-success status. got message: %v", preFilterStatus.Message())
+			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.newPod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if !reflect.DeepEqual(gotStatus, test.wantFilterStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantFilterStatus)
 			}
 		})
 	}
