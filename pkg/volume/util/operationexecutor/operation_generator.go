@@ -782,7 +782,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		// plugin call to succeed
 		mountRequestTime := volumeToMount.MountRequestTime
 		totalTimeTaken := time.Since(mountRequestTime).Seconds()
-		util.RecordOperationLatencyMetric(util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec), "volume_mount", totalTimeTaken)
+		util.RecordOperationLatencyMetric(util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec), "overall_volume_mount", totalTimeTaken)
 
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markOpts)
 		if markVolMountedErr != nil {
