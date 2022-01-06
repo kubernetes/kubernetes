@@ -116,6 +116,25 @@ func TestFIFO_requeueOnPop(t *testing.T) {
 	}
 }
 
+func TestFIFO_AddDeleteReAddSameKeyObject(t *testing.T) {
+	f := NewFIFO(testFifoObjectKeyFunc)
+
+	f.Add(mkFifoObj("foo", 10))
+	if e, a := []string{"foo"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %+v, got %+v", e, a)
+	}
+
+	f.Delete(mkFifoObj("foo", 10))
+	if e, a := []string{"foo"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %+v, got %+v", e, a)
+	}
+
+	f.Add(mkFifoObj("foo", 20))
+	if e, a := []string{"foo"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %+v, got %+v", e, a)
+	}
+}
+
 func TestFIFO_addUpdate(t *testing.T) {
 	f := NewFIFO(testFifoObjectKeyFunc)
 	f.Add(mkFifoObj("foo", 10))

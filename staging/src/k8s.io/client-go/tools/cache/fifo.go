@@ -18,6 +18,7 @@ package cache
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -215,8 +216,14 @@ func (f *FIFO) Delete(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
-	delete(f.items, id)
-	return err
+
+	if _, ok := f.items[id]; !ok {
+		return fmt.Errorf("FIFO deletion error: %s not exists in items", id)
+	}
+	// set the items[id] to nil, to prevent duplicate key appear in queue,
+	// see issue #107376 for detail.
+	f.items[id] = nil
+	return nil
 }
 
 // List returns a list of all the items.
@@ -225,7 +232,10 @@ func (f *FIFO) List() []interface{} {
 	defer f.lock.RUnlock()
 	list := make([]interface{}, 0, len(f.items))
 	for _, item := range f.items {
-		list = append(list, item)
+		// skip the deleted item
+		if item != nil {
+			list = append(list, item)
+		}
 	}
 	return list
 }
@@ -235,8 +245,8 @@ func (f *FIFO) List() []interface{} {
 func (f *FIFO) ListKeys() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	list := make([]string, 0, len(f.items))
-	for key := range f.items {
+	list := make([]string, 0, len(f.queue))
+	for _, key := range f.queue {
 		list = append(list, key)
 	}
 	return list
@@ -256,6 +266,9 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	item, exists = f.items[key]
+	if exists && item == nil {
+		return nil, false, nil
+	}
 	return item, exists, nil
 }
 
@@ -293,9 +306,14 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		}
 		item, ok := f.items[id]
 		if !ok {
+			// should not happen, the keys in queue and items correspond one by one.
+			return nil, fmt.Errorf("FIFO internal error: %s appears in queue, but not in items", id)
+		}
+		if item == nil {
 			// Item may have been deleted subsequently.
 			continue
 		}
+
 		delete(f.items, id)
 		err := process(item)
 		if e, ok := err.(ErrRequeue); ok {
