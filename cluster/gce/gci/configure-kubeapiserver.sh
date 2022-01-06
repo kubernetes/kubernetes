@@ -69,7 +69,7 @@ function start-kube-apiserver {
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
-  params+=" --cloud-provider=${CLOUD_PROVIDER:-gce}"
+  params+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
 
   # params is passed by reference, so no "$"

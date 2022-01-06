@@ -616,6 +616,6 @@ export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECT
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
 export TLS_CIPHER_SUITES=""
 
-# CLOUD_PROVIDER defines the cloud-provider value presented to KCM, apiserver,
+# CLOUD_PROVIDER_FLAG defines the cloud-provider value presented to KCM, apiserver,
 # and kubelet
-export CLOUD_PROVIDER="${CLOUD_PROVIDER:-gce}"
+export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"
