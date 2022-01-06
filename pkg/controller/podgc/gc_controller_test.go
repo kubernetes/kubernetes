@@ -325,6 +325,7 @@ func TestGCOrphaned(t *testing.T) {
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			gcc.nodeQueue.ShutDown()
 			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
+			defer gcc.nodeQueue.ShutDown()
 
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
