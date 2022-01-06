@@ -47,6 +47,7 @@ type ResumeOptions struct {
 	Resumer          polymorphichelpers.ObjectResumerFunc
 	Namespace        string
 	EnforceNamespace bool
+	LabelSelector    string
 
 	resource.FilenameOptions
 	genericclioptions.IOStreams
@@ -98,6 +99,7 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-rollout")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	o.PrintFlags.AddFlags(cmd)
 	return cmd
 }
@@ -136,6 +138,7 @@ func (o ResumeOptions) RunResume() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
+		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
@@ -157,7 +160,14 @@ func (o ResumeOptions) RunResume() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Resumer)) {
+	patches := set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Resumer))
+
+	if len(patches) == 0 && len(allErrs) == 0 {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		return nil
+	}
+
+	for _, patch := range patches {
 		info := patch.Info
 
 		if patch.Err != nil {
