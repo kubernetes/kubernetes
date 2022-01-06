@@ -211,12 +211,19 @@ kube::util::find-binary-for-platform() {
     "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
     "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
+
   # if we're looking for the host platform, add local non-platform-qualified search paths
   if [[ "${platform}" = "$(kube::util::host_platform)" ]]; then
     locations+=(
       "${KUBE_ROOT}/_output/local/go/bin/${lookfor}"
       "${KUBE_ROOT}/_output/dockerized/go/bin/${lookfor}"
     );
+  fi
+
+  # looks for $1 in the $PATH
+  if which ${lookfor} >/dev/null; then
+    local -r local_bin="$(which ${lookfor})"
+    locations+=( "${local_bin}"  );
   fi
 
   # List most recently-updated location.
