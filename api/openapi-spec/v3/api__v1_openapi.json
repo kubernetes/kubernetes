@@ -366,31 +366,31 @@
         "properties": {
           "controllerExpandSecretRef": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.SecretReference",
-            "description": "ControllerExpandSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerExpandVolume call. This is an alpha field and requires enabling ExpandCSIVolumes feature gate. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
+            "description": "controllerExpandSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerExpandVolume call. This is an alpha field and requires enabling ExpandCSIVolumes feature gate. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
           },
           "controllerPublishSecretRef": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.SecretReference",
-            "description": "ControllerPublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerPublishVolume and ControllerUnpublishVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
+            "description": "controllerPublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerPublishVolume and ControllerUnpublishVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
           },
           "driver": {
             "default": "",
-            "description": "Driver is the name of the driver to use for this volume. Required.",
+            "description": "driver is the name of the driver to use for this volume. Required.",
             "type": "string"
           },
           "fsType": {
-            "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\".",
+            "description": "fsType to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\".",
             "type": "string"
           },
           "nodePublishSecretRef": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.SecretReference",
-            "description": "NodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
+            "description": "nodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
           },
           "nodeStageSecretRef": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.SecretReference",
-            "description": "NodeStageSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodeStageVolume and NodeStageVolume and NodeUnstageVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
+            "description": "nodeStageSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodeStageVolume and NodeStageVolume and NodeUnstageVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed."
           },
           "readOnly": {
-            "description": "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
+            "description": "readOnly value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
             "type": "boolean"
           },
           "volumeAttributes": {
@@ -398,12 +398,12 @@
               "default": "",
               "type": "string"
             },
-            "description": "Attributes of the volume to publish.",
+            "description": "volumeAttributes of the volume to publish.",
             "type": "object"
           },
           "volumeHandle": {
             "default": "",
-            "description": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
+            "description": "volumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
             "type": "string"
           }
         },
@@ -418,19 +418,19 @@
         "properties": {
           "driver": {
             "default": "",
-            "description": "Driver is the name of the CSI driver that handles this volume. Consult with your admin for the correct name as registered in the cluster.",
+            "description": "driver is the name of the CSI driver that handles this volume. Consult with your admin for the correct name as registered in the cluster.",
             "type": "string"
           },
           "fsType": {
-            "description": "Filesystem type to mount. Ex. \"ext4\", \"xfs\", \"ntfs\". If not provided, the empty value is passed to the associated CSI driver which will determine the default filesystem to apply.",
+            "description": "fsType to mount. Ex. \"ext4\", \"xfs\", \"ntfs\". If not provided, the empty value is passed to the associated CSI driver which will determine the default filesystem to apply.",
             "type": "string"
           },
           "nodePublishSecretRef": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.LocalObjectReference",
-            "description": "NodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed."
+            "description": "nodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed."
           },
           "readOnly": {
-            "description": "Specifies a read-only configuration for the volume. Defaults to false (read/write).",
+            "description": "readOnly specifies a read-only configuration for the volume. Defaults to false (read/write).",
             "type": "boolean"
           },
           "volumeAttributes": {
@@ -438,7 +438,7 @@
               "default": "",
               "type": "string"
             },
-            "description": "VolumeAttributes stores driver-specific properties that are passed to the CSI driver. Consult your driver's documentation for supported values.",
+            "description": "volumeAttributes stores driver-specific properties that are passed to the CSI driver. Consult your driver's documentation for supported values.",
             "type": "object"
           }
         },
