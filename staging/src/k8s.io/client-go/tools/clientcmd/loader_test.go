@@ -643,13 +643,13 @@ func TestFileLocking(t *testing.T) {
 	destinationFile.Close()
 	defer os.Remove(destinationFile.Name())
 
-	lock, err := lockFile(destinationFile.Name())
+	lock, err := LockFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error while locking file: %v", err)
 	}
 	defer lock.Close()
 
-	_, err = lockFile(destinationFile.Name())
+	_, err = LockFile(destinationFile.Name())
 	if err == nil {
 		t.Error("expected error while locking file.")
 	}
@@ -673,7 +673,20 @@ func TestFileLockingWithWriting(t *testing.T) {
 		t.Errorf("expected config, got: %s", string(b))
 	}
 
-	lock, err := lockFile(destinationFile.Name())
+	config, err := Load(b)
+	if err != nil {
+		t.Errorf("error loading written config: %v", err)
+	}
+
+	if len(config.Clusters) == 0 {
+		t.Errorf("expected to find clusters in loaded config, but found none")
+	}
+
+	if _, ok := config.Clusters["cow-cluster"]; !ok {
+		t.Errorf("expected to find cow-cluster but did not")
+	}
+
+	lock, err := LockFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error while locking file: %v", err)
 	}
@@ -683,6 +696,7 @@ func TestFileLockingWithWriting(t *testing.T) {
 		t.Error("expected error while locking file.")
 	}
 	lock.Close()
+
 }
 
 func Example_noMergingOnExplicitPaths() {

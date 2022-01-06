@@ -18,10 +18,12 @@ package clientcmd
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 
 	"k8s.io/klog/v2"
 
@@ -163,6 +165,23 @@ func NewDefaultPathOptions() *PathOptions {
 // that means that this code will only write into a single file.  If you want to relativizePaths, you must provide a fully qualified path in any
 // modified element.
 func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
+	cachedLocks := map[string]io.WriteCloser{}
+
+	if UseModifyConfigLock {
+		possibleSources := configAccess.GetLoadingPrecedence()
+		// sort the possible kubeconfig files so we always "lock" in the same order
+		// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
+		sort.Strings(possibleSources)
+		for _, filename := range possibleSources {
+			wc, err := LockFile(filename)
+			if err != nil {
+				continue
+			}
+			defer wc.Close()
+			cachedLocks[filename] = wc
+		}
+	}
+
 	startingConfig, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
@@ -176,13 +195,13 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	}
 
 	if startingConfig.CurrentContext != newConfig.CurrentContext {
-		if err := writeCurrentContext(configAccess, newConfig.CurrentContext); err != nil {
+		if err := writeCurrentContext(configAccess, newConfig.CurrentContext, cachedLocks); err != nil {
 			return err
 		}
 	}
 
 	if !reflect.DeepEqual(startingConfig.Preferences, newConfig.Preferences) {
-		if err := writePreferences(configAccess, newConfig.Preferences); err != nil {
+		if err := writePreferences(configAccess, newConfig.Preferences, cachedLocks); err != nil {
 			return err
 		}
 	}
@@ -211,7 +230,15 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 
 			if UseModifyConfigLock {
-				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+				wc, ok := cachedLocks[destinationFile]
+				if !ok {
+					if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+						return err
+					}
+					continue
+				}
+
+				if err := WriteTo(*configToWrite, wc); err != nil {
 					return err
 				}
 			} else {
@@ -254,7 +281,15 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	// actually persist config object changes
 	for destinationFile, configToWrite := range seenConfigs {
 		if UseModifyConfigLock {
-			if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+			wc, ok := cachedLocks[destinationFile]
+			if !ok {
+				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+					return err
+				}
+				continue
+			}
+
+			if err := WriteTo(*configToWrite, wc); err != nil {
 				return err
 			}
 		} else {
@@ -286,7 +321,15 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			}
 
 			if UseModifyConfigLock {
-				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+				wc, ok := cachedLocks[destinationFile]
+				if !ok {
+					if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+						return err
+					}
+					continue
+				}
+
+				if err := WriteTo(*configToWrite, wc); err != nil {
 					return err
 				}
 			} else {
@@ -311,7 +354,15 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			delete(configToWrite.Clusters, key)
 
 			if UseModifyConfigLock {
-				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+				wc, ok := cachedLocks[destinationFile]
+				if !ok {
+					if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+						return err
+					}
+					continue
+				}
+
+				if err := WriteTo(*configToWrite, wc); err != nil {
 					return err
 				}
 			} else {
@@ -336,7 +387,15 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			delete(configToWrite.Contexts, key)
 
 			if UseModifyConfigLock {
-				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+				wc, ok := cachedLocks[destinationFile]
+				if !ok {
+					if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+						return err
+					}
+					continue
+				}
+
+				if err := WriteTo(*configToWrite, wc); err != nil {
 					return err
 				}
 			} else {
@@ -361,7 +420,15 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 			delete(configToWrite.AuthInfos, key)
 
 			if UseModifyConfigLock {
-				if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+				wc, ok := cachedLocks[destinationFile]
+				if !ok {
+					if err := WriteToFileWithLock(*configToWrite, destinationFile); err != nil {
+						return err
+					}
+					continue
+				}
+
+				if err := WriteTo(*configToWrite, wc); err != nil {
 					return err
 				}
 			} else {
@@ -401,7 +468,7 @@ func (p *persister) Persist(config map[string]string) error {
 // If newCurrentContext is the same as the startingConfig's current context, then we exit.
 // If newCurrentContext has a value, then that value is written into the default destination file.
 // If newCurrentContext is empty, then we find the config file that is setting the CurrentContext and clear the value from that file
-func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) error {
+func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, cachedLocks map[string]io.WriteCloser) error {
 	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
 		return err
 	} else if startingConfig.CurrentContext == newCurrentContext {
@@ -416,16 +483,15 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 		}
 		currConfig.CurrentContext = newCurrentContext
 		if UseModifyConfigLock {
-			if err := WriteToFileWithLock(*currConfig, file); err != nil {
-				return err
+			wc, ok := cachedLocks[file]
+			if !ok {
+				return WriteToFileWithLock(*currConfig, file)
 			}
-		} else {
-			if err := WriteToFile(*currConfig, file); err != nil {
-				return err
-			}
-		}
 
-		return nil
+			return WriteTo(*currConfig, wc)
+		} else {
+			return WriteToFile(*currConfig, file)
+		}
 	}
 
 	if len(newCurrentContext) > 0 {
@@ -437,16 +503,15 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 		config.CurrentContext = newCurrentContext
 
 		if UseModifyConfigLock {
-			if err := WriteToFileWithLock(*config, destinationFile); err != nil {
-				return err
+			wc, ok := cachedLocks[destinationFile]
+			if !ok {
+				return WriteToFileWithLock(*config, destinationFile)
 			}
-		} else {
-			if err := WriteToFile(*config, destinationFile); err != nil {
-				return err
-			}
-		}
 
-		return nil
+			return WriteTo(*config, wc)
+		} else {
+			return WriteToFile(*config, destinationFile)
+		}
 	}
 
 	// we're supposed to be clearing the current context.  We need to find the first spot in the chain that is setting it and clear it
@@ -460,16 +525,15 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			if len(currConfig.CurrentContext) > 0 {
 				currConfig.CurrentContext = newCurrentContext
 				if UseModifyConfigLock {
-					if err := WriteToFileWithLock(*currConfig, file); err != nil {
-						return err
+					wc, ok := cachedLocks[file]
+					if !ok {
+						return WriteToFileWithLock(*currConfig, file)
 					}
-				} else {
-					if err := WriteToFile(*currConfig, file); err != nil {
-						return err
-					}
-				}
 
-				return nil
+					return WriteTo(*currConfig, wc)
+				} else {
+					return WriteToFile(*currConfig, file)
+				}
 			}
 		}
 	}
@@ -477,7 +541,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 	return errors.New("no config found to write context")
 }
 
-func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferences) error {
+func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferences, cachedLocks map[string]io.WriteCloser) error {
 	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
 		return err
 	} else if reflect.DeepEqual(startingConfig.Preferences, newPrefs) {
@@ -492,16 +556,15 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 		}
 		currConfig.Preferences = newPrefs
 		if UseModifyConfigLock {
-			if err := WriteToFileWithLock(*currConfig, file); err != nil {
-				return err
+			wc, ok := cachedLocks[file]
+			if !ok {
+				return WriteToFileWithLock(*currConfig, file)
 			}
-		} else {
-			if err := WriteToFile(*currConfig, file); err != nil {
-				return err
-			}
-		}
 
-		return nil
+			return WriteTo(*currConfig, wc)
+		} else {
+			return WriteToFile(*currConfig, file)
+		}
 	}
 
 	for _, file := range configAccess.GetLoadingPrecedence() {
@@ -513,16 +576,15 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
 			currConfig.Preferences = newPrefs
 			if UseModifyConfigLock {
-				if err := WriteToFileWithLock(*currConfig, file); err != nil {
-					return err
+				wc, ok := cachedLocks[file]
+				if !ok {
+					return WriteToFileWithLock(*currConfig, file)
 				}
-			} else {
-				if err := WriteToFile(*currConfig, file); err != nil {
-					return err
-				}
-			}
 
-			return nil
+				return WriteTo(*currConfig, wc)
+			} else {
+				return WriteToFile(*currConfig, file)
+			}
 		}
 	}
 

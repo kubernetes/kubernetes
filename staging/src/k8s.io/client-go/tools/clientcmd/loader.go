@@ -429,11 +429,8 @@ func WriteTo(config clientcmdapi.Config, w io.Writer) error {
 // WriteToFile serializes the config to yaml and writes it out to a file.  If not present, it creates the file with the mode 0600.  If it is present
 // it stomps the contents
 func WriteToFile(config clientcmdapi.Config, filename string) error {
-	dir := filepath.Dir(filename)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
-			return err
-		}
+	if err := EnsureDir(filepath.Dir(filename)); err != nil {
+		return err
 	}
 
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
@@ -448,14 +445,11 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 // WriteToFileWithLock serializes the config to yaml and writes it out to a file with a platform-specific exclusive lock to prevent concurrent
 // write operations from multiple kubectl processes.
 func WriteToFileWithLock(config clientcmdapi.Config, filename string) error {
-	dir := filepath.Dir(filename)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
-			return err
-		}
+	if err := EnsureDir(filepath.Dir(filename)); err != nil {
+		return err
 	}
 
-	f, err := lockFile(filename)
+	f, err := LockFile(filename)
 	if err != nil {
 		return err
 	}
@@ -464,8 +458,18 @@ func WriteToFileWithLock(config clientcmdapi.Config, filename string) error {
 	return WriteTo(config, f)
 }
 
-// lockFile uses a platform-specific exclusive lock to prevent concurrent write operations from multiple kubectl processes.
-func lockFile(filename string) (io.WriteCloser, error) {
+// EnsureDir checks if a directory exists, and if not, creates it.
+func EnsureDir(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err = os.MkdirAll(path, 0755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// LockFile uses a platform-specific exclusive lock to prevent concurrent write operations from multiple kubectl processes.
+func LockFile(filename string) (io.WriteCloser, error) {
 	return fileutil.TryLockFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 }
 
