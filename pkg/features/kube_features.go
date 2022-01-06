@@ -214,6 +214,7 @@ const (
 	// owner: @alculquicondor
 	// alpha: v1.21
 	// beta: v1.22
+	// stable: v1.24
 	//
 	// Allows Job controller to manage Pod completions per completion index.
 	IndexedJob featuregate.Feature = "IndexedJob"
@@ -887,7 +888,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NetworkPolicyEndPort:                           {Default: true, PreRelease: featuregate.Beta},
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-	IndexedJob:                                     {Default: true, PreRelease: featuregate.Beta},
+	IndexedJob:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	JobTrackingWithFinalizers:                      {Default: true, PreRelease: featuregate.Beta},
 	JobReadyPods:                                   {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},

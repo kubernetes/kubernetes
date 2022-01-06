@@ -634,11 +634,6 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		return true, nil
 	}
 
-	// Cannot create Pods if this is an Indexed Job and the feature is disabled.
-	if !feature.DefaultFeatureGate.Enabled(features.IndexedJob) && isIndexedJob(&job) {
-		jm.recorder.Event(&job, v1.EventTypeWarning, "IndexedJobDisabled", "Skipped Indexed Job sync because feature is disabled.")
-		return false, nil
-	}
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode != batch.NonIndexedCompletion && *job.Spec.CompletionMode != batch.IndexedCompletion {
 		jm.recorder.Event(&job, v1.EventTypeWarning, "UnknownCompletionMode", "Skipped Job sync because completion mode is unknown")
 		return false, nil
