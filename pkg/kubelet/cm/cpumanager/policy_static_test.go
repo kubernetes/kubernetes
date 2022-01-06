@@ -558,6 +558,62 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	}
 }
 
+func TestStaticPolicyReuseCPUs(t *testing.T) {
+	testCases := []struct {
+		staticPolicyTest
+		expCSetAfterAlloc  cpuset.CPUSet
+		expCSetAfterRemove cpuset.CPUSet
+	}{
+		{
+			staticPolicyTest: staticPolicyTest{
+				description: "SingleSocketHT, DeAllocOneInitContainer",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPod(
+					[]struct{ request, limit string }{
+						{"4000m", "4000m"}}, // 0, 1, 4, 5
+					[]struct{ request, limit string }{
+						{"2000m", "2000m"}}), // 0, 4
+				containerName:   "initContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:  cpuset.NewCPUSet(2, 3, 6, 7),
+			expCSetAfterRemove: cpuset.NewCPUSet(1, 2, 3, 5, 6, 7),
+		},
+	}
+
+	for _, testCase := range testCases {
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
+
+		st := &mockState{
+			assignments:   testCase.stAssignments,
+			defaultCPUSet: testCase.stDefaultCPUSet,
+		}
+		pod := testCase.pod
+
+		// allocate
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			policy.Allocate(st, pod, &container)
+		}
+		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
+				testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)
+		}
+
+		// remove
+		policy.RemoveContainer(st, string(pod.UID), testCase.containerName)
+
+		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterRemove) {
+			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",
+				testCase.description, testCase.expCSetAfterRemove, st.defaultCPUSet)
+		}
+		if _, found := st.assignments[string(pod.UID)][testCase.containerName]; found {
+			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected (pod %v, container %v) not be in assignments %v",
+				testCase.description, testCase.podUID, testCase.containerName, st.assignments)
+		}
+	}
+}
+
 func TestStaticPolicyRemove(t *testing.T) {
 	testCases := []staticPolicyTest{
 		{
