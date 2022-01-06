@@ -224,7 +224,6 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedPodPatches int
 
 		// features
-		indexedJobEnabled   bool
 		jobReadyPodsEnabled bool
 	}{
 		"job start": {
@@ -490,7 +489,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCreations:      2,
 			expectedActive:         2,
 			expectedCreatedIndexes: sets.NewInt(0, 1),
-			indexedJobEnabled:      true,
 		},
 		"indexed job completed": {
 			parallelism:    2,
@@ -510,7 +508,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedPodPatches:      4,
-			indexedJobEnabled:       true,
 		},
 		"indexed job repeated completed index": {
 			parallelism:    2,
@@ -529,7 +526,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs:  "0,1",
 			expectedCreatedIndexes: sets.NewInt(2),
 			expectedPodPatches:     3,
-			indexedJobEnabled:      true,
 		},
 		"indexed job some running and completed pods": {
 			parallelism:    8,
@@ -553,7 +549,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs:  "2,4,5,7-9",
 			expectedCreatedIndexes: sets.NewInt(1, 6, 10, 11, 12, 13),
 			expectedPodPatches:     6,
-			indexedJobEnabled:      true,
 		},
 		"indexed job some failed pods": {
 			parallelism:    3,
@@ -570,7 +565,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:         2,
 			expectedCreatedIndexes: sets.NewInt(0, 2),
 			expectedPodPatches:     2,
-			indexedJobEnabled:      true,
 		},
 		"indexed job some pods without index": {
 			parallelism:    2,
@@ -596,7 +590,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:        0,
 			expectedCompletedIdxs: "0",
 			expectedPodPatches:    8,
-			indexedJobEnabled:     true,
 		},
 		"indexed job repeated indexes": {
 			parallelism:    5,
@@ -619,7 +612,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:     1,
 			expectedCompletedIdxs: "0",
 			expectedPodPatches:    5,
-			indexedJobEnabled:     true,
 		},
 		"indexed job with indexes outside of range": {
 			parallelism:    2,
@@ -641,19 +633,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:        0,
 			expectedFailed:        0,
 			expectedPodPatches:    5,
-			indexedJobEnabled:     true,
-		},
-		"indexed job feature disabled": {
-			parallelism:    2,
-			completions:    3,
-			backoffLimit:   6,
-			completionMode: batch.IndexedCompletion,
-			podsWithIndexes: []indexPhase{
-				{"0", v1.PodRunning},
-				{"1", v1.PodSucceeded},
-			},
-			// No status updates.
-			indexedJobEnabled: false,
 		},
 		"suspending a job with satisfied expectations": {
 			// Suspended Job should delete active pods when expectations are
@@ -727,7 +706,6 @@ func TestControllerSyncJob(t *testing.T) {
 				if wFinalizers && tc.podControllerError != nil {
 					t.Skip("Can't track status if finalizers can't be removed")
 				}
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
 
@@ -857,7 +835,7 @@ func TestControllerSyncJob(t *testing.T) {
 				if actual.Status.StartTime != nil && tc.suspend {
 					t.Error("Unexpected .status.startTime not nil when suspend is true")
 				}
-				if actual.Status.StartTime == nil && tc.indexedJobEnabled && !tc.suspend {
+				if actual.Status.StartTime == nil && !tc.suspend {
 					t.Error("Missing .status.startTime")
 				}
 				// validate conditions

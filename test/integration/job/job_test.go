@@ -373,7 +373,6 @@ func TestIndexedJob(t *testing.T) {
 	for _, wFinalizers := range []bool{false, true} {
 		t.Run(fmt.Sprintf("finalizers=%t", wFinalizers), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, true)()
 
 			closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 			defer closeFn()
@@ -411,30 +410,10 @@ func TestIndexedJob(t *testing.T) {
 			}, wFinalizers)
 			validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
 
-			// Disable feature gate and restart controller.
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, false)()
-			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
-			events, err := clientSet.EventsV1().Events(ns.Name).Watch(ctx, metav1.ListOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer events.Stop()
-
-			// One Pod fails, but no recreations happen because feature is disabled.
+			// One Pod fails, which should be recreated.
 			if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
 				t.Fatal("Failed trying to succeed pod with index 2")
 			}
-			if err := waitForEvent(events, jobObj.UID, "IndexedJobDisabled"); err != nil {
-				t.Errorf("Waiting for an event for IndexedJobDisabled: %v", err)
-			}
-			validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 3), "1")
-
-			// Re-enable feature gate and restart controller. Failed Pod should be recreated now.
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, true)()
-			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
-
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active:    3,
 				Failed:    1,

@@ -763,6 +763,13 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Ensure Pods of an Indexed Job get a unique index.
+  codename: '[sig-apps] Job should create pods for an Indexed job with completion
+    indexes and specified hostname [Conformance]'
+  description: Create an Indexed job. Job MUST complete successfully. Ensure that
+    created pods have completion index annotation and environment variable.
+  release: v1.24
+  file: test/e2e/apps/job.go
 - testname: Jobs, active pods, graceful termination
   codename: '[sig-apps] Job should delete a job [Conformance]'
   description: Create a job. Ensure the active pods reflect paralellism in the namespace
