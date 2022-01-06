@@ -163,7 +163,7 @@ loop:
 }
 
 func setup() (chan interface{}, chan interface{}, OperationExecutor) {
-	ch, quit := make(chan interface{}), make(chan interface{})
+	ch, quit := make(chan interface{}, 1), make(chan interface{})
 	return ch, quit, NewOperationExecutor(newFakeOperationGenerator(ch, quit))
 }
 
