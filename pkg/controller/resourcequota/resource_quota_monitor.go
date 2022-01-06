@@ -72,11 +72,11 @@ type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
 	monitorLock sync.RWMutex
-	// informersStarted is closed after after all of the controllers have been initialized and are running.
+	// informersStarted is closed after all the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
 
-	// stopCh drives shutdown. When a receive from it unblocks, monitors will shut down.
+	// stopCh drives shutdown. When a reception from it unblocks, monitors will shut down.
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
