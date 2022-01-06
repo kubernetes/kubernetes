@@ -1495,10 +1495,19 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTe
 
 func (v *vSphereDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	return &testsuites.PerTestConfig{
-		Driver:    v,
-		Prefix:    "vsphere",
-		Framework: f,
-	}, func() {}
+			Driver:    v,
+			Prefix:    "vsphere",
+			Framework: f,
+		}, func() {
+			// Driver Cleanup function
+			// Logout each vSphere client connection to prevent session leakage
+			nodes := vspheretest.GetReadySchedulableNodeInfos()
+			for _, node := range nodes {
+				if node.VSphere.Client != nil {
+					node.VSphere.Client.Logout(context.TODO())
+				}
+			}
+		}
 }
 
 func (v *vSphereDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
