@@ -44,7 +44,6 @@ MAKEFLAGS += --no-builtin-rules
 .EXPORT_ALL_VARIABLES:
 OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
-PRJ_SRC_PATH := k8s.io/kubernetes
 
 ifdef KUBE_GOFLAGS
 $(info KUBE_GOFLAGS is now deprecated. Please use GOFLAGS instead.)
