@@ -463,6 +463,10 @@ func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 }
 
+func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
+	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+}
+
 type ValidateOptions struct {
 	EnableValidation bool
 }
