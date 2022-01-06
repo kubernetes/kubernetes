@@ -337,8 +337,3 @@ func GetKubeletContainer(kubeletCgroups string) (string, error) {
 	}
 	return kubeletCgroups, nil
 }
-
-// GetRuntimeContainer returns the cgroup used by the container runtime
-func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
-	return runtimeCgroups, nil
-}

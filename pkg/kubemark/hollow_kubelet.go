@@ -163,7 +163,6 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
-	f.ContainerRuntimeOptions.ContainerRuntime = kubetypes.RemoteContainerRuntime
 	f.RegisterSchedulable = true
 	f.RemoteImageEndpoint = "unix:///run/containerd/containerd.sock"
 

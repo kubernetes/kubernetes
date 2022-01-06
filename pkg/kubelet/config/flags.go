@@ -56,8 +56,7 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 
 	// Docker-specific settings.
-	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("Specified image will not be pruned by the image garbage collector. "+
-		"When container-runtime is set to 'docker', all containers in each pod will use the network/ipc namespaces from this image. Other CRI implementations have their own configuration to set this image."))
+	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image."))
 
 	// Image credential provider settings.
 	fs.StringVar(&s.ImageCredentialProviderConfigFile, "image-credential-provider-config", s.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")

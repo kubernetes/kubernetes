@@ -184,8 +184,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				return fmt.Errorf("failed to validate kubelet flags: %w", err)
 			}
 
-			if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
-				klog.InfoS("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
+			if cleanFlagSet.Changed("pod-infra-container-image") {
+				klog.InfoS("--pod-infra-container-image will not be pruned by the image garbage collector in kubelet and should also be set in the remote runtime")
 			}
 
 			// load kubelet config file, if provided
@@ -612,12 +612,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		cgroupRoots = append(cgroupRoots, kubeletCgroup)
 	}
 
-	runtimeCgroup, err := cm.GetRuntimeContainer(s.ContainerRuntime, s.RuntimeCgroups)
 	if err != nil {
 		klog.InfoS("Failed to get the container runtime's cgroup. Runtime system container metrics may be missing.", "err", err)
-	} else if runtimeCgroup != "" {
+	} else if s.RuntimeCgroups != "" {
 		// RuntimeCgroups is optional, so ignore if it isn't specified
-		cgroupRoots = append(cgroupRoots, runtimeCgroup)
+		cgroupRoots = append(cgroupRoots, s.RuntimeCgroups)
 	}
 
 	if s.SystemCgroups != "" {
@@ -626,8 +625,8 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
-		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.RemoteRuntimeEndpoint)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
 		}
@@ -703,7 +702,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				RuntimeCgroupsName:    s.RuntimeCgroups,
 				SystemCgroupsName:     s.SystemCgroups,
 				KubeletCgroupsName:    s.KubeletCgroups,
-				ContainerRuntime:      s.ContainerRuntime,
 				CgroupsPerQOS:         s.CgroupsPerQOS,
 				CgroupRoot:            s.CgroupRoot,
 				CgroupDriver:          s.CgroupDriver,
@@ -745,12 +743,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		klog.InfoS("Failed to ApplyOOMScoreAdj", "err", err)
 	}
 
-	err = kubelet.PreInitRuntimeService(&s.KubeletConfiguration,
-		kubeDeps, &s.ContainerRuntimeOptions,
-		s.ContainerRuntime,
-		s.RuntimeCgroups,
-		s.RemoteRuntimeEndpoint,
-		s.RemoteImageEndpoint)
+	err = kubelet.PreInitRuntimeService(&s.KubeletConfiguration, kubeDeps, s.RemoteRuntimeEndpoint, s.RemoteImageEndpoint)
 	if err != nil {
 		return err
 	}
@@ -1114,7 +1107,6 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	k, err := createAndInitKubelet(&kubeServer.KubeletConfiguration,
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
-		kubeServer.ContainerRuntime,
 		hostname,
 		hostnameOverridden,
 		nodeName,
@@ -1189,7 +1181,6 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
-	containerRuntime string,
 	hostname string,
 	hostnameOverridden bool,
 	nodeName types.NodeName,
@@ -1223,7 +1214,6 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	k, err = kubelet.NewMainKubelet(kubeCfg,
 		kubeDeps,
 		crOptions,
-		containerRuntime,
 		hostname,
 		hostnameOverridden,
 		nodeName,

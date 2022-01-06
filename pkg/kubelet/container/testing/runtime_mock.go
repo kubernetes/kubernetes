@@ -124,20 +124,6 @@ func (mr *MockRuntimeMockRecorder) Type() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockRuntime)(nil).Type))
 }
 
-// SupportsSingleFileMapping mocks base method
-func (m *MockRuntime) SupportsSingleFileMapping() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SupportsSingleFileMapping")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// SupportsSingleFileMapping indicates an expected call of SupportsSingleFileMapping
-func (mr *MockRuntimeMockRecorder) SupportsSingleFileMapping() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsSingleFileMapping", reflect.TypeOf((*MockRuntime)(nil).SupportsSingleFileMapping))
-}
-
 // Version mocks base method
 func (m *MockRuntime) Version() (container.Version, error) {
 	m.ctrl.T.Helper()

@@ -37,6 +37,7 @@ import (
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -173,6 +174,10 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 
 	if f.SeccompDefault && !utilfeature.DefaultFeatureGate.Enabled(features.SeccompDefault) {
 		return fmt.Errorf("the SeccompDefault feature gate must be enabled in order to use the --seccomp-default flag")
+	}
+
+	if f.ContainerRuntime != kubetypes.RemoteContainerRuntime {
+		return fmt.Errorf("unsupported CRI runtime: %q, only %q is currently supported", f.ContainerRuntime, kubetypes.RemoteContainerRuntime)
 	}
 
 	return nil

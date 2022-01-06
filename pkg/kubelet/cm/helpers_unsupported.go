@@ -70,8 +70,3 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 func GetKubeletContainer(kubeletCgroups string) (string, error) {
 	return "", nil
 }
-
-// GetRuntimeContainer returns the cgroup used by the container runtime
-func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
-	return "", nil
-}
