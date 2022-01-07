@@ -272,7 +272,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 					return nil
 				}
 			}
-			
+
 			switch steps.steps[steps.currentStepIndex-1].stepValue {
 			case "name":
 				// Since unsetting just the name of the auth-provider is pointless return error
@@ -316,7 +316,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 			default:
 				path := []string{}
-				for _, step := range(steps.steps) {
+				for _, step := range steps.steps {
 					path = append(path, step.stepValue)
 				}
 				return fmt.Errorf("unrecognized step in path %v", strings.Join(path, "."))
