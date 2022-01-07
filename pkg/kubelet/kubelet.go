@@ -835,7 +835,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	if sysruntime.GOOS == "linux" {
 		// AppArmor is a Linux kernel security module and it does not support other operating systems.
-		klet.appArmorValidator = apparmor.NewValidator(containerRuntime)
+		klet.appArmorValidator = apparmor.NewValidator()
 		klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	}
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))

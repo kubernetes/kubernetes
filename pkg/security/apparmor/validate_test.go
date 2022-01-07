@@ -43,8 +43,7 @@ func TestValidateHost(t *testing.T) {
 	// The test should be manually run if modifying the getAppArmorFS function.
 	t.Skip()
 
-	assert.NoError(t, validateHost("docker"))
-	assert.Error(t, validateHost("rkt"))
+	assert.NoError(t, validateHost())
 }
 
 func TestValidateProfile(t *testing.T) {
