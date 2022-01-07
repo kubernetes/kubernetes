@@ -553,6 +553,7 @@ github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.2 => github.com/modern-go/reflect2 v1.0.2
 github.com/modern-go/reflect2
 # github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
+## explicit
 github.com/mohae/deepcopy
 # github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 => github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
 github.com/monochromegane/go-gitignore
