@@ -100,7 +100,9 @@ for more information about scheduling and the kube-scheduler component.`,
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cliflag.SetUsageAndHelpFunc(cmd, *nfs, cols)
 
-	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
+	if err := cmd.MarkFlagFilename("config", "yaml", "yml", "json"); err != nil {
+		klog.ErrorS(err, "Failed to mark flag filename")
+	}
 
 	return cmd
 }
