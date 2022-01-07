@@ -79,7 +79,6 @@ the cloud specific control loops shipped with Kubernetes.`,
 
 			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List())
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
 			}
 
@@ -87,11 +86,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			cloud := cloudInitializer(completedConfig)
 			controllerInitializers := ConstructControllerInitializers(controllerInitFuncConstructors, completedConfig, cloud)
 
-			if err := Run(completedConfig, cloud, controllerInitializers, stopCh); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				return err
-			}
-			return nil
+			return Run(completedConfig, cloud, controllerInitializers, stopCh)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
