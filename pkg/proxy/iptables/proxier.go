@@ -975,6 +975,16 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil {
 		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 	}
+	// nodeAddresses may contain dual-stack zero-CIDRs if proxier.nodePortAddresses is empty.
+	// Ensure nodeAddresses only contains the addresses for this proxier's IP family.
+	isIPv6 := proxier.iptables.IsIPv6()
+	for addr := range nodeAddresses {
+		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
+			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
+			nodeAddresses = sets.NewString(addr)
+			break
+		}
+	}
 
 	// Build rules for each service.
 	for svcName, svc := range proxier.serviceMap {
@@ -1438,7 +1448,6 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodeports chain.  This needs to be after all
 	// other service portal rules.
-	isIPv6 := proxier.iptables.IsIPv6()
 	for address := range nodeAddresses {
 		// TODO(thockin, m1093782566): If/when we have dual-stack support we will want to distinguish v4 from v6 zero-CIDRs.
 		if utilproxy.IsZeroCIDR(address) {
