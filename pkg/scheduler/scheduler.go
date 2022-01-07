@@ -297,9 +297,9 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	sched.SchedulingQueue.Close()
 }
 
-// recordSchedulingFailure records an event for the pod that indicates the
+// handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
-func (sched *Scheduler) recordSchedulingFailure(fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo) {
+func (sched *Scheduler) handleSchedulingFailure(fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo) {
 	sched.Error(podInfo, err)
 
 	// Update the scheduling queue with the nominated pod information. Without
@@ -487,7 +487,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		}
-		sched.recordSchedulingFailure(fwk, podInfo, err, v1.PodReasonUnschedulable, nominatingInfo)
+		sched.handleSchedulingFailure(fwk, podInfo, err, v1.PodReasonUnschedulable, nominatingInfo)
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -504,7 +504,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
-		sched.recordSchedulingFailure(fwk, assumedPodInfo, err, SchedulerError, clearNominatedNode)
+		sched.handleSchedulingFailure(fwk, assumedPodInfo, err, SchedulerError, clearNominatedNode)
 		return
 	}
 
@@ -516,7 +516,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
-		sched.recordSchedulingFailure(fwk, assumedPodInfo, sts.AsError(), SchedulerError, clearNominatedNode)
+		sched.handleSchedulingFailure(fwk, assumedPodInfo, sts.AsError(), SchedulerError, clearNominatedNode)
 		return
 	}
 
@@ -536,7 +536,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
-		sched.recordSchedulingFailure(fwk, assumedPodInfo, runPermitStatus.AsError(), reason, clearNominatedNode)
+		sched.handleSchedulingFailure(fwk, assumedPodInfo, runPermitStatus.AsError(), reason, clearNominatedNode)
 		return
 	}
 
@@ -579,7 +579,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 					return assumedPod.UID != pod.UID
 				})
 			}
-			sched.recordSchedulingFailure(fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, clearNominatedNode)
+			sched.handleSchedulingFailure(fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, clearNominatedNode)
 			return
 		}
 
@@ -597,7 +597,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				// TODO(#103853): de-duplicate the logic.
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
-			sched.recordSchedulingFailure(fwk, assumedPodInfo, preBindStatus.AsError(), SchedulerError, clearNominatedNode)
+			sched.handleSchedulingFailure(fwk, assumedPodInfo, preBindStatus.AsError(), SchedulerError, clearNominatedNode)
 			return
 		}
 
@@ -614,7 +614,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				// TODO(#103853): de-duplicate the logic.
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
-			sched.recordSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, clearNominatedNode)
+			sched.handleSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, clearNominatedNode)
 		} else {
 			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 			if klog.V(2).Enabled() {
