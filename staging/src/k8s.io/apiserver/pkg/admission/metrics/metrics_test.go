@@ -159,6 +159,23 @@ func TestObserveWebhookRejection(t *testing.T) {
 	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsAPIServerInternalError, 1)
 }
 
+func TestObserveWebhookFailOpen(t *testing.T) {
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
+	Metrics.ObserveWebhookFailOpen(context.TODO(), "x", stepAdmit)
+	Metrics.ObserveWebhookFailOpen(context.TODO(), "x", stepValidate)
+	wantLabelsCounterAdmit := map[string]string{
+		"name": "x",
+		"type": "admit",
+	}
+	wantLabelsCounterValidate := map[string]string{
+		"name": "x",
+		"type": "validate",
+	}
+	expectCounterValue(t, "apiserver_admission_webhook_fail_open_count", wantLabelsCounterAdmit, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_fail_open_count", wantLabelsCounterValidate, 1)
+}
+
 func TestWithMetrics(t *testing.T) {
 	defer Metrics.reset()
 	defer legacyregistry.Reset()
