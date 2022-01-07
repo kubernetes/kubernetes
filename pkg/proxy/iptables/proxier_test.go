@@ -419,17 +419,262 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	return p
 }
 
-func countRules(table, data string) int {
-	inRightTable := false
+// parseIPTablesData takes iptables-save output and returns a map of table name to array of lines.
+func parseIPTablesData(ruleData string) (map[string][]string, error) {
+	// Split ruleData at the "COMMIT" lines; given valid input, this will result in
+	// one element for each table plus an extra empty element (since the ruleData
+	// should end with a "COMMIT" line).
+	rawTables := strings.Split(strings.TrimPrefix(ruleData, "\n"), "COMMIT\n")
+	nTables := len(rawTables) - 1
+	if nTables < 2 || rawTables[nTables] != "" {
+		return nil, fmt.Errorf("bad ruleData (%d tables)\n%s", nTables, ruleData)
+	}
+
+	tables := make(map[string][]string, nTables)
+	for i, table := range rawTables[:nTables] {
+		lines := strings.Split(strings.Trim(table, "\n"), "\n")
+		// The first line should be, eg, "*nat" or "*filter"
+		if lines[0][0] != '*' {
+			return nil, fmt.Errorf("bad ruleData (table %d starts with %q)", i+1, lines[0])
+		}
+		// add back the "COMMIT" line that got eaten by the strings.Split above
+		lines = append(lines, "COMMIT")
+		tables[lines[0][1:]] = lines
+	}
+
+	if tables["nat"] == nil {
+		return nil, fmt.Errorf("bad ruleData (no %q table)", "nat")
+	}
+	if tables["filter"] == nil {
+		return nil, fmt.Errorf("bad ruleData (no %q table)", "filter")
+	}
+	return tables, nil
+}
+
+func Test_parseIPTablesData(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		input  string
+		output map[string][]string
+		error  string
+	}{
+		{
+			name: "basic test",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`,
+			output: map[string][]string{
+				"filter": {
+					`*filter`,
+					`:KUBE-SERVICES - [0:0]`,
+					`:KUBE-EXTERNAL-SERVICES - [0:0]`,
+					`:KUBE-FORWARD - [0:0]`,
+					`:KUBE-NODEPORTS - [0:0]`,
+					`-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT`,
+					`-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP`,
+					`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT`,
+					`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`,
+					`COMMIT`,
+				},
+				"nat": {
+					`*nat`,
+					`:KUBE-SERVICES - [0:0]`,
+					`:KUBE-NODEPORTS - [0:0]`,
+					`:KUBE-POSTROUTING - [0:0]`,
+					`:KUBE-MARK-MASQ - [0:0]`,
+					`:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]`,
+					`:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]`,
+					`-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN`,
+					`-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000`,
+					`-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE`,
+					`-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000`,
+					`-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O`,
+					`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ`,
+					`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ`,
+					`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ`,
+					`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80`,
+					`-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS`,
+					`COMMIT`,
+				},
+			},
+		},
+		{
+			name: "not enough tables",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+`,
+			error: "bad ruleData (1 tables)",
+		},
+		{
+			name: "trailing junk",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+junk
+`,
+			error: "bad ruleData (2 tables)",
+		},
+		{
+			name: "bad start line",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+`,
+			error: `bad ruleData (table 2 starts with ":KUBE-SERVICES - [0:0]")`,
+		},
+		{
+			name: "no nat",
+			input: `
+*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*mangle
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+`,
+			error: `bad ruleData (no "nat" table)`,
+		},
+		{
+			name: "no filter",
+			input: `
+*mangle
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+`,
+			error: `bad ruleData (no "filter" table)`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := parseIPTablesData(tc.input)
+			if err == nil {
+				if tc.error != "" {
+					t.Errorf("unexpectedly did not get error")
+				} else {
+					assert.Equal(t, tc.output, out)
+				}
+			} else {
+				if tc.error == "" {
+					t.Errorf("got unexpected error: %v", err)
+				} else if !strings.HasPrefix(err.Error(), tc.error) {
+					t.Errorf("got wrong error: %v (expected %q)", err, tc.error)
+				}
+			}
+		})
+	}
+}
+
+func countRules(tableName string, ruleData string) int {
+	tables, err := parseIPTablesData(ruleData)
+	if err != nil {
+		klog.ErrorS(err, "error parsing iptables rules")
+		return -1
+	}
+
 	rules := 0
-	for _, line := range strings.Split(data, "\n") {
-		if line == "" {
-			continue
-		}
-		if line[0] == '*' {
-			inRightTable = (line == "*"+table)
-		}
-		if inRightTable && line[0] == '-' {
+	for _, line := range tables[tableName] {
+		if line[0] == '-' {
 			rules++
 		}
 	}
@@ -464,60 +709,158 @@ func moveMatchingLines(pattern string, input, output []string) ([]string, []stri
 	return newIn, output
 }
 
-// assertIPTablesRuleJumps asserts that every `-j` in the given rules jumps to a chain
+// checkIPTablesRuleJumps checks that every `-j` in the given rules jumps to a chain
 // that we created and added rules to
-func assertIPTablesRuleJumps(lines []string) error {
-	tableName := lines[0]
-
-	createdChains := sets.NewString(findAllMatches(lines, `^:([^ ]*)`)...)
-	filledChains := sets.NewString(findAllMatches(lines, `-A ([^ ]*)`)...)
-
-	jumpedChains := sets.NewString(findAllMatches(lines, `-j ([^ ]*)`)...)
-	// Ignore jumps to built-in chains
-	jumpedChains.Delete("ACCEPT", "REJECT", "DROP", "MARK", "RETURN", "DNAT", "SNAT", "MASQUERADE")
-	// KubeMarkDropChain is created by kubelet, not kube-proxy
-	jumpedChains.Delete(string(KubeMarkDropChain))
-	// In some cases it's not a bug if we jump to a chain when that chain is empty
-	jumpedChains.Delete(string(kubeNodePortsChain))
-
-	missingChains := jumpedChains.Difference(createdChains)
-	missingChains = missingChains.Union(filledChains.Difference(createdChains))
-	if len(missingChains) > 0 {
-		return fmt.Errorf("some chains in %s are used but were not created: %v", tableName, missingChains.List())
+func checkIPTablesRuleJumps(ruleData string) error {
+	tables, err := parseIPTablesData(ruleData)
+	if err != nil {
+		return err
 	}
 
-	emptyChains := jumpedChains.Difference(filledChains)
-	if len(emptyChains) > 0 {
-		return fmt.Errorf("some chains in %s are jumped to but have no rules: %v", tableName, emptyChains.List())
-	}
+	for tableName, lines := range tables {
+		// Find all of the lines like ":KUBE-SERVICES", indicating chains that
+		// iptables-restore would create when loading the data.
+		createdChains := sets.NewString(findAllMatches(lines, `^:([^ ]*)`)...)
 
-	// FIXME: This currently fails
-	// extraChains := createdChains.Difference(jumpedChains)
-	// extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(KubeMarkMasqChain))
-	// if len(extraChains) > 0 {
-	// 	return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
-	// }
+		// Find all of the lines like "-A KUBE-SERVICES ..." indicating chains
+		// that we are adding at least one rule to.
+		filledChains := sets.NewString(findAllMatches(lines, `-A ([^ ]*)`)...)
+
+		// Find all of the chains that are jumped to by some rule so we can make
+		// sure we only jump to valid chains.
+		jumpedChains := sets.NewString(findAllMatches(lines, `-j ([^ ]*)`)...)
+		// Ignore jumps to chains that we expect to exist even if kube-proxy
+		// didn't create them itself.
+		jumpedChains.Delete("ACCEPT", "REJECT", "DROP", "MARK", "RETURN", "DNAT", "SNAT", "MASQUERADE")
+		jumpedChains.Delete(string(KubeMarkDropChain))
+
+		// Find cases where we have "-A FOO ... -j BAR" but no ":BAR", meaning
+		// that we are jumping to a chain that was not created.
+		missingChains := jumpedChains.Difference(createdChains)
+		missingChains = missingChains.Union(filledChains.Difference(createdChains))
+		if len(missingChains) > 0 {
+			return fmt.Errorf("some chains in %s are used but were not created: %v", tableName, missingChains.List())
+		}
+
+		// Find cases where we have "-A FOO ... -j BAR", but no "-A BAR ...",
+		// meaning that we are jumping to a chain that we didn't write out any
+		// rules for, which is normally a bug. (Except that KUBE-SERVICES always
+		// jumps to KUBE-NODEPORTS, even when there are no NodePort rules.)
+		emptyChains := jumpedChains.Difference(filledChains)
+		emptyChains.Delete(string(kubeNodePortsChain))
+		if len(emptyChains) > 0 {
+			return fmt.Errorf("some chains in %s are jumped to but have no rules: %v", tableName, emptyChains.List())
+		}
+
+		// Find cases where we have ":BAR" but no "-A FOO ... -j BAR", meaning
+		// that we are creating an empty chain but not using it for anything.
+		// FIXME: This currently fails
+		// extraChains := createdChains.Difference(jumpedChains)
+		// extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(KubeMarkMasqChain))
+		// if len(extraChains) > 0 {
+		// 	return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
+		// }
+	}
 
 	return nil
+}
+
+func Test_checkIPTablesRuleJumps(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input string
+		error string
+	}{
+		{
+			name: "valid",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SERVICES - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+COMMIT
+`,
+			error: "",
+		},
+		{
+			name: "can't jump to chain that wasn't created",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+COMMIT
+`,
+			error: "some chains in nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't jump to chain that has no rules",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+COMMIT
+`,
+			error: "some chains in nat are jumped to but have no rules: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't add rules to a chain that wasn't created",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" ...
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+COMMIT
+`,
+			error: "some chains in nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkIPTablesRuleJumps(tc.input)
+			if err == nil {
+				if tc.error != "" {
+					t.Errorf("unexpectedly did not get error")
+				}
+			} else {
+				if tc.error == "" {
+					t.Errorf("got unexpected error: %v", err)
+				} else if !strings.HasPrefix(err.Error(), tc.error) {
+					t.Errorf("got wrong error: %v (expected %q)", err, tc.error)
+				}
+			}
+		})
+	}
 }
 
 // sortIPTablesRules sorts `iptables-restore` output so as to not depend on the order that
 // Services get processed in, while preserving the relative ordering of related rules.
 func sortIPTablesRules(ruleData string) (string, error) {
-	tables := strings.Split(strings.TrimPrefix(ruleData, "\n"), "COMMIT\n")
-	if len(tables) != 3 || tables[2] != "" {
-		return "", fmt.Errorf("wrong number of tables (%d) in ruleData\n%s", len(tables)-1, ruleData)
+	tables, err := parseIPTablesData(ruleData)
+	if err != nil {
+		return "", err
 	}
-	tables = tables[:2]
+
+	tableNames := make([]string, 0, len(tables))
+	for tableName := range tables {
+		tableNames = append(tableNames, tableName)
+	}
+	sort.Strings(tableNames)
+
 	var output []string
-
-	for _, table := range tables {
-		lines := strings.Split(strings.Trim(table, "\n"), "\n")
-
-		err := assertIPTablesRuleJumps(lines)
-		if err != nil {
-			return "", err
-		}
+	for _, name := range tableNames {
+		lines := tables[name]
 
 		// Move "*TABLENAME" line
 		lines, output = moveMatchingLines(`^\*`, lines, output)
@@ -552,48 +895,15 @@ func sortIPTablesRules(ruleData string) (string, error) {
 			lines, output = moveMatchingLines(nextChain, lines, output)
 		}
 
-		// There should not be anything left, but if there is, just move it over now
-		// and it will show up in the diff later.
+		// Move the "COMMIT" line and anything else left. (There shouldn't be anything
+		// else, but if there is, it will show up in the diff later.)
 		_, output = moveMatchingLines(".", lines, output)
-
-		// The "COMMIT" line got eaten by strings.Split() above, so put it back
-		output = append(output, "COMMIT")
 	}
 
 	// Input ended with a "\n", so make sure the output does too
 	output = append(output, "")
 
 	return strings.Join(output, "\n"), nil
-}
-
-// assertIPTablesRulesEqual asserts that the generated rules in result match the rules in
-// expected, ignoring irrelevant ordering differences.
-func assertIPTablesRulesEqual(t *testing.T, expected, result string) {
-	expected, err := sortIPTablesRules(expected)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-	result, err = sortIPTablesRules(result)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-
-	assert.Equal(t, expected, result)
-}
-
-// assertIPTablesRulesNotEqual asserts that the generated rules in result DON'T match the
-// rules in expected, ignoring irrelevant ordering differences.
-func assertIPTablesRulesNotEqual(t *testing.T, expected, result string) {
-	expected, err := sortIPTablesRules(expected)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-	result, err = sortIPTablesRules(result)
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-
-	assert.NotEqual(t, expected, result)
 }
 
 func Test_sortIPTablesRules(t *testing.T) {
@@ -762,10 +1072,10 @@ COMMIT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 COMMIT
 `,
-			error: "wrong number of tables (1)",
+			error: "bad ruleData (1 tables)",
 		},
 		{
-			name: "too many tables",
+			name: "extra tables",
 			input: `
 *filter
 :KUBE-SERVICES - [0:0]
@@ -798,7 +1108,38 @@ COMMIT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 COMMIT
 `,
-			error: "wrong number of tables (3)",
+			output: `
+*filter
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-SERVICES - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*mangle
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-SERVICES - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-SERVICES - [0:0]
+-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+`,
 		},
 		{
 			name: "correctly match same service name in different styles of comments",
@@ -880,45 +1221,6 @@ COMMIT
 COMMIT
 `,
 		},
-		{
-			name: "can't jump to chain that wasn't created",
-			input: `
-*filter
-COMMIT
-*nat
-:KUBE-SERVICES - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
-COMMIT
-`,
-			error: "some chains in *nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
-		},
-		{
-			name: "can't jump to chain that has no rules",
-			input: `
-*filter
-COMMIT
-*nat
-:KUBE-SERVICES - [0:0]
-:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
-COMMIT
-`,
-			error: "some chains in *nat are jumped to but have no rules: [KUBE-SVC-XPGD46QRK7WJZT7O]",
-		},
-		{
-			name: "can't add rules to a chain that wasn't created",
-			input: `
-*filter
-COMMIT
-*nat
-:KUBE-MARK-MASQ - [0:0]
-:KUBE-SERVICES - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" ...
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
-COMMIT
-`,
-			error: "some chains in *nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out, err := sortIPTablesRules(tc.input)
@@ -936,6 +1238,50 @@ COMMIT
 				}
 			}
 		})
+	}
+}
+
+// assertIPTablesRulesEqual asserts that the generated rules in result match the rules in
+// expected, ignoring irrelevant ordering differences.
+func assertIPTablesRulesEqual(t *testing.T, expected, result string) {
+	expected, err := sortIPTablesRules(expected)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+	result, err = sortIPTablesRules(result)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	assert.Equal(t, expected, result)
+
+	err = checkIPTablesRuleJumps(expected)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+}
+
+// assertIPTablesRulesNotEqual asserts that the generated rules in result DON'T match the
+// rules in expected, ignoring irrelevant ordering differences.
+func assertIPTablesRulesNotEqual(t *testing.T, expected, result string) {
+	expected, err := sortIPTablesRules(expected)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+	result, err = sortIPTablesRules(result)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	assert.NotEqual(t, expected, result)
+
+	err = checkIPTablesRuleJumps(expected)
+	if err != nil {
+		t.Fatalf("%s", err)
+	}
+	err = checkIPTablesRuleJumps(result)
+	if err != nil {
+		t.Fatalf("%s", err)
 	}
 }
 
