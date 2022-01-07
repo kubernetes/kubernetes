@@ -721,6 +721,10 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		// Find all of the lines like ":KUBE-SERVICES", indicating chains that
 		// iptables-restore would create when loading the data.
 		createdChains := sets.NewString(findAllMatches(lines, `^:([^ ]*)`)...)
+		// Find all of the lines like "-X KUBE-SERVICES ..." indicating chains
+		// that we are deleting because they are no longer used, and remove
+		// those chains from createdChains.
+		createdChains = createdChains.Delete(findAllMatches(lines, `-X ([^ ]*)`)...)
 
 		// Find all of the lines like "-A KUBE-SERVICES ..." indicating chains
 		// that we are adding at least one rule to.
@@ -754,12 +758,11 @@ func checkIPTablesRuleJumps(ruleData string) error {
 
 		// Find cases where we have ":BAR" but no "-A FOO ... -j BAR", meaning
 		// that we are creating an empty chain but not using it for anything.
-		// FIXME: This currently fails
-		// extraChains := createdChains.Difference(jumpedChains)
-		// extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(KubeMarkMasqChain))
-		// if len(extraChains) > 0 {
-		// 	return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
-		// }
+		extraChains := createdChains.Difference(jumpedChains)
+		extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(KubeMarkMasqChain))
+		if len(extraChains) > 0 {
+			return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
+		}
 	}
 
 	return nil
@@ -825,6 +828,20 @@ COMMIT
 COMMIT
 `,
 			error: "some chains in nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't create chain and then not use it",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SERVICES - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" ...
+COMMIT
+`,
+			error: "some chains in nat are created but not used: [KUBE-SVC-XPGD46QRK7WJZT7O]",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1899,7 +1916,6 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
-:KUBE-XLB-XPGD46QRK7WJZT7O - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
@@ -2289,7 +2305,6 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
-:KUBE-XLB-XPGD46QRK7WJZT7O - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
@@ -5117,7 +5132,6 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
-:KUBE-XLB-AQI2S6QIMU7PVVRP - [0:0]
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE

@@ -1101,7 +1101,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		svcXlbChain := svcInfo.serviceLBChainName
-		if svcInfo.NodeLocalExternal() {
+		if hasEndpoints && svcInfo.NodeLocalExternal() {
 			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
