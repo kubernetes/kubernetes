@@ -101,6 +101,7 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affi
 		klog.V(4).InfoS("LoadBalancerRR service does not exist, created", "servicePortName", svcPort)
 	} else if affinityType != "" {
 		lb.services[svcPort].affinity.affinityType = affinityType
+		lb.services[svcPort].affinity.ttlSeconds = ttlSeconds
 	}
 	return lb.services[svcPort]
 }

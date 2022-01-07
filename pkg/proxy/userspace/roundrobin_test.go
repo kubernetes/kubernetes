@@ -26,6 +26,27 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 )
 
+func TestLoadBalancerNewInternalService(t *testing.T) {
+	loadBalancer, ttlSeconds := NewLoadBalancerRR(), 10
+	svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "default", Name: "foo"}, Port: "80"}
+
+	state := loadBalancer.newServiceInternal(svcPort,  v1.ServiceAffinity(""), 0)
+	if state.affinity.affinityType != v1.ServiceAffinity("")  {
+		t.Errorf("State affinity has a wrong service affinity set")
+	}
+	if state.affinity.ttlSeconds != int(v1.DefaultClientIPServiceAffinitySeconds) {
+		t.Error("Wrong TTL secoonds set on affinity configuration")
+	}
+
+	state = loadBalancer.newServiceInternal(svcPort, v1.ServiceAffinity(v1.ServiceAffinityClientIP), ttlSeconds)
+	if state.affinity.affinityType != v1.ServiceAffinityClientIP  {
+		t.Errorf("State affinity has a wrong service affinity set")
+	}
+	if state.affinity.ttlSeconds != ttlSeconds {
+		t.Error("Wrong TTL secoonds set on affinity configuration")
+	}
+}
+
 func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
 	service := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "foo"}, Port: "does-not-exist"}
