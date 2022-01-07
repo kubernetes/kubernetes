@@ -82,15 +82,17 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			switch currType {
 			case reflect.TypeOf(&clientcmdapi.AuthProviderConfig{}):
 				steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
+				currPartIndex += 1
 
 				// If we have a part after the auth provider name we need to add it. There should only ever be at most one part after this.
 				// If there is not nothing happens because just unsetting the name is pointless.
 				nextPart := strings.Join(individualParts[currPartIndex:], ".")
-				if len(strings.Split(nextPart, ".")) > 1 {
+				if len(strings.Split(nextPart, ".")) > 2 {
 					return nil, fmt.Errorf("too many steps in path %v", path)
+				} else if len(strings.Split(nextPart, ".")) > 1 {
+					steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
+					currPartIndex += 1
 				}
-
-				currPartIndex += 1
 
 			case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
 				return nil, fmt.Errorf("found ExecConfig")

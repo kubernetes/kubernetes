@@ -261,24 +261,51 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 		// Similar to the navigation step parser, because we can't easily work with the AuthProviderConfig or ExecConfig structs we work with them manually
 		switch actualCurrValue.Type() {
 		case reflect.TypeOf(&clientcmdapi.AuthProviderConfig{}):
-			// Since unsetting just the name of the auth-provider is pointless return error
-			if !steps.moreStepsRemaining() && unset {
-				return fmt.Errorf("cannot unset the name of auth-provider, must update or unset auth-provider itself")
-			}
-
+			// Check and see if we need to create a new auth-provider config or not
 			newActualCurrValue := actualCurrValue.Elem()
-			currFieldValue := newActualCurrValue.Field(1)
+			if actualCurrValue.IsNil() {
+				newValue := reflect.New(reflect.TypeOf(clientcmdapi.AuthProviderConfig{}))
+				actualCurrValue.Set(newValue)
+				newActualCurrValue = actualCurrValue.Elem()
 
-			if unset {
-				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
+				if !steps.moreStepsRemaining() && unset {
+					return nil
+				}
 			}
+			
+			switch steps.steps[steps.currentStepIndex-1].stepValue {
+			case "name":
+				// Since unsetting just the name of the auth-provider is pointless return error
+				if !steps.moreStepsRemaining() && unset {
+					return fmt.Errorf("cannot unset the name of auth-provider, must update or unset auth-provider itself")
+				}
 
-			mapKey := reflect.ValueOf(currStep.stepValue)
-			newMapValue := reflect.ValueOf(propertyValue)
+				currFieldValue := newActualCurrValue.FieldByName("Name")
+				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
 
-			currFieldValue.SetMapIndex(mapKey, newMapValue)
+			case "config":
+				currFieldValue := newActualCurrValue.FieldByName("Config")
 
-			return nil
+				if unset {
+					return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
+				}
+
+				currStep := steps.pop()
+				actualCurrValue = curr
+				mapKey := reflect.ValueOf(currStep.stepValue)
+				newMapValue := reflect.ValueOf(propertyValue)
+
+				currFieldValue.SetMapIndex(mapKey, newMapValue)
+
+				return nil
+
+			default:
+				path := []string{}
+				for _, step := range(steps.steps) {
+					path = append(path, step.stepValue)
+				}
+				return fmt.Errorf("unrecognized step in path %v", strings.Join(path, "."))
+			}
 
 		case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
 			return fmt.Errorf("found ExecConfig")
