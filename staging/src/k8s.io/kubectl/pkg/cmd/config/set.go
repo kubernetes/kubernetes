@@ -295,6 +295,10 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				mapKey := reflect.ValueOf(currStep.stepValue)
 				newMapValue := reflect.ValueOf(propertyValue)
 
+				if currFieldValue.IsNil() {
+					currFieldValue.Set(reflect.ValueOf(map[string]string{}))
+				}
+
 				currFieldValue.SetMapIndex(mapKey, newMapValue)
 
 				return nil
