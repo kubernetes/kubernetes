@@ -288,7 +288,10 @@ aliases:
   # sig-apps-emeritus:
   # - tnozicka
 
-  sig-autoscaling-maintainers: []
+  sig-autoscaling-maintainers:
+    - bskiba
+    - MaciekPytel
+    - mwielgus
   sig-instrumentation-approvers:
     - brancz
     - logicalhan
