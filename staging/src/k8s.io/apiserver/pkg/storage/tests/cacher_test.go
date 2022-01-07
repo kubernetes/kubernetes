@@ -291,7 +291,10 @@ func TestList(t *testing.T) {
 	// We first List directly from etcd by passing empty resourceVersion,
 	// to get the current etcd resourceVersion.
 	rvResult := &example.PodList{}
-	if err := cacher.List(context.TODO(), "pods/ns", storage.ListOptions{Predicate: storage.Everything}, rvResult); err != nil {
+	options := storage.ListOptions{
+		Predicate: storage.Everything,
+	}
+	if err := cacher.List(context.TODO(), "pods/ns", options, rvResult); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	deletedPodRV := rvResult.ListMeta.ResourceVersion
@@ -299,7 +302,11 @@ func TestList(t *testing.T) {
 	result := &example.PodList{}
 	// We pass the current etcd ResourceVersion received from the above List() operation,
 	// since there is not easy way to get ResourceVersion of barPod deletion operation.
-	if err := cacher.List(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: deletedPodRV, Predicate: storage.Everything}, result); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: deletedPodRV,
+		Predicate:       storage.Everything,
+	}
+	if err := cacher.List(context.TODO(), "pods/ns", options, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != deletedPodRV {
@@ -361,7 +368,11 @@ func TestTooLargeResourceVersionList(t *testing.T) {
 	listRV := strconv.Itoa(int(rv + 10))
 
 	result := &example.PodList{}
-	err = cacher.List(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: listRV, Predicate: storage.Everything}, result)
+	options := storage.ListOptions{
+		ResourceVersion: listRV,
+		Predicate:       storage.Everything,
+	}
+	err = cacher.List(context.TODO(), "pods/ns", options, result)
 	if !errors.IsTimeout(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
