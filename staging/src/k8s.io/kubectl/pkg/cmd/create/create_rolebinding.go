@@ -40,7 +40,7 @@ var (
 	roleBindingLong = templates.LongDesc(i18n.T(`
 		Create a role binding for a particular role or cluster role.`))
 
-		roleBindingExample = templates.Examples(i18n.T(`
+	roleBindingExample = templates.Examples(i18n.T(`
 		# Create a role binding for user1, user2, and group1 using the admin cluster role
 		kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1
 
