@@ -286,13 +286,21 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			case "config":
 				currFieldValue := newActualCurrValue.FieldByName("Config")
 
-				if unset {
+				// If we're unsetting values in the config branch we need to check if there are more steps. If so, we want to continue to unset the value itself, if not we want to unset the entire config.
+				if steps.moreStepsRemaining() && unset {
 					return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
+				} else if !steps.moreStepsRemaining() && unset {
+					currFieldValue.Set(reflect.ValueOf(map[string]string{}))
+					return nil
 				}
 
+				// Assuming we're unsetting a specific config value we will need to pop the next step for the key we want to set.
 				currStep := steps.pop()
 				actualCurrValue = curr
 				mapKey := reflect.ValueOf(currStep.stepValue)
+				if currStep.stepValue == "" {
+					return fmt.Errorf("can not set config to value, must specify key, e.g. users.foo.auth-provider.config.refresh-token")
+				}
 				newMapValue := reflect.ValueOf(propertyValue)
 
 				if currFieldValue.IsNil() {
@@ -302,6 +310,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				currFieldValue.SetMapIndex(mapKey, newMapValue)
 
 				return nil
+
+			case "auth-provider":
+				return fmt.Errorf("can not set auth-provider, must set name or config key, e.g. users.foo.auth-provider.name or users.foo.auth-provider.config.refresh-token")
 
 			default:
 				path := []string{}
