@@ -422,6 +422,9 @@ aliases:
     - cblecker
     - nikhita
   sig-docs-approvers:
+    - jimangel
+    - kbhawkey
+    - onlydole
     - sftim
   sig-node-api-reviewers:
     - dchen1107
