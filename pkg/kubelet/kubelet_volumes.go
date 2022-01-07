@@ -53,10 +53,10 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 }
 
 // podVolumesExist checks with the volume manager and returns true any of the
-// pods for the specified volume are mounted.
+// pods for the specified volume are mounted or are uncertain.
 func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {
 	if mountedVolumes :=
-		kl.volumeManager.GetMountedVolumesForPod(
+		kl.volumeManager.GetPossiblyMountedVolumesForPod(
 			volumetypes.UniquePodName(podUID)); len(mountedVolumes) > 0 {
 		return true
 	}

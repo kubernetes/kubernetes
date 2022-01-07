@@ -156,6 +156,184 @@ func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
 }
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
+	dswp, fakeRuntime, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
+	podName := util.GetUniquePodName(pod)
+
+	//let the pod be terminated
+	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	if !exist {
+		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
+	}
+	podGet.Status.Phase = v1.PodFailed
+	dswp.podManager.DeletePod(pod)
+
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{
+			Pod: &kubecontainer.Pod{
+				Name: pod.Name,
+				ID:   pod.UID,
+				Sandboxes: []*kubecontainer.Container{
+					{
+						Name: "dswp-test-pod-sandbox",
+					},
+				},
+			},
+		},
+	}
+
+	dswp.findAndRemoveDeletedPods()
+
+	if !dswp.pods.processedPods[podName] {
+		t.Fatalf("Pod should not been removed from desired state of world since sandbox exist")
+	}
+
+	fakeRuntime.PodList = nil
+
+	// fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
+	dswp.findAndRemoveDeletedPods()
+	if dswp.pods.processedPods[podName] {
+		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
+	}
+
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
+		podName, expectedVolumeName); podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	volumesToMount := dswp.desiredStateOfWorld.GetVolumesToMount()
+	for _, volume := range volumesToMount {
+		if volume.VolumeName == expectedVolumeName {
+			t.Fatalf(
+				"Found volume %v in the list of desired state of world volumes to mount. Expected not",
+				expectedVolumeName)
+		}
+	}
+}
+
+func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
+	dswp, _, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
+	podName := util.GetUniquePodName(pod)
+
+	//let the pod be terminated
+	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	if !exist {
+		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
+	}
+	podGet.Status.Phase = v1.PodFailed
+
+	dswp.findAndRemoveDeletedPods()
+	// Although Pod status is terminated, pod still exists in pod manager and actual state does not has this pod and volume information
+	// desired state populator will fail to delete this pod and volume first
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
+		podName, expectedVolumeName); !podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	// reconcile with actual state so that volume is added into the actual state
+	// desired state populator now can successfully delete the pod and volume
+	fakeASW := dswp.actualStateOfWorld
+	reconcileASW(fakeASW, dswp.desiredStateOfWorld, t)
+	dswp.findAndRemoveDeletedPods()
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
+		podName, expectedVolumeName); podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
+			podExistsInVolume)
+	}
+}
+
+func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
+	dswp, fakeRuntime, pod, expectedVolumeName, pv := prepareDSWPWithPodPV(t)
+	podName := util.GetUniquePodName(pod)
+
+	//let the pod be terminated
+	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	if !exist {
+		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
+	}
+	podGet.Status.Phase = v1.PodFailed
+	dswp.podManager.DeletePod(pod)
+	fakeRuntime.PodList = nil
+
+	// Add the volume to ASW by reconciling.
+	fakeASW := dswp.actualStateOfWorld
+	reconcileASW(fakeASW, dswp.desiredStateOfWorld, t)
+
+	// Mark the volume as uncertain
+	opts := operationexecutor.MarkVolumeOpts{
+		PodName:             util.GetUniquePodName(pod),
+		PodUID:              pod.UID,
+		VolumeName:          expectedVolumeName,
+		OuterVolumeSpecName: "dswp-test-volume-name",
+		VolumeGidVolume:     "",
+		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
+		VolumeMountState:    operationexecutor.VolumeMountUncertain,
+	}
+	err := dswp.actualStateOfWorld.MarkVolumeMountAsUncertain(opts)
+	if err != nil {
+		t.Fatalf("Failed to set the volume as uncertain: %s", err)
+	}
+
+	// fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
+	dswp.findAndRemoveDeletedPods()
+	if dswp.pods.processedPods[podName] {
+		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
+	}
+
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
+		podName, expectedVolumeName); podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	volumesToMount := dswp.desiredStateOfWorld.GetVolumesToMount()
+	for _, volume := range volumesToMount {
+		if volume.VolumeName == expectedVolumeName {
+			t.Fatalf(
+				"Found volume %v in the list of desired state of world volumes to mount. Expected not",
+				expectedVolumeName)
+		}
+	}
+}
+
+func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *containertest.FakeRuntime, *v1.Pod, v1.UniqueVolumeName, *v1.PersistentVolume) {
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -221,181 +399,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	verifyVolumeExistsInVolumesToMount(
 		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
-
-	//let the pod be terminated
-	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
-	if !exist {
-		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
-	}
-	podGet.Status.Phase = v1.PodFailed
-
-	fakePodManager.DeletePod(pod)
-
-	fakeRuntime.PodList = []*containertest.FakePod{
-		{
-			Pod: &kubecontainer.Pod{
-				Name: pod.Name,
-				ID:   pod.UID,
-				Sandboxes: []*kubecontainer.Container{
-					{
-						Name: "dswp-test-pod-sandbox",
-					},
-				},
-			},
-		},
-	}
-
-	dswp.findAndRemoveDeletedPods()
-
-	if !dswp.pods.processedPods[podName] {
-		t.Fatalf("Pod should not been removed from desired state of world since sandbox exist")
-	}
-
-	fakeRuntime.PodList = nil
-
-	// fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
-	dswp.findAndRemoveDeletedPods()
-	if dswp.pods.processedPods[podName] {
-		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
-	}
-
-	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
-	if volumeExists {
-		t.Fatalf(
-			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
-			expectedVolumeName,
-			volumeExists)
-	}
-
-	if podExistsInVolume := fakesDSW.PodExistsInVolume(
-		podName, expectedVolumeName); podExistsInVolume {
-		t.Fatalf(
-			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
-			podExistsInVolume)
-	}
-
-	volumesToMount := fakesDSW.GetVolumesToMount()
-	for _, volume := range volumesToMount {
-		if volume.VolumeName == expectedVolumeName {
-			t.Fatalf(
-				"Found volume %v in the list of desired state of world volumes to mount. Expected not",
-				expectedVolumeName)
-		}
-	}
-
-}
-
-func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
-	// create dswp
-	mode := v1.PersistentVolumeFilesystem
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "dswp-test-volume-name",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-			VolumeMode: &mode,
-		},
-	}
-	pvc := &v1.PersistentVolumeClaim{
-		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName: "dswp-test-volume-name",
-		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase: v1.ClaimBound,
-		},
-	}
-	dswp, fakePodManager, fakesDSW, _ := createDswpWithVolume(t, pv, pvc)
-
-	// create pod
-	containers := []v1.Container{
-		{
-			VolumeMounts: []v1.VolumeMount{
-				{
-					Name:      "dswp-test-volume-name",
-					MountPath: "/mnt",
-				},
-			},
-		},
-	}
-	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
-
-	fakePodManager.AddPod(pod)
-
-	podName := util.GetUniquePodName(pod)
-
-	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
-
-	dswp.findAndAddNewPods()
-
-	if !dswp.pods.processedPods[podName] {
-		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
-	}
-
-	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
-
-	volumeExists := fakesDSW.VolumeExists(expectedVolumeName)
-	if !volumeExists {
-		t.Fatalf(
-			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
-			expectedVolumeName,
-			volumeExists)
-	}
-
-	if podExistsInVolume := fakesDSW.PodExistsInVolume(
-		podName, expectedVolumeName); !podExistsInVolume {
-		t.Fatalf(
-			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
-			podExistsInVolume)
-	}
-
-	verifyVolumeExistsInVolumesToMount(
-		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
-
-	//let the pod be terminated
-	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
-	if !exist {
-		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
-	}
-	podGet.Status.Phase = v1.PodFailed
-
-	dswp.findAndRemoveDeletedPods()
-	// Although Pod status is terminated, pod still exists in pod manager and actual state does not has this pod and volume information
-	// desired state populator will fail to delete this pod and volume first
-	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
-	if !volumeExists {
-		t.Fatalf(
-			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
-			expectedVolumeName,
-			volumeExists)
-	}
-
-	if podExistsInVolume := fakesDSW.PodExistsInVolume(
-		podName, expectedVolumeName); !podExistsInVolume {
-		t.Fatalf(
-			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
-			podExistsInVolume)
-	}
-
-	// reconcile with actual state so that volume is added into the actual state
-	// desired state populator now can successfully delete the pod and volume
-	fakeASW := dswp.actualStateOfWorld
-	reconcileASW(fakeASW, fakesDSW, t)
-	dswp.findAndRemoveDeletedPods()
-	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
-	if volumeExists {
-		t.Fatalf(
-			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
-			expectedVolumeName,
-			volumeExists)
-	}
-
-	if podExistsInVolume := fakesDSW.PodExistsInVolume(
-		podName, expectedVolumeName); podExistsInVolume {
-		t.Fatalf(
-			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
-			podExistsInVolume)
-	}
+	return dswp, fakeRuntime, pod, expectedVolumeName, pv
 }
 
 func TestFindAndRemoveNonattachableVolumes(t *testing.T) {

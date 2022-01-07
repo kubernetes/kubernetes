@@ -822,6 +822,22 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		// Execute unmount
 		unmountErr := volumeUnmounter.TearDown()
 		if unmountErr != nil {
+			// Mark the volume as uncertain, so SetUp is called for new pods. Teardown may be already in progress.
+			opts := MarkVolumeOpts{
+				PodName:             volumeToUnmount.PodName,
+				PodUID:              volumeToUnmount.PodUID,
+				VolumeName:          volumeToUnmount.VolumeName,
+				OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
+				VolumeGidVolume:     volumeToUnmount.VolumeGidValue,
+				VolumeSpec:          volumeToUnmount.VolumeSpec,
+				VolumeMountState:    VolumeMountUncertain,
+			}
+			markMountUncertainErr := actualStateOfWorld.MarkVolumeMountAsUncertain(opts)
+			if markMountUncertainErr != nil {
+				// There is nothing else we can do. Hope that UnmountVolume will be re-tried shortly.
+				klog.Errorf(volumeToUnmount.GenerateErrorDetailed("UnmountVolume.MarkVolumeMountAsUncertain failed", markMountUncertainErr).Error())
+			}
+
 			// On failure, return error. Caller will log and retry.
 			eventErr, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.TearDown failed", unmountErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -908,6 +924,13 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		// Execute unmount
 		unmountDeviceErr := volumeDeviceUnmounter.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
+			// Mark the device as uncertain, so MountDevice is called for new pods. UnmountDevice may be already in progress.
+			markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath)
+			if markDeviceUncertainErr != nil {
+				// There is nothing else we can do. Hope that UnmountDevice will be re-tried shortly.
+				klog.Errorf(deviceToDetach.GenerateErrorDetailed("UnmountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr).Error())
+			}
+
 			// On failure, return error. Caller will log and retry.
 			eventErr, detailedErr := deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -1209,6 +1232,25 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		// plugins/kubernetes.io/{PluginName}/volumeDevices/{volumePluginDependentPath}/{podUID}
 		globalUnmapPath := volumeToUnmount.DeviceMountPath
 
+		// Mark the device as uncertain to make sure kubelet calls UnmapDevice again in all the "return err"
+		// cases below. The volume is marked as fully un-mapped at the end of this function, when everything
+		// succeeds.
+		markVolumeOpts := MarkVolumeOpts{
+			PodName:             volumeToUnmount.PodName,
+			PodUID:              volumeToUnmount.PodUID,
+			VolumeName:          volumeToUnmount.VolumeName,
+			OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToUnmount.VolumeGidValue,
+			VolumeSpec:          volumeToUnmount.VolumeSpec,
+			VolumeMountState:    VolumeMountUncertain,
+		}
+		markVolumeUncertainErr := actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts)
+		if markVolumeUncertainErr != nil {
+			// On failure, return error. Caller will log and retry.
+			eventErr, detailedErr := volumeToUnmount.GenerateError("UnmapVolume.MarkDeviceAsUncertain failed", markVolumeUncertainErr)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
 		// Execute common unmap
 		unmapErr := util.UnmapBlockVolume(og.blkUtil, globalUnmapPath, podDeviceUnmapPath, volName, volumeToUnmount.PodUID)
 		if unmapErr != nil {
@@ -1307,6 +1349,17 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		if len(refs) > 0 {
 			err = fmt.Errorf("the device %q is still referenced from other Pods %v", globalMapPath, refs)
 			eventErr, detailedErr := deviceToDetach.GenerateError("UnmapDevice failed", err)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
+		// Mark the device as uncertain to make sure kubelet calls UnmapDevice again in all the "return err"
+		// cases below. The volume is marked as fully un-mapped at the end of this function, when everything
+		// succeeds.
+		markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(
+			deviceToDetach.VolumeName, deviceToDetach.DevicePath, globalMapPath)
+		if markDeviceUncertainErr != nil {
+			// On failure, return error. Caller will log and retry.
+			eventErr, detailedErr := deviceToDetach.GenerateError("UnmapDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
