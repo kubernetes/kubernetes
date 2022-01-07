@@ -1753,31 +1753,30 @@ type LocalVolumeSource struct {
 
 // Represents storage that is managed by an external CSI volume driver (Beta feature)
 type CSIPersistentVolumeSource struct {
-	// Driver is the name of the driver to use for this volume.
+	// driver is the name of the driver to use for this volume.
 	// Required.
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
 
-	// VolumeHandle is the unique volume name returned by the CSI volume
+	// volumeHandle is the unique volume name returned by the CSI volume
 	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
 	// Required.
 	VolumeHandle string `json:"volumeHandle" protobuf:"bytes,2,opt,name=volumeHandle"`
 
-	// Optional: The value to pass to ControllerPublishVolumeRequest.
+	// readOnly value to pass to ControllerPublishVolumeRequest.
 	// Defaults to false (read/write).
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 
-	// Filesystem type to mount.
-	// Must be a filesystem type supported by the host operating system.
+	// fsType to mount. Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs".
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
 
-	// Attributes of the volume to publish.
+	// volumeAttributes of the volume to publish.
 	// +optional
 	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty" protobuf:"bytes,5,rep,name=volumeAttributes"`
 
-	// ControllerPublishSecretRef is a reference to the secret object containing
+	// controllerPublishSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// ControllerPublishVolume and ControllerUnpublishVolume calls.
 	// This field is optional, and may be empty if no secret is required. If the
@@ -1785,7 +1784,7 @@ type CSIPersistentVolumeSource struct {
 	// +optional
 	ControllerPublishSecretRef *SecretReference `json:"controllerPublishSecretRef,omitempty" protobuf:"bytes,6,opt,name=controllerPublishSecretRef"`
 
-	// NodeStageSecretRef is a reference to the secret object containing sensitive
+	// nodeStageSecretRef is a reference to the secret object containing sensitive
 	// information to pass to the CSI driver to complete the CSI NodeStageVolume
 	// and NodeStageVolume and NodeUnstageVolume calls.
 	// This field is optional, and may be empty if no secret is required. If the
@@ -1793,7 +1792,7 @@ type CSIPersistentVolumeSource struct {
 	// +optional
 	NodeStageSecretRef *SecretReference `json:"nodeStageSecretRef,omitempty" protobuf:"bytes,7,opt,name=nodeStageSecretRef"`
 
-	// NodePublishSecretRef is a reference to the secret object containing
+	// nodePublishSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodePublishVolume and NodeUnpublishVolume calls.
 	// This field is optional, and may be empty if no secret is required. If the
@@ -1801,7 +1800,7 @@ type CSIPersistentVolumeSource struct {
 	// +optional
 	NodePublishSecretRef *SecretReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,8,opt,name=nodePublishSecretRef"`
 
-	// ControllerExpandSecretRef is a reference to the secret object containing
+	// controllerExpandSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// ControllerExpandVolume call.
 	// This is an alpha field and requires enabling ExpandCSIVolumes feature gate.
@@ -1813,27 +1812,27 @@ type CSIPersistentVolumeSource struct {
 
 // Represents a source location of a volume to mount, managed by an external CSI driver
 type CSIVolumeSource struct {
-	// Driver is the name of the CSI driver that handles this volume.
+	// driver is the name of the CSI driver that handles this volume.
 	// Consult with your admin for the correct name as registered in the cluster.
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
 
-	// Specifies a read-only configuration for the volume.
+	// readOnly specifies a read-only configuration for the volume.
 	// Defaults to false (read/write).
 	// +optional
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 
-	// Filesystem type to mount. Ex. "ext4", "xfs", "ntfs".
+	// fsType to mount. Ex. "ext4", "xfs", "ntfs".
 	// If not provided, the empty value is passed to the associated CSI driver
 	// which will determine the default filesystem to apply.
 	// +optional
 	FSType *string `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
 
-	// VolumeAttributes stores driver-specific properties that are passed to the CSI
+	// volumeAttributes stores driver-specific properties that are passed to the CSI
 	// driver. Consult your driver's documentation for supported values.
 	// +optional
 	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty" protobuf:"bytes,4,rep,name=volumeAttributes"`
 
-	// NodePublishSecretRef is a reference to the secret object containing
+	// nodePublishSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodePublishVolume and NodeUnpublishVolume calls.
 	// This field is optional, and  may be empty if no secret is required. If the
