@@ -222,6 +222,10 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
 		TpPairToMatchNum:     make(map[topologyPair]*int32, sizeHeuristic(len(allNodes), constraints)),
 	}
+
+	// Nodes that pass nodeAffinity check and carry all required topology keys will be
+	// stored in `filteredNodes`, and be looped later to calculate preFilterState.
+	var filteredNodes []*framework.NodeInfo
 	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(pod)
 	for _, n := range allNodes {
 		node := n.Node()
@@ -244,10 +248,12 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			s.TpPairToMatchNum[pair] = new(int32)
 		}
+
+		filteredNodes = append(filteredNodes, n)
 	}
 
 	processNode := func(i int) {
-		nodeInfo := allNodes[i]
+		nodeInfo := filteredNodes[i]
 		node := nodeInfo.Node()
 
 		for _, constraint := range constraints {
@@ -260,7 +266,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			atomic.AddInt32(tpCount, int32(count))
 		}
 	}
-	pl.parallelizer.Until(context.Background(), len(allNodes), processNode)
+	pl.parallelizer.Until(context.Background(), len(filteredNodes), processNode)
 
 	// calculate min match for each topology pair
 	for i := 0; i < len(constraints); i++ {
