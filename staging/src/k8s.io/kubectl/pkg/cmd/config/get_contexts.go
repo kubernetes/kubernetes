@@ -21,6 +21,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"encoding/json"
 
 	"github.com/liggitt/tabwriter"
 	"github.com/spf13/cobra"
@@ -40,10 +41,19 @@ import (
 type GetContextsOptions struct {
 	configAccess clientcmd.ConfigAccess
 	nameOnly     bool
+	printJson    bool
 	showHeaders  bool
 	contextNames []string
 
 	genericclioptions.IOStreams
+}
+
+type Context struct {
+	Current string
+	Name string
+	Cluster string
+	AuthInfo string
+	Namespace string
 }
 
 var (
@@ -67,7 +77,7 @@ func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess c
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "get-contexts [(-o|--output=)name)]",
+		Use:                   "get-contexts [(-o|--output=)name, json)]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Describe one or many contexts"),
 		Long:                  getContextsLong,
@@ -80,7 +90,7 @@ func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess c
 	}
 
 	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
-	cmd.Flags().StringP("output", "o", "", "Output format. One of: name")
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: name, json")
 	return cmd
 }
 
@@ -88,11 +98,17 @@ func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess c
 func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.contextNames = args
 	o.nameOnly = false
+	o.printJson = false
 	if cmdutil.GetFlagString(cmd, "output") == "name" {
 		o.nameOnly = true
 	}
+
+	if cmdutil.GetFlagString(cmd, "output") == "json" {
+		o.printJson = true
+	}
+
 	o.showHeaders = true
-	if cmdutil.GetFlagBool(cmd, "no-headers") || o.nameOnly {
+	if cmdutil.GetFlagBool(cmd, "no-headers") || o.nameOnly || o.printJson {
 		o.showHeaders = false
 	}
 
@@ -102,10 +118,10 @@ func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
 // Validate ensures the of output format
 func (o *GetContextsOptions) Validate(cmd *cobra.Command) error {
 	validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
-	supportedOutputTypes := sets.NewString("", "name")
+	supportedOutputTypes := sets.NewString("", "name", "json")
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	if !validOutputTypes.Has(outputFormat) {
-		return fmt.Errorf("output must be one of '' or 'name': %v", outputFormat)
+		return fmt.Errorf("output must be one of '' or 'name, json': %v", outputFormat)
 	}
 	if !supportedOutputTypes.Has(outputFormat) {
 		cmd.Flags().Set("output", "")
@@ -146,7 +162,7 @@ func (o GetContextsOptions) RunGetContexts() error {
 		}
 	}
 	if o.showHeaders {
-		err = printContextHeaders(out, o.nameOnly)
+		err = printContextHeaders(out, o.nameOnly, o.printJson)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		}
@@ -154,7 +170,7 @@ func (o GetContextsOptions) RunGetContexts() error {
 
 	sort.Strings(toPrint)
 	for _, name := range toPrint {
-		err = printContext(name, config.Contexts[name], out, o.nameOnly, config.CurrentContext == name)
+		err = printContext(name, config.Contexts[name], out, o.nameOnly, o.printJson, config.CurrentContext == name)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		}
@@ -163,16 +179,19 @@ func (o GetContextsOptions) RunGetContexts() error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func printContextHeaders(out io.Writer, nameOnly bool) error {
+func printContextHeaders(out io.Writer, nameOnly bool, printJson bool) error {
 	columnNames := []string{"CURRENT", "NAME", "CLUSTER", "AUTHINFO", "NAMESPACE"}
 	if nameOnly {
 		columnNames = columnNames[:1]
+	}
+	if printJson {
+		columnNames = nil
 	}
 	_, err := fmt.Fprintf(out, "%s\n", strings.Join(columnNames, "\t"))
 	return err
 }
 
-func printContext(name string, context *clientcmdapi.Context, w io.Writer, nameOnly, current bool) error {
+func printContext(name string, context *clientcmdapi.Context, w io.Writer, nameOnly, printJson, current bool) error {
 	if nameOnly {
 		_, err := fmt.Fprintf(w, "%s\n", name)
 		return err
@@ -181,6 +200,18 @@ func printContext(name string, context *clientcmdapi.Context, w io.Writer, nameO
 	if current {
 		prefix = "*"
 	}
+
+	if printJson {
+		context := Context{prefix, name, context.Cluster, context.AuthInfo, context.Namespace}
+		jsonBytes, err := json.Marshal(context)
+		if err != nil {
+			panic(err)
+		}
+		jsonString := string(jsonBytes)
+		fmt.Println(jsonString)
+		return err
+	}
+
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", prefix, name, context.Cluster, context.AuthInfo, context.Namespace)
 	return err
 }
