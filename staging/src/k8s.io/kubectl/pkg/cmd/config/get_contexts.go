@@ -22,7 +22,6 @@ import (
 	"io"
 	"sort"
 	"strings"
-	"encoding/json"
 
 	"github.com/liggitt/tabwriter"
 	"github.com/spf13/cobra"
