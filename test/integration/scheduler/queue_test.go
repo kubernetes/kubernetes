@@ -105,10 +105,6 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 		}
 		testCtx.Scheduler.Error(podInfo, fitError)
-
-		// Scheduling cycle is incremented by one after NextPod() is called, so
-		// pass a number larger than i to move Pod to unschedulablePods.
-		testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, int64(i+10))
 	}
 
 	// Trigger a NodeTaintChange event.
