@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -49,10 +50,10 @@ type GetContextsOptions struct {
 }
 
 type Context struct {
-	Current string
-	Name string
-	Cluster string
-	AuthInfo string
+	Current   string
+	Name      string
+	Cluster   string
+	AuthInfo  string
 	Namespace string
 }
 
