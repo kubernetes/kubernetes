@@ -227,14 +227,8 @@ func SetDefaults_NodeResourcesBalancedAllocationArgs(obj *v1beta3.NodeResourcesB
 }
 
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta3.PodTopologySpreadArgs) {
-	if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
-		if obj.DefaultingType == "" {
-			obj.DefaultingType = v1beta3.SystemDefaulting
-		}
-		return
-	}
 	if obj.DefaultingType == "" {
-		obj.DefaultingType = v1beta3.ListDefaulting
+		obj.DefaultingType = v1beta3.SystemDefaulting
 	}
 }
 
