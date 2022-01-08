@@ -48,6 +48,14 @@ type GetContextsOptions struct {
 	genericclioptions.IOStreams
 }
 
+type Context struct {
+	Current string
+	Name string
+	Cluster string
+	AuthInfo string
+	Namespace string
+}
+
 var (
 	getContextsLong = templates.LongDesc(i18n.T(`Display one or many contexts from the kubeconfig file.`))
 
@@ -181,14 +189,6 @@ func printContextHeaders(out io.Writer, nameOnly bool, printJson bool) error {
 	}
 	_, err := fmt.Fprintf(out, "%s\n", strings.Join(columnNames, "\t"))
 	return err
-}
-
-type Context struct {
-	Current string
-	Name string
-	Cluster string
-	AuthInfo string
-	Namespace string
 }
 
 func printContext(name string, context *clientcmdapi.Context, w io.Writer, nameOnly, printJson, current bool) error {
