@@ -209,11 +209,6 @@ func (pl *nonCSILimits) EventsToRegister() []framework.ClusterEvent {
 	}
 }
 
-const (
-	Name              = "NonCSILimits"
-	preFilterStateKey = "PreFilter" + Name
-)
-
 type preFilterState struct {
 	newVolumes sets.String
 }
@@ -223,13 +218,19 @@ func (s *preFilterState) Clone() framework.StateData {
 	return s
 }
 
+const preFilterStateKeyBase = "PreFilter"
+
+func (pl *nonCSILimits) preFilterStateKey() framework.StateKey {
+	return framework.StateKey(preFilterStateKeyBase + pl.name)
+}
+
 func (pl *nonCSILimits) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	newVolumes := make(sets.String)
 	if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
 		return framework.AsStatus(err)
 	}
 	pfState := &preFilterState{newVolumes: newVolumes}
-	state.Write(preFilterStateKey, pfState)
+	state.Write(pl.preFilterStateKey(), pfState)
 	return nil
 }
 
@@ -245,7 +246,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, state *framework.CycleState,
 		return nil
 	}
 
-	s, err := getPreFilterState(state)
+	s, err := pl.getPreFilterState(state)
 	if err != nil {
 		newVolumes := make(sets.String)
 		if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
@@ -307,10 +308,10 @@ func (pl *nonCSILimits) Filter(ctx context.Context, state *framework.CycleState,
 	return nil
 }
 
-func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
-	c, err := cycleState.Read(preFilterStateKey)
+func (pl *nonCSILimits) getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+	c, err := cycleState.Read(pl.preFilterStateKey())
 	if err != nil {
-		return nil, fmt.Errorf("reading %q from cycleState: %v", preFilterStateKey, err)
+		return nil, fmt.Errorf("reading %q from cycleState: %v", pl.preFilterStateKey(), err)
 	}
 
 	s, ok := c.(*preFilterState)
