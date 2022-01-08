@@ -85,7 +85,6 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 				currPartIndex += 1
 
 				// If we have a part after the auth provider name we need to add it. There should only ever be at most one part after this.
-				// If there is not nothing happens because just unsetting the name is pointless.
 				nextPart := strings.Join(individualParts[currPartIndex:], ".")
 				if len(strings.Split(nextPart, ".")) > 2 {
 					return nil, fmt.Errorf("too many steps in path %v", path)
@@ -95,7 +94,7 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 				}
 
 			case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
-				return nil, fmt.Errorf("found ExecConfig")
+				return nil, fmt.Errorf("found exec, kubectl does not currently support manipulating exec settings")
 
 			default:
 				return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
