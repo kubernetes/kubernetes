@@ -77,7 +77,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 		{
 			description: "V4 UDP",
 			svcName:     "v4-udp",
-			svcIP:       "10.96.1.1",
+			svcIP:       "172.30.1.1",
 			svcPort:     80,
 			protocol:    UDP,
 			endpoint:    "10.240.0.3:80",
@@ -85,7 +85,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 		{
 			description: "V4 TCP",
 			svcName:     "v4-tcp",
-			svcIP:       "10.96.2.2",
+			svcIP:       "172.30.2.2",
 			svcPort:     80,
 			protocol:    TCP,
 			endpoint:    "10.240.0.4:80",
@@ -93,7 +93,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 		{
 			description: "V4 SCTP",
 			svcName:     "v4-sctp",
-			svcIP:       "10.96.3.3",
+			svcIP:       "172.30.3.3",
 			svcPort:     80,
 			protocol:    SCTP,
 			endpoint:    "10.240.0.5:80",
@@ -101,7 +101,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 		{
 			description:  "V4 UDP, nothing to delete, benign error",
 			svcName:      "v4-udp-nothing-to-delete",
-			svcIP:        "10.96.1.1",
+			svcIP:        "172.30.1.1",
 			svcPort:      80,
 			protocol:     UDP,
 			endpoint:     "10.240.0.3:80",
@@ -110,7 +110,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 		{
 			description:  "V4 UDP, unexpected error, should be glogged",
 			svcName:      "v4-udp-simulated-error",
-			svcIP:        "10.96.1.1",
+			svcIP:        "172.30.1.1",
 			svcPort:      80,
 			protocol:     UDP,
 			endpoint:     "10.240.0.3:80",
@@ -381,7 +381,19 @@ func (f *fakePortOpener) OpenLocalPort(lp *netutils.LocalPort) (netutils.Closeab
 	return &fakeCloseable{}, nil
 }
 
+// Conventions for tests using NewFakeProxier:
+//
+// Pod IPs:             10.0.0.0/8
+// Service ClusterIPs:  172.30.0.0/16
+// Node IPs:            192.168.0.0/24
+// Local Node IP:       192.168.0.2
+// Service ExternalIPs: 192.168.99.0/24
+// LoadBalancer IPs:    1.2.3.4, 5.6.7.8, 9.10.11.12
+// Non-cluster IPs:     203.0.113.0/24
+// LB Source Range:     203.0.113.0/25
+
 const testHostname = "test-hostname"
+const testNodeIP = "192.168.0.2"
 
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
@@ -390,7 +402,21 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	if ipt.IsIPv6() {
 		ipfamily = v1.IPv6Protocol
 	}
-	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", ipt)
+	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/8", ipt)
+
+	networkInterfacer := utilproxytest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{
+		&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
+		&net.IPNet{IP: netutils.ParseIPSloppy("::1/128"), Mask: net.CIDRMask(128, 128)},
+	}
+	networkInterfacer.AddInterfaceAddr(&itf, addrs)
+	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
+	addrs1 := []net.Addr{
+		&net.IPNet{IP: netutils.ParseIPSloppy(testNodeIP), Mask: net.CIDRMask(24, 32)},
+	}
+	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
+
 	p := &Proxier{
 		exec:                     &fakeexec.FakeExec{},
 		serviceMap:               make(proxy.ServiceMap),
@@ -412,7 +438,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		natChains:                utilproxy.LineBuffer{},
 		natRules:                 utilproxy.LineBuffer{},
 		nodePortAddresses:        make([]string, 0),
-		networkInterfacer:        utilproxytest.NewFakeNetwork(),
+		networkInterfacer:        networkInterfacer,
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
@@ -797,7 +823,7 @@ COMMIT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 COMMIT
 `,
 			error: "some chains in nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
@@ -810,7 +836,7 @@ COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
 :KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 COMMIT
 `,
 			error: "some chains in nat are jumped to but have no rules: [KUBE-SVC-XPGD46QRK7WJZT7O]",
@@ -824,7 +850,46 @@ COMMIT
 :KUBE-MARK-MASQ - [0:0]
 :KUBE-SERVICES - [0:0]
 -A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" ...
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+COMMIT
+`,
+			error: "some chains in nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't jump to chain that wasn't created",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+COMMIT
+`,
+			error: "some chains in nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't jump to chain that has no rules",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+COMMIT
+`,
+			error: "some chains in nat are jumped to but have no rules: [KUBE-SVC-XPGD46QRK7WJZT7O]",
+		},
+		{
+			name: "can't add rules to a chain that wasn't created",
+			input: `
+*filter
+COMMIT
+*nat
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SERVICES - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" ...
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 COMMIT
 `,
 			error: "some chains in nat are used but were not created: [KUBE-SVC-XPGD46QRK7WJZT7O]",
@@ -963,37 +1028,37 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
--A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
--A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-GNZBNJ2PO5MGZ6GT
--A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment ns2/svc2:p80 -j KUBE-SEP-RS4RBKLTHTF2IUXJ
 -A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2 -j KUBE-MARK-MASQ
 -A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
--A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
--A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
--A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
--A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
--A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3002 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3002 -j KUBE-MARK-MASQ
 -A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -j KUBE-SEP-OYPFS5VJICHGATKP
 -A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
 -A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
--A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
--A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
--A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 192.168.99.22 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-UKSFD7AGPMPPLUHC
 -A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -j KUBE-SEP-C6EBXVWJJZMIWKLZ
 -A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -s 10.180.0.4 -j KUBE-MARK-MASQ
@@ -1032,16 +1097,16 @@ COMMIT
 :KUBE-XLB-GNZBNJ2PO5MGZ6GT - [0:0]
 -A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
--A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3002 -j KUBE-SVC-X27LE4BHSL4DOUIK
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
--A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-GNZBNJ2PO5MGZ6GT
--A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
--A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
--A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
--A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -1057,18 +1122,18 @@ COMMIT
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
 -A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -s 10.180.0.4 -j KUBE-MARK-MASQ
 -A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.4:80
--A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 192.168.99.22 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-UKSFD7AGPMPPLUHC
 -A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -j KUBE-SEP-C6EBXVWJJZMIWKLZ
--A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment ns2/svc2:p80 -j KUBE-SEP-RS4RBKLTHTF2IUXJ
--A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3002 -j KUBE-MARK-MASQ
 -A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -j KUBE-SEP-OYPFS5VJICHGATKP
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
--A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
@@ -1315,7 +1380,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 	makeServiceMap(fp,
 		// create ClusterIP service
 		makeTestService("ns1", "svc1", func(svc *v1.Service) {
-			svc.Spec.ClusterIP = "10.20.30.41"
+			svc.Spec.ClusterIP = "172.30.0.41"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
 				Port:     80,
@@ -1326,7 +1391,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		makeTestService("ns2", "svc2", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-			svc.Spec.ClusterIP = "10.20.30.42"
+			svc.Spec.ClusterIP = "172.30.0.42"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
 				Port:     80,
@@ -1338,42 +1403,42 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 			}}
 			// Also ensure that invalid LoadBalancerSourceRanges will not result
 			// in a crash.
-			svc.Spec.ExternalIPs = []string{"1.2.3.4"}
-			svc.Spec.LoadBalancerSourceRanges = []string{" 1.2.3.4/28"}
+			svc.Spec.ExternalIPs = []string{"192.168.99.22"}
+			svc.Spec.LoadBalancerSourceRanges = []string{" 203.0.113.0/25"}
 			svc.Spec.HealthCheckNodePort = 30000
 		}),
 		// create LoadBalancer service with Cluster traffic policy and no source ranges
 		makeTestService("ns2b", "svc2b", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
-			svc.Spec.ClusterIP = "10.20.30.43"
+			svc.Spec.ClusterIP = "172.30.0.43"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
 				Port:     80,
 				Protocol: v1.ProtocolTCP,
-				NodePort: 3001,
+				NodePort: 3002,
 			}}
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
-				IP: "1.2.3.5",
+				IP: "5.6.7.8",
 			}}
 			svc.Spec.HealthCheckNodePort = 30000
 		}),
 		// create NodePort service
 		makeTestService("ns3", "svc3", func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
-			svc.Spec.ClusterIP = "10.20.30.43"
+			svc.Spec.ClusterIP = "172.30.0.43"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
 				Port:     80,
 				Protocol: v1.ProtocolTCP,
-				NodePort: 3001,
+				NodePort: 3003,
 			}}
 		}),
 		// create ExternalIP service
 		makeTestService("ns4", "svc4", func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
-			svc.Spec.ClusterIP = "10.20.30.44"
-			svc.Spec.ExternalIPs = []string{"50.60.70.81"}
+			svc.Spec.ClusterIP = "172.30.0.44"
+			svc.Spec.ExternalIPs = []string{"192.168.99.33"}
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:       "p80",
 				Port:       80,
@@ -1485,48 +1550,48 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
--A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
--A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 external IP" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-GNZBNJ2PO5MGZ6GT
--A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 10.20.30.42 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-GNZBNJ2PO5MGZ6GT -m comment --comment ns2/svc2:p80 -j KUBE-SEP-RS4RBKLTHTF2IUXJ
 -A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2 -j KUBE-MARK-MASQ
 -A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
--A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
+-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
 -A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-GNZBNJ2PO5MGZ6GT
--A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
+-A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 -A KUBE-XLB-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
--A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns2b/svc2b:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 -j KUBE-SVC-PAZTZYUUMV5KCDZL
--A KUBE-SERVICES -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.5 --dport 80 -j KUBE-FW-PAZTZYUUMV5KCDZL
+-A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns2b/svc2b:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-PAZTZYUUMV5KCDZL
+-A KUBE-SERVICES -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j KUBE-FW-PAZTZYUUMV5KCDZL
 -A KUBE-FW-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -j KUBE-MARK-MASQ
 -A KUBE-FW-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -j KUBE-SVC-PAZTZYUUMV5KCDZL
 -A KUBE-FW-PAZTZYUUMV5KCDZL -m comment --comment "ns2b/svc2b:p80 loadbalancer IP" -j KUBE-MARK-DROP
--A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
--A KUBE-NODEPORTS -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-PAZTZYUUMV5KCDZL
+-A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp --dport 3002 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp --dport 3002 -j KUBE-SVC-PAZTZYUUMV5KCDZL
 -A KUBE-SVC-PAZTZYUUMV5KCDZL -m comment --comment ns2b/svc2b:p80 -j KUBE-SEP-QDCEFMBQEGWIV4VT
 -A KUBE-SEP-QDCEFMBQEGWIV4VT -m comment --comment ns2b/svc2b:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
 -A KUBE-SEP-QDCEFMBQEGWIV4VT -m comment --comment ns2b/svc2b:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
--A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
--A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 10.20.30.43 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-X27LE4BHSL4DOUIK
--A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3003 -j KUBE-SVC-X27LE4BHSL4DOUIK
+-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3003 -j KUBE-MARK-MASQ
 -A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment ns3/svc3:p80 -j KUBE-SEP-OYPFS5VJICHGATKP
 -A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
 -A KUBE-SEP-OYPFS5VJICHGATKP -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.3:80
--A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
--A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
--A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 10.20.30.44 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 192.168.99.33 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 external IP" -m tcp -p tcp -d 192.168.99.33 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-UKSFD7AGPMPPLUHC
 -A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment ns4/svc4:p80 -j KUBE-SEP-C6EBXVWJJZMIWKLZ
 -A KUBE-SEP-UKSFD7AGPMPPLUHC -m comment --comment ns4/svc4:p80 -s 10.180.0.4 -j KUBE-MARK-MASQ
@@ -1554,7 +1619,7 @@ COMMIT
 func TestClusterIPReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -1579,7 +1644,7 @@ func TestClusterIPReject(t *testing.T) {
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 :KUBE-NODEPORTS - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j REJECT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -1603,7 +1668,7 @@ COMMIT
 func TestClusterIPEndpointsJump(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -1661,8 +1726,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
@@ -1676,7 +1741,7 @@ COMMIT
 func TestLoadBalancer(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcLBIP := "1.2.3.4"
@@ -1701,8 +1766,7 @@ func TestLoadBalancer(t *testing.T) {
 			}}
 			// Also ensure that invalid LoadBalancerSourceRanges will not result
 			// in a crash.
-			svc.Spec.ExternalIPs = []string{svcLBIP}
-			svc.Spec.LoadBalancerSourceRanges = []string{" 1.2.3.4/28"}
+			svc.Spec.LoadBalancerSourceRanges = []string{" 203.0.113.0/25"}
 		}),
 	)
 
@@ -1746,13 +1810,11 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-XPGD46QRK7WJZT7O
 -A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-MASQ
--A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 1.2.3.4/28 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-XPGD46QRK7WJZT7O
@@ -1769,7 +1831,7 @@ COMMIT
 func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcPortName := proxy.ServicePortName{
@@ -1807,14 +1869,6 @@ func TestNodePort(t *testing.T) {
 		}),
 	)
 
-	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
-	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
-	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1/128"), Mask: net.CIDRMask(128, 128)}}
-	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
-	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = []string{}
-
 	fp.syncProxyRules()
 
 	expected := `
@@ -1838,8 +1892,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
@@ -1863,7 +1917,9 @@ COMMIT
 func TestHealthCheckNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.42"
+	fp.nodePortAddresses = []string{"127.0.0.0/8"}
+
+	svcIP := "172.30.0.42"
 	svcPort := 80
 	svcNodePort := 3001
 	svcHealthCheckNodePort := 30000
@@ -1888,14 +1944,6 @@ func TestHealthCheckNodePort(t *testing.T) {
 		}),
 	)
 
-	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(16, 32)}}
-	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
-	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}}
-	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
-	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = []string{"127.0.0.1/16"}
-
 	fp.syncProxyRules()
 
 	expected := `
@@ -1904,7 +1952,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 :KUBE-NODEPORTS - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 10.20.30.42 --dport 80 -j REJECT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j REJECT
 -A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j REJECT
 -A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -1968,9 +2016,9 @@ COMMIT
 func TestExternalIPsReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
-	svcExternalIPs := "50.60.70.81"
+	svcExternalIPs := "192.168.99.11"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -1998,8 +2046,8 @@ func TestExternalIPsReject(t *testing.T) {
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 :KUBE-NODEPORTS - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j REJECT
--A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 50.60.70.81 --dport 80 -j REJECT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
+-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j REJECT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -2023,9 +2071,9 @@ COMMIT
 func TestOnlyLocalExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
-	svcExternalIPs := "50.60.70.81"
+	svcExternalIPs := "192.168.99.11"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -2090,16 +2138,16 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 -j KUBE-XLB-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j KUBE-XLB-XPGD46QRK7WJZT7O
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
 -A KUBE-SEP-ZX7GRIZKSNUQ3LAJ -m comment --comment ns1/svc1:p80 -s 10.180.2.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-ZX7GRIZKSNUQ3LAJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.2.1:80
--A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
@@ -2115,9 +2163,9 @@ COMMIT
 func TestNonLocalExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
-	svcExternalIPs := "50.60.70.81"
+	svcExternalIPs := "192.168.99.11"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -2180,10 +2228,10 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 50.60.70.81 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 192.168.99.11 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
@@ -2200,7 +2248,7 @@ COMMIT
 func TestNodePortReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcPortName := proxy.ServicePortName{
@@ -2229,7 +2277,7 @@ func TestNodePortReject(t *testing.T) {
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 :KUBE-NODEPORTS - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j REJECT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 -A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j REJECT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -2254,7 +2302,7 @@ COMMIT
 func TestLoadBalancerReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcLBIP := "1.2.3.4"
@@ -2293,7 +2341,7 @@ func TestLoadBalancerReject(t *testing.T) {
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 :KUBE-NODEPORTS - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j REJECT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 -A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
 -A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j REJECT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -2319,7 +2367,7 @@ COMMIT
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcLBIP := "1.2.3.4"
@@ -2397,8 +2445,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-XPGD46QRK7WJZT7O
 -A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-XLB-XPGD46QRK7WJZT7O
 -A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
@@ -2412,7 +2460,7 @@ COMMIT
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m recent --name KUBE-SEP-SXIVWICOYRO3J4NJ --set -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
 -A KUBE-SEP-ZX7GRIZKSNUQ3LAJ -m comment --comment ns1/svc1:p80 -s 10.180.2.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-ZX7GRIZKSNUQ3LAJ -m comment --comment ns1/svc1:p80 -m recent --name KUBE-SEP-ZX7GRIZKSNUQ3LAJ --set -m tcp -p tcp -j DNAT --to-destination 10.180.2.1:80
--A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m recent --name KUBE-SEP-ZX7GRIZKSNUQ3LAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
@@ -2428,6 +2476,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
+	fp.nodePortAddresses = []string{"192.168.0.0/24"}
 
 	expected := `
 *filter
@@ -2452,7 +2501,7 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-XPGD46QRK7WJZT7O
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SXIVWICOYRO3J4NJ
@@ -2464,7 +2513,7 @@ COMMIT
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
--A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -d 10.20.30.51 -j KUBE-NODEPORTS
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -d 192.168.0.2 -j KUBE-NODEPORTS
 COMMIT
 `
 	onlyLocalNodePorts(t, fp, ipt, expected)
@@ -2473,6 +2522,7 @@ COMMIT
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
+	fp.nodePortAddresses = []string{"192.168.0.0/24"}
 
 	expected := `
 *filter
@@ -2497,8 +2547,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-XLB-XPGD46QRK7WJZT7O
 -A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SXIVWICOYRO3J4NJ
@@ -2507,18 +2557,18 @@ COMMIT
 -A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
 -A KUBE-SEP-ZX7GRIZKSNUQ3LAJ -m comment --comment ns1/svc1:p80 -s 10.180.2.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-ZX7GRIZKSNUQ3LAJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.2.1:80
--A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "masquerade LOCAL traffic for ns1/svc1:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment "route LOCAL traffic for ns1/svc1:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-XLB-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
--A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -d 10.20.30.51 -j KUBE-NODEPORTS
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -d 192.168.0.2 -j KUBE-NODEPORTS
 COMMIT
 `
 	onlyLocalNodePorts(t, fp, ipt, expected)
 }
 
 func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTables, expected string) {
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
 	svcPortName := proxy.ServicePortName{
@@ -2561,11 +2611,6 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 			}}
 		}),
 	)
-
-	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
-	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("10.20.30.51"), Mask: net.CIDRMask(24, 32)}}
-	fp.networkInterfacer.(*utilproxytest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
-	fp.nodePortAddresses = []string{"10.20.30.0/24"}
 
 	fp.syncProxyRules()
 
@@ -2636,39 +2681,39 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	services := []*v1.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
-			svc.Spec.ClusterIP = "172.16.55.4"
+			svc.Spec.ClusterIP = "172.30.55.4"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 0)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "UDP", 1235, 5321, 0)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "sctpport", "SCTP", 1236, 6321, 0)
 		}),
 		makeTestService("somewhere-else", "node-port", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
-			svc.Spec.ClusterIP = "172.16.55.10"
+			svc.Spec.ClusterIP = "172.30.55.10"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "blahblah", "UDP", 345, 678, 0)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "moreblahblah", "TCP", 344, 677, 0)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "muchmoreblah", "SCTP", 343, 676, 0)
 		}),
 		makeTestService("somewhere", "load-balancer", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			svc.Spec.ClusterIP = "172.16.55.11"
-			svc.Spec.LoadBalancerIP = "5.6.7.8"
+			svc.Spec.ClusterIP = "172.30.55.11"
+			svc.Spec.LoadBalancerIP = "1.2.3.4"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "foobar", "UDP", 8675, 30061, 7000)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "baz", "UDP", 8676, 30062, 7001)
 			svc.Status.LoadBalancer = v1.LoadBalancerStatus{
 				Ingress: []v1.LoadBalancerIngress{
-					{IP: "10.1.2.4"},
+					{IP: "1.2.3.4"},
 				},
 			}
 		}),
 		makeTestService("somewhere", "only-local-load-balancer", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			svc.Spec.ClusterIP = "172.16.55.12"
+			svc.Spec.ClusterIP = "172.30.55.12"
 			svc.Spec.LoadBalancerIP = "5.6.7.8"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "foobar2", "UDP", 8677, 30063, 7002)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "baz", "UDP", 8678, 30064, 7003)
 			svc.Status.LoadBalancer = v1.LoadBalancerStatus{
 				Ingress: []v1.LoadBalancerIngress{
-					{IP: "10.1.2.3"},
+					{IP: "5.6.7.8"},
 				},
 			}
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
@@ -2703,7 +2748,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	// oneService is a modification of services[0] with removed first port.
 	oneService := makeTestService("somewhere-else", "cluster-ip", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
-		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.ClusterIP = "172.30.55.4"
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "UDP", 1235, 5321, 0)
 	})
 
@@ -2724,7 +2769,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	// All services but one were deleted. While you'd expect only the ClusterIPs
 	// from the three deleted services here, we still have the ClusterIP for
 	// the not-deleted service, because one of it's ServicePorts was deleted.
-	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
+	expectedStaleUDPServices := []string{"172.30.55.10", "172.30.55.4", "172.30.55.11", "172.30.55.12"}
 	if len(result.UDPStaleClusterIP) != len(expectedStaleUDPServices) {
 		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.UDPStaleClusterIP.UnsortedList())
 	}
@@ -2774,7 +2819,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeExternalName
-			svc.Spec.ClusterIP = "172.16.55.4" // Should be ignored
+			svc.Spec.ClusterIP = "172.30.55.4" // Should be ignored
 			svc.Spec.ExternalName = "foo2.bar.com"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "blah", "UDP", 1235, 5321, 0)
 		}),
@@ -2799,19 +2844,19 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
-		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.ClusterIP = "172.30.55.4"
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 0)
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "TCP", 1235, 5321, 0)
 	})
 	servicev2 := makeTestService("somewhere", "some-service", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		svc.Spec.ClusterIP = "172.16.55.4"
-		svc.Spec.LoadBalancerIP = "5.6.7.8"
+		svc.Spec.ClusterIP = "172.30.55.4"
+		svc.Spec.LoadBalancerIP = "1.2.3.4"
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 7002)
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "TCP", 1235, 5321, 7003)
 		svc.Status.LoadBalancer = v1.LoadBalancerStatus{
 			Ingress: []v1.LoadBalancerIngress{
-				{IP: "10.1.2.3"},
+				{IP: "1.2.3.4"},
 			},
 		}
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
@@ -2949,7 +2994,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subset1 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.1"},
+			Addresses: []string{"10.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     utilpointer.String("p11"),
@@ -2960,7 +3005,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subset2 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.2"},
+			Addresses: []string{"10.1.1.2"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     utilpointer.String("p12"),
@@ -2973,7 +3018,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			func(eps *discovery.EndpointSlice) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
-					Addresses: []string{"1.1.1.1"},
+					Addresses: []string{"10.1.1.1"},
 					NodeName:  &nodeName,
 				}}
 				eps.Ports = []discovery.EndpointPort{{
@@ -2991,7 +3036,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			func(eps *discovery.EndpointSlice) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
-					Addresses: []string{"1.1.1.1"},
+					Addresses: []string{"10.1.1.1"},
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     utilpointer.String("p11-2"),
@@ -3005,7 +3050,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			func(eps *discovery.EndpointSlice) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
-					Addresses: []string{"1.1.1.1"},
+					Addresses: []string{"10.1.1.1"},
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     utilpointer.String("p11"),
@@ -3019,9 +3064,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 			func(eps *discovery.EndpointSlice) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
-					Addresses: []string{"1.1.1.1"},
+					Addresses: []string{"10.1.1.1"},
 				}, {
-					Addresses: []string{"1.1.1.2"},
+					Addresses: []string{"10.1.1.2"},
 					NodeName:  &nodeName,
 				}}
 				eps.Ports = []discovery.EndpointPort{{
@@ -3042,7 +3087,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subsetLocal := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.2"},
+			Addresses: []string{"10.1.1.2"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3058,7 +3103,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subsetMultiplePortsLocal := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.1"},
+			Addresses: []string{"10.1.1.1"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3074,7 +3119,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subset3 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.3"},
+			Addresses: []string{"10.1.1.3"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     utilpointer.String("p13"),
@@ -3089,9 +3134,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subsetMultipleIPsPorts1 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.1"},
+			Addresses: []string{"10.1.1.1"},
 		}, {
-			Addresses: []string{"1.1.1.2"},
+			Addresses: []string{"10.1.1.2"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3107,9 +3152,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subsetMultipleIPsPorts2 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.3"},
+			Addresses: []string{"10.1.1.3"},
 		}, {
-			Addresses: []string{"1.1.1.4"},
+			Addresses: []string{"10.1.1.4"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3125,9 +3170,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 	subsetMultipleIPsPorts3 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"2.2.2.1"},
+			Addresses: []string{"10.2.2.1"},
 		}, {
-			Addresses: []string{"2.2.2.2"},
+			Addresses: []string{"10.2.2.2"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3148,10 +3193,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset1 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"2.2.2.2"},
+			Addresses: []string{"10.2.2.2"},
 			NodeName:  &nodeName,
 		}, {
-			Addresses: []string{"2.2.2.22"},
+			Addresses: []string{"10.2.2.22"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3163,7 +3208,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset2 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"2.2.2.3"},
+			Addresses: []string{"10.2.2.3"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3175,10 +3220,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset3 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"4.4.4.4"},
+			Addresses: []string{"10.4.4.4"},
 			NodeName:  &nodeName,
 		}, {
-			Addresses: []string{"4.4.4.5"},
+			Addresses: []string{"10.4.4.5"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3190,7 +3235,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset4 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"4.4.4.6"},
+			Addresses: []string{"10.4.4.6"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3202,9 +3247,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset5 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.1"},
+			Addresses: []string{"10.1.1.1"},
 		}, {
-			Addresses: []string{"1.1.1.11"},
+			Addresses: []string{"10.1.1.11"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     utilpointer.String("p11"),
@@ -3215,7 +3260,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset6 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.1.1.2"},
+			Addresses: []string{"10.1.1.2"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     utilpointer.String("p12"),
@@ -3230,7 +3275,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset7 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"3.3.3.3"},
+			Addresses: []string{"10.3.3.3"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     utilpointer.String("p33"),
@@ -3241,7 +3286,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 	complexSubset8 := func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"4.4.4.4"},
+			Addresses: []string{"10.4.4.4"},
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
@@ -3293,12 +3338,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  namedPortLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -3312,18 +3357,18 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  multipleSubsets,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -3335,24 +3380,24 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  multipleSubsetsMultiplePortsLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -3366,54 +3411,54 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  multipleSubsetsIPsPorts,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -3429,7 +3474,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		oldEndpoints:      map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -3445,12 +3490,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  []*discovery.EndpointSlice{nil},
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
+			Endpoint:        "10.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
@@ -3461,17 +3506,17 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  namedPortsLocalNoLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -3487,27 +3532,27 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  namedPort,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.2:11",
+			Endpoint:        "10.1.1.2:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}, {
-			Endpoint:        "1.1.1.1:12",
+			Endpoint:        "10.1.1.1:12",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}, {
-			Endpoint:        "1.1.1.2:12",
+			Endpoint:        "10.1.1.2:12",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
@@ -3518,15 +3563,15 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  multipleSubsetsWithLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -3542,19 +3587,19 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  []*discovery.EndpointSlice{namedPort[0], nil},
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.2:12",
+			Endpoint:        "10.1.1.2:12",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
@@ -3565,16 +3610,16 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  namedPortRenamed,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
+			Endpoint:        "10.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
@@ -3587,16 +3632,16 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  namedPortRenumbered,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "1.1.1.1:11",
+			Endpoint:        "10.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
@@ -3607,55 +3652,55 @@ func Test_updateEndpointsMap(t *testing.T) {
 		currentEndpoints:  complexAfter,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "2.2.2.3:23", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.2.2.3:23", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "4.4.4.5:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.5:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.11:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.11:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.2:122", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.2:122", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "3.3.3.3:33", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.3.3.3:33", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
-			Endpoint:        "2.2.2.2:22",
+			Endpoint:        "10.2.2.2:22",
 			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
 		}, {
-			Endpoint:        "2.2.2.22:22",
+			Endpoint:        "10.2.2.22:22",
 			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
 		}, {
-			Endpoint:        "2.2.2.3:23",
+			Endpoint:        "10.2.2.3:23",
 			ServicePortName: makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP),
 		}, {
-			Endpoint:        "4.4.4.5:44",
+			Endpoint:        "10.4.4.5:44",
 			ServicePortName: makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP),
 		}, {
-			Endpoint:        "4.4.4.6:45",
+			Endpoint:        "10.4.4.6:45",
 			ServicePortName: makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
@@ -3673,7 +3718,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		oldEndpoints:      map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedResult: map[proxy.ServicePortName][]*endpointsInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
+				{BaseEndpointInfo: &proxy.BaseEndpointInfo{Endpoint: "10.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -3781,8 +3826,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 0 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
@@ -3807,7 +3852,7 @@ COMMIT
 	fp.OnServiceAdd(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 		Spec: v1.ServiceSpec{
-			ClusterIP: "172.20.1.1",
+			ClusterIP: "172.30.1.1",
 			Selector:  map[string]string{"foo": "bar"},
 			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
 		},
@@ -3880,8 +3925,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 0 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -s 127.0.0.0/8 -j KUBE-MARK-MASQ
 -A KUBE-NODEPORTS -m comment --comment ns1/svc1 -m tcp -p tcp --dport 30010 -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
@@ -3893,7 +3938,7 @@ COMMIT
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3 -j KUBE-MARK-MASQ
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-3JOIVZTXZZRGORX4
@@ -3912,7 +3957,7 @@ COMMIT
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 		Spec: v1.ServiceSpec{
-			ClusterIP:             "172.20.1.1",
+			ClusterIP:             "172.30.1.1",
 			Selector:              map[string]string{"foo": "bar"},
 			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), NodePort: 30010, Protocol: v1.ProtocolTCP}},
 			Type:                  "LoadBalancer",
@@ -3975,7 +4020,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 	fp.OnServiceAdd(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 		Spec: v1.ServiceSpec{
-			ClusterIP: "172.20.1.1",
+			ClusterIP: "172.30.1.1",
 			Selector:  map[string]string{"foo": "bar"},
 			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
 		},
@@ -4102,9 +4147,9 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	fp := NewFakeProxier(ipt)
 	fp.exec = &fexec
 
-	svcIP := "10.20.30.41"
-	extIP := "1.1.1.1"
-	lbIngressIP := "2.2.2.2"
+	svcIP := "172.30.0.41"
+	extIP := "192.168.99.11"
+	lbIngressIP := "1.2.3.4"
 	svcPort := 80
 	nodePort := 31201
 	svcPortName := proxy.ServicePortName{
@@ -4215,7 +4260,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 
 	metrics.RegisterMetrics()
 
-	svcIP := "10.20.30.41"
+	svcIP := "172.30.0.41"
 	svcPort := 80
 	nodePort := 31201
 	svcPortName := proxy.ServicePortName{
@@ -4338,8 +4383,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-XGJFVO3L2O5SRFNT
@@ -4404,8 +4449,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-3JOIVZTXZZRGORX4
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1 -j KUBE-MARK-MASQ
 -A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
@@ -4429,7 +4474,7 @@ COMMIT
 :KUBE-EXTERNAL-SERVICES - [0:0]
 :KUBE-FORWARD - [0:0]
 :KUBE-NODEPORTS - [0:0]
--A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j REJECT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -4475,7 +4520,7 @@ COMMIT
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 				Spec: v1.ServiceSpec{
-					ClusterIP: "172.20.1.1",
+					ClusterIP: "172.30.1.1",
 					Selector:  map[string]string{"foo": "bar"},
 					Ports:     []v1.ServicePort{{Name: "", Port: 80, Protocol: v1.ProtocolTCP}},
 				},
@@ -4529,7 +4574,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
 		Spec: v1.ServiceSpec{
-			ClusterIP:             "172.20.1.1",
+			ClusterIP:             "172.30.1.1",
 			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 			Selector:              map[string]string{"foo": "bar"},
@@ -4551,7 +4596,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 		Status: v1.ServiceStatus{
 			LoadBalancer: v1.LoadBalancerStatus{
 				Ingress: []v1.LoadBalancerIngress{
-					{IP: "10.1.2.3"},
+					{IP: "1.2.3.4"},
 				},
 			},
 		},
@@ -4655,9 +4700,9 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
--A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
@@ -4672,7 +4717,7 @@ COMMIT
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
@@ -4774,9 +4819,9 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
--A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
@@ -4791,7 +4836,7 @@ COMMIT
 -A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-3JOIVZTXZZRGORX4 --rcheck --seconds 10800 --reap -j KUBE-SEP-3JOIVZTXZZRGORX4
@@ -4885,9 +4930,9 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
--A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
@@ -4898,7 +4943,7 @@ COMMIT
 -A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-XGJFVO3L2O5SRFNT --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-IO5XOSKPAXIFQXAJ --rcheck --seconds 10800 --reap -j KUBE-SEP-IO5XOSKPAXIFQXAJ
@@ -4995,16 +5040,16 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
--A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment ns1/svc1 -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -s 10.0.1.5 -j KUBE-MARK-MASQ
 -A KUBE-SEP-EQCHZ7S2PJ72OHAY -m comment --comment ns1/svc1 -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --set -m tcp -p tcp -j DNAT --to-destination 10.0.1.5:80
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
@@ -5063,12 +5108,12 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
--A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 10.1.2.3 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
+-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-XLB-AQI2S6QIMU7PVVRP
 -A KUBE-FW-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 loadbalancer IP" -j KUBE-MARK-DROP
--A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/24 -j KUBE-SVC-AQI2S6QIMU7PVVRP
+-A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
 -A KUBE-XLB-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
@@ -5124,8 +5169,8 @@ COMMIT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
--A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.20.1.1 --dport 80 -j REJECT
--A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 10.1.2.3 --dport 80 -j REJECT
+-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
+-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -5178,7 +5223,7 @@ func TestMasqueradeAll(t *testing.T) {
 	makeServiceMap(fp,
 		makeTestService("ns1", "svc1", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.ClusterIP = "10.20.30.41"
+			svc.Spec.ClusterIP = "172.30.0.41"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
 				Port:     80,
@@ -5230,8 +5275,8 @@ COMMIT
 -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
--A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 -A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-XPGD46QRK7WJZT7O
 -A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-MASQ
 -A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-SVC-XPGD46QRK7WJZT7O
@@ -5273,7 +5318,7 @@ func TestEndpointCommentElision(t *testing.T) {
 	makeServiceMap(fp,
 		makeTestService("ns1", "svc1", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
-			svc.Spec.ClusterIP = "10.20.30.41"
+			svc.Spec.ClusterIP = "172.30.0.41"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
 				Port:     80,
@@ -5282,7 +5327,7 @@ func TestEndpointCommentElision(t *testing.T) {
 		}),
 		makeTestService("ns2", "svc2", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
-			svc.Spec.ClusterIP = "10.20.30.42"
+			svc.Spec.ClusterIP = "172.30.0.42"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p8080",
 				Port:     8080,
@@ -5291,7 +5336,7 @@ func TestEndpointCommentElision(t *testing.T) {
 		}),
 		makeTestService("ns3", "svc3", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
-			svc.Spec.ClusterIP = "10.20.30.43"
+			svc.Spec.ClusterIP = "172.30.0.43"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p8081",
 				Port:     8081,
@@ -5343,11 +5388,11 @@ func TestEndpointCommentElision(t *testing.T) {
 	fp.OnEndpointSliceAdd(makeTestEndpointSlice("ns3", "svc3", 1, func(eps *discovery.EndpointSlice) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
-			Addresses: []string{"1.2.3.4"},
+			Addresses: []string{"203.0.113.4"},
 		}, {
-			Addresses: []string{"5.6.7.8"},
+			Addresses: []string{"203.0.113.8"},
 		}, {
-			Addresses: []string{"9.10.11.12"},
+			Addresses: []string{"203.0.113.12"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     utilpointer.StringPtr("p8081"),
