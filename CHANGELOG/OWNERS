@@ -8,6 +8,7 @@ approvers:
   - pmmalinov01 # 1.22 Release Notes Lead
   - wilsonehusin # 1.21 Release Notes Lead
 reviewers:
+  - release-managers
   - AuraSinis # 1.24 Release Notes Lead
   - csantanapr # 1.24 Release Notes Shadow
   - parul5sahoo # 1.24 Release Notes Shadow
