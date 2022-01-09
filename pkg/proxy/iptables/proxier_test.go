@@ -2305,6 +2305,7 @@ func TestLoadBalancerReject(t *testing.T) {
 	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
+	svcHealthCheckNodePort := 30000
 	svcLBIP := "1.2.3.4"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -2322,6 +2323,7 @@ func TestLoadBalancerReject(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
+			svc.Spec.HealthCheckNodePort = int32(svcHealthCheckNodePort)
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
@@ -2347,6 +2349,7 @@ func TestLoadBalancerReject(t *testing.T) {
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -2370,6 +2373,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
+	svcHealthCheckNodePort := 30000
 	svcLBIP := "1.2.3.4"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -2388,6 +2392,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
+			svc.Spec.HealthCheckNodePort = int32(svcHealthCheckNodePort)
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
@@ -2430,6 +2435,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -4586,7 +4592,8 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
-			SessionAffinity: v1.ServiceAffinityClientIP,
+			HealthCheckNodePort: 30000,
+			SessionAffinity:     v1.ServiceAffinityClientIP,
 			SessionAffinityConfig: &v1.SessionAffinityConfig{
 				ClientIP: &v1.ClientIPConfig{
 					TimeoutSeconds: &timeout,
@@ -4684,6 +4691,7 @@ func Test_EndpointSliceWithTerminatingEndpoints(t *testing.T) {
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -4803,6 +4811,7 @@ COMMIT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -4914,6 +4923,7 @@ COMMIT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -5026,6 +5036,7 @@ COMMIT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -5095,6 +5106,7 @@ COMMIT
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
@@ -5171,6 +5183,7 @@ COMMIT
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 -A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 -A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
+-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]
