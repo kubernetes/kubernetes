@@ -79,7 +79,7 @@ type SecureServingOptions struct {
 	PermitAddressSharing bool
 
 	// ProxyProtocol enables kube-apiserver to know the clients' IP via proxy protocol.
-        ProxyProtocol bool
+	ProxyProtocol bool
 }
 
 type CertKey struct {
@@ -252,16 +252,16 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}
-
-		if s.ProxyProtocol {
-			s.Listener = &proxyproto.Listener{Listener: s.Listener}
-		}
 	} else {
 		if _, ok := s.Listener.Addr().(*net.TCPAddr); !ok {
 			return fmt.Errorf("failed to parse ip and port from listener")
 		}
 		s.BindPort = s.Listener.Addr().(*net.TCPAddr).Port
 		s.BindAddress = s.Listener.Addr().(*net.TCPAddr).IP
+	}
+
+	if s.ProxyProtocol {
+		s.Listener = &proxyproto.Listener{Listener: s.Listener}
 	}
 
 	*config = &server.SecureServingInfo{
