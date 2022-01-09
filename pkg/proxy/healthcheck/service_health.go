@@ -26,7 +26,7 @@ import (
 	"github.com/lithammer/dedent"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -180,7 +180,6 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 
 	for nsn, count := range newEndpoints {
 		if hcs.services[nsn] == nil {
-			klog.V(3).Infof("Not saving endpoints for unknown healthcheck %q", nsn.String())
 			continue
 		}
 		klog.V(3).Infof("Reporting %d endpoints for healthcheck %q", count, nsn.String())
