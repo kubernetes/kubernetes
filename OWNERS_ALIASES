@@ -104,8 +104,10 @@ aliases:
   release-managers:
     - cpanato
     - justaugustus
+    - palnabarun
     - puerco
     - saschagrunert
+    - Verolop
     - xmudrii
   build-image-approvers:
     - BenTheElder
@@ -113,8 +115,10 @@ aliases:
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
     - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    - palnabarun # Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+    - Verolop # Release Manager
     - xmudrii # Release Manager
   build-image-reviewers:
     - BenTheElder
@@ -123,8 +127,10 @@ aliases:
     - dims
     - jeremyrickard # SIG Technical Lead / RelEng subproject owner
     #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
+    - palnabarun # Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+    - Verolop # Release Manager
     - xmudrii # Release Manager
   sig-storage-approvers:
     - saad-ali
