@@ -478,7 +478,7 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 
 	requestedCapacity := resource.MustParse(t.ClaimSize)
 	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	gomega.Expect(claimCapacity.Value()).To(gomega.BeNumerically(">=", requestedCapacity.Value), "claimCapacity is not greater or equal to requestedCapacity")
+	gomega.Expect(claimCapacity.Value()).To(gomega.BeNumerically(">=", requestedCapacity.Value()), "claimCapacity is not greater or equal to requestedCapacity")
 
 	// Check PV properties
 	ginkgo.By("checking the PV")
