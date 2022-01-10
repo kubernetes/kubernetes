@@ -61,7 +61,7 @@ GO_PKGDEPS_FILE = go-pkgdeps.mk
 # Include the Go package dependencies file.  This will cause the rule of
 # the same name to be considered and if it is updated, make will restart and
 # reload the updated deps.
-sinclude $(META_DIR)/$(GO_PKGDEPS_FILE)
+include $(META_DIR)/$(GO_PKGDEPS_FILE)
 
 # Only build and run go2make on the first pass.  If that generates a new
 # GO_PKGDEPS_FILE, make will restart the whole process and set MAKE_RESTARTS to
@@ -77,17 +77,23 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	fi
 	KUBE_BUILD_PLATFORMS="" \
 	    hack/make-rules/build.sh hack/make-rules/helpers/go2make
-	hack/run-in-gopath.sh go2make                       \
-	    k8s.io/kubernetes/...                           \
-	    --prune  k8s.io/kubernetes/staging              \
-	    --prune  k8s.io/kubernetes/vendor               \
-	    k8s.io/kubernetes/vendor/k8s.io/...             \
+	hack/run-in-gopath.sh go2make            \
+	    k8s.io/kubernetes/...                \
+	    --prune  k8s.io/kubernetes/staging   \
+	    --prune  k8s.io/kubernetes/vendor    \
+	    k8s.io/kubernetes/vendor/k8s.io/...  \
 	    > $@.tmp
-	if ! cmp -s $@.tmp $@; then                         \
-	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \
-	        echo "DBG: $(GO_PKGDEPS_FILE) changed";     \
-	    fi;                                             \
-	    cat $@.tmp > $@;                                \
+	if [[ -s $@.tmp ]]; then                             \
+	    if ! cmp -s $@.tmp $@; then                      \
+	        if [[ "$(DBG_CODEGEN)" == 1 ]]; then         \
+	            echo "DBG: $(GO_PKGDEPS_FILE) changed";  \
+	        fi;                                          \
+	        cat $@.tmp > $@;                             \
+	    fi                                               \
+	else                                                 \
+	    kube::log::error "go2make produced no results";  \
+	    rm -f $@;                                        \
+	    false;                                           \
 	fi
 	rm -f $@.tmp
 endif # MAKE_RESTARTS
