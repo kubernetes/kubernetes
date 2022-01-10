@@ -167,7 +167,7 @@ func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command
 		return err
 	}
 
-	return kubectl.GenBashCompletion(out)
+	return kubectl.GenBashCompletionV2(out, true)
 }
 
 func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
