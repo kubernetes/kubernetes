@@ -178,7 +178,7 @@ func (h *HTTPExtender) ProcessPreemption(
 
 	if h.nodeCacheCapable {
 		// If extender has cached node info, pass NodeNameToMetaVictims in args.
-		nodeNameToMetaVictims := convertToNodeNameToMetaVictims(nodeNameToVictims)
+		nodeNameToMetaVictims := convertToMetaVictims(nodeNameToVictims)
 		args = &extenderv1.ExtenderPreemptionArgs{
 			Pod:                   pod,
 			NodeNameToMetaVictims: nodeNameToMetaVictims,
@@ -196,7 +196,7 @@ func (h *HTTPExtender) ProcessPreemption(
 
 	// Extender will always return NodeNameToMetaVictims.
 	// So let's convert it to NodeNameToVictims by using <nodeInfos>.
-	newNodeNameToVictims, err := h.convertToNodeNameToVictims(result.NodeNameToMetaVictims, nodeInfos)
+	newNodeNameToVictims, err := h.convertToVictims(result.NodeNameToMetaVictims, nodeInfos)
 	if err != nil {
 		return nil, err
 	}
@@ -204,9 +204,9 @@ func (h *HTTPExtender) ProcessPreemption(
 	return newNodeNameToVictims, nil
 }
 
-// convertToNodeNameToVictims converts "nodeNameToMetaVictims" from object identifiers,
+// convertToVictims converts "nodeNameToMetaVictims" from object identifiers,
 // such as UIDs and names, to object pointers.
-func (h *HTTPExtender) convertToNodeNameToVictims(
+func (h *HTTPExtender) convertToVictims(
 	nodeNameToMetaVictims map[string]*extenderv1.MetaVictims,
 	nodeInfos framework.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
@@ -217,7 +217,8 @@ func (h *HTTPExtender) convertToNodeNameToVictims(
 			return nil, err
 		}
 		victims := &extenderv1.Victims{
-			Pods: []*v1.Pod{},
+			Pods:             []*v1.Pod{},
+			NumPDBViolations: metaVictims.NumPDBViolations,
 		}
 		for _, metaPod := range metaVictims.Pods {
 			pod, err := h.convertPodUIDToPod(metaPod, nodeInfo)
@@ -247,14 +248,15 @@ func (h *HTTPExtender) convertPodUIDToPod(
 		h.extenderURL, metaPod, nodeInfo.Node().Name)
 }
 
-// convertToNodeNameToMetaVictims converts from struct type to meta types.
-func convertToNodeNameToMetaVictims(
+// convertToMetaVictims converts from struct type to meta types.
+func convertToMetaVictims(
 	nodeNameToVictims map[string]*extenderv1.Victims,
 ) map[string]*extenderv1.MetaVictims {
 	nodeNameToMetaVictims := map[string]*extenderv1.MetaVictims{}
 	for node, victims := range nodeNameToVictims {
 		metaVictims := &extenderv1.MetaVictims{
-			Pods: []*extenderv1.MetaPod{},
+			Pods:             []*extenderv1.MetaPod{},
+			NumPDBViolations: victims.NumPDBViolations,
 		}
 		for _, pod := range victims.Pods {
 			metaPod := &extenderv1.MetaPod{
