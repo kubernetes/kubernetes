@@ -958,7 +958,7 @@ func TestRunScorePlugins(t *testing.T) {
 		},
 		{
 			name: "single ScoreWithNormalize plugin",
-			//registry: registry,
+			// registry: registry,
 			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
@@ -1596,7 +1596,9 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 
 			podNominator := internalqueue.NewPodNominator(nil)
 			if tt.nominatedPod != nil {
-				podNominator.AddNominatedPod(framework.NewPodInfo(tt.nominatedPod), nodeName)
+				podNominator.AddNominatedPod(
+					framework.NewPodInfo(tt.nominatedPod),
+					&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: nodeName})
 			}
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
 			f, err := newFrameworkWithQueueSortAndBind(registry, profile, WithPodNominator(podNominator))
