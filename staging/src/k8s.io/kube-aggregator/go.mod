@@ -32,4 +32,5 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/kube-aggregator => ../kube-aggregator
+	k8s.io/kube-openapi => github.com/austince/kube-openapi v0.0.0-restframework-e9ebba8
 )

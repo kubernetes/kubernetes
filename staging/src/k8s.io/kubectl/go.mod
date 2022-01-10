@@ -54,6 +54,7 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
+	k8s.io/kube-openapi => github.com/austince/kube-openapi v0.0.0-restframework-e9ebba8
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
 )
