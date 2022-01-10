@@ -123,6 +123,30 @@ func TestErrorRecorder(t *testing.T) {
 	}
 }
 
+func TestNoopErrorRecorder(t *testing.T) {
+	recorder := newNoopErrorRecorder()
+
+	xNode, yNode, zNode := newXNode(), newYNode(), newZNode()
+
+	recorder.SetSyncError(goerrors.New("sync failed"))
+	recorder.SetAttemptToOrphanError(xNode, goerrors.New(testErrMessage("orphan", "x")))
+	recorder.SetAttemptToOrphanError(yNode, goerrors.New(testErrMessage("orphan", "y")))
+	recorder.ClearAttemptToOrphanError(xNode)
+	recorder.SetAttemptToOrphanError(zNode, goerrors.New(testErrMessage("orphan", "z")))
+	recorder.SetAttemptToDeleteError(xNode, goerrors.New(testErrMessage("delete", "x")))
+
+	errors := recorder.DumpErrors()
+
+	if errors != nil {
+		t.Errorf("unexpected non nil errors result: %v: noopErrorRecorder should not implement any fuctionality", errors)
+	}
+
+	// check for no panics
+	recorder.ClearAttemptToOrphanError(zNode)
+	recorder.ClearAttemptToDeleteError(xNode)
+	recorder.ClearSyncError()
+}
+
 func testErrMessage(action, what string) string {
 	return fmt.Sprintf("attempt to %s %s failed", action, what)
 }

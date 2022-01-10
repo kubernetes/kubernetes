@@ -20,6 +20,8 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"reflect"
 	"sync"
 	"time"
@@ -77,7 +79,7 @@ type GarbageCollector struct {
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *ReferenceCache
 	// errorRecorder records various types of errors for later debugging
-	errorRecorder *errorRecorder
+	errorRecorder errorRecorder
 
 	workerLock sync.RWMutex
 }
@@ -103,14 +105,21 @@ func NewGarbageCollector(
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewReferenceCache(500)
-	errorRecorder := newErrorRecorder()
+
+	var errRecorder errorRecorder
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.GCDebugStatus) {
+		errRecorder = newErrorRecorder()
+	} else {
+		errRecorder = newNoopErrorRecorder()
+	}
+
 	gc := &GarbageCollector{
 		metadataClient:   metadataClient,
 		restMapper:       mapper,
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
-		errorRecorder:    errorRecorder,
+		errorRecorder:    errRecorder,
 	}
 	gc.dependencyGraphBuilder = &GraphBuilder{
 		eventRecorder:    eventRecorder,

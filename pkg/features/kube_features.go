@@ -871,6 +871,13 @@ const (
 	//
 	// Enables NetworkPolicy status subresource
 	NetworkPolicyStatus featuregate.Feature = "NetworkPolicyStatus"
+
+	// owner: @atiratree
+	// alpha: v1.24
+	//
+	// GCDebugStatus makes a new endpoint /debug/controllers/garbagecollector/status in kube-controller-manager
+	// which allows querying for errors that prevent garbage collection.
+	GCDebugStatus featuregate.Feature = "GCDebugStatus"
 )
 
 func init() {
@@ -997,6 +1004,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NodeOutOfServiceVolumeDetach:                   {Default: false, PreRelease: featuregate.Alpha},
 	MaxUnavailableStatefulSet:                      {Default: false, PreRelease: featuregate.Alpha},
 	NetworkPolicyStatus:                            {Default: false, PreRelease: featuregate.Alpha},
+	GCDebugStatus:                                  {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

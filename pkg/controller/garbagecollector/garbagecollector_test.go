@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -58,9 +59,11 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 type testRESTMapper struct {
@@ -72,6 +75,7 @@ func (m *testRESTMapper) Reset() {
 }
 
 func TestGarbageCollectorConstruction(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GCDebugStatus, true)()
 	config := &restclient.Config{}
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
@@ -250,6 +254,7 @@ func serilizeOrDie(t *testing.T, object interface{}) []byte {
 
 // test the attemptToDeleteItem function making the expected actions.
 func TestAttemptToDeleteItem(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GCDebugStatus, true)()
 	pod := getPod("ToBeDeletedPod", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
@@ -439,6 +444,7 @@ func BenchmarkReferencesDiffs(t *testing.B) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GCDebugStatus, true)()
 	gc := setupGC(t, &restclient.Config{})
 	defer close(gc.stop)
 
@@ -483,6 +489,7 @@ func podToGCNode(pod *v1.Pod) *node {
 }
 
 func TestAbsentOwnerCache(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GCDebugStatus, true)()
 	rc1Pod1 := getPod("rc1Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
@@ -672,6 +679,7 @@ func TestUnblockOwnerReference(t *testing.T) {
 }
 
 func TestOrphanDependentsFailure(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GCDebugStatus, true)()
 	testHandler := &fakeActionHandler{
 		response: map[string]FakeResponse{
 			"PATCH" + "/api/v1/namespaces/ns1/pods/pod": {
@@ -804,6 +812,7 @@ func TestGetDeletableResources(t *testing.T) {
 // TestGarbageCollectorSync ensures that a discovery client error
 // will not cause the garbage collector to block infinitely.
 func TestGarbageCollectorSync(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GCDebugStatus, true)()
 	serverResources := []*metav1.APIResourceList{
 		{
 			GroupVersion: "v1",
@@ -2232,7 +2241,7 @@ func TestConflictingData(t *testing.T) {
 	close(alwaysStarted)
 	for _, scenario := range testScenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GCDebugStatus, true)()
 			absentOwnerCache := NewReferenceCache(100)
 
 			eventRecorder := record.NewFakeRecorder(100)

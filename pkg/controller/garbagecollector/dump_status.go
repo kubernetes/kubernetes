@@ -21,6 +21,8 @@ import (
 	"net/http"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 type ErrorType string
@@ -62,6 +64,11 @@ func newErrorResult(errorType ErrorType, record *errorRecord, identity *objectRe
 
 // serveHTTPStatus responds to an HTTP request on /status endpoint.
 func (h *debugHTTPHandler) serveHTTPStatus(w http.ResponseWriter, req *http.Request) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.GCDebugStatus) {
+		http.Error(w, "", http.StatusMethodNotAllowed)
+		return
+	}
+
 	errors := h.controller.errorRecorder.DumpErrors()
 	if errors == nil {
 		errors = make([]errorResult, 0)
