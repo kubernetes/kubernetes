@@ -882,11 +882,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
 	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CSIMigration:                                   {Default: true, PreRelease: featuregate.Beta},
-	CSIMigrationGCE:                                {Default: true, PreRelease: featuregate.Beta}, // On by default in 1.23 (requires GCE PD CSI Driver)
+	CSIMigrationGCE:                                {Default: false, PreRelease: featuregate.Beta}, // OCP(storage team): force off by default, requires explicit opt-in via FeatureGate CR. Please <carry> until it's GA. https://github.com/openshift/enhancements/pull/549
 	InTreePluginGCEUnregister:                      {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAWS:                                {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationAWS:                                {Default: false, PreRelease: featuregate.Beta}, // OCP(storage team): force off by default, requires explicit opt-in via FeatureGate CR. Please <carry> until it's GA. https://github.com/openshift/enhancements/pull/549
 	InTreePluginAWSUnregister:                      {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureDisk:                          {Default: true, PreRelease: featuregate.Beta}, // On by default in 1.23 (requires Azure Disk CSI driver)
+	CSIMigrationAzureDisk:                          {Default: false, PreRelease: featuregate.Beta}, // OCP(storage team): force off by default, requires explicit opt-in via FeatureGate CR. Please <carry> until it's GA. https://github.com/openshift/enhancements/pull/549
 	InTreePluginAzureDiskUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFile:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure File CSI driver)
 	InTreePluginAzureFileUnregister:                {Default: false, PreRelease: featuregate.Alpha},
