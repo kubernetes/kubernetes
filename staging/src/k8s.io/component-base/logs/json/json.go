@@ -17,6 +17,7 @@ limitations under the License.
 package logs
 
 import (
+	"io"
 	"os"
 	"time"
 
@@ -83,9 +84,17 @@ type Factory struct{}
 var _ registry.LogFormatFactory = Factory{}
 
 func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
-	stderr := zapcore.Lock(os.Stderr)
+	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,
+	// therefore we don't need to flush, and calling the underlying fsync
+	// would just slow down writing.
+	//
+	// The assumption is that logging only needs to ensure that data gets
+	// written to the output stream before the process terminates, but
+	// doesn't need to worry about data not being written because of a
+	// system crash or powerloss.
+	stderr := zapcore.Lock(AddNopSync(os.Stderr))
 	if options.JSON.SplitStream {
-		stdout := zapcore.Lock(os.Stdout)
+		stdout := zapcore.Lock(AddNopSync(os.Stdout))
 		size := options.JSON.InfoBufferSize.Value()
 		if size > 0 {
 			// Prevent integer overflow.
@@ -102,4 +111,17 @@ func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
 	}
 	// Write info messages and errors to stderr to prevent mixing with normal program output.
 	return NewJSONLogger(stderr, nil, nil)
+}
+
+// AddNoSync adds a NOP Sync implementation.
+func AddNopSync(writer io.Writer) zapcore.WriteSyncer {
+	return nopSync{Writer: writer}
+}
+
+type nopSync struct {
+	io.Writer
+}
+
+func (f nopSync) Sync() error {
+	return nil
 }

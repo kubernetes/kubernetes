@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"go.uber.org/zap/zapcore"
 	"k8s.io/component-base/logs"
 	logsjson "k8s.io/component-base/logs/json"
 	"k8s.io/klog/v2"
@@ -173,10 +172,11 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 			klog.SetOutput(out)
 			defer klog.SetOutput(&output)
 		}
-		generateOutput(b, config, out)
+		generateOutput(b, config, nil, out)
 	})
 	b.Run("JSON", func(b *testing.B) {
 		var logger logr.Logger
+		var flush func()
 		var out1, out2 *os.File
 		if !discard {
 			var err error
@@ -193,7 +193,7 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		}
 		b.Run("single-stream", func(b *testing.B) {
 			if discard {
-				logger, _ = logsjson.NewJSONLogger(zapcore.AddSync(&output), nil, nil)
+				logger, flush = logsjson.NewJSONLogger(logsjson.AddNopSync(&output), nil, nil)
 			} else {
 				stderr := os.Stderr
 				os.Stderr = out1
@@ -201,16 +201,16 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 					os.Stderr = stderr
 				}()
 				options := logs.NewOptions()
-				logger, _ = logsjson.Factory{}.Create(options.Config.Options)
+				logger, flush = logsjson.Factory{}.Create(options.Config.Options)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
-			generateOutput(b, config, out1)
+			generateOutput(b, config, flush, out1)
 		})
 
 		b.Run("split-stream", func(b *testing.B) {
 			if discard {
-				logger, _ = logsjson.NewJSONLogger(zapcore.AddSync(&output), zapcore.AddSync(&output), nil)
+				logger, flush = logsjson.NewJSONLogger(logsjson.AddNopSync(&output), logsjson.AddNopSync(&output), nil)
 			} else {
 				stdout, stderr := os.Stdout, os.Stderr
 				os.Stdout, os.Stderr = out1, out2
@@ -219,16 +219,16 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 				}()
 				options := logs.NewOptions()
 				options.Config.Options.JSON.SplitStream = true
-				logger, _ = logsjson.Factory{}.Create(options.Config.Options)
+				logger, flush = logsjson.Factory{}.Create(options.Config.Options)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
-			generateOutput(b, config, out1, out2)
+			generateOutput(b, config, flush, out1, out2)
 		})
 	})
 }
 
-func generateOutput(b *testing.B, config loadGeneratorConfig, files ...*os.File) {
+func generateOutput(b *testing.B, config loadGeneratorConfig, flush func(), files ...*os.File) {
 	msg := strings.Repeat("X", config.messageLength)
 	err := errors.New("fail")
 	start := time.Now()
@@ -257,6 +257,9 @@ func generateOutput(b *testing.B, config loadGeneratorConfig, files ...*os.File)
 	}
 	wg.Wait()
 	klog.Flush()
+	if flush != nil {
+		flush()
+	}
 	b.StopTimer()
 
 	// Print some information about the result.
