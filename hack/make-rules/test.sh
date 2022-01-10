@@ -21,7 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 kube::golang::setup_gomaxprocs
 
 # start the cache mutation detector by default so that cache mutators will be found
@@ -42,7 +42,6 @@ kube::test::find_dirs() {
           -o -path './_gopath/*' \
           -o -path './cmd/kubeadm/test/*' \
           -o -path './contrib/podex/*' \
-          -o -path './output/*' \
           -o -path './release/*' \
           -o -path './target/*' \
           -o -path './test/e2e/e2e_test.go' \
@@ -53,7 +52,7 @@ kube::test::find_dirs() {
           -o -path './staging/*' \
           -o -path './vendor/*' \
         \) -prune \
-      \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
+      \) -name '*_test.go' -print0 | xargs -0n1 dirname | LC_ALL=C sort -u
 
     find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
   )
@@ -165,7 +164,7 @@ for arg; do
   fi
 done
 if [[ ${#testcases[@]} -eq 0 ]]; then
-  while IFS='' read -r line; do testcases+=("$line"); done < <(kube::test::find_dirs)
+  kube::util::read-array testcases < <(kube::test::find_dirs)
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
@@ -219,7 +218,7 @@ runTests() {
 
   # Try to normalize input names.
   local -a targets
-  while IFS="" read -r target; do targets+=("$target"); done < <(kube::golang::binaries_from_targets "$@")
+  kube::util::read-array targets < <(kube::golang::normalize_go_targets "$@")
 
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
