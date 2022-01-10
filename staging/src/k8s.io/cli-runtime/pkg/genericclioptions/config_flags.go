@@ -397,7 +397,7 @@ func (f *ConfigFlags) WithDiscoveryBurst(discoveryBurst int) *ConfigFlags {
 	return f
 }
 
-// WithDiscoveryBurst sets the RESTClient burst for discovery.
+// WithDiscoveryQPS sets the RESTClient QPS for discovery.
 func (f *ConfigFlags) WithDiscoveryQPS(discoveryQPS float32) *ConfigFlags {
 	f.discoveryQPS = discoveryQPS
 	return f
