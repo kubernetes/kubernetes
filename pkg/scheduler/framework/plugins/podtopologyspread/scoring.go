@@ -209,7 +209,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 			score += scoreForCount(cnt, c.MaxSkew, s.TopologyNormalizingWeight[i])
 		}
 	}
-	return int64(score), nil
+	return int64(math.Round(score)), nil
 }
 
 // NormalizeScore invoked after scoring all nodes.
