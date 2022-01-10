@@ -21,7 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::old::setup_env
+kube::golang::new::setup_env
 kube::golang::setup_gomaxprocs
 
 # start the cache mutation detector by default so that cache mutators will be found
@@ -219,7 +219,10 @@ runTests() {
 
   # Try to normalize input names.
   local -a targets
-  while IFS="" read -r target; do targets+=("$target"); done < <(kube::golang::binaries_from_targets "$@")
+  while IFS="" read -r target; do
+    # shellcheck disable=SC2031 # false positive
+    targets+=("$target")
+  done < <(kube::golang::normalize_go_targets "$@")
 
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
