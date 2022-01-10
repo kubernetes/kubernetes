@@ -643,14 +643,15 @@ func TestFileLocking(t *testing.T) {
 	destinationFile.Close()
 	defer os.Remove(destinationFile.Name())
 
-	lock, err := LockFile(destinationFile.Name())
+	lock, err := NewFileLock(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error while locking file: %v", err)
 	}
 	defer lock.Close()
 
-	_, err = LockFile(destinationFile.Name())
+	lock, err = NewFileLock(destinationFile.Name())
 	if err == nil {
+		lock.Close()
 		t.Error("expected error while locking file.")
 	}
 }
@@ -686,7 +687,7 @@ func TestFileLockingWithWriting(t *testing.T) {
 		t.Errorf("expected to find cow-cluster but did not")
 	}
 
-	lock, err := LockFile(destinationFile.Name())
+	lock, err := NewFileLock(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error while locking file: %v", err)
 	}
@@ -696,7 +697,24 @@ func TestFileLockingWithWriting(t *testing.T) {
 		t.Error("expected error while locking file.")
 	}
 	lock.Close()
+}
 
+func TestWithLegacyLockFiles(t *testing.T) {
+	destinationFile, _ := ioutil.TempFile("", "")
+	destinationFile.Close()
+	defer os.Remove(destinationFile.Name())
+
+	f, err := os.OpenFile(destinationFile.Name()+".lock", os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		t.Errorf("unexpected error while creating lock file: %v", err)
+	}
+	f.Close()
+	defer os.Remove(destinationFile.Name() + ".lock")
+
+	_, err = NewFileLock(destinationFile.Name())
+	if err == nil {
+		t.Error("expected error while locking file.")
+	}
 }
 
 func Example_noMergingOnExplicitPaths() {

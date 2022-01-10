@@ -173,12 +173,12 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 		// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
 		sort.Strings(possibleSources)
 		for _, filename := range possibleSources {
-			wc, err := LockFile(filename)
+			lock, err := NewFileLock(filename)
 			if err != nil {
 				continue
 			}
-			defer wc.Close()
-			cachedLocks[filename] = wc
+			defer lock.Close()
+			cachedLocks[filename] = lock
 		}
 	}
 

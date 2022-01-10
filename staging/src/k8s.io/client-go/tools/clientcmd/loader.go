@@ -361,6 +361,51 @@ func (rules *ClientConfigLoadingRules) IsDefaultConfig(config *restclient.Config
 	return reflect.DeepEqual(config, defaultConfig)
 }
 
+// FileLock implements a file locking mechanism to prevent multiple concurrent writes
+// to a file by multiple processes. Implements `io.WriteCloser`.
+type FileLock struct {
+	io.WriteCloser
+
+	lockFile string // this is for backwards compatibility to transition away from `.lock` files to platform-native locking
+}
+
+// NewFileLock opens or creates a file for writing and obtaining an exlusive lock on it.
+func NewFileLock(filename string) (*FileLock, error) {
+	f, err := fileutil.TryLockFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return nil, err
+	}
+
+	lock := &FileLock{
+		WriteCloser: f,
+		lockFile:    filename + ".lock",
+	}
+
+	fi, err := os.Stat(lock.lockFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
+	if fi != nil {
+		f.Close()
+		return nil, fmt.Errorf("file locked by another process")
+	}
+
+	return lock, nil
+}
+
+// Write to the file.
+func (f *FileLock) Write(b []byte) (int, error) {
+	return f.WriteCloser.Write(b)
+}
+
+// Close the file and remove the lock.
+func (f *FileLock) Close() error {
+	return f.WriteCloser.Close()
+}
+
 // LoadFromFile takes a filename and deserializes the contents into Config object
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	kubeconfigBytes, err := ioutil.ReadFile(filename)
@@ -449,7 +494,7 @@ func WriteToFileWithLock(config clientcmdapi.Config, filename string) error {
 		return err
 	}
 
-	f, err := LockFile(filename)
+	f, err := NewFileLock(filename)
 	if err != nil {
 		return err
 	}
@@ -466,11 +511,6 @@ func EnsureDir(path string) error {
 		}
 	}
 	return nil
-}
-
-// LockFile uses a platform-specific exclusive lock to prevent concurrent write operations from multiple kubectl processes.
-func LockFile(filename string) (io.WriteCloser, error) {
-	return fileutil.TryLockFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 }
 
 // Write serializes the config to yaml.
