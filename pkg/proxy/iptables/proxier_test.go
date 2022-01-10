@@ -6958,87 +6958,137 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 	}
 }
 
-func TestMasqueradeAll(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
-	fp.masqueradeAll = true
+func TestInternalExternalMasquerade(t *testing.T) {
+	// (Put the test setup code in an internal function so we can have it here at the
+	// top, before the test cases that will be run against it.)
+	setupTest := func(fp *Proxier) {
+		local := v1.ServiceInternalTrafficPolicyLocal
+		tcpProtocol := v1.ProtocolTCP
 
-	makeServiceMap(fp,
-		makeTestService("ns1", "svc1", func(svc *v1.Service) {
-			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.ClusterIP = "172.30.0.41"
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     "p80",
-				Port:     80,
-				Protocol: v1.ProtocolTCP,
-				NodePort: int32(3001),
-			}}
-			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
-				IP: "1.2.3.4",
-			}}
-		}),
-	)
+		makeServiceMap(fp,
+			makeTestService("ns1", "svc1", func(svc *v1.Service) {
+				svc.Spec.Type = "LoadBalancer"
+				svc.Spec.ClusterIP = "172.30.0.41"
+				svc.Spec.Ports = []v1.ServicePort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+					NodePort: int32(3001),
+				}}
+				svc.Spec.HealthCheckNodePort = 30001
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+					IP: "1.2.3.4",
+				}}
+			}),
+			makeTestService("ns2", "svc2", func(svc *v1.Service) {
+				svc.Spec.Type = "LoadBalancer"
+				svc.Spec.ClusterIP = "172.30.0.42"
+				svc.Spec.Ports = []v1.ServicePort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+					NodePort: int32(3002),
+				}}
+				svc.Spec.HealthCheckNodePort = 30002
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+					IP: "5.6.7.8",
+				}}
+			}),
+			makeTestService("ns3", "svc3", func(svc *v1.Service) {
+				svc.Spec.Type = "LoadBalancer"
+				svc.Spec.ClusterIP = "172.30.0.43"
+				svc.Spec.Ports = []v1.ServicePort{{
+					Name:     "p80",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+					NodePort: int32(3003),
+				}}
+				svc.Spec.HealthCheckNodePort = 30003
+				svc.Spec.InternalTrafficPolicy = &local
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+					IP: "9.10.11.12",
+				}}
+			}),
+		)
 
-	tcpProtocol := v1.ProtocolTCP
-	populateEndpointSlices(fp,
-		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
-			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{"10.180.0.1"},
-			}}
-			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
-				Protocol: &tcpProtocol,
-			}}
-		}),
-	)
+		populateEndpointSlices(fp,
+			makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+				eps.AddressType = discovery.AddressTypeIPv4
+				eps.Endpoints = []discovery.Endpoint{
+					{
+						Addresses: []string{"10.180.0.1"},
+						NodeName:  utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.180.1.1"},
+						NodeName:  utilpointer.StringPtr("remote"),
+					},
+				}
+				eps.Ports = []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("p80"),
+					Port:     utilpointer.Int32(80),
+					Protocol: &tcpProtocol,
+				}}
+			}),
+			makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
+				eps.AddressType = discovery.AddressTypeIPv4
+				eps.Endpoints = []discovery.Endpoint{
+					{
+						Addresses: []string{"10.180.0.2"},
+						NodeName:  utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.180.1.2"},
+						NodeName:  utilpointer.StringPtr("remote"),
+					},
+				}
+				eps.Ports = []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("p80"),
+					Port:     utilpointer.Int32(80),
+					Protocol: &tcpProtocol,
+				}}
+			}),
+			makeTestEndpointSlice("ns3", "svc3", 1, func(eps *discovery.EndpointSlice) {
+				eps.AddressType = discovery.AddressTypeIPv4
+				eps.Endpoints = []discovery.Endpoint{
+					{
+						Addresses: []string{"10.180.0.3"},
+						NodeName:  utilpointer.StringPtr(testHostname),
+					},
+					{
+						Addresses: []string{"10.180.1.3"},
+						NodeName:  utilpointer.StringPtr("remote"),
+					},
+				}
+				eps.Ports = []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("p80"),
+					Port:     utilpointer.Int32(80),
+					Protocol: &tcpProtocol,
+				}}
+			}),
+		)
 
-	fp.syncProxyRules()
+		fp.syncProxyRules()
+	}
 
-	expected := dedent.Dedent(`
-		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-SERVICES - [0:0]
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-		COMMIT
-		*nat
-		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
-		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
-		:KUBE-SERVICES - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
-		-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-XPGD46QRK7WJZT7O
-		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
-		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-EXT-XPGD46QRK7WJZT7O
-		-A KUBE-EXT-XPGD46QRK7WJZT7O -m comment --comment "masquerade traffic for ns1/svc1:p80 external destinations" -j KUBE-MARK-MASQ
-		-A KUBE-EXT-XPGD46QRK7WJZT7O -j KUBE-SVC-XPGD46QRK7WJZT7O
-		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
-		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
-		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
-		COMMIT
-		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
-
-	runPacketFlowTests(t, getLine(), fp.iptablesData.String(), testNodeIP, []packetFlowTest{
+	// We use the same flowTests for all of the testCases. The "output" and "masq"
+	// values here represent the normal case (working localDetector, no masqueradeAll)
+	flowTests := []packetFlowTest{
 		{
-			name:     "pod to cluster IP",
+			name:     "pod to ClusterIP",
 			sourceIP: "10.0.0.2",
 			destIP:   "172.30.0.41",
 			destPort: 80,
-			output:   "10.180.0.1:80",
+			output:   "10.180.0.1:80, 10.180.1.1:80",
+			masq:     false,
+		},
+		{
+			name:     "pod to NodePort",
+			sourceIP: "10.0.0.2",
+			destIP:   testNodeIP,
+			destPort: 3001,
+			output:   "10.180.0.1:80, 10.180.1.1:80",
 			masq:     true,
 		},
 		{
@@ -7046,15 +7096,55 @@ func TestMasqueradeAll(t *testing.T) {
 			sourceIP: "10.0.0.2",
 			destIP:   "1.2.3.4",
 			destPort: 80,
-			output:   "10.180.0.1:80",
+			output:   "10.180.0.1:80, 10.180.1.1:80",
 			masq:     true,
 		},
 		{
-			name:     "external to cluster IP",
+			name:     "node to ClusterIP",
+			sourceIP: testNodeIP,
+			destIP:   "172.30.0.41",
+			destPort: 80,
+			output:   "10.180.0.1:80, 10.180.1.1:80",
+			masq:     true,
+		},
+		{
+			name:     "node to NodePort",
+			sourceIP: testNodeIP,
+			destIP:   testNodeIP,
+			destPort: 3001,
+			output:   "10.180.0.1:80, 10.180.1.1:80",
+			masq:     true,
+		},
+		{
+			name:     "localhost to NodePort",
+			sourceIP: "127.0.0.1",
+			destIP:   "127.0.0.1",
+			destPort: 3001,
+			output:   "10.180.0.1:80, 10.180.1.1:80",
+			masq:     true,
+		},
+		{
+			name:     "node to LB",
+			sourceIP: testNodeIP,
+			destIP:   "1.2.3.4",
+			destPort: 80,
+			output:   "10.180.0.1:80, 10.180.1.1:80",
+			masq:     true,
+		},
+		{
+			name:     "external to ClusterIP",
 			sourceIP: testExternalClient,
 			destIP:   "172.30.0.41",
 			destPort: 80,
-			output:   "10.180.0.1:80",
+			output:   "10.180.0.1:80, 10.180.1.1:80",
+			masq:     true,
+		},
+		{
+			name:     "external to NodePort",
+			sourceIP: testExternalClient,
+			destIP:   testNodeIP,
+			destPort: 3001,
+			output:   "10.180.0.1:80, 10.180.1.1:80",
 			masq:     true,
 		},
 		{
@@ -7062,10 +7152,380 @@ func TestMasqueradeAll(t *testing.T) {
 			sourceIP: testExternalClient,
 			destIP:   "1.2.3.4",
 			destPort: 80,
-			output:   "10.180.0.1:80",
+			output:   "10.180.0.1:80, 10.180.1.1:80",
 			masq:     true,
 		},
-	})
+		{
+			name:     "pod to ClusterIP with eTP:Local",
+			sourceIP: "10.0.0.2",
+			destIP:   "172.30.0.42",
+			destPort: 80,
+
+			// externalTrafficPolicy does not apply to ClusterIP traffic, so same
+			// as "Pod to ClusterIP"
+			output: "10.180.0.2:80, 10.180.1.2:80",
+			masq:   false,
+		},
+		{
+			name:     "pod to NodePort with eTP:Local",
+			sourceIP: "10.0.0.2",
+			destIP:   testNodeIP,
+			destPort: 3002,
+
+			// FIXME: The short-circuit rule means we potentially send to a remote
+			// endpoint without masquerading, which is inconsistent with the
+			// eTP:Cluster case. We should either be masquerading here, or NOT
+			// masquerading in the "pod to NodePort" case above.
+			output: "10.180.0.2:80, 10.180.1.2:80",
+			masq:   false,
+		},
+		{
+			name:     "pod to LB with eTP:Local",
+			sourceIP: "10.0.0.2",
+			destIP:   "5.6.7.8",
+			destPort: 80,
+
+			// FIXME: The short-circuit rule means we potentially send to a remote
+			// endpoint without masquerading, which is inconsistent with the
+			// eTP:Cluster case. We should either be masquerading here, or NOT
+			// masquerading in the "pod to LB" case above.
+			output: "10.180.0.2:80, 10.180.1.2:80",
+			masq:   false,
+		},
+		{
+			name:     "node to ClusterIP with eTP:Local",
+			sourceIP: testNodeIP,
+			destIP:   "172.30.0.42",
+			destPort: 80,
+
+			// externalTrafficPolicy does not apply to ClusterIP traffic, so same
+			// as "node to ClusterIP"
+			output: "10.180.0.2:80, 10.180.1.2:80",
+			masq:   true,
+		},
+		{
+			name:     "node to NodePort with eTP:Local",
+			sourceIP: testNodeIP,
+			destIP:   testNodeIP,
+			destPort: 3001,
+
+			// The traffic gets short-circuited, ignoring externalTrafficPolicy, so
+			// same as "node to NodePort" above.
+			output: "10.180.0.1:80, 10.180.1.1:80",
+			masq:   true,
+		},
+		{
+			name:     "localhost to NodePort with eTP:Local",
+			sourceIP: "127.0.0.1",
+			destIP:   "127.0.0.1",
+			destPort: 3002,
+
+			// The traffic gets short-circuited, ignoring externalTrafficPolicy, so
+			// same as "localhost to NodePort" above.
+			output: "10.180.0.2:80, 10.180.1.2:80",
+			masq:   true,
+		},
+		{
+			name:     "node to LB with eTP:Local",
+			sourceIP: testNodeIP,
+			destIP:   "5.6.7.8",
+			destPort: 80,
+
+			// The traffic gets short-circuited, ignoring externalTrafficPolicy, so
+			// same as "node to LB" above.
+			output: "10.180.0.2:80, 10.180.1.2:80",
+			masq:   true,
+		},
+		{
+			name:     "external to ClusterIP with eTP:Local",
+			sourceIP: testExternalClient,
+			destIP:   "172.30.0.42",
+			destPort: 80,
+
+			// externalTrafficPolicy does not apply to ClusterIP traffic, so same
+			// as "external to ClusterIP" above.
+			output: "10.180.0.2:80, 10.180.1.2:80",
+			masq:   true,
+		},
+		{
+			name:     "external to NodePort with eTP:Local",
+			sourceIP: testExternalClient,
+			destIP:   testNodeIP,
+			destPort: 3002,
+
+			// externalTrafficPolicy applies; only the local endpoint is
+			// selected, and we don't masquerade.
+			output: "10.180.0.2:80",
+			masq:   false,
+		},
+		{
+			name:     "external to LB with eTP:Local",
+			sourceIP: testExternalClient,
+			destIP:   "5.6.7.8",
+			destPort: 80,
+
+			// externalTrafficPolicy applies; only the local endpoint is
+			// selected, and we don't masquerade.
+			output: "10.180.0.2:80",
+			masq:   false,
+		},
+		{
+			name:     "pod to ClusterIP with iTP:Local",
+			sourceIP: "10.0.0.2",
+			destIP:   "172.30.0.43",
+			destPort: 80,
+
+			// internalTrafficPolicy applies; only the local endpoint is
+			// selected.
+			output: "10.180.0.3:80",
+			masq:   false,
+		},
+		{
+			name:     "pod to NodePort with iTP:Local",
+			sourceIP: "10.0.0.2",
+			destIP:   testNodeIP,
+			destPort: 3003,
+
+			// internalTrafficPolicy does not apply to NodePort traffic, so same as
+			// "pod to NodePort" above.
+			output: "10.180.0.3:80, 10.180.1.3:80",
+			masq:   true,
+		},
+		{
+			name:     "pod to LB with iTP:Local",
+			sourceIP: "10.0.0.2",
+			destIP:   "9.10.11.12",
+			destPort: 80,
+
+			// internalTrafficPolicy does not apply to LoadBalancer traffic, so
+			// same as "pod to LB" above.
+			output: "10.180.0.3:80, 10.180.1.3:80",
+			masq:   true,
+		},
+		{
+			name:     "node to ClusterIP with iTP:Local",
+			sourceIP: testNodeIP,
+			destIP:   "172.30.0.43",
+			destPort: 80,
+
+			// internalTrafficPolicy applies; only the local endpoint is selected.
+			// Traffic is masqueraded as in the "node to ClusterIP" case because
+			// internalTrafficPolicy does not affect masquerading.
+			output: "10.180.0.3:80",
+			masq:   true,
+		},
+		{
+			name:     "node to NodePort with iTP:Local",
+			sourceIP: testNodeIP,
+			destIP:   testNodeIP,
+			destPort: 3003,
+
+			// internalTrafficPolicy does not apply to NodePort traffic, so same as
+			// "node to NodePort" above.
+			output: "10.180.0.3:80, 10.180.1.3:80",
+			masq:   true,
+		},
+		{
+			name:     "localhost to NodePort with iTP:Local",
+			sourceIP: "127.0.0.1",
+			destIP:   "127.0.0.1",
+			destPort: 3003,
+
+			// internalTrafficPolicy does not apply to NodePort traffic, so same as
+			// "localhost to NodePort" above.
+			output: "10.180.0.3:80, 10.180.1.3:80",
+			masq:   true,
+		},
+		{
+			name:     "node to LB with iTP:Local",
+			sourceIP: testNodeIP,
+			destIP:   "9.10.11.12",
+			destPort: 80,
+
+			// internalTrafficPolicy does not apply to LoadBalancer traffic, so
+			// same as "node to LB" above.
+			output: "10.180.0.3:80, 10.180.1.3:80",
+			masq:   true,
+		},
+		{
+			name:     "external to ClusterIP with iTP:Local",
+			sourceIP: testExternalClient,
+			destIP:   "172.30.0.43",
+			destPort: 80,
+
+			// internalTrafficPolicy applies; only the local endpoint is selected.
+			// Traffic is masqueraded as in the "external to ClusterIP" case
+			// because internalTrafficPolicy does not affect masquerading.
+			output: "10.180.0.3:80",
+			masq:   true,
+		},
+		{
+			name:     "external to NodePort with iTP:Local",
+			sourceIP: testExternalClient,
+			destIP:   testNodeIP,
+			destPort: 3003,
+
+			// internalTrafficPolicy does not apply to NodePort traffic, so same as
+			// "external to NodePort" above.
+			output: "10.180.0.3:80, 10.180.1.3:80",
+			masq:   true,
+		},
+		{
+			name:     "external to LB with iTP:Local",
+			sourceIP: testExternalClient,
+			destIP:   "9.10.11.12",
+			destPort: 80,
+
+			// internalTrafficPolicy does not apply to LoadBalancer traffic, so
+			// same as "external to LB" above.
+			output: "10.180.0.3:80, 10.180.1.3:80",
+			masq:   true,
+		},
+	}
+
+	type packetFlowTestOverride struct {
+		output *string
+		masq   *bool
+	}
+
+	testCases := []struct {
+		name          string
+		line          int
+		masqueradeAll bool
+		localDetector bool
+		overrides     map[string]packetFlowTestOverride
+	}{
+		{
+			name:          "base",
+			line:          getLine(),
+			masqueradeAll: false,
+			localDetector: true,
+			overrides:     nil,
+		},
+		{
+			name:          "no LocalTrafficDetector",
+			line:          getLine(),
+			masqueradeAll: false,
+			localDetector: false,
+			overrides: map[string]packetFlowTestOverride{
+				// With no LocalTrafficDetector, all traffic to a
+				// ClusterIP is assumed to be from a pod, and thus to not
+				// require masquerading.
+				"node to ClusterIP": {
+					masq: utilpointer.Bool(false),
+				},
+				"node to ClusterIP with eTP:Local": {
+					masq: utilpointer.Bool(false),
+				},
+				"node to ClusterIP with iTP:Local": {
+					masq: utilpointer.Bool(false),
+				},
+				"external to ClusterIP": {
+					masq: utilpointer.Bool(false),
+				},
+				"external to ClusterIP with eTP:Local": {
+					masq: utilpointer.Bool(false),
+				},
+				"external to ClusterIP with iTP:Local": {
+					masq: utilpointer.Bool(false),
+				},
+
+				// And there's no eTP:Local short-circuit for pod traffic,
+				// so pods get only the local endpoints.
+				"pod to NodePort with eTP:Local": {
+					output: utilpointer.String("10.180.0.2:80"),
+				},
+				"pod to LB with eTP:Local": {
+					output: utilpointer.String("10.180.0.2:80"),
+				},
+			},
+		},
+		{
+			name:          "masqueradeAll",
+			line:          getLine(),
+			masqueradeAll: true,
+			localDetector: true,
+			overrides: map[string]packetFlowTestOverride{
+				// All "to ClusterIP" traffic gets masqueraded when using
+				// --masquerade-all.
+				"pod to ClusterIP": {
+					masq: utilpointer.Bool(true),
+				},
+				"pod to ClusterIP with eTP:Local": {
+					masq: utilpointer.Bool(true),
+				},
+				"pod to ClusterIP with iTP:Local": {
+					masq: utilpointer.Bool(true),
+				},
+			},
+		},
+		{
+			name:          "masqueradeAll, no LocalTrafficDetector",
+			line:          getLine(),
+			masqueradeAll: true,
+			localDetector: false,
+			overrides: map[string]packetFlowTestOverride{
+				// As in "masqueradeAll"
+				"pod to ClusterIP": {
+					masq: utilpointer.Bool(true),
+				},
+				"pod to ClusterIP with eTP:Local": {
+					masq: utilpointer.Bool(true),
+				},
+				"pod to ClusterIP with iTP:Local": {
+					masq: utilpointer.Bool(true),
+				},
+
+				// As in "no LocalTrafficDetector"
+				"pod to NodePort with eTP:Local": {
+					output: utilpointer.String("10.180.0.2:80"),
+				},
+				"pod to LB with eTP:Local": {
+					output: utilpointer.String("10.180.0.2:80"),
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, true)()
+
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.masqueradeAll = tc.masqueradeAll
+			if !tc.localDetector {
+				fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
+			}
+			setupTest(fp)
+
+			// Merge base flowTests with per-test-case overrides
+			tcFlowTests := make([]packetFlowTest, len(flowTests))
+			overridesApplied := 0
+			for i := range flowTests {
+				tcFlowTests[i] = flowTests[i]
+				if overrides, set := tc.overrides[flowTests[i].name]; set {
+					overridesApplied++
+					if overrides.masq != nil {
+						if tcFlowTests[i].masq == *overrides.masq {
+							t.Errorf("%q override value for masq is same as base value", flowTests[i].name)
+						}
+						tcFlowTests[i].masq = *overrides.masq
+					}
+					if overrides.output != nil {
+						if tcFlowTests[i].output == *overrides.output {
+							t.Errorf("%q override value for output is same as base value", flowTests[i].name)
+						}
+						tcFlowTests[i].output = *overrides.output
+					}
+				}
+			}
+			if overridesApplied != len(tc.overrides) {
+				t.Errorf("%d overrides did not match any test case name!", len(tc.overrides)-overridesApplied)
+			}
+			runPacketFlowTests(t, tc.line, fp.iptablesData.String(), testNodeIP, tcFlowTests)
+		})
+	}
 }
 
 func countEndpointsAndComments(iptablesData string, matchEndpoint string) (string, int, int) {
