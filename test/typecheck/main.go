@@ -57,10 +57,6 @@ var (
 
 	// directories we always ignore
 	standardIgnoreDirs = []string{
-		// Staging code is symlinked from vendor/k8s.io, and uses import
-		// paths as if it were inside of vendor/. It fails typechecking
-		// inside of staging/, but works when typechecked as part of vendor/.
-		"staging",
 		// OS-specific vendor code tends to be imported by OS-specific
 		// packages. We recursively typecheck imported vendored packages for
 		// each OS, but don't typecheck everything for every OS.
