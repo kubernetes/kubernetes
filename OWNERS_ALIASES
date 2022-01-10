@@ -389,6 +389,7 @@ aliases:
     - pwittrock
     - ncdc
     - tallclair
+    - mwielgus
     - soltysh
     - jsafrane
     - dims
@@ -448,8 +449,6 @@ aliases:
     - msau42
     - jsafrane
     - xing-yang
-  sig-security-approvers: []
-  sig-security-reviewers: []
   sig-windows-api-reviewers:
     - jayunit100
     - jsturtevant
@@ -484,6 +483,7 @@ aliases:
     - luxas # Cluster Lifecycle
     - marosset # Windows
     - msau42 # Storage
+    - mwielgus # Autoscaling
     - pwittrock # CLI
     - justinsb # Cluster Lifecycle
     - saad-ali # Storage
