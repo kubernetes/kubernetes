@@ -1261,8 +1261,8 @@ func (ObjectReference) SwaggerDoc() map[string]string {
 var map_PersistentVolume = map[string]string{
 	"":         "PersistentVolume (PV) is a storage resource provisioned by an administrator. It is analogous to a node. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Spec defines a specification of a persistent volume owned by the cluster. Provisioned by an administrator. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes",
-	"status":   "Status represents the current information/status for the persistent volume. Populated by the system. Read-only. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes",
+	"spec":     "spec defines a specification of a persistent volume owned by the cluster. Provisioned by an administrator. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes",
+	"status":   "status represents the current information/status for the persistent volume. Populated by the system. Read-only. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes",
 }
 
 func (PersistentVolume) SwaggerDoc() map[string]string {
@@ -1272,8 +1272,8 @@ func (PersistentVolume) SwaggerDoc() map[string]string {
 var map_PersistentVolumeClaim = map[string]string{
 	"":         "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Spec defines the desired characteristics of a volume requested by a pod author. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-	"status":   "Status represents the current information/status of a persistent volume claim. Read-only. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+	"spec":     "spec defines the desired characteristics of a volume requested by a pod author. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+	"status":   "status represents the current information/status of a persistent volume claim. Read-only. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
 }
 
 func (PersistentVolumeClaim) SwaggerDoc() map[string]string {
@@ -1282,10 +1282,10 @@ func (PersistentVolumeClaim) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeClaimCondition = map[string]string{
 	"":                   "PersistentVolumeClaimCondition contails details about state of pvc",
-	"lastProbeTime":      "Last time we probed the condition.",
-	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
-	"reason":             "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized.",
-	"message":            "Human-readable message indicating details about last transition.",
+	"lastProbeTime":      "lastProbeTime is the time we probed the condition.",
+	"lastTransitionTime": "lastTransitionTime is the time the condition transitioned from one status to another.",
+	"reason":             "reason is a unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized.",
+	"message":            "message is the human-readable message indicating details about last transition.",
 }
 
 func (PersistentVolumeClaimCondition) SwaggerDoc() map[string]string {
@@ -1295,7 +1295,7 @@ func (PersistentVolumeClaimCondition) SwaggerDoc() map[string]string {
 var map_PersistentVolumeClaimList = map[string]string{
 	"":         "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-	"items":    "A list of persistent volume claims. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+	"items":    "items is a list of persistent volume claims. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
 }
 
 func (PersistentVolumeClaimList) SwaggerDoc() map[string]string {
@@ -1304,14 +1304,14 @@ func (PersistentVolumeClaimList) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeClaimSpec = map[string]string{
 	"":                 "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
-	"accessModes":      "AccessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-	"selector":         "A label query over volumes to consider for binding.",
-	"resources":        "Resources represents the minimum resources the volume should have. If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
-	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
-	"storageClassName": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
+	"accessModes":      "accessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
+	"selector":         "selector is a label query over volumes to consider for binding.",
+	"resources":        "resources represents the minimum resources the volume should have. If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+	"volumeName":       "volumeName is the binding reference to the PersistentVolume backing this claim.",
+	"storageClassName": "storageClassName is the name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
 	"volumeMode":       "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec.",
-	"dataSource":       "This field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. If the AnyVolumeDataSource feature gate is enabled, this field will always have the same contents as the DataSourceRef field.",
-	"dataSourceRef":    "Specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any local object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the DataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, both fields (DataSource and DataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. There are two important differences between DataSource and DataSourceRef: * While DataSource only allows two specific types of objects, DataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While DataSource ignores disallowed values (dropping them), DataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n(Alpha) Using this field requires the AnyVolumeDataSource feature gate to be enabled.",
+	"dataSource":       "dataSource field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. If the AnyVolumeDataSource feature gate is enabled, this field will always have the same contents as the DataSourceRef field.",
+	"dataSourceRef":    "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any local object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the DataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, both fields (DataSource and DataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. There are two important differences between DataSource and DataSourceRef: * While DataSource only allows two specific types of objects, DataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While DataSource ignores disallowed values (dropping them), DataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n(Alpha) Using this field requires the AnyVolumeDataSource feature gate to be enabled.",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
@@ -1320,12 +1320,12 @@ func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeClaimStatus = map[string]string{
 	"":                   "PersistentVolumeClaimStatus is the current status of a persistent volume claim.",
-	"phase":              "Phase represents the current phase of PersistentVolumeClaim.",
-	"accessModes":        "AccessModes contains the actual access modes the volume backing the PVC has. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-	"capacity":           "Represents the actual resources of the underlying volume.",
-	"conditions":         "Current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
-	"allocatedResources": "The storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may be larger than the actual capacity when a volume expansion operation is requested. For storage quota, the larger value from allocatedResources and PVC.spec.resources is used. If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation. If a volume expansion capacity request is lowered, allocatedResources is only lowered if there are no expansion operations in progress and if the actual volume capacity is equal or lower than the requested capacity. This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
-	"resizeStatus":       "ResizeStatus stores status of resize operation. ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty string by resize controller or kubelet. This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
+	"phase":              "phase represents the current phase of PersistentVolumeClaim.",
+	"accessModes":        "accessModes contains the actual access modes the volume backing the PVC has. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
+	"capacity":           "capacity represents the actual resources of the underlying volume.",
+	"conditions":         "conditions is the current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
+	"allocatedResources": "allocatedResources is the storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may be larger than the actual capacity when a volume expansion operation is requested. For storage quota, the larger value from allocatedResources and PVC.spec.resources is used. If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation. If a volume expansion capacity request is lowered, allocatedResources is only lowered if there are no expansion operations in progress and if the actual volume capacity is equal or lower than the requested capacity. This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
+	"resizeStatus":       "resizeStatus stores status of resize operation. ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty string by resize controller or kubelet. This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
 }
 
 func (PersistentVolumeClaimStatus) SwaggerDoc() map[string]string {
@@ -1344,8 +1344,8 @@ func (PersistentVolumeClaimTemplate) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeClaimVolumeSource = map[string]string{
 	"":          "PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).",
-	"claimName": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-	"readOnly":  "Will force the ReadOnly setting in VolumeMounts. Default false.",
+	"claimName": "claimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+	"readOnly":  "readOnly Will force the ReadOnly setting in VolumeMounts. Default false.",
 }
 
 func (PersistentVolumeClaimVolumeSource) SwaggerDoc() map[string]string {
@@ -1355,7 +1355,7 @@ func (PersistentVolumeClaimVolumeSource) SwaggerDoc() map[string]string {
 var map_PersistentVolumeList = map[string]string{
 	"":         "PersistentVolumeList is a list of PersistentVolume items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-	"items":    "List of persistent volumes. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes",
+	"items":    "items is a list of persistent volumes. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes",
 }
 
 func (PersistentVolumeList) SwaggerDoc() map[string]string {
@@ -1394,14 +1394,14 @@ func (PersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeSpec = map[string]string{
 	"":                              "PersistentVolumeSpec is the specification of a persistent volume.",
-	"capacity":                      "A description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
-	"accessModes":                   "AccessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
-	"claimRef":                      "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
-	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
-	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
-	"mountOptions":                  "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
+	"capacity":                      "capacity is the description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
+	"accessModes":                   "accessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
+	"claimRef":                      "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
+	"persistentVolumeReclaimPolicy": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
+	"storageClassName":              "storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+	"mountOptions":                  "mountOptions is the list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
 	"volumeMode":                    "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec.",
-	"nodeAffinity":                  "NodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
+	"nodeAffinity":                  "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -1410,9 +1410,9 @@ func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeStatus = map[string]string{
 	"":        "PersistentVolumeStatus is the current status of a persistent volume.",
-	"phase":   "Phase indicates if a volume is available, bound to a claim, or released by a claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase",
-	"message": "A human-readable message indicating details about why the volume is in this state.",
-	"reason":  "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
+	"phase":   "phase indicates if a volume is available, bound to a claim, or released by a claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase",
+	"message": "message is a human-readable message indicating details about why the volume is in this state.",
+	"reason":  "reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
 }
 
 func (PersistentVolumeStatus) SwaggerDoc() map[string]string {
@@ -2423,7 +2423,7 @@ func (TypedLocalObjectReference) SwaggerDoc() map[string]string {
 
 var map_Volume = map[string]string{
 	"":     "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
-	"name": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+	"name": "name of the volume. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 }
 
 func (Volume) SwaggerDoc() map[string]string {
@@ -2456,7 +2456,7 @@ func (VolumeMount) SwaggerDoc() map[string]string {
 
 var map_VolumeNodeAffinity = map[string]string{
 	"":         "VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.",
-	"required": "Required specifies hard node constraints that must be met.",
+	"required": "required specifies hard node constraints that must be met.",
 }
 
 func (VolumeNodeAffinity) SwaggerDoc() map[string]string {
