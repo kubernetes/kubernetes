@@ -202,6 +202,52 @@ func TestTimeout(t *testing.T) {
 	}
 }
 
+func TestTimeoutHeaders(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+
+	ts := httptest.NewServer(
+		withDeadline(
+			WithTimeout(
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					h := w.Header()
+					// trigger the timeout
+					cancel()
+					// mutate response Headers
+					for j := 0; j < 1000; j++ {
+						h.Set("Test", "post")
+					}
+				}),
+				func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+					return req, false, func() {}, apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
+				},
+			),
+		),
+	)
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	res.Body.Close()
+}
+
 func captureStdErr() (func() string, func(), error) {
 	var buf bytes.Buffer
 	reader, writer, err := os.Pipe()
