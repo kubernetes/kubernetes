@@ -135,6 +135,11 @@ func buildHeader(headerList []v1.HTTPHeader) http.Header {
 	return headers
 }
 
+var (
+	defaultHttpPort  = 80
+	defaultHttpsPort = 443
+)
+
 func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
@@ -148,11 +153,13 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		}
 		host = status.IPs[0]
 	}
+	changePort := false
 	var port int
 	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
-		port = 80
+		port = defaultHttpPort
 		if utilfeature.DefaultFeatureGate.Enabled(features.LifecycleHandlerHTTPS) && handler.HTTPGet.Scheme == v1.URISchemeHTTPS {
-			port = 443
+			port = defaultHttpsPort
+			changePort = true
 		}
 	} else {
 		var err error
@@ -172,10 +179,37 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	if err != nil {
 		return "", err
 	}
-	req.Header = buildHeader(handler.HTTPGet.HTTPHeaders)
+	header := buildHeader(handler.HTTPGet.HTTPHeaders)
+	req.Header = header
 	resp, err := hr.httpDoer.Do(req)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.LifecycleHandlerHTTPS) && err != nil {
+		if isGaveHttpResponseErr(err) {
+			url = formatURL("http", host, port, path)
+		} else if changePort && isConnectionRefusedErr(err) {
+			url = formatURL("http", host, defaultHttpPort, path)
+		} else {
+			return getHTTPRespBody(resp), err
+		}
+		if req, err1 := http.NewRequest(http.MethodGet, url.String(), nil); err1 == nil {
+			req.Header = header
+			resp, err = hr.httpDoer.Do(req)
+			return getHTTPRespBody(resp), err
+		} else {
+			klog.ErrorS(err1, "fail fallback lifecycle")
+		}
+	}
+
 	return getHTTPRespBody(resp), err
+}
+
+func isGaveHttpResponseErr(err error) bool {
+	return strings.Contains(err.Error(), "server gave HTTP response to HTTPS client")
+}
+
+func isConnectionRefusedErr(err error) bool {
+	return strings.Contains(err.Error(), "connection refused")
+
 }
 
 func getHTTPRespBody(resp *http.Response) string {
