@@ -50,6 +50,7 @@ source "${KUBE_ROOT}/test/cmd/plugins.sh"
 source "${KUBE_ROOT}/test/cmd/proxy.sh"
 source "${KUBE_ROOT}/test/cmd/rbac.sh"
 source "${KUBE_ROOT}/test/cmd/request-timeout.sh"
+source "${KUBE_ROOT}/test/cmd/results.sh"
 source "${KUBE_ROOT}/test/cmd/run.sh"
 source "${KUBE_ROOT}/test/cmd/save-config.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
@@ -435,6 +436,12 @@ runTests() {
   #########################
 
   record_command run_kubectl_version_tests
+
+  ############################
+  # Kubectl result reporting #
+  ############################
+
+  record_command run_kubectl_results_tests
 
   #######################
   # kubectl config set #
