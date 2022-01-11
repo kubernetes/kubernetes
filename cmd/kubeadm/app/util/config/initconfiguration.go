@@ -18,7 +18,6 @@ package config
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"strconv"
@@ -328,7 +327,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 
 		// If the group is neither a kubeadm core type or of a supported component config group, we dump a warning about it being ignored
 		if !componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
-			fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
 		}
 	}
 

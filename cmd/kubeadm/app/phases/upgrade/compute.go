@@ -95,8 +95,8 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	// Get and output the current latest stable version
 	stableVersionStr, stableVersion, err := versionGetterImpl.VersionFromCILabel("stable", "stable version")
 	if err != nil {
-		fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
-		fmt.Println("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
+		klog.Warningf("[upgrade/versions] WARNING: %v\n", err)
+		klog.Warningf("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
 		stableVersionStr, stableVersion = kubeadmVersionStr, kubeadmVersion
 	} else {
 		fmt.Printf("[upgrade/versions] Target version: %s\n", stableVersionStr)
@@ -146,7 +146,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		// Get and output the latest patch version for the cluster branch
 		patchVersionStr, patchVersion, err := versionGetterImpl.VersionFromCILabel(versionLabel, description)
 		if err != nil {
-			fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
+			klog.Warningf("[upgrade/versions] WARNING: %v\n", err)
 		} else {
 			fmt.Printf("[upgrade/versions] Latest %s: %s\n", description, patchVersionStr)
 

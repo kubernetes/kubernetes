@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -25,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -54,7 +54,7 @@ func GetControlPlaneEndpoint(controlPlaneEndpoint string, localEndpoint *kubeadm
 		localEndpointPort := strconv.Itoa(int(localEndpoint.BindPort))
 		if port != "" {
 			if port != localEndpointPort {
-				fmt.Println("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
+				klog.Warning("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
 			}
 		} else {
 			port = localEndpointPort
