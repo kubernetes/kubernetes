@@ -29,12 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -217,9 +215,6 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func() {
-		// The ExecProbeTimeout feature gate exists to allow backwards-compatibility with pre-1.20 cluster behaviors, where livenessProbe timeouts were ignored
-		// If ExecProbeTimeout feature gate is disabled, timeout enforcement for exec livenessProbes is disabled, so we should skip this test
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.ExecProbeTimeout)
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -237,10 +232,6 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
 	*/
 	ginkgo.It("should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func() {
-		// The ExecProbeTimeout feature gate exists to allow backwards-compatibility with pre-1.20 cluster behaviors, where readiness probe timeouts were ignored
-		// If ExecProbeTimeout feature gate is disabled, timeout enforcement for exec readiness probe is disabled, so we should skip this test
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.ExecProbeTimeout)
-
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		readinessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -255,14 +246,9 @@ var _ = SIGDescribe("Probing container", func() {
 	/*
 		Release: v1.21
 		Testname: Pod liveness probe, container exec timeout, restart
-		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod. When ExecProbeTimeout feature gate is disabled and cluster is using dockershim, the timeout is ignored BUT a failing liveness probe MUST restart the Pod.
+		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func() {
-		// The ExecProbeTimeout feature gate exists to allow backwards-compatibility with pre-1.20 cluster behaviors using dockershim, where livenessProbe timeouts were ignored
-		// If ExecProbeTimeout feature gate is disabled on a dockershim cluster, timeout enforcement for exec livenessProbes is disabled, but a failing liveness probe MUST still trigger a restart
-		// Note ExecProbeTimeout=false is not recommended for non-dockershim clusters (e.g., containerd), and this test will fail if run against such a configuration
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.ExecProbeTimeout)
-
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10 & exit 1"}),
