@@ -16,7 +16,8 @@ func (r *RouteAdapter) StatusCodeResponses() []common.StatusCodeResponse {
 	// go-restful uses the ResponseErrors field to contain both error and regular responses.
 	var responses []common.StatusCodeResponse
 	for _, res := range r.Route.ResponseErrors {
-		responses = append(responses, &ResponseErrorAdapter{&res})
+		localRes := res
+		responses = append(responses, &ResponseErrorAdapter{&localRes})
 	}
 
 	return responses

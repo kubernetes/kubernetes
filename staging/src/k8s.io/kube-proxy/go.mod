@@ -14,6 +14,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
-	k8s.io/kube-openapi => github.com/austince/kube-openapi v0.0.0-restframework-e9ebba8
+	k8s.io/kube-openapi => github.com/austince/kube-openapi v0.0.0-restframework-35b5ddc
 	k8s.io/kube-proxy => ../kube-proxy
 )
