@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -165,25 +166,29 @@ func validateStructuralMetadataInvariants(s *Structural, checkMetadata bool, lvl
 	}
 
 	if lvl == rootLevel {
-		// metadata is a shallow copy. We can mutate it.
-		_, foundName := s.Properties["name"]
-		_, foundGenerateName := s.Properties["generateName"]
-		if foundName && foundGenerateName && len(s.Properties) == 2 {
-			s.Properties = nil
-		} else if (foundName || foundGenerateName) && len(s.Properties) == 1 {
-			s.Properties = nil
+		invalidProperties := make([]string, 0)
+		for property := range s.Properties {
+			if property != "name" && property != "generateName" {
+				invalidProperties = append(invalidProperties, property)
+			}
 		}
+		if len(invalidProperties) > 0 {
+			errMsg := fmt.Sprintf("must not specify any property other than name and generateName: %s", strings.Join(invalidProperties, ","))
+			allErrs = append(allErrs, field.Forbidden(fldPath, errMsg))
+		}
+
+		// metadata is a shallow copy. We can mutate it.
 		s.Type = ""
+		s.Properties = nil
 		s.Default.Object = nil // this is checked in API validation (and also tested)
 		if s.ValueValidation == nil {
 			s.ValueValidation = &ValueValidation{}
 		}
 		if !reflect.DeepEqual(*s, Structural{ValueValidation: &ValueValidation{}}) {
 			// TODO: this is actually a field.Invalid error, but we cannot do JSON serialization of metadata here to get a proper message
-			allErrs = append(allErrs, field.Forbidden(fldPath, "must not specify anything other than name and generateName, but metadata is implicitly specified"))
+			allErrs = append(allErrs, field.Forbidden(fldPath, "must not specify anything other than type and properties, but metadata is implicitly specified"))
 		}
 	}
-
 	return allErrs
 }
 
