@@ -17,12 +17,16 @@ limitations under the License.
 package ipallocator
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -176,6 +180,57 @@ func TestAllocateTiny(t *testing.T) {
 	}
 }
 
+func TestAllocateReserved(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
+
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/25")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := NewInMemory(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// allocate all addresses on the dynamic block
+	// subnet /25 = 128 ; dynamic block size is min(max(16,128/16),256) = 16
+	dynamicOffset := calculateRangeOffset(cidr)
+	dynamicBlockSize := r.max - dynamicOffset
+	for i := 0; i < dynamicBlockSize; i++ {
+		if _, err := r.AllocateNext(); err != nil {
+			t.Errorf("Unexpected error trying to allocate: %v", err)
+		}
+	}
+	for i := dynamicOffset; i < r.max; i++ {
+		ip := fmt.Sprintf("192.168.1.%d", i+1)
+		if !r.Has(netutils.ParseIPSloppy(ip)) {
+			t.Errorf("IP %s expected to be allocated", ip)
+		}
+	}
+	if f := r.Free(); f != dynamicOffset {
+		t.Errorf("expected %d free addresses, got %d", dynamicOffset, f)
+	}
+	// allocate all addresses on the static block
+	for i := 0; i < dynamicOffset; i++ {
+		ip := fmt.Sprintf("192.168.1.%d", i+1)
+		if err := r.Allocate(netutils.ParseIPSloppy(ip)); err != nil {
+			t.Errorf("Unexpected error trying to allocate IP %s: %v", ip, err)
+		}
+	}
+	if f := r.Free(); f != 0 {
+		t.Errorf("expected free equal to 0 got: %d", f)
+	}
+	// release one address in the allocated block and another a new one randomly
+	if err := r.Release(netutils.ParseIPSloppy("192.168.1.10")); err != nil {
+		t.Fatalf("Unexpected error trying to release ip 192.168.1.10: %v", err)
+	}
+	if _, err := r.AllocateNext(); err != nil {
+		t.Error(err)
+	}
+	if f := r.Free(); f != 0 {
+		t.Errorf("expected free equal to 0 got: %d", f)
+	}
+}
+
 func TestAllocateSmall(t *testing.T) {
 	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.240/30")
 	if err != nil {
@@ -186,7 +241,7 @@ func TestAllocateSmall(t *testing.T) {
 		t.Fatal(err)
 	}
 	if f := r.Free(); f != 2 {
-		t.Errorf("free: %d", f)
+		t.Errorf("expected free equal to 2 got: %d", f)
 	}
 	found := sets.NewString()
 	for i := 0; i < 2; i++ {
@@ -195,7 +250,7 @@ func TestAllocateSmall(t *testing.T) {
 			t.Fatal(err)
 		}
 		if found.Has(ip.String()) {
-			t.Fatalf("already reserved: %s", ip)
+			t.Fatalf("address %s has been already allocated", ip)
 		}
 		found.Insert(ip.String())
 	}
@@ -213,8 +268,12 @@ func TestAllocateSmall(t *testing.T) {
 		}
 	}
 
-	if r.Free() != 0 && r.max != 2 {
-		t.Fatalf("unexpected range: %v", r)
+	if f := r.Free(); f != 0 {
+		t.Errorf("expected free equal to 0 got: %d", f)
+	}
+
+	if r.max != 2 {
+		t.Fatalf("expected range equal to 2, got: %v", r)
 	}
 
 	t.Logf("allocated: %v", found)
@@ -365,6 +424,9 @@ func TestNewFromSnapshot(t *testing.T) {
 }
 
 func TestClusterIPMetrics(t *testing.T) {
+	clearMetrics()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
+
 	// create IPv4 allocator
 	cidrIPv4 := "10.0.0.0/24"
 	_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy(cidrIPv4)
@@ -372,7 +434,6 @@ func TestClusterIPMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error creating CidrSet: %v", err)
 	}
-	clearMetrics(map[string]string{"cidr": cidrIPv4})
 	// create IPv6 allocator
 	cidrIPv6 := "2001:db8::/112"
 	_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy(cidrIPv6)
@@ -380,7 +441,6 @@ func TestClusterIPMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error creating CidrSet: %v", err)
 	}
-	clearMetrics(map[string]string{"cidr": cidrIPv6})
 
 	// Check initial state
 	em := testMetrics{
@@ -475,12 +535,72 @@ func TestClusterIPMetrics(t *testing.T) {
 	expectMetrics(t, cidrIPv6, em)
 }
 
+func TestClusterIPAllocatedMetrics(t *testing.T) {
+	clearMetrics()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
+
+	// create IPv4 allocator
+	cidrIPv4 := "10.0.0.0/25"
+	_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy(cidrIPv4)
+	a, err := NewInMemory(clusterCIDRv4)
+	if err != nil {
+		t.Fatalf("unexpected error creating CidrSet: %v", err)
+	}
+
+	em := testMetrics{
+		free:      0,
+		used:      0,
+		allocated: 0,
+		errors:    0,
+	}
+	expectMetrics(t, cidrIPv4, em)
+
+	// allocate 2 dynamic IPv4 addresses
+	found := sets.NewString()
+	for i := 0; i < 2; i++ {
+		ip, err := a.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if found.Has(ip.String()) {
+			t.Fatalf("already reserved: %s", ip)
+		}
+		found.Insert(ip.String())
+	}
+
+	dynamic_allocated, err := testutil.GetCounterMetricValue(clusterIPAllocations.WithLabelValues(cidrIPv4, "dynamic"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAllocations.Name, err)
+	}
+	if dynamic_allocated != 2 {
+		t.Fatalf("Expected 2 received %f", dynamic_allocated)
+	}
+
+	// try to allocate the same IP addresses
+	for s := range found {
+		if !a.Has(netutils.ParseIPSloppy(s)) {
+			t.Fatalf("missing: %s", s)
+		}
+		if err := a.Allocate(netutils.ParseIPSloppy(s)); err != ErrAllocated {
+			t.Fatal(err)
+		}
+	}
+
+	static_errors, err := testutil.GetCounterMetricValue(clusterIPAllocationErrors.WithLabelValues(cidrIPv4, "static"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAllocationErrors.Name, err)
+	}
+	if static_errors != 2 {
+		t.Fatalf("Expected 2 received %f", dynamic_allocated)
+	}
+}
+
 // Metrics helpers
-func clearMetrics(labels map[string]string) {
-	clusterIPAllocated.Delete(labels)
-	clusterIPAvailable.Delete(labels)
-	clusterIPAllocations.Delete(labels)
-	clusterIPAllocationErrors.Delete(labels)
+func clearMetrics() {
+	clusterIPAllocated.Reset()
+	clusterIPAvailable.Reset()
+	clusterIPAllocations.Reset()
+	clusterIPAllocationErrors.Reset()
 }
 
 type testMetrics struct {
@@ -501,14 +621,25 @@ func expectMetrics(t *testing.T, label string, em testMetrics) {
 	if err != nil {
 		t.Errorf("failed to get %s value, err: %v", clusterIPAllocated.Name, err)
 	}
-	m.allocated, err = testutil.GetCounterMetricValue(clusterIPAllocations.WithLabelValues(label))
+	static_allocated, err := testutil.GetCounterMetricValue(clusterIPAllocations.WithLabelValues(label, "static"))
 	if err != nil {
 		t.Errorf("failed to get %s value, err: %v", clusterIPAllocations.Name, err)
 	}
-	m.errors, err = testutil.GetCounterMetricValue(clusterIPAllocationErrors.WithLabelValues(label))
+	static_errors, err := testutil.GetCounterMetricValue(clusterIPAllocationErrors.WithLabelValues(label, "static"))
 	if err != nil {
 		t.Errorf("failed to get %s value, err: %v", clusterIPAllocationErrors.Name, err)
 	}
+	dynamic_allocated, err := testutil.GetCounterMetricValue(clusterIPAllocations.WithLabelValues(label, "dynamic"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAllocations.Name, err)
+	}
+	dynamic_errors, err := testutil.GetCounterMetricValue(clusterIPAllocationErrors.WithLabelValues(label, "dynamic"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", clusterIPAllocationErrors.Name, err)
+	}
+
+	m.allocated = static_allocated + dynamic_allocated
+	m.errors = static_errors + dynamic_errors
 
 	if m != em {
 		t.Fatalf("metrics error: expected %v, received %v", em, m)
@@ -575,6 +706,78 @@ func TestDryRun(t *testing.T) {
 				t.Fatalf("unexpected failure: %v", err)
 			}
 			expectUsed(t, r, baseUsed)
+		})
+	}
+}
+
+func Test_calculateRangeOffset(t *testing.T) {
+	// default $min = 16, $max = 256 and $step = 16.
+	tests := []struct {
+		name string
+		cidr string
+		want int
+	}{
+		{
+			name: "full mask IPv4",
+			cidr: "192.168.1.1/32",
+			want: 0,
+		},
+		{
+			name: "full mask IPv6",
+			cidr: "fd00::1/128",
+			want: 0,
+		},
+		{
+			name: "very small mask IPv4",
+			cidr: "192.168.1.1/30",
+			want: 0,
+		},
+		{
+			name: "very small mask IPv6",
+			cidr: "fd00::1/126",
+			want: 0,
+		},
+		{
+			name: "small mask IPv4",
+			cidr: "192.168.1.1/28",
+			want: 16,
+		},
+		{
+			name: "small mask IPv6",
+			cidr: "fd00::1/122",
+			want: 16,
+		},
+		{
+			name: "medium mask IPv4",
+			cidr: "192.168.1.1/22",
+			want: 64,
+		},
+		{
+			name: "medium mask IPv6",
+			cidr: "fd00::1/118",
+			want: 64,
+		},
+		{
+			name: "large mask IPv4",
+			cidr: "192.168.1.1/8",
+			want: 256,
+		},
+		{
+			name: "large mask IPv6",
+			cidr: "fd00::1/12",
+			want: 256,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			_, cidr, err := netutils.ParseCIDRSloppy(tt.cidr)
+			if err != nil {
+				t.Fatalf("Unexpected error parsing CIDR %s: %v", tt.cidr, err)
+			}
+			if got := calculateRangeOffset(cidr); got != tt.want {
+				t.Errorf("DynamicRangeOffset() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
