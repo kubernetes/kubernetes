@@ -27,7 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2146,6 +2146,8 @@ func TestAddPod(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2191,6 +2193,8 @@ func TestAddPodOrphan(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2219,6 +2223,8 @@ func TestUpdatePod(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2268,6 +2274,8 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2295,6 +2303,8 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2321,6 +2331,8 @@ func TestUpdatePodRelease(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2347,6 +2359,8 @@ func TestDeletePod(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2392,6 +2406,8 @@ func TestDeletePodOrphan(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2703,24 +2719,61 @@ func TestJobBackoff(t *testing.T) {
 	newPod.ResourceVersion = "2"
 
 	testCases := map[string]struct {
-		// inputs
-		requeues int
-		phase    v1.PodPhase
-
-		// expectation
-		backoff int
+		requeues            int
+		phase               v1.PodPhase
+		jobReadyPodsEnabled bool
+		wantBackoff         time.Duration
 	}{
-		"1st failure": {0, v1.PodFailed, 0},
-		"2nd failure": {1, v1.PodFailed, 1},
-		"3rd failure": {2, v1.PodFailed, 2},
-		"1st success": {0, v1.PodSucceeded, 0},
-		"2nd success": {1, v1.PodSucceeded, 0},
-		"1st running": {0, v1.PodSucceeded, 0},
-		"2nd running": {1, v1.PodSucceeded, 0},
+		"1st failure": {
+			requeues:    0,
+			phase:       v1.PodFailed,
+			wantBackoff: 0,
+		},
+		"2nd failure": {
+			requeues:    1,
+			phase:       v1.PodFailed,
+			wantBackoff: DefaultJobBackOff,
+		},
+		"3rd failure": {
+			requeues:    2,
+			phase:       v1.PodFailed,
+			wantBackoff: 2 * DefaultJobBackOff,
+		},
+		"1st success": {
+			requeues:    0,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"2nd success": {
+			requeues:    1,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"1st running": {
+			requeues:    0,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"2nd running": {
+			requeues:    1,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"1st failure with pod updates batching": {
+			requeues:    0,
+			phase:       v1.PodFailed,
+			wantBackoff: podUpdateBatchPeriod,
+		},
+		"2nd failure with pod updates batching": {
+			requeues:    1,
+			phase:       v1.PodFailed,
+			wantBackoff: DefaultJobBackOff,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 			fakePodControl := controller.FakePodControl{}
@@ -2735,7 +2788,7 @@ func TestJobBackoff(t *testing.T) {
 			newPod.Status.Phase = tc.phase
 			manager.updatePod(oldPod, newPod)
 
-			if queue.duration.Nanoseconds() != int64(tc.backoff)*DefaultJobBackOff.Nanoseconds() {
+			if queue.duration.Nanoseconds() != int64(tc.wantBackoff)*DefaultJobBackOff.Nanoseconds() {
 				t.Errorf("unexpected backoff %v", queue.duration)
 			}
 		})

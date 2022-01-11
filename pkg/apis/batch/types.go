@@ -245,8 +245,8 @@ type JobStatus struct {
 
 	// The number of active pods which have a Ready condition.
 	//
-	// This field is alpha-level. The job controller populates the field when
-	// the feature gate JobReadyPods is enabled (disabled by default).
+	// This field is beta-level. The job controller populates the field when
+	// the feature gate JobReadyPods is enabled (enabled by default).
 	// +optional
 	Ready *int32
 

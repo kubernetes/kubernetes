@@ -59,7 +59,7 @@ import (
 
 // podUpdateBatchPeriod is the batch period to hold pod updates before syncing
 // a Job. It is used if the feature gate JobReadyPods is enabled.
-const podUpdateBatchPeriod = 500 * time.Millisecond
+const podUpdateBatchPeriod = time.Second
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")

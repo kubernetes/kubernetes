@@ -28,7 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -81,6 +81,7 @@ func TestNonParallelJob(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 1,
+				Ready:  pointer.Int32(0),
 			}, wFinalizers)
 
 			// Restarting controller.
@@ -94,6 +95,7 @@ func TestNonParallelJob(t *testing.T) {
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 1,
 				Failed: 1,
+				Ready:  pointer.Int32(0),
 			}, wFinalizers)
 
 			// Restarting controller.
@@ -108,6 +110,7 @@ func TestNonParallelJob(t *testing.T) {
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Failed:    1,
 				Succeeded: 1,
+				Ready:     pointer.Int32(0),
 			}, false)
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 		})
@@ -240,6 +243,7 @@ func TestParallelJobParallelism(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 5,
+				Ready:  pointer.Int32(0),
 			}, wFinalizers)
 
 			// Reduce parallelism by a number greater than backoffLimit.
@@ -250,6 +254,7 @@ func TestParallelJobParallelism(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 2,
+				Ready:  pointer.Int32(0),
 			}, wFinalizers)
 
 			// Increase parallelism again.
@@ -260,6 +265,7 @@ func TestParallelJobParallelism(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 4,
+				Ready:  pointer.Int32(0),
 			}, wFinalizers)
 
 			// Succeed Job
@@ -269,6 +275,7 @@ func TestParallelJobParallelism(t *testing.T) {
 			validateJobSucceeded(ctx, t, clientSet, jobObj)
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Succeeded: 4,
+				Ready:     pointer.Int32(0),
 			}, false)
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 		})
@@ -403,6 +410,7 @@ func TestIndexedJob(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 3,
+				Ready:  pointer.Int32(0),
 			}, wFinalizers)
 			validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 1, 2), "")
 
@@ -413,6 +421,7 @@ func TestIndexedJob(t *testing.T) {
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active:    3,
 				Succeeded: 1,
+				Ready:     pointer.Int32(0),
 			}, wFinalizers)
 			validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
 
@@ -424,6 +433,7 @@ func TestIndexedJob(t *testing.T) {
 				Active:    3,
 				Failed:    1,
 				Succeeded: 1,
+				Ready:     pointer.Int32(0),
 			}, wFinalizers)
 			validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
 
@@ -435,6 +445,7 @@ func TestIndexedJob(t *testing.T) {
 				Active:    0,
 				Failed:    1,
 				Succeeded: 4,
+				Ready:     pointer.Int32(0),
 			}, false)
 			validateIndexedJobPods(ctx, t, clientSet, jobObj, nil, "0-3")
 			validateJobSucceeded(ctx, t, clientSet, jobObj)
@@ -471,6 +482,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active: 2,
+		Ready:  pointer.Int32(0),
 	}, true)
 
 	// Step 2: Disable tracking with finalizers.
@@ -489,6 +501,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active: 2,
 		Failed: 1,
+		Ready:  pointer.Int32(0),
 	}, false)
 
 	jobObj, err = clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
@@ -516,6 +529,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 		Active:    1,
 		Failed:    1,
 		Succeeded: 1,
+		Ready:     pointer.Int32(0),
 	}, false)
 }
 
@@ -551,6 +565,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 2,
+				Ready:  pointer.Int32(0),
 			}, true)
 
 			// Delete Job. The GC should delete the pods in cascade.
@@ -607,6 +622,7 @@ func TestOrphanPodsFinalizersClearedWithFeatureDisabled(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active: 1,
+		Ready:  pointer.Int32(0),
 	}, true)
 
 	// Step 2: Disable tracking with finalizers.
@@ -693,6 +709,7 @@ func TestSuspendJob(t *testing.T) {
 			validate := func(s string, active int, status v1.ConditionStatus, reason string) {
 				validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 					Active: active,
+					Ready:  pointer.Int32(0),
 				}, true)
 				job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
 				if err != nil {
@@ -737,6 +754,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 		Active: 0,
+		Ready:  pointer.Int32(0),
 	}, true)
 }
 
