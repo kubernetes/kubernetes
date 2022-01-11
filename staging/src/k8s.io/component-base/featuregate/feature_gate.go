@@ -17,6 +17,7 @@ limitations under the License.
 package featuregate
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -266,7 +267,7 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 	defer f.lock.Unlock()
 
 	if f.closed {
-		return fmt.Errorf("cannot add a feature gate after adding it to the flag set")
+		return errors.New("cannot add a feature gate after adding it to the flag set")
 	}
 
 	// Copy existing state
