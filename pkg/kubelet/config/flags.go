@@ -86,7 +86,8 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	dockerOnlyWarning := "This docker-specific flag only works when container-runtime is set to docker."
 
 	// General settings.
-	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'remote'.")
+	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible value: 'remote'.")
+	fs.MarkDeprecated("container-runtime", "will be removed in 1.27 as the only valid value is 'remote'")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 
 	// Docker-specific settings.
