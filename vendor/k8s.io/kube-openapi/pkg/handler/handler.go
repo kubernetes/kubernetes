@@ -36,6 +36,7 @@ import (
 	klog "k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -276,8 +277,16 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 
 // BuildAndRegisterOpenAPIVersionedService builds the spec and registers a handler to provide access to it.
 // Use this method if your OpenAPI spec is static. If you want to update the spec, use BuildOpenAPISpec then RegisterOpenAPIVersionedService.
+//
+// Deprecated: BuildAndRegisterOpenAPIVersionedServiceFromRoutes should be used instead.
 func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*restful.WebService, config *common.Config, handler common.PathHandler) (*OpenAPIService, error) {
-	spec, err := builder.BuildOpenAPISpec(webServices, config)
+	return BuildAndRegisterOpenAPIVersionedServiceFromRoutes(servePath, restfuladapter.AdaptWebServices(webServices), config, handler)
+}
+
+// BuildAndRegisterOpenAPIVersionedServiceFromRoutes builds the spec and registers a handler to provide access to it.
+// Use this method if your OpenAPI spec is static. If you want to update the spec, use BuildOpenAPISpec then RegisterOpenAPIVersionedService.
+func BuildAndRegisterOpenAPIVersionedServiceFromRoutes(servePath string, routeContainers []common.RouteContainer, config *common.Config, handler common.PathHandler) (*OpenAPIService, error) {
+	spec, err := builder.BuildOpenAPISpecFromRoutes(routeContainers, config)
 	if err != nil {
 		return nil, err
 	}

@@ -26,5 +26,6 @@ replace (
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/kube-openapi => github.com/austince/kube-openapi v0.0.0-restframework-e9ebba8
 	k8s.io/pod-security-admission => ../pod-security-admission
 )
