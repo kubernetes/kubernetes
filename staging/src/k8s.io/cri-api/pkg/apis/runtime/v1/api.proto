@@ -103,10 +103,10 @@ service RuntimeService {
     // ListContainerStats returns stats of all running containers.
     rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
 
-    // PodSandboxStats returns stats of the pod. If the pod sandbox does not
+    // PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
     // exist, the call returns an error.
     rpc PodSandboxStats(PodSandboxStatsRequest) returns (PodSandboxStatsResponse) {}
-    // ListPodSandboxStats returns stats of the pods matching a filter.
+    // ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
     rpc ListPodSandboxStats(ListPodSandboxStatsRequest) returns (ListPodSandboxStatsResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
@@ -409,7 +409,7 @@ message RunPodSandboxRequest {
     // If the runtime handler is unknown, this request should be rejected.  An
     // empty string should select the default handler, equivalent to the
     // behavior before this feature was added.
-    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class/README.md
+    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
     string runtime_handler = 2;
 }
 
@@ -587,9 +587,9 @@ message ListPodSandboxStatsResponse {
 
 // PodSandboxAttributes provides basic information of the pod sandbox.
 message PodSandboxAttributes {
-    // ID of the pod.
+    // ID of the pod sandbox.
     string id = 1;
-    // Metadata of the pod.
+    // Metadata of the pod sandbox.
     PodSandboxMetadata metadata = 2;
     // Key-value pairs that may be used to scope and select individual resources.
     map<string,string> labels = 3;
@@ -812,7 +812,7 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
-// WindowsSandboxSecurityContext holds platform-specific configurations that will be 
+// WindowsSandboxSecurityContext holds platform-specific configurations that will be
 // applied to a sandbox.
 // These settings will only apply to the sandbox container.
 message WindowsSandboxSecurityContext {

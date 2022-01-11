@@ -66,7 +66,8 @@ service RuntimeService {
     // StopContainer stops a running container with a grace period (i.e., timeout).
     // This call is idempotent, and must not return an error if the container has
     // already been stopped.
-    // TODO: what must the runtime do after the grace period is reached?
+    // The runtime must forcibly kill the container after the grace period is
+    // reached.
     rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
     // RemoveContainer removes the container. If the container is running, the
     // container must be forcibly removed.
@@ -371,11 +372,6 @@ message PodSandboxConfig {
     // E.g.,
     //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
     //     ContainerConfig.LogPath = `containerName/Instance#.log`
-    //
-    // WARNING: Log management and how kubelet should interface with the
-    // container logs are under active discussion in
-    // https://issues.k8s.io/24677. There *may* be future change of direction
-    // for logging as the discussion carries on.
     string log_directory = 3;
     // DNS config for the sandbox.
     DNSConfig dns_config = 4;
@@ -568,7 +564,7 @@ message PodSandboxStatsResponse {
     PodSandboxStats stats = 1;
 }
 
-// PodSandboxStatsFilter is used to filter pod sandboxes.
+// PodSandboxStatsFilter is used to filter the list of pod sandboxes to retrieve stats for.
 // All those fields are combined with 'AND'.
 message PodSandboxStatsFilter {
     // ID of the pod sandbox.
@@ -662,7 +658,7 @@ message NetworkInterfaceUsage {
 message ProcessUsage {
     // The time at which these stats were updated.
     int64 timestamp = 1;
-	// Number of processes.
+    // Number of processes.
     UInt64Value process_count = 2;
 }
 
@@ -683,8 +679,6 @@ message KeyValue {
 
 // LinuxContainerResources specifies Linux specific configuration for
 // resources.
-// TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
-// directly.
 message LinuxContainerResources {
     // CPU CFS (Completely Fair Scheduler) period. Default: 0 (not specified).
     int64 cpu_period = 1;
@@ -818,7 +812,7 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
-// WindowsSandboxSecurityContext holds platform-specific configurations that will be 
+// WindowsSandboxSecurityContext holds platform-specific configurations that will be
 // applied to a sandbox.
 // These settings will only apply to the sandbox container.
 message WindowsSandboxSecurityContext {
@@ -830,7 +824,7 @@ message WindowsSandboxSecurityContext {
     // The contents of the GMSA credential spec to use to run this container.
     string credential_spec = 2;
 
-    // Indicates whether the container be asked to run as a HostProcess container.
+    // Indicates whether the container requested to run as a HostProcess container.
     bool host_process = 3;
 }
 
@@ -956,8 +950,6 @@ message ContainerConfig {
 
     // Variables for interactive containers, these have very specialized
     // use-cases (e.g. debugging).
-    // TODO: Determine if we need to continue supporting these fields that are
-    // part of Kubernetes's Container Spec.
     bool stdin = 12;
     bool stdin_once = 13;
     bool tty = 14;
@@ -1135,10 +1127,10 @@ message UpdateContainerResourcesRequest {
     string container_id = 1;
     // Resource configuration specific to Linux containers.
     LinuxContainerResources linux = 2;
-    // Resource configuration specific to Windows containers. 
+    // Resource configuration specific to Windows containers.
     WindowsContainerResources windows = 3;
-    // Unstructured key-value map holding arbitrary additional information for 
-    // container resources updating. This can be used for specifying experimental 
+    // Unstructured key-value map holding arbitrary additional information for
+    // container resources updating. This can be used for specifying experimental
     // resources to update or other options to use when updating the container.
     map<string, string> annotations = 4;
 }
@@ -1491,7 +1483,7 @@ message MemoryUsage {
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
-    // Available memory for use.  This is defined as the memory limit = workingSetBytes.
+    // Available memory for use. This is defined as the memory limit - workingSetBytes.
     UInt64Value available_bytes = 3;
     // Total memory in use. This includes all memory regardless of when it was accessed.
     UInt64Value usage_bytes = 4;

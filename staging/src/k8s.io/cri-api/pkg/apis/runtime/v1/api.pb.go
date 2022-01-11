@@ -1241,7 +1241,7 @@ type RunPodSandboxRequest struct {
 	// If the runtime handler is unknown, this request should be rejected.  An
 	// empty string should select the default handler, equivalent to the
 	// behavior before this feature was added.
-	// See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class/README.md
+	// See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 	RuntimeHandler       string   `protobuf:"bytes,2,opt,name=runtime_handler,json=runtimeHandler,proto3" json:"runtime_handler,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -2492,9 +2492,9 @@ func (m *ListPodSandboxStatsResponse) GetStats() []*PodSandboxStats {
 
 // PodSandboxAttributes provides basic information of the pod sandbox.
 type PodSandboxAttributes struct {
-	// ID of the pod.
+	// ID of the pod sandbox.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Metadata of the pod.
+	// Metadata of the pod sandbox.
 	Metadata *PodSandboxMetadata `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
@@ -8495,10 +8495,10 @@ type RuntimeServiceClient interface {
 	ContainerStats(ctx context.Context, in *ContainerStatsRequest, opts ...grpc.CallOption) (*ContainerStatsResponse, error)
 	// ListContainerStats returns stats of all running containers.
 	ListContainerStats(ctx context.Context, in *ListContainerStatsRequest, opts ...grpc.CallOption) (*ListContainerStatsResponse, error)
-	// PodSandboxStats returns stats of the pod. If the pod sandbox does not
+	// PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
 	// exist, the call returns an error.
 	PodSandboxStats(ctx context.Context, in *PodSandboxStatsRequest, opts ...grpc.CallOption) (*PodSandboxStatsResponse, error)
-	// ListPodSandboxStats returns stats of the pods matching a filter.
+	// ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
 	ListPodSandboxStats(ctx context.Context, in *ListPodSandboxStatsRequest, opts ...grpc.CallOption) (*ListPodSandboxStatsResponse, error)
 	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(ctx context.Context, in *UpdateRuntimeConfigRequest, opts ...grpc.CallOption) (*UpdateRuntimeConfigResponse, error)
@@ -8798,10 +8798,10 @@ type RuntimeServiceServer interface {
 	ContainerStats(context.Context, *ContainerStatsRequest) (*ContainerStatsResponse, error)
 	// ListContainerStats returns stats of all running containers.
 	ListContainerStats(context.Context, *ListContainerStatsRequest) (*ListContainerStatsResponse, error)
-	// PodSandboxStats returns stats of the pod. If the pod sandbox does not
+	// PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
 	// exist, the call returns an error.
 	PodSandboxStats(context.Context, *PodSandboxStatsRequest) (*PodSandboxStatsResponse, error)
-	// ListPodSandboxStats returns stats of the pods matching a filter.
+	// ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
 	ListPodSandboxStats(context.Context, *ListPodSandboxStatsRequest) (*ListPodSandboxStatsResponse, error)
 	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(context.Context, *UpdateRuntimeConfigRequest) (*UpdateRuntimeConfigResponse, error)
