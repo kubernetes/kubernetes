@@ -29,9 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestHashOnLineBreak(t *testing.T) {
@@ -313,27 +311,6 @@ func TestEditOptions_visitToPatch(t *testing.T) {
 		return err != nil && strings.Contains(err.Error(), "At least one of apiVersion, kind and name was changed")
 	}
 
-	type fields struct {
-		FilenameOptions     resource.FilenameOptions
-		RecordFlags         *genericclioptions.RecordFlags
-		PrintFlags          *genericclioptions.PrintFlags
-		ToPrinter           func(string) (printers.ResourcePrinter, error)
-		OutputPatch         bool
-		WindowsLineEndings  bool
-		ValidateOptions     cmdutil.ValidateOptions
-		OriginalResult      *resource.Result
-		EditMode            EditMode
-		CmdNamespace        string
-		ApplyAnnotation     bool
-		ChangeCause         string
-		managedFields       map[types.UID][]metav1.ManagedFieldsEntry
-		IOStreams           genericclioptions.IOStreams
-		Recorder            genericclioptions.Recorder
-		f                   cmdutil.Factory
-		editPrinterOptions  *editPrinterOptions
-		updatedResultGetter func(data []byte) *resource.Result
-		FieldManager        string
-	}
 	type args struct {
 		originalInfos []*resource.Info
 		patchVisitor  resource.Visitor
@@ -341,13 +318,11 @@ func TestEditOptions_visitToPatch(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		fields   fields
 		args     args
 		checkErr func(err error) bool
 	}{
 		{
-			name:   "name-diff",
-			fields: fields{},
+			name: "name-diff",
 			args: args{
 				originalInfos: []*resource.Info{
 					{
@@ -394,8 +369,7 @@ func TestEditOptions_visitToPatch(t *testing.T) {
 			checkErr: expectedErr,
 		},
 		{
-			name:   "kind-diff",
-			fields: fields{},
+			name: "kind-diff",
 			args: args{
 				originalInfos: []*resource.Info{
 					{
@@ -442,8 +416,7 @@ func TestEditOptions_visitToPatch(t *testing.T) {
 			checkErr: expectedErr,
 		},
 		{
-			name:   "apiver-diff",
-			fields: fields{},
+			name: "apiver-diff",
 			args: args{
 				originalInfos: []*resource.Info{
 					{
@@ -492,27 +465,7 @@ func TestEditOptions_visitToPatch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o := &EditOptions{
-				FilenameOptions:     tt.fields.FilenameOptions,
-				RecordFlags:         tt.fields.RecordFlags,
-				PrintFlags:          tt.fields.PrintFlags,
-				ToPrinter:           tt.fields.ToPrinter,
-				OutputPatch:         tt.fields.OutputPatch,
-				WindowsLineEndings:  tt.fields.WindowsLineEndings,
-				ValidateOptions:     tt.fields.ValidateOptions,
-				OriginalResult:      tt.fields.OriginalResult,
-				EditMode:            tt.fields.EditMode,
-				CmdNamespace:        tt.fields.CmdNamespace,
-				ApplyAnnotation:     tt.fields.ApplyAnnotation,
-				ChangeCause:         tt.fields.ChangeCause,
-				managedFields:       tt.fields.managedFields,
-				IOStreams:           tt.fields.IOStreams,
-				Recorder:            tt.fields.Recorder,
-				f:                   tt.fields.f,
-				editPrinterOptions:  tt.fields.editPrinterOptions,
-				updatedResultGetter: tt.fields.updatedResultGetter,
-				FieldManager:        tt.fields.FieldManager,
-			}
+			o := &EditOptions{}
 			if err := o.visitToPatch(tt.args.originalInfos, tt.args.patchVisitor, tt.args.results); !tt.checkErr(err) {
 				t.Errorf("EditOptions.visitToPatch() %s error = %v", tt.name, err)
 			}
