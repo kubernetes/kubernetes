@@ -17,10 +17,13 @@ limitations under the License.
 package lifecycle
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -182,7 +185,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{
+			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
 					Port: intstr.FromInt(8080),
@@ -222,7 +225,7 @@ func TestRunHandlerHttps(t *testing.T) {
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{
+			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Scheme: v1.URISchemeHTTPS,
 					Host:   "foo",
@@ -430,5 +433,189 @@ func TestFormatURL(t *testing.T) {
 				t.Errorf("expected url: %s\ngot url: %s", expectURL, actualURL)
 			}
 		})
+	}
+}
+
+func TestCompatibilityHttpGetSchemeFallback(t *testing.T) {
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	run := func(scheme *v1.URIScheme, tls bool) (string, error) {
+		server := httptest.NewUnstartedServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if tls {
+				rw.Write([]byte("OK https"))
+			} else {
+				rw.Write([]byte("OK http"))
+			}
+		}))
+		if tls {
+			server.StartTLS()
+		} else {
+			server.Start()
+		}
+
+		defer server.Close()
+
+		httpUri, err := url.Parse(server.URL)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		handlerRunner := NewHandlerRunner(client, &fakeContainerCommandRunner{}, nil)
+		containerName := "containerFoo"
+		containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+		container := v1.Container{
+			Name: containerName,
+			Lifecycle: &v1.Lifecycle{
+				PostStart: &v1.LifecycleHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: v1.URISchemeHTTPS,
+						Host:   httpUri.Hostname(),
+						Port:   intstr.Parse(httpUri.Port()),
+					},
+				},
+			},
+		}
+		pod := v1.Pod{}
+		pod.ObjectMeta.Name = "podFoo"
+		pod.ObjectMeta.Namespace = "nsFoo"
+		pod.Spec.Containers = []v1.Container{container}
+		return handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	}
+
+	tests := []struct {
+		name        string
+		scheme      v1.URIScheme
+		tls         bool
+		featureGate bool
+		want        string
+		wantErr     bool
+	}{
+		{
+			scheme:      v1.URISchemeHTTPS,
+			tls:         true,
+			featureGate: false,
+			want:        "Client sent an HTTP request to an HTTPS server.\n",
+		},
+		{
+			scheme:      v1.URISchemeHTTPS,
+			tls:         false,
+			featureGate: false,
+			want:        "OK http",
+		},
+		{
+			scheme:      v1.URISchemeHTTP,
+			tls:         true,
+			featureGate: false,
+			want:        "Client sent an HTTP request to an HTTPS server.\n",
+		},
+		{
+			scheme:      v1.URISchemeHTTP,
+			tls:         false,
+			featureGate: false,
+			want:        "OK http",
+		},
+
+		{
+			scheme:      v1.URISchemeHTTPS,
+			tls:         true,
+			featureGate: true,
+			want:        "OK https",
+		},
+		{
+			scheme:      v1.URISchemeHTTPS,
+			tls:         false,
+			featureGate: true,
+			want:        "OK http",
+		},
+		{
+			scheme:      v1.URISchemeHTTP,
+			tls:         true,
+			featureGate: true,
+			want:        "OK https",
+		},
+		{
+			scheme:      v1.URISchemeHTTP,
+			tls:         false,
+			featureGate: true,
+			want:        "OK http",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LifecycleHandlerHTTPS, tt.featureGate)()
+
+			got, err := run(&tt.scheme, tt.tls)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("unexpected error = %v, wantErr %v", err, tt.wantErr)
+				}
+				return
+			}
+			if got != tt.want {
+				t.Errorf("unexpected got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompatibilityHttpGetPortFallback(t *testing.T) {
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Write([]byte("OK http"))
+	}))
+	defer server.Close()
+
+	httpUri, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	port, err := strconv.Atoi(httpUri.Port())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	restoreDefaultHttpPort := defaultHttpPort
+	restoreDefaultHttpsPort := defaultHttpsPort
+	defer func() {
+		defaultHttpPort = restoreDefaultHttpPort
+		defaultHttpsPort = restoreDefaultHttpsPort
+	}()
+	defaultHttpPort = port
+	defaultHttpsPort = defaultHttpPort + 1
+
+	handlerRunner := NewHandlerRunner(client, &fakeContainerCommandRunner{}, nil)
+	containerName := "containerFoo"
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.LifecycleHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Scheme: v1.URISchemeHTTPS,
+					Host:   httpUri.Hostname(),
+					Port:   intstr.FromString(""),
+				},
+			},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "OK http"
+	if msg != want {
+		t.Errorf("unexpected want %q, got %q", want, msg)
 	}
 }
