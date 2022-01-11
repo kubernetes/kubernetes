@@ -1027,7 +1027,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
 	isDocker := false
 	if err != nil {
-		fmt.Printf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
+		klog.Warningf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
 	} else {
 		checks = append(checks, ContainerRuntimeCheck{runtime: containerRuntime})
 		if containerRuntime.IsDocker() {
