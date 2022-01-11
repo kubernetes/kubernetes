@@ -170,19 +170,9 @@ function verify-prereqs() {
   # we use gcloud to create the cluster, gsutil to stage binaries and data
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
-      local resp="n"
-      if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
-        echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
-        read -r resp
-      fi
-      if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
-        curl https://sdk.cloud.google.com | bash
-      fi
-      if ! which "${cmd}" >/dev/null; then
-        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
-        echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
-        exit 1
-      fi
+      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
+      echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
+      exit 1
     fi
   done
   update-or-verify-gcloud
