@@ -1263,25 +1263,26 @@ func (f *frameworkImpl) SharedInformerFactory() informers.SharedInformerFactory 
 	return f.informerFactory
 }
 
-func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
-	pgMap := make(map[string]config.Plugin)
+func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.String {
+	pgSet := sets.String{}
 
 	if plugins == nil {
-		return pgMap
+		return pgSet
 	}
 
 	find := func(pgs *config.PluginSet) {
 		for _, pg := range pgs.Enabled {
-			pgMap[pg.Name] = pg
+			pgSet.Insert(pg.Name)
 		}
 	}
+
 	for _, e := range f.getExtensionPoints(plugins) {
 		find(e.plugins)
 	}
-
 	// Parse MultiPoint separately since they are not returned by f.getExtensionPoints()
 	find(&plugins.MultiPoint)
-	return pgMap
+
+	return pgSet
 }
 
 // ProfileName returns the profile name associated to this framework.
