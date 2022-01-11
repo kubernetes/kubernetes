@@ -584,7 +584,7 @@
         "description": "PersistentVolumeSpec is the specification of a persistent volume.",
         "properties": {
           "accessModes": {
-            "description": "AccessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
+            "description": "accessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
             "items": {
               "default": "",
               "type": "string"
@@ -608,7 +608,7 @@
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity",
               "default": {}
             },
-            "description": "A description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
+            "description": "capacity is the description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
             "type": "object"
           },
           "cephfs": {
@@ -621,7 +621,7 @@
           },
           "claimRef": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.ObjectReference",
-            "description": "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding"
+            "description": "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding"
           },
           "csi": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.CSIPersistentVolumeSource",
@@ -660,7 +660,7 @@
             "description": "local represents directly-attached storage with node affinity"
           },
           "mountOptions": {
-            "description": "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
+            "description": "mountOptions is the list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
             "items": {
               "default": "",
               "type": "string"
@@ -673,10 +673,10 @@
           },
           "nodeAffinity": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeNodeAffinity",
-            "description": "NodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
+            "description": "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
           },
           "persistentVolumeReclaimPolicy": {
-            "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming\n\nPossible enum values:\n - `\"Delete\"` means the volume will be deleted from Kubernetes on release from its claim. The volume plugin must support Deletion.\n - `\"Recycle\"` means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim. The volume plugin must support Recycling.\n - `\"Retain\"` means the volume will be left in its current phase (Released) for manual reclamation by the administrator. The default policy is Retain.",
+            "description": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming\n\nPossible enum values:\n - `\"Delete\"` means the volume will be deleted from Kubernetes on release from its claim. The volume plugin must support Deletion.\n - `\"Recycle\"` means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim. The volume plugin must support Recycling.\n - `\"Retain\"` means the volume will be left in its current phase (Released) for manual reclamation by the administrator. The default policy is Retain.",
             "enum": [
               "Delete",
               "Recycle",
@@ -705,7 +705,7 @@
             "description": "scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
           },
           "storageClassName": {
-            "description": "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+            "description": "storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
             "type": "string"
           },
           "storageos": {
@@ -983,7 +983,7 @@
         "properties": {
           "required": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector",
-            "description": "Required specifies hard node constraints that must be met."
+            "description": "required specifies hard node constraints that must be met."
           }
         },
         "type": "object"

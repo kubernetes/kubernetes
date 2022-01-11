@@ -2594,13 +2594,13 @@ message PersistentVolume {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines a specification of a persistent volume owned by the cluster.
+  // spec defines a specification of a persistent volume owned by the cluster.
   // Provisioned by an administrator.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes
   // +optional
   optional PersistentVolumeSpec spec = 2;
 
-  // Status represents the current information/status for the persistent volume.
+  // status represents the current information/status for the persistent volume.
   // Populated by the system.
   // Read-only.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes
@@ -2615,12 +2615,12 @@ message PersistentVolumeClaim {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired characteristics of a volume requested by a pod author.
+  // spec defines the desired characteristics of a volume requested by a pod author.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
   // +optional
   optional PersistentVolumeClaimSpec spec = 2;
 
-  // Status represents the current information/status of a persistent volume claim.
+  // status represents the current information/status of a persistent volume claim.
   // Read-only.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
   // +optional
@@ -2633,21 +2633,21 @@ message PersistentVolumeClaimCondition {
 
   optional string status = 2;
 
-  // Last time we probed the condition.
+  // lastProbeTime is the time we probed the condition.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
-  // Last time the condition transitioned from one status to another.
+  // lastTransitionTime is the time the condition transitioned from one status to another.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
-  // Unique, this should be a short, machine understandable string that gives the reason
+  // reason is a unique, this should be a short, machine understandable string that gives the reason
   // for condition's last transition. If it reports "ResizeStarted" that means the underlying
   // persistent volume is being resized.
   // +optional
   optional string reason = 5;
 
-  // Human-readable message indicating details about last transition.
+  // message is the human-readable message indicating details about last transition.
   // +optional
   optional string message = 6;
 }
@@ -2659,7 +2659,7 @@ message PersistentVolumeClaimList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // A list of persistent volume claims.
+  // items is a list of persistent volume claims.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
   repeated PersistentVolumeClaim items = 2;
 }
@@ -2667,16 +2667,16 @@ message PersistentVolumeClaimList {
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 message PersistentVolumeClaimSpec {
-  // AccessModes contains the desired access modes the volume should have.
+  // accessModes contains the desired access modes the volume should have.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
   // +optional
   repeated string accessModes = 1;
 
-  // A label query over volumes to consider for binding.
+  // selector is a label query over volumes to consider for binding.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
 
-  // Resources represents the minimum resources the volume should have.
+  // resources represents the minimum resources the volume should have.
   // If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
   // that are lower than previous value but must still be higher than capacity recorded in the
   // status field of the claim.
@@ -2684,11 +2684,11 @@ message PersistentVolumeClaimSpec {
   // +optional
   optional ResourceRequirements resources = 2;
 
-  // VolumeName is the binding reference to the PersistentVolume backing this claim.
+  // volumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
   optional string volumeName = 3;
 
-  // Name of the StorageClass required by the claim.
+  // storageClassName is the name of the StorageClass required by the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
   // +optional
   optional string storageClassName = 5;
@@ -2698,7 +2698,7 @@ message PersistentVolumeClaimSpec {
   // +optional
   optional string volumeMode = 6;
 
-  // This field can be used to specify either:
+  // dataSource field can be used to specify either:
   // * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
   // * An existing PVC (PersistentVolumeClaim)
   // If the provisioner or an external controller can support the specified data source,
@@ -2708,7 +2708,7 @@ message PersistentVolumeClaimSpec {
   // +optional
   optional TypedLocalObjectReference dataSource = 7;
 
-  // Specifies the object from which to populate the volume with data, if a non-empty
+  // dataSourceRef specifies the object from which to populate the volume with data, if a non-empty
   // volume is desired. This may be any local object from a non-empty API group (non
   // core object) or a PersistentVolumeClaim object.
   // When this field is specified, volume binding will only succeed if the type of
@@ -2731,27 +2731,27 @@ message PersistentVolumeClaimSpec {
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
 message PersistentVolumeClaimStatus {
-  // Phase represents the current phase of PersistentVolumeClaim.
+  // phase represents the current phase of PersistentVolumeClaim.
   // +optional
   optional string phase = 1;
 
-  // AccessModes contains the actual access modes the volume backing the PVC has.
+  // accessModes contains the actual access modes the volume backing the PVC has.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
   // +optional
   repeated string accessModes = 2;
 
-  // Represents the actual resources of the underlying volume.
+  // capacity represents the actual resources of the underlying volume.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
 
-  // Current Condition of persistent volume claim. If underlying persistent volume is being
+  // conditions is the current Condition of persistent volume claim. If underlying persistent volume is being
   // resized then the Condition will be set to 'ResizeStarted'.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated PersistentVolumeClaimCondition conditions = 4;
 
-  // The storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may
+  // allocatedResources is the storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may
   // be larger than the actual capacity when a volume expansion operation is requested.
   // For storage quota, the larger value from allocatedResources and PVC.spec.resources is used.
   // If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.
@@ -2763,7 +2763,7 @@ message PersistentVolumeClaimStatus {
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
 
-  // ResizeStatus stores status of resize operation.
+  // resizeStatus stores status of resize operation.
   // ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty
   // string by resize controller or kubelet.
   // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
@@ -2794,11 +2794,11 @@ message PersistentVolumeClaimTemplate {
 // PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another
 // type of volume that is owned by someone else (the system).
 message PersistentVolumeClaimVolumeSource {
-  // ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume.
+  // claimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
   optional string claimName = 1;
 
-  // Will force the ReadOnly setting in VolumeMounts.
+  // readOnly Will force the ReadOnly setting in VolumeMounts.
   // Default false.
   // +optional
   optional bool readOnly = 2;
@@ -2811,7 +2811,7 @@ message PersistentVolumeList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // List of persistent volumes.
+  // items is a list of persistent volumes.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
   repeated PersistentVolume items = 2;
 }
@@ -2925,27 +2925,27 @@ message PersistentVolumeSource {
 
 // PersistentVolumeSpec is the specification of a persistent volume.
 message PersistentVolumeSpec {
-  // A description of the persistent volume's resources and capacity.
+  // capacity is the description of the persistent volume's resources and capacity.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
-  // The actual volume backing the persistent volume.
+  // persistentVolumeSource is the actual volume backing the persistent volume.
   optional PersistentVolumeSource persistentVolumeSource = 2;
 
-  // AccessModes contains all ways the volume can be mounted.
+  // accessModes contains all ways the volume can be mounted.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
   // +optional
   repeated string accessModes = 3;
 
-  // ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
+  // claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
   // Expected to be non-nil when bound.
   // claim.VolumeName is the authoritative bind between PV and PVC.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding
   // +optional
   optional ObjectReference claimRef = 4;
 
-  // What happens to a persistent volume when released from its claim.
+  // persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim.
   // Valid options are Retain (default for manually created PersistentVolumes), Delete (default
   // for dynamically provisioned PersistentVolumes), and Recycle (deprecated).
   // Recycle must be supported by the volume plugin underlying this PersistentVolume.
@@ -2953,12 +2953,12 @@ message PersistentVolumeSpec {
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
 
-  // Name of StorageClass to which this persistent volume belongs. Empty value
+  // storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value
   // means that this volume does not belong to any StorageClass.
   // +optional
   optional string storageClassName = 6;
 
-  // A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+  // mountOptions is the list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
   // simply fail if one is invalid.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
   // +optional
@@ -2969,7 +2969,7 @@ message PersistentVolumeSpec {
   // +optional
   optional string volumeMode = 8;
 
-  // NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+  // nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
   // This field influences the scheduling of pods that use this volume.
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
@@ -2977,16 +2977,16 @@ message PersistentVolumeSpec {
 
 // PersistentVolumeStatus is the current status of a persistent volume.
 message PersistentVolumeStatus {
-  // Phase indicates if a volume is available, bound to a claim, or released by a claim.
+  // phase indicates if a volume is available, bound to a claim, or released by a claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase
   // +optional
   optional string phase = 1;
 
-  // A human-readable message indicating details about why the volume is in this state.
+  // message is a human-readable message indicating details about why the volume is in this state.
   // +optional
   optional string message = 2;
 
-  // Reason is a brief CamelCase string that describes any failure and is meant
+  // reason is a brief CamelCase string that describes any failure and is meant
   // for machine parsing and tidy display in the CLI.
   // +optional
   optional string reason = 3;
@@ -5454,12 +5454,12 @@ message TypedLocalObjectReference {
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
 message Volume {
-  // Volume's name.
+  // name of the volume.
   // Must be a DNS_LABEL and unique within the pod.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   optional string name = 1;
 
-  // VolumeSource represents the location and type of the mounted volume.
+  // volumeSource represents the location and type of the mounted volume.
   // If not specified, the Volume is implied to be an EmptyDir.
   // This implied behavior is deprecated and will be removed in a future version.
   optional VolumeSource volumeSource = 2;
@@ -5510,7 +5510,7 @@ message VolumeMount {
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 message VolumeNodeAffinity {
-  // Required specifies hard node constraints that must be met.
+  // required specifies hard node constraints that must be met.
   optional NodeSelector required = 1;
 }
 
