@@ -22,7 +22,9 @@ import (
 	"math/big"
 	"net"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	netutils "k8s.io/utils/net"
 )
@@ -86,7 +88,7 @@ type Range struct {
 }
 
 // New creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
-func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, error) {
+func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory) (*Range, error) {
 	registerMetrics()
 
 	max := netutils.RangeSize(cidr)
@@ -118,16 +120,24 @@ func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, 
 		max:    maximum(0, int(max)),
 		family: family,
 	}
-	var err error
-	r.alloc, err = allocatorFactory(r.max, rangeSpec)
 
-	return &r, err
+	offset := 0
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceIPStaticSubrange) {
+		offset = calculateRangeOffset(cidr)
+	}
+
+	var err error
+	r.alloc, err = allocatorFactory(r.max, rangeSpec, offset)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
 }
 
 // NewInMemory creates an in-memory allocator.
 func NewInMemory(cidr *net.IPNet) (*Range, error) {
-	return New(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
-		return allocator.NewAllocationMap(max, rangeSpec), nil
+	return New(cidr, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+		return allocator.NewAllocationMapWithOffset(max, rangeSpec, offset), nil
 	})
 }
 
@@ -191,7 +201,7 @@ func (r *Range) allocate(ip net.IP, dryRun bool) error {
 	ok, offset := r.contains(ip)
 	if !ok {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+		clusterIPAllocationErrors.WithLabelValues(label.String(), "static").Inc()
 		return &ErrNotInRange{ip, r.net.String()}
 	}
 	if dryRun {
@@ -203,18 +213,18 @@ func (r *Range) allocate(ip net.IP, dryRun bool) error {
 	allocated, err := r.alloc.Allocate(offset)
 	if err != nil {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+		clusterIPAllocationErrors.WithLabelValues(label.String(), "static").Inc()
 
 		return err
 	}
 	if !allocated {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+		clusterIPAllocationErrors.WithLabelValues(label.String(), "static").Inc()
 
 		return ErrAllocated
 	}
 	// update metrics
-	clusterIPAllocations.WithLabelValues(label.String()).Inc()
+	clusterIPAllocations.WithLabelValues(label.String(), "static").Inc()
 	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
 	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
 
@@ -238,18 +248,18 @@ func (r *Range) allocateNext(dryRun bool) (net.IP, error) {
 	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+		clusterIPAllocationErrors.WithLabelValues(label.String(), "dynamic").Inc()
 
 		return nil, err
 	}
 	if !ok {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+		clusterIPAllocationErrors.WithLabelValues(label.String(), "dynamic").Inc()
 
 		return nil, ErrFull
 	}
 	// update metrics
-	clusterIPAllocations.WithLabelValues(label.String()).Inc()
+	clusterIPAllocations.WithLabelValues(label.String(), "dynamic").Inc()
 	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
 	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
 
@@ -352,6 +362,33 @@ func (r *Range) contains(ip net.IP) (bool, int) {
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
 	return int(big.NewInt(0).Sub(netutils.BigForIP(ip), base).Int64())
+}
+
+// calculateRangeOffset estimates the offset used on the range for statically allocation based on
+// the following formula `min(max($min, cidrSize/$step), $max)`, described as ~never less than
+// $min or more than $max, with a graduated step function between them~. The function returns 0
+// if any of the parameters is invalid.
+func calculateRangeOffset(cidr *net.IPNet) int {
+	// default values for min(max($min, cidrSize/$step), $max)
+	const (
+		min  = 16
+		max  = 256
+		step = 16
+	)
+
+	cidrSize := netutils.RangeSize(cidr)
+	if cidrSize < min {
+		return 0
+	}
+
+	offset := cidrSize / step
+	if offset < min {
+		return min
+	}
+	if offset > max {
+		return max
+	}
+	return int(offset)
 }
 
 // dryRunRange is a shim to satisfy Interface without persisting state.

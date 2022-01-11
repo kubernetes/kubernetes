@@ -51,7 +51,7 @@ var (
 		},
 		[]string{"cidr"},
 	)
-	// clusterIPAllocation counts the total number of ClusterIP allocation.
+	// clusterIPAllocation counts the total number of ClusterIP allocation and allocation mode: static or dynamic.
 	clusterIPAllocations = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Namespace:      namespace,
@@ -60,9 +60,9 @@ var (
 			Help:           "Number of Cluster IPs allocations",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"cidr"},
+		[]string{"cidr", "scope"},
 	)
-	// clusterIPAllocationErrors counts the number of error trying to allocate a ClusterIP.
+	// clusterIPAllocationErrors counts the number of error trying to allocate a ClusterIP and allocation mode: static or dynamic.
 	clusterIPAllocationErrors = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Namespace:      namespace,
@@ -71,7 +71,7 @@ var (
 			Help:           "Number of errors trying to allocate Cluster IPs",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"cidr"},
+		[]string{"cidr", "scope"},
 	)
 )
 

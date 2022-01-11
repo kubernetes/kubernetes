@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -25,8 +26,11 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -43,8 +47,8 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interfa
 
 	var backing allocator.Interface
 	configForAllocations := etcdStorage.ForResource(api.Resource("serviceipallocations"))
-	storage, err := ipallocator.New(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
-		mem := allocator.NewAllocationMap(max, rangeSpec)
+	storage, err := ipallocator.New(cidr, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+		mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		backing = mem
 		etcd, err := allocatorstore.NewEtcd(mem, "/ranges/serviceips", configForAllocations)
 		if err != nil {
@@ -113,5 +117,53 @@ func TestStore(t *testing.T) {
 	}
 	if err := storage.Allocate(netutils.ParseIPSloppy("192.168.1.2")); err != ipallocator.ErrAllocated {
 		t.Fatal(err)
+	}
+}
+
+func TestAllocateReserved(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
+
+	_, storage, _, si, destroyFunc := newStorage(t)
+	defer destroyFunc()
+	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// allocate all addresses on the dynamic block
+	// subnet /24 = 256 ; dynamic block size is min(max(16,256/16),256) = 16
+	dynamicOffset := 16
+	max := 254
+	dynamicBlockSize := max - dynamicOffset
+	for i := 0; i < dynamicBlockSize; i++ {
+		if _, err := storage.AllocateNext(); err != nil {
+			t.Errorf("Unexpected error trying to allocate: %v", err)
+		}
+	}
+	for i := dynamicOffset; i < max; i++ {
+		ip := fmt.Sprintf("192.168.1.%d", i+1)
+		if !storage.Has(netutils.ParseIPSloppy(ip)) {
+			t.Errorf("IP %s expected to be allocated", ip)
+		}
+	}
+
+	// allocate all addresses on the static block
+	for i := 0; i < dynamicOffset; i++ {
+		ip := fmt.Sprintf("192.168.1.%d", i+1)
+		if err := storage.Allocate(netutils.ParseIPSloppy(ip)); err != nil {
+			t.Errorf("Unexpected error trying to allocate IP %s: %v", ip, err)
+		}
+	}
+	if _, err := storage.AllocateNext(); err == nil {
+		t.Error("Allocator expected to be full")
+	}
+	// release one address in the allocated block and another a new one randomly
+	if err := storage.Release(netutils.ParseIPSloppy("192.168.1.10")); err != nil {
+		t.Fatalf("Unexpected error trying to release ip 192.168.1.10: %v", err)
+	}
+	if _, err := storage.AllocateNext(); err != nil {
+		t.Error(err)
+	}
+	if _, err := storage.AllocateNext(); err == nil {
+		t.Error("Allocator expected to be full")
 	}
 }
