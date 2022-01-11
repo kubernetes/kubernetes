@@ -177,9 +177,9 @@ func TestEnsureMultipleInstanceGroups(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
-	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureNetLBRbs})
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureSkipIGsManagement})
 
-	nodes, err  := createAndInsertNodes(gce, []string{"n1"}, vals.ZoneName)
+	nodes, err := createAndInsertNodes(gce, []string{"n1"}, vals.ZoneName)
 	require.NoError(t, err)
 
 	baseName := makeInstanceGroupName(vals.ClusterID)
@@ -560,14 +560,13 @@ func TestSkipInstanceGroupDeletion(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
 	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
-	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureNetLBRbs})
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureSkipIGsManagement})
 	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
 	assert.NoError(t, err)
 

@@ -625,7 +625,7 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	klog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), g.region)
 	var igLinks []string
 	for zone, nodes := range zonedNodes {
-		if g.AlphaFeatureGate.Enabled(AlphaFeatureNetLBRbs) {
+		if g.AlphaFeatureGate.Enabled(AlphaFeatureSkipIGsManagement) {
 			igs, err := g.FilterInstanceGroupsByName(name, zone)
 			if err != nil {
 				return []string{}, err
@@ -652,9 +652,10 @@ func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
-	for _, z := range zones {
-		if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetLBRbs) {
+	// Skip Instance Group deletion if IG management was moved out of k/k code
+	if !g.AlphaFeatureGate.Enabled(AlphaFeatureSkipIGsManagement) {
+		klog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
+		for _, z := range zones {
 			if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
 				return err
 			}
