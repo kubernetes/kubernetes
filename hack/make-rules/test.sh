@@ -218,7 +218,9 @@ runTests() {
 
   # Try to normalize input names.
   local -a targets
-  while IFS="" read -r target; do targets+=("$target"); done < <(kube::golang::binaries_from_targets "$@")
+  while IFS="" read -r target; do
+    targets+=("$target")
+  done < <(kube::golang::normalize_go_targets "$@")
 
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
