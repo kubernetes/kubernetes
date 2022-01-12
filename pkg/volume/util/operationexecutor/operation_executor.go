@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
+
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -342,6 +344,33 @@ func (volume *VolumeToAttach) GenerateError(prefixMsg string, err error) (simple
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
 }
 
+// String combines key fields of the volume for logging in text format.
+func (volume *VolumeToAttach) String() string {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return fmt.Sprintf("%s (UniqueName: %s) from node %s", volumeSpecName, volume.VolumeName, volume.NodeName)
+}
+
+// MarshalLog combines key fields of the volume for logging in a structured format.
+func (volume *VolumeToAttach) MarshalLog() interface{} {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return struct {
+		VolumeName, UniqueName, NodeName string
+	}{
+		VolumeName: volumeSpecName,
+		UniqueName: string(volume.VolumeName),
+		NodeName:   string(volume.NodeName),
+	}
+}
+
+var _ fmt.Stringer = &VolumeToAttach{}
+var _ logr.Marshaler = &VolumeToAttach{}
+
 // VolumeToMount represents a volume that should be attached to this node and
 // mounted to the PodName.
 type VolumeToMount struct {
@@ -529,6 +558,33 @@ func (volume *AttachedVolume) GenerateError(prefixMsg string, err error) (simple
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
 }
+
+// String combines key fields of the volume for logging in text format.
+func (volume *AttachedVolume) String() string {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return fmt.Sprintf("%s (UniqueName: %s) from node %s", volumeSpecName, volume.VolumeName, volume.NodeName)
+}
+
+// MarshalLog combines key fields of the volume for logging in a structured format.
+func (volume *AttachedVolume) MarshalLog() interface{} {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return struct {
+		VolumeName, UniqueName, NodeName string
+	}{
+		VolumeName: volumeSpecName,
+		UniqueName: string(volume.VolumeName),
+		NodeName:   string(volume.NodeName),
+	}
+}
+
+var _ fmt.Stringer = &AttachedVolume{}
+var _ logr.Marshaler = &AttachedVolume{}
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
 type MountedVolume struct {

@@ -426,10 +426,12 @@ func prioritizeNodes(
 		return nil, scoreStatus.AsError()
 	}
 
-	if klog.V(10).Enabled() {
+	// Additional details logged at level 10 if enabled.
+	klogV := klog.V(10)
+	if klogV.Enabled() {
 		for plugin, nodeScoreList := range scoresMap {
 			for _, nodeScore := range nodeScoreList {
-				klog.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
+				klogV.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
 			}
 		}
 	}
@@ -467,8 +469,8 @@ func prioritizeNodes(
 				mu.Lock()
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					if klog.V(10).Enabled() {
-						klog.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
+					if klogV.Enabled() {
+						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
 					}
 					combinedScores[host] += score * weight
 				}
@@ -484,9 +486,9 @@ func prioritizeNodes(
 		}
 	}
 
-	if klog.V(10).Enabled() {
+	if klogV.Enabled() {
 		for i := range result {
-			klog.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
+			klogV.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
 		}
 	}
 	return result, nil

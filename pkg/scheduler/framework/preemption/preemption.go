@@ -220,12 +220,12 @@ func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framewor
 	}
 
 	offset, numCandidates := ev.GetOffsetAndNumCandidates(int32(len(potentialNodes)))
-	if klog.V(5).Enabled() {
+	if klogV := klog.V(5); klogV.Enabled() {
 		var sample []string
 		for i := offset; i < offset+10 && i < int32(len(potentialNodes)); i++ {
 			sample = append(sample, potentialNodes[i].Node().Name)
 		}
-		klog.InfoS("Selecting candidates from a pool of nodes", "potentialNodesCount", len(potentialNodes), "offset", offset, "sampleLength", len(sample), "sample", sample, "candidates", numCandidates)
+		klogV.InfoS("Selecting candidates from a pool of nodes", "potentialNodesCount", len(potentialNodes), "offset", offset, "sampleLength", len(sample), "sample", sample, "candidates", numCandidates)
 	}
 	candidates, nodeStatuses, err := ev.DryRunPreemption(ctx, pod, potentialNodes, pdbs, offset, numCandidates)
 	for node, nodeStatus := range unschedulableNodeStatus {

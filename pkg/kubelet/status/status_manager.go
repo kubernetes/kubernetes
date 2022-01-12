@@ -439,7 +439,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	// Perform some more extensive logging of container termination state to assist in
 	// debugging production races (generally not needed).
-	if klog.V(5).Enabled() {
+	if klogV := klog.V(5); klogV.Enabled() {
 		var containers []string
 		for _, s := range append(append([]v1.ContainerStatus(nil), status.InitContainerStatuses...), status.ContainerStatuses...) {
 			var current, previous string
@@ -466,7 +466,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 			containers = append(containers, fmt.Sprintf("(%s state=%s previous=%s)", s.Name, current, previous))
 		}
 		sort.Strings(containers)
-		klog.InfoS("updateStatusInternal", "version", cachedStatus.version+1, "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
+		klogV.InfoS("updateStatusInternal", "version", cachedStatus.version+1, "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
 	}
 
 	// The intent here is to prevent concurrent updates to a pod's status from

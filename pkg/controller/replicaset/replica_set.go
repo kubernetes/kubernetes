@@ -37,7 +37,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -219,12 +219,10 @@ func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.Repli
 		}
 	}
 
-	if klog.V(2).Enabled() {
-		var relatedNames []string
-		for _, r := range relatedRSs {
-			relatedNames = append(relatedNames, r.Name)
-		}
-		klog.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", relatedNames)
+	// The if check is used to avoid the overhead for the KObjs call, see
+	// https://github.com/kubernetes/kubernetes/issues/106945.
+	if klogV := klog.V(2); klogV.Enabled() {
+		klogV.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", klog.KObjs(relatedRSs))
 	}
 
 	return relatedRSs
@@ -791,13 +789,7 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 			relatedPods = append(relatedPods, pod)
 		}
 	}
-	if klog.V(4).Enabled() {
-		var relatedNames []string
-		for _, related := range relatedPods {
-			relatedNames = append(relatedNames, related.Name)
-		}
-		klog.Infof("Found %d related pods for %v %s/%s: %v", len(relatedPods), rsc.Kind, rs.Namespace, rs.Name, strings.Join(relatedNames, ", "))
-	}
+	klog.V(4).InfoS("Found related pods", "kind", rsc.Kind, "object", klog.KObj(rs), "pods", klog.KObjs(relatedPods))
 	return relatedPods, nil
 }
 
