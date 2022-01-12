@@ -128,7 +128,7 @@ done
 
 kube::golang::verify_go_version
 
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
+# Explicitly opt into go modules
 export GO111MODULE=on
 
 # Install golangci-lint
