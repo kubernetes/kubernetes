@@ -534,21 +534,19 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 	defer cache.mu.Unlock()
 
 	currState, ok := cache.podStates[key]
-	switch {
-	case ok:
-		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
-			klog.ErrorS(nil, "Pod was added to a different node than it was assumed", "pod", klog.KObj(pod), "assumedNode", klog.KRef("", pod.Spec.NodeName), "currentNode", klog.KRef("", currState.pod.Spec.NodeName))
-			if pod.Spec.NodeName != "" {
-				// An empty NodeName is possible when the scheduler misses a Delete
-				// event and it gets the last known state from the informer cache.
-				klog.ErrorS(nil, "SchedulerCache is corrupted and can badly affect scheduling decisions")
-				os.Exit(1)
-			}
-		}
-		return cache.removePod(currState.pod)
-	default:
+	if !ok {
 		return fmt.Errorf("pod %v is not found in scheduler cache, so cannot be removed from it", key)
 	}
+	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
+		klog.ErrorS(nil, "Pod was added to a different node than it was assumed", "pod", klog.KObj(pod), "assumedNode", klog.KRef("", pod.Spec.NodeName), "currentNode", klog.KRef("", currState.pod.Spec.NodeName))
+		if pod.Spec.NodeName != "" {
+			// An empty NodeName is possible when the scheduler misses a Delete
+			// event and it gets the last known state from the informer cache.
+			klog.ErrorS(nil, "SchedulerCache is corrupted and can badly affect scheduling decisions")
+			os.Exit(1)
+		}
+	}
+	return cache.removePod(currState.pod)
 }
 
 func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
