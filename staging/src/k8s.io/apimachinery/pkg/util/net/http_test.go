@@ -970,3 +970,36 @@ func Benchmark_ParseQuotedString(b *testing.B) {
 		}
 	}
 }
+
+func TestCloneRequestDontMutate(t *testing.T) {
+	u, err := url.Parse("https://user:info@testuri.k8s.io/")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := http.Header{
+		"Expires":        {"-1"},
+		"Content-Length": {"0"},
+	}
+	req := &http.Request{
+		URL:    u,
+		Header: h,
+		Host:   "apiserver",
+	}
+	origURLString := u.String()
+	clone := CloneRequest(req)
+	if !reflect.DeepEqual(req, clone) {
+		t.Errorf("CloneRequest() = %v, want %v", clone, req)
+	}
+	// mutate url UserInfo and headers and check they don't change the original request
+	clone.URL.User = &url.Userinfo{}
+	clone.Header.Add("X-Forwarded-For", "1.1.1.1")
+	if origURLString != req.URL.String() {
+		t.Errorf("CloneRequest() mutated original request URL: %s -> %s", origURLString, req.URL.String())
+	}
+
+	if !reflect.DeepEqual(h, req.Header) {
+		t.Errorf("CloneRequest() mutated original request Headers: %v -> %v", h, req.Header)
+	}
+
+}

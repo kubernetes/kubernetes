@@ -452,10 +452,28 @@ func CloneRequest(req *http.Request) *http.Request {
 	// shallow clone
 	*r = *req
 
+	// deep copy URL
+	r.URL = CloneURL(req.URL)
+
 	// deep copy headers
 	r.Header = CloneHeader(req.Header)
 
 	return r
+}
+
+// CloneURL creates a deep copy of an URL
+// https://github.com/golang/go/blob/2ebe77a2fda1ee9ff6fd9a3e08933ad1ebaea039/src/net/http/clone.go#L22
+func CloneURL(u *url.URL) *url.URL {
+	if u == nil {
+		return nil
+	}
+	u2 := new(url.URL)
+	*u2 = *u
+	if u.User != nil {
+		u2.User = new(url.Userinfo)
+		*u2.User = *u.User
+	}
+	return u2
 }
 
 // CloneHeader creates a deep copy of an http.Header.
