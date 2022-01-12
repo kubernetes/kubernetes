@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
@@ -132,7 +132,7 @@ func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, 
 }
 
 // Run starts the autoregister controller in a loop which syncs API services until stopCh is closed.
-func (c *autoRegisterController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *autoRegisterController) Run(workers int, stopCh <-chan struct{}) {
 	// don't let panics crash the process
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
@@ -153,8 +153,8 @@ func (c *autoRegisterController) Run(threadiness int, stopCh <-chan struct{}) {
 		}
 	}
 
-	// start up your worker threads based on threadiness.  Some controllers have multiple kinds of workers
-	for i := 0; i < threadiness; i++ {
+	// start up your worker threads based on workers.  Some controllers have multiple kinds of workers
+	for i := 0; i < workers; i++ {
 		// runWorker will loop until "something bad" happens.  The .Until will then rekick the worker
 		// after one second
 		go wait.Until(c.runWorker, time.Second, stopCh)

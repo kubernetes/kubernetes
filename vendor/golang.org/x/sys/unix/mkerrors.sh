@@ -217,8 +217,6 @@ struct ltchars {
 #include <linux/genetlink.h>
 #include <linux/hdreg.h>
 #include <linux/hidraw.h>
-#include <linux/icmp.h>
-#include <linux/icmpv6.h>
 #include <linux/if.h>
 #include <linux/if_addr.h>
 #include <linux/if_alg.h>
@@ -502,7 +500,7 @@ ccflags="$@"
 		$2 ~ /^LOCK_(SH|EX|NB|UN)$/ ||
 		$2 ~ /^LO_(KEY|NAME)_SIZE$/ ||
 		$2 ~ /^LOOP_(CLR|CTL|GET|SET)_/ ||
-		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|TCP|MCAST|EVFILT|NOTE|SHUT|PROT|MAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR|LOCAL)_/ ||
+		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|TCP|MCAST|EVFILT|NOTE|SHUT|PROT|MAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR|LOCAL|TCPOPT)_/ ||
 		$2 ~ /^NFC_(GENL|PROTO|COMM|RF|SE|DIRECTION|LLCP|SOCKPROTO)_/ ||
 		$2 ~ /^NFC_.*_(MAX)?SIZE$/ ||
 		$2 ~ /^RAW_PAYLOAD_/ ||

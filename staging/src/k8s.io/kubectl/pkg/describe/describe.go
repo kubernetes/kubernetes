@@ -52,7 +52,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -414,7 +413,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 			return newList, nil
 		})
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Server does not support resource quotas.
 			// Not an error, will not show resource quotas information.
 			resourceQuotaList = nil
@@ -434,7 +433,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 			return newList, nil
 		})
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Server does not support limit ranges.
 			// Not an error, will not show limit ranges information.
 			limitRangeList = nil
@@ -452,14 +451,31 @@ func describeNamespace(namespace *corev1.Namespace, resourceQuotaList *corev1.Re
 		printLabelsMultiline(w, "Labels", namespace.Labels)
 		printAnnotationsMultiline(w, "Annotations", namespace.Annotations)
 		w.Write(LEVEL_0, "Status:\t%s\n", string(namespace.Status.Phase))
+
+		if len(namespace.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t------------------\t------\t-------\n")
+			for _, c := range namespace.Status.Conditions {
+				w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
+					c.Type,
+					c.Status,
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
+			}
+		}
+
 		if resourceQuotaList != nil {
 			w.Write(LEVEL_0, "\n")
 			DescribeResourceQuotas(resourceQuotaList, w)
 		}
+
 		if limitRangeList != nil {
 			w.Write(LEVEL_0, "\n")
 			DescribeLimitRanges(limitRangeList, w)
 		}
+
 		return nil
 	})
 }
@@ -1399,7 +1415,6 @@ func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIn
 		} else {
 			w.Write(LEVEL_2, "%s\n", line)
 		}
-		i++
 	}
 }
 
@@ -1927,6 +1942,9 @@ func DescribeProbe(probe *corev1.Probe) string {
 		return fmt.Sprintf("http-get %s %s", url.String(), attrs)
 	case probe.TCPSocket != nil:
 		return fmt.Sprintf("tcp-socket %s:%s %s", probe.TCPSocket.Host, probe.TCPSocket.Port.String(), attrs)
+
+	case probe.GRPC != nil:
+		return fmt.Sprintf("grpc <pod>:%d %s %s", probe.GRPC.Port, *(probe.GRPC.Service), attrs)
 	}
 	return fmt.Sprintf("unknown %s", attrs)
 }
@@ -2216,7 +2234,11 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 		if job.Spec.ActiveDeadlineSeconds != nil {
 			w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
-		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
+		if job.Status.Ready == nil {
+			w.Write(LEVEL_0, "Pods Statuses:\t%d Active / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
+		} else {
+			w.Write(LEVEL_0, "Pods Statuses:\t%d Active (%d Ready) / %d Succeeded / %d Failed\n", job.Status.Active, *job.Status.Ready, job.Status.Succeeded, job.Status.Failed)
+		}
 		if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batchv1.IndexedCompletion {
 			w.Write(LEVEL_0, "Completed Indexes:\t%s\n", capIndexesListOrNone(job.Status.CompletedIndexes, 50))
 		}
@@ -2605,6 +2627,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
+		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
 		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
 		def := ing.Spec.DefaultBackend
@@ -2660,6 +2683,7 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
+		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
 		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
 		def := ing.Spec.Backend
@@ -3487,7 +3511,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 	}
 	nodeNonTerminatedPodsList, err := getPodsInChunks(d.CoreV1().Pods(namespace), initialOpts)
 	if err != nil {
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			return "", err
 		}
 		canViewPods = false
@@ -4138,13 +4162,16 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 	w.Write(LEVEL_1, "----\t------\t----\t----\t-------\n")
 	for _, e := range el.Items {
 		var interval string
-		if e.Count > 1 {
-			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp), e.Count, translateTimestampSince(e.FirstTimestamp))
+		firstTimestampSince := translateMicroTimestampSince(e.EventTime)
+		if e.EventTime.IsZero() {
+			firstTimestampSince = translateTimestampSince(e.FirstTimestamp)
+		}
+		if e.Series != nil {
+			interval = fmt.Sprintf("%s (x%d over %s)", translateMicroTimestampSince(e.Series.LastObservedTime), e.Series.Count, firstTimestampSince)
+		} else if e.Count > 1 {
+			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp), e.Count, firstTimestampSince)
 		} else {
-			interval = translateTimestampSince(e.FirstTimestamp)
-			if e.FirstTimestamp.IsZero() {
-				interval = translateMicroTimestampSince(e.EventTime)
-			}
+			interval = firstTimestampSince
 		}
 		source := e.Source.Component
 		if source == "" {
@@ -5086,7 +5113,6 @@ func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 			w.Write(LEVEL_0, "%s", innerIndent)
 		}
 		w.Write(LEVEL_0, "%s=%s\n", key, labels[key])
-		i++
 	}
 }
 
@@ -5320,7 +5346,6 @@ func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[str
 		} else {
 			w.Write(LEVEL_0, "%s: %s\n", key, value)
 		}
-		i++
 	}
 }
 

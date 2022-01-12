@@ -267,7 +267,7 @@ func (o *PatchOptions) RunPatch() error {
 			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
 				klog.V(4).Infof("error recording current command: %v", err)
 			} else if len(mergePatch) > 0 {
-				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, nil); err != nil {
+				if recordedObj, err := helper.Patch(namespace, name, types.MergePatchType, mergePatch, nil); err != nil {
 					klog.V(4).Infof("error recording reason: %v", err)
 				} else {
 					patchedObj = recordedObj

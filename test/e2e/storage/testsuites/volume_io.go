@@ -80,6 +80,7 @@ func InitVolumeIOTestSuite() storageframework.TestSuite {
 		storageframework.DefaultFsInlineVolume,
 		storageframework.DefaultFsPreprovisionedPV,
 		storageframework.DefaultFsDynamicPV,
+		storageframework.NtfsDynamicPV,
 	}
 	return InitCustomVolumeIOTestSuite(patterns)
 }
@@ -143,7 +144,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.It("should write files of various sizes, verify size, validate content [Slow][LinuxOnly]", func() {
+	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func() {
 		init()
 		defer cleanup()
 

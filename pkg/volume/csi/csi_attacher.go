@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -491,14 +491,14 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(volumeHandle, at
 		clock         = &clock.RealClock{}
 	)
 	backoffMgr := wait.NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration, backoffFactor, jitter, clock)
-	defer backoffMgr.Backoff().Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	for {
+		t := backoffMgr.Backoff()
 		select {
-		case <-backoffMgr.Backoff().C():
+		case <-t.C():
 			successful, err := verifyStatus()
 			if err != nil {
 				return err
@@ -507,6 +507,7 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(volumeHandle, at
 				return nil
 			}
 		case <-ctx.Done():
+			t.Stop()
 			klog.Error(log("%s timeout after %v [volume=%v; attachment.ID=%v]", operation, timeout, volumeHandle, attachID))
 			return fmt.Errorf("%s timeout for volume %v", operation, volumeHandle)
 		}

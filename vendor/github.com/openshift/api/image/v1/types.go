@@ -597,7 +597,7 @@ type ImageStreamImport struct {
 
 	// Spec is a description of the images that the user wishes to import
 	Spec ImageStreamImportSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
-	// Status is the the result of importing the image
+	// Status is the result of importing the image
 	Status ImageStreamImportStatus `json:"status" protobuf:"bytes,3,opt,name=status"`
 }
 

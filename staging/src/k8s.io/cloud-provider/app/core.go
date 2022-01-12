@@ -21,9 +21,9 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"strings"
 
 	cloudprovider "k8s.io/cloud-provider"
@@ -32,6 +32,7 @@ import (
 	cloudnodelifecyclecontroller "k8s.io/cloud-provider/controllers/nodelifecycle"
 	routecontroller "k8s.io/cloud-provider/controllers/route"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -39,52 +40,52 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-func startCloudNodeController(ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+func startCloudNodeController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	// Start the CloudNodeController
 	nodeController, err := cloudnodecontroller.NewCloudNodeController(
-		ctx.SharedInformers.Core().V1().Nodes(),
+		completedConfig.SharedInformers.Core().V1().Nodes(),
 		// cloud node controller uses existing cluster role from node-controller
-		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
 		cloud,
-		ctx.ComponentConfig.NodeStatusUpdateFrequency.Duration,
+		completedConfig.ComponentConfig.NodeStatusUpdateFrequency.Duration,
 	)
 	if err != nil {
 		klog.Warningf("failed to start cloud node controller: %s", err)
 		return nil, false, nil
 	}
 
-	go nodeController.Run(stopCh)
+	go nodeController.Run(ctx.Done())
 
 	return nil, true, nil
 }
 
-func startCloudNodeLifecycleController(ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+func startCloudNodeLifecycleController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	// Start the cloudNodeLifecycleController
 	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
-		ctx.SharedInformers.Core().V1().Nodes(),
+		completedConfig.SharedInformers.Core().V1().Nodes(),
 		// cloud node lifecycle controller uses existing cluster role from node-controller
-		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
 		cloud,
-		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+		completedConfig.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 	)
 	if err != nil {
 		klog.Warningf("failed to start cloud node lifecycle controller: %s", err)
 		return nil, false, nil
 	}
 
-	go cloudNodeLifecycleController.Run(stopCh)
+	go cloudNodeLifecycleController.Run(ctx)
 
 	return nil, true, nil
 }
 
-func startServiceController(ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+func startServiceController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
 		cloud,
-		ctx.ClientBuilder.ClientOrDie("service-controller"),
-		ctx.SharedInformers.Core().V1().Services(),
-		ctx.SharedInformers.Core().V1().Nodes(),
-		ctx.ComponentConfig.KubeCloudShared.ClusterName,
+		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		completedConfig.SharedInformers.Core().V1().Services(),
+		completedConfig.SharedInformers.Core().V1().Nodes(),
+		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
 		utilfeature.DefaultFeatureGate,
 	)
 	if err != nil {
@@ -93,14 +94,14 @@ func startServiceController(ctx *config.CompletedConfig, cloud cloudprovider.Int
 		return nil, false, nil
 	}
 
-	go serviceController.Run(stopCh, int(ctx.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+	go serviceController.Run(ctx, int(completedConfig.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 
 	return nil, true, nil
 }
 
-func startRouteController(ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
-	if !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
-		klog.Infof("Will not configure cloud provider routes, --configure-cloud-routes: %v", ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
+func startRouteController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+	if !completedConfig.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
+		klog.Infof("Will not configure cloud provider routes, --configure-cloud-routes: %v", completedConfig.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil
 	}
 
@@ -112,7 +113,7 @@ func startRouteController(ctx *config.CompletedConfig, cloud cloudprovider.Inter
 	}
 
 	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+	clusterCIDRs, dualStack, err := processCIDRs(completedConfig.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
 		return nil, false, err
 	}
@@ -134,12 +135,12 @@ func startRouteController(ctx *config.CompletedConfig, cloud cloudprovider.Inter
 
 	routeController := routecontroller.New(
 		routes,
-		ctx.ClientBuilder.ClientOrDie("route-controller"),
-		ctx.SharedInformers.Core().V1().Nodes(),
-		ctx.ComponentConfig.KubeCloudShared.ClusterName,
+		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		completedConfig.SharedInformers.Core().V1().Nodes(),
+		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs,
 	)
-	go routeController.Run(stopCh, ctx.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
+	go routeController.Run(ctx, completedConfig.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
 
 	return nil, true, nil
 }

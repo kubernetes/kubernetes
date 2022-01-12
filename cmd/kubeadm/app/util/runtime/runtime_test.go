@@ -24,12 +24,12 @@ import (
 	"runtime"
 	"testing"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"github.com/pkg/errors"
 
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestNewContainerRuntime(t *testing.T) {

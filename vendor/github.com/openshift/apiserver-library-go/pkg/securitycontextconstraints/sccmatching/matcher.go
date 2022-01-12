@@ -124,24 +124,31 @@ func AssignSecurityContext(provider SecurityContextConstraintsProvider, pod *kap
 	errs = append(errs, provider.ValidatePodSecurityContext(pod, fldPath.Child("spec", "securityContext"))...)
 
 	for i := range pod.Spec.InitContainers {
-		sc, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
-			continue
-		}
-		pod.Spec.InitContainers[i].SecurityContext = sc
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
+		errs = append(errs, assignContainerSecurityContext(provider, pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
+	}
+	for i := range pod.Spec.EphemeralContainers {
+		errs = append(errs, assignContainerSecurityContext(provider, pod, (*kapi.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon), field.NewPath("spec", "ephemeralContainers").Index(i).Child("securityContext"))...)
+	}
+	for i := range pod.Spec.Containers {
+		errs = append(errs, assignContainerSecurityContext(provider, pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
 	}
 
-	for i := range pod.Spec.Containers {
-		sc, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[i])
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
-			continue
-		}
-		pod.Spec.Containers[i].SecurityContext = sc
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
+	if len(errs) > 0 {
+		return errs
 	}
+
+	return nil
+}
+
+func assignContainerSecurityContext(provider SecurityContextConstraintsProvider, pod *kapi.Pod, container *kapi.Container, fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
+	sc, err := provider.CreateContainerSecurityContext(pod, container)
+	if err != nil {
+		errs = append(errs, field.Invalid(fldPath, "", err.Error()))
+		return errs
+	}
+	container.SecurityContext = sc
+	errs = append(errs, provider.ValidateContainerSecurityContext(pod, container, fldPath)...)
 
 	if len(errs) > 0 {
 		return errs

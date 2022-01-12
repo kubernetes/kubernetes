@@ -44,6 +44,12 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+const (
+	MsgNotLabeled = "not labeled"
+	MsgLabeled    = "labeled"
+	MsgUnLabeled  = "unlabeled"
+)
+
 // LabelOptions have the data required to perform the label operation
 type LabelOptions struct {
 	// Filename options
@@ -147,9 +153,9 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
 	cmd.Flags().BoolVar(&o.list, "list", o.list, "If true, display the labels for a given resource.")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, label will NOT contact api-server but run locally.")
-	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
 	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
-	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, in the namespace of the specified resource types")
 	cmd.Flags().BoolVarP(&o.allNamespaces, "all-namespaces", "A", o.allNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the labels"
@@ -390,9 +396,12 @@ func (o *LabelOptions) RunLabel() error {
 }
 
 func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
-	msg := "not labeled"
+	msg := MsgNotLabeled
 	if !reflect.DeepEqual(oldObj, newObj) {
-		msg = "labeled"
+		msg = MsgLabeled
+		if len(newObj) < len(oldObj) {
+			msg = MsgUnLabeled
+		}
 	}
 	return msg
 }

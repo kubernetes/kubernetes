@@ -603,7 +603,8 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.CoreV1().Services(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			framework.Logf("Retrying .... error trying to get Service %s: %v", j.Name, err)
+			return false, nil
 		}
 		if conditionFn(svc) {
 			service = svc
@@ -612,7 +613,7 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 		return false, nil
 	}
 	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
-		return nil, fmt.Errorf("timed out waiting for service %q to %s", j.Name, message)
+		return nil, fmt.Errorf("timed out waiting for service %q to %s: %w", j.Name, message, err)
 	}
 	return service, nil
 }
@@ -645,7 +646,7 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 							Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &v1.Probe{
 								PeriodSeconds: 3,
-								Handler: v1.Handler{
+								ProbeHandler: v1.ProbeHandler{
 									HTTPGet: &v1.HTTPGetAction{
 										Port: intstr.FromInt(80),
 										Path: "/hostName",

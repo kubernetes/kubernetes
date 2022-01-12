@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -186,70 +185,7 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 	}
 }
 
-func TestDeploymentDefaultGarbageCollectionPolicy(t *testing.T) {
-	// Make sure we correctly implement the interface.
-	// Otherwise a typo could silently change the default.
-	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	tests := []struct {
-		requestInfo      genericapirequest.RequestInfo
-		expectedGCPolicy rest.GarbageCollectionPolicy
-		isNilRequestInfo bool
-	}{
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "extensions",
-				APIVersion: "v1beta1",
-				Resource:   "deployments",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1beta1",
-				Resource:   "deployments",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1beta2",
-				Resource:   "deployments",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1",
-				Resource:   "deployments",
-			},
-			rest.DeleteDependents,
-			false,
-		},
-		{
-			expectedGCPolicy: rest.DeleteDependents,
-			isNilRequestInfo: true,
-		},
-	}
-
-	for _, test := range tests {
-		context := genericapirequest.NewContext()
-		if !test.isNilRequestInfo {
-			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
-		}
-		if got, want := gcds.DefaultGarbageCollectionPolicy(context), test.expectedGCPolicy; got != want {
-			t.Errorf("%s/%s: DefaultGarbageCollectionPolicy() = %#v, want %#v", test.requestInfo.APIGroup,
-				test.requestInfo.APIVersion, got, want)
-		}
-	}
-}
-
-func newDeploymentWithHugePageValue(reousreceName api.ResourceName, value resource.Quantity) *apps.Deployment {
+func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resource.Quantity) *apps.Deployment {
 	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            deploymentName,
@@ -285,11 +221,11 @@ func newDeploymentWithHugePageValue(reousreceName api.ResourceName, value resour
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
-								api.ResourceName(reousreceName):   value,
+								api.ResourceName(resourceName):    value,
 							},
 							Limits: api.ResourceList{
 								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
-								api.ResourceName(reousreceName):   value,
+								api.ResourceName(resourceName):    value,
 							},
 						}},
 					}},

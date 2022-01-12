@@ -19,9 +19,9 @@ package apiclient
 import (
 	"strings"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +29,7 @@ import (
 	core "k8s.io/client-go/testing"
 	netutils "k8s.io/utils/net"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // InitDryRunGetter implements the DryRunGetter interface and can be used to GET/LIST values in the dryrun fake clientset

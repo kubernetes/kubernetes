@@ -31,10 +31,10 @@ import (
 )
 
 var fakeRegistry = frameworkruntime.Registry{
-	"QueueSort": newFakePlugin,
-	"Bind1":     newFakePlugin,
-	"Bind2":     newFakePlugin,
-	"Another":   newFakePlugin,
+	"QueueSort": newFakePlugin("QueueSort"),
+	"Bind1":     newFakePlugin("Bind1"),
+	"Bind2":     newFakePlugin("Bind2"),
+	"Another":   newFakePlugin("Another"),
 }
 
 func TestNewMap(t *testing.T) {
@@ -260,10 +260,12 @@ func TestNewMap(t *testing.T) {
 	}
 }
 
-type fakePlugin struct{}
+type fakePlugin struct {
+	name string
+}
 
 func (p *fakePlugin) Name() string {
-	return ""
+	return p.name
 }
 
 func (p *fakePlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) bool {
@@ -274,8 +276,10 @@ func (p *fakePlugin) Bind(context.Context, *framework.CycleState, *v1.Pod, strin
 	return nil
 }
 
-func newFakePlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-	return &fakePlugin{}, nil
+func newFakePlugin(name string) func(object runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &fakePlugin{name: name}, nil
+	}
 }
 
 func nilRecorderFactory(_ string) events.EventRecorder {

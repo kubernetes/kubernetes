@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -97,7 +98,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 
 	actual := &testPatchType{}
-	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &testPatchType{})
+	err := strategicPatchObject(context.TODO(), defaulter, original, []byte(patch), actual, &testPatchType{}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +120,7 @@ func TestStrategicMergePatchInvalid(t *testing.T) {
 	expectedError := "invalid character 'b' looking for beginning of value"
 
 	actual := &testPatchType{}
-	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &testPatchType{})
+	err := strategicPatchObject(context.TODO(), defaulter, original, []byte(patch), actual, &testPatchType{}, "")
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
@@ -165,7 +166,7 @@ func TestJSONPatch(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
 		}
-		_, err = jp.applyJSPatch(versionedJS)
+		_, _, err = jp.applyJSPatch(versionedJS)
 		if err != nil {
 			if len(test.expectedError) == 0 {
 				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
@@ -205,7 +206,7 @@ func TestPatchCustomResource(t *testing.T) {
 	expectedError := "strategic merge patch format is not supported"
 
 	actual := &unstructured.Unstructured{}
-	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &unstructured.Unstructured{})
+	err := strategicPatchObject(context.TODO(), defaulter, original, []byte(patch), actual, &unstructured.Unstructured{}, "")
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
@@ -534,7 +535,7 @@ func TestNumberConversion(t *testing.T) {
 
 	patchJS := []byte(`{"spec":{"terminationGracePeriodSeconds":42,"activeDeadlineSeconds":120}}`)
 
-	err := strategicPatchObject(defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj)
+	err := strategicPatchObject(context.TODO(), defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1206,6 +1207,77 @@ func TestDedupOwnerReferences(t *testing.T) {
 			deduped, _ := dedupOwnerReferences(tc.ownerReferences)
 			if !apiequality.Semantic.DeepEqual(deduped, tc.expected) {
 				t.Errorf("diff: %v", diff.ObjectReflectDiff(deduped, tc.expected))
+			}
+		})
+	}
+}
+
+func TestParseYAMLWarnings(t *testing.T) {
+	yamlNoErrs := `---
+apiVersion: foo
+kind: bar
+metadata:
+  name: no-errors
+spec:
+  field1: val1
+  field2: val2
+  nested:
+  - name: nestedName
+    nestedField1: val1`
+	yamlOneErr := `---
+apiVersion: foo
+kind: bar
+metadata:
+  name: no-errors
+spec:
+  field1: val1
+  field2: val2
+  field2: val3
+  nested:
+  - name: nestedName
+    nestedField1: val1`
+	yamlManyErrs := `---
+apiVersion: foo
+kind: bar
+metadata:
+  name: no-errors
+spec:
+  field1: val1
+  field2: val2
+  field2: val3
+  nested:
+  - name: nestedName
+    nestedField1: val1
+    nestedField2: val2
+    nestedField2: val3`
+	testCases := []struct {
+		name     string
+		yaml     string
+		expected []string
+	}{
+		{
+			name: "no errors",
+			yaml: yamlNoErrs,
+		},
+		{
+			name:     "one error",
+			yaml:     yamlOneErr,
+			expected: []string{`line 9: key "field2" already set in map`},
+		},
+		{
+			name:     "many errors",
+			yaml:     yamlManyErrs,
+			expected: []string{`line 9: key "field2" already set in map`, `line 14: key "nestedField2" already set in map`},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			if err := yaml.UnmarshalStrict([]byte(tc.yaml), &obj.Object); err != nil {
+				parsedErrs := parseYAMLWarnings(err.Error())
+				if !reflect.DeepEqual(tc.expected, parsedErrs) {
+					t.Fatalf("expected: %v\n, got: %v\n", tc.expected, parsedErrs)
+				}
 			}
 		})
 	}

@@ -1,4 +1,3 @@
-pkg/kubelet/cm/cpuset
 pkg/util/flag
 test/e2e/apimachinery
 vendor/k8s.io/apimachinery/pkg/util/json
@@ -6,9 +5,6 @@ vendor/k8s.io/apimachinery/pkg/util/strategicpatch
 vendor/k8s.io/apiserver/pkg/server/dynamiccertificates
 vendor/k8s.io/apiserver/pkg/server/filters
 vendor/k8s.io/apiserver/pkg/server/routes
-vendor/k8s.io/apiserver/pkg/storage/cacher
-vendor/k8s.io/apiserver/pkg/storage/tests
 vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope
 vendor/k8s.io/apiserver/pkg/util/wsstream
 vendor/k8s.io/client-go/rest
-vendor/k8s.io/client-go/rest/watch

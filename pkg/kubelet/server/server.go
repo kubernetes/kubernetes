@@ -353,7 +353,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.addMetricsBucketMatcher("metrics/cadvisor")
 	s.addMetricsBucketMatcher("metrics/probes")
 	s.addMetricsBucketMatcher("metrics/resource")
-	//lint:ignore SA1019 https://github.com/kubernetes/enhancements/issues/1206
+	//nolint:staticcheck // SA1019 https://github.com/kubernetes/enhancements/issues/1206
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
@@ -373,7 +373,7 @@ func (s *Server) InstallDefaultHandlers() {
 	// Only add the Accelerator metrics if the feature is inactive
 	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
-		includedMetrics.Add(cadvisormetrics.MetricKind(cadvisormetrics.AcceleratorUsageMetrics))
+		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
 	cadvisorOpts := cadvisorv2.RequestOptions{

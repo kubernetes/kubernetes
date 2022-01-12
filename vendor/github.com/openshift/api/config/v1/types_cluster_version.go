@@ -123,14 +123,26 @@ type ClusterVersionStatus struct {
 	// +optional
 	Conditions []ClusterOperatorStatusCondition `json:"conditions,omitempty"`
 
-	// availableUpdates contains the list of updates that are appropriate
-	// for this cluster. This list may be empty if no updates are recommended,
-	// if the update service is unavailable, or if an invalid channel has
-	// been specified.
+	// availableUpdates contains updates recommended for this
+	// cluster. Updates which appear in conditionalUpdates but not in
+	// availableUpdates may expose this cluster to known issues. This list
+	// may be empty if no updates are recommended, if the update service
+	// is unavailable, or if an invalid channel has been specified.
 	// +nullable
 	// +kubebuilder:validation:Required
 	// +required
 	AvailableUpdates []Release `json:"availableUpdates"`
+
+	// conditionalUpdates contains the list of updates that may be
+	// recommended for this cluster if it meets specific required
+	// conditions. Consumers interested in the set of updates that are
+	// actually recommended for this cluster should use
+	// availableUpdates. This list may be empty if no updates are
+	// recommended, if the update service is unavailable, or if an empty
+	// or invalid channel has been specified.
+	// +listType=atomic
+	// +optional
+	ConditionalUpdates []ConditionalUpdate `json:"conditionalUpdates,omitempty"`
 }
 
 // UpdateState is a constant representing whether an update was successfully
@@ -190,6 +202,14 @@ type UpdateHistory struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Verified bool `json:"verified"`
+
+	// acceptedRisks records risks which were accepted to initiate the update.
+	// For example, it may menition an Upgradeable=False or missing signature
+	// that was overriden via desiredUpdate.force, or an update that was
+	// initiated despite not being in the availableUpdates set of recommended
+	// update targets.
+	// +optional
+	AcceptedRisks string `json:"acceptedRisks,omitempty"`
 }
 
 // ClusterID is string RFC4122 uuid.
@@ -289,6 +309,112 @@ type Release struct {
 // if the updates could not be retrieved or recently failed, or True if the
 // availableUpdates field is accurate and recent.
 const RetrievedUpdates ClusterStatusConditionType = "RetrievedUpdates"
+
+// ConditionalUpdate represents an update which is recommended to some
+// clusters on the version the current cluster is reconciling, but which
+// may not be recommended for the current cluster.
+type ConditionalUpdate struct {
+	// release is the target of the update.
+	// +kubebuilder:validation:Required
+	// +required
+	Release Release `json:"release"`
+
+	// risks represents the range of issues associated with
+	// updating to the target release. The cluster-version
+	// operator will evaluate all entries, and only recommend the
+	// update if there is at least one entry and all entries
+	// recommend the update.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +required
+	Risks []ConditionalUpdateRisk `json:"risks" patchStrategy:"merge" patchMergeKey:"name"`
+
+	// conditions represents the observations of the conditional update's
+	// current status. Known types are:
+	// * Evaluating, for whether the cluster-version operator will attempt to evaluate any risks[].matchingRules.
+	// * Recommended, for whether the update is recommended for the current cluster.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// ConditionalUpdateRisk represents a reason and cluster-state
+// for not recommending a conditional update.
+// +k8s:deepcopy-gen=true
+type ConditionalUpdateRisk struct {
+	// url contains information about this risk.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Format=uri
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	URL string `json:"url"`
+
+	// name is the CamelCase reason for not recommending a
+	// conditional update, in the event that matchingRules match the
+	// cluster state.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Name string `json:"name"`
+
+	// message provides additional information about the risk of
+	// updating, in the event that matchingRules match the cluster
+	// state. This is only to be consumed by humans. It may
+	// contain Line Feed characters (U+000A), which should be
+	// rendered as new lines.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Message string `json:"message"`
+
+	// matchingRules is a slice of conditions for deciding which
+	// clusters match the risk and which do not. The slice is
+	// ordered by decreasing precedence. The cluster-version
+	// operator will walk the slice in order, and stop after the
+	// first it can successfully evaluate. If no condition can be
+	// successfully evaluated, the update will not be recommended.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +listType=atomic
+	// +required
+	MatchingRules []ClusterCondition `json:"matchingRules"`
+}
+
+// ClusterCondition is a union of typed cluster conditions.  The 'type'
+// property determines which of the type-specific properties are relevant.
+// When evaluated on a cluster, the condition may match, not match, or
+// fail to evaluate.
+// +k8s:deepcopy-gen=true
+type ClusterCondition struct {
+	// type represents the cluster-condition type. This defines
+	// the members and semantics of any additional properties.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={"Always","PromQL"}
+	// +required
+	Type string `json:"type"`
+
+	// promQL represents a cluster condition based on PromQL.
+	// +optional
+	PromQL *PromQLClusterCondition `json:"promql,omitempty"`
+}
+
+// PromQLClusterCondition represents a cluster condition based on PromQL.
+type PromQLClusterCondition struct {
+	// PromQL is a PromQL query classifying clusters. This query
+	// query should return a 1 in the match case and a 0 in the
+	// does-not-match case. Queries which return no time
+	// series, or which return values besides 0 or 1, are
+	// evaluation failures.
+	// +kubebuilder:validation:Required
+	// +required
+	PromQL string `json:"promql"`
+}
 
 // ClusterVersionList is a list of ClusterVersion resources.
 //

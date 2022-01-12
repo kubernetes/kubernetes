@@ -24,11 +24,21 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
-	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
+	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -38,16 +48,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	utilsexec "k8s.io/utils/exec"
-
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 )
 
 // newCmdConfig returns cobra.Command for "kubeadm config" command
@@ -413,7 +413,7 @@ type imageTextPrinter struct {
 // PrintObj is an implementation of ResourcePrinter.PrintObj for plain text output
 func (itp *imageTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 	var err error
-	if imgs, ok := obj.(*outputapiv1alpha1.Images); ok {
+	if imgs, ok := obj.(*outputapiv1alpha2.Images); ok {
 		_, err = fmt.Fprintln(writer, strings.Join(imgs.Images, "\n"))
 	} else {
 		err = errors.New("unexpected object type")
@@ -436,7 +436,7 @@ func (ipf *imageTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, 
 func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
 
-	if err := printer.PrintObj(&outputapiv1alpha1.Images{Images: imgs}, out); err != nil {
+	if err := printer.PrintObj(&outputapiv1alpha2.Images{Images: imgs}, out); err != nil {
 		return errors.Wrap(err, "unable to print images")
 	}
 

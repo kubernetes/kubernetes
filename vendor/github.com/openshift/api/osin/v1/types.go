@@ -397,6 +397,9 @@ type OpenIDClaims struct {
 	// email is the list of claims whose values should be used as the email address. Optional.
 	// If unspecified, no email is set for the identity
 	Email []string `json:"email"`
+	// groups is the list of claims value of which should be used to synchronize groups
+	// from the OIDC provider to OpenShift for the user
+	Groups []string `json:"groups"`
 }
 
 // GrantConfig holds the necessary configuration options for grant handlers

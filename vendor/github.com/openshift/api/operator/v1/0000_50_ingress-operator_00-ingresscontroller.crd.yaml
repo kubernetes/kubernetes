@@ -329,6 +329,47 @@ spec:
                 required:
                 - type
                 type: object
+              httpCompression:
+                description: httpCompression defines a policy for HTTP traffic compression.
+                  By default, there is no HTTP compression.
+                properties:
+                  mimeTypes:
+                    description: "mimeTypes is a list of MIME types that should have
+                      compression applied. This list can be empty, in which case the
+                      ingress controller does not apply compression. \n Note: Not
+                      all MIME types benefit from compression, but HAProxy will still
+                      use resources to try to compress if instructed to.  Generally
+                      speaking, text (html, css, js, etc.) formats benefit from compression,
+                      but formats that are already compressed (image, audio, video,
+                      etc.) benefit little in exchange for the time and cpu spent
+                      on compressing again. See https://joehonton.medium.com/the-gzip-penalty-d31bd697f1a2"
+                    items:
+                      description: "CompressionMIMEType defines the format of a single
+                        MIME type. E.g. \"text/css; charset=utf-8\", \"text/html\",
+                        \"text/*\", \"image/svg+xml\", \"application/octet-stream\",
+                        \"X-custom/customsub\", etc. \n The format should follow the
+                        Content-Type definition in RFC 1341: Content-Type := type
+                        \"/\" subtype *[\";\" parameter] - The type in Content-Type
+                        can be one of:   application, audio, image, message, multipart,
+                        text, video, or a custom   type preceded by \"X-\" and followed
+                        by a token as defined below. - The token is a string of at
+                        least one character, and not containing white   space, control
+                        characters, or any of the characters in the tspecials set.
+                        - The tspecials set contains the characters ()<>@,;:\\\"/[]?.=
+                        - The subtype in Content-Type is also a token. - The optional
+                        parameter/s following the subtype are defined as:   token
+                        \"=\" (token / quoted-string) - The quoted-string, as defined
+                        in RFC 822, is surrounded by double quotes   and can contain
+                        white space plus any character EXCEPT \\, \", and CR.   It
+                        can also contain any single ASCII character as long as it
+                        is escaped by \\."
+                      pattern: ^(?i)(x-[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+|application|audio|image|message|multipart|text|video)/[^][
+                        ()\\<>@,;:"/?.=\x00-\x1F\x7F]+(; *[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+=([^][
+                        ()\\<>@,;:"/?.=\x00-\x1F\x7F]+|"(\\[\x00-\x7F]|[^\x0D"\\])*"))*$
+                      type: string
+                    type: array
+                    x-kubernetes-list-type: set
+                type: object
               httpEmptyRequestsPolicy:
                 default: Respond
                 description: "httpEmptyRequestsPolicy describes how HTTP connections
@@ -511,6 +552,15 @@ spec:
                                 - local6
                                 - local7
                                 type: string
+                              maxLength:
+                                default: 1024
+                                description: "maxLength is the maximum length of the
+                                  syslog message \n If this field is empty, the maxLength
+                                  is set to \"1024\"."
+                                format: int32
+                                maximum: 4096
+                                minimum: 480
+                                type: integer
                               port:
                                 description: port is the UDP port number of the syslog
                                   endpoint that receives log messages.

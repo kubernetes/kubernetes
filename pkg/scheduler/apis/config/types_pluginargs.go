@@ -56,26 +56,6 @@ type InterPodAffinityArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeLabelArgs holds arguments used to configure the NodeLabel plugin.
-//
-// This plugin has been deprecated and is only configurable through the
-// scheduler policy API and the v1beta1 component config API. It is recommended
-// to use the NodeAffinity plugin instead.
-type NodeLabelArgs struct {
-	metav1.TypeMeta
-
-	// PresentLabels should be present for the node to be considered a fit for hosting the pod
-	PresentLabels []string
-	// AbsentLabels should be absent for the node to be considered a fit for hosting the pod
-	AbsentLabels []string
-	// Nodes that have labels in the list will get a higher score.
-	PresentLabelsPreference []string
-	// Nodes that don't have labels in the list will get a higher score.
-	AbsentLabelsPreference []string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeResourcesFitArgs holds arguments used to configure the NodeResourcesFit plugin.
 type NodeResourcesFitArgs struct {
 	metav1.TypeMeta
@@ -133,44 +113,6 @@ type PodTopologySpreadArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RequestedToCapacityRatioArgs holds arguments used to configure RequestedToCapacityRatio plugin.
-type RequestedToCapacityRatioArgs struct {
-	metav1.TypeMeta
-
-	// Points defining priority function shape
-	Shape []UtilizationShapePoint
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Weights should be larger than 0.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesLeastAllocatedArgs holds arguments used to configure NodeResourcesLeastAllocated plugin.
-type NodeResourcesLeastAllocatedArgs struct {
-	metav1.TypeMeta
-
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeResourcesMostAllocatedArgs holds arguments used to configure NodeResourcesMostAllocated plugin.
-type NodeResourcesMostAllocatedArgs struct {
-	metav1.TypeMeta
-
-	// Resources to be considered when scoring.
-	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
-	Resources []ResourceSpec
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // NodeResourcesBalancedAllocationArgs holds arguments used to configure NodeResourcesBalancedAllocation plugin.
 type NodeResourcesBalancedAllocationArgs struct {
 	metav1.TypeMeta
@@ -194,25 +136,6 @@ type ResourceSpec struct {
 	Name string
 	// Weight of the resource.
 	Weight int64
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ServiceAffinityArgs holds arguments used to configure the ServiceAffinity
-// plugin.
-//
-// This plugin has been deprecated and is only configurable through the
-// scheduler policy API and the v1beta1 component config API. It is recommended
-// to use the InterPodAffinity plugin instead.
-type ServiceAffinityArgs struct {
-	metav1.TypeMeta
-
-	// AffinityLabels are homogeneous for pods that are scheduled to a node.
-	// (i.e. it returns true IFF this pod can be added to this node such that all other pods in
-	// the same service are running on nodes with the exact same values for Labels).
-	AffinityLabels []string
-	// AntiAffinityLabelsPreference are the labels to consider for service anti affinity scoring.
-	AntiAffinityLabelsPreference []string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

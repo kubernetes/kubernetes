@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -53,6 +54,9 @@ const (
 	lbAttrAccessLogsS3Enabled           = "access_logs.s3.enabled"
 	lbAttrAccessLogsS3Bucket            = "access_logs.s3.bucket"
 	lbAttrAccessLogsS3Prefix            = "access_logs.s3.prefix"
+
+	// defaultEC2InstanceCacheMaxAge is the max age for the EC2 instance cache
+	defaultEC2InstanceCacheMaxAge = 10 * time.Minute
 )
 
 var (
@@ -1607,7 +1611,7 @@ func (c *Cloud) findInstancesForELB(nodes []*v1.Node, annotations map[string]str
 	instanceIDs := mapToAWSInstanceIDsTolerant(targetNodes)
 
 	cacheCriteria := cacheCriteria{
-		// MaxAge not required, because we only care about security groups, which should not change
+		MaxAge:       defaultEC2InstanceCacheMaxAge,
 		HasInstances: instanceIDs, // Refresh if any of the instance ids are missing
 	}
 	snapshot, err := c.instanceCache.describeAllInstancesCached(cacheCriteria)

@@ -38,6 +38,10 @@ type FeatureGateListerExpansion interface{}
 // ImageLister.
 type ImageListerExpansion interface{}
 
+// ImageContentPolicyListerExpansion allows custom methods to be added to
+// ImageContentPolicyLister.
+type ImageContentPolicyListerExpansion interface{}
+
 // InfrastructureListerExpansion allows custom methods to be added to
 // InfrastructureLister.
 type InfrastructureListerExpansion interface{}

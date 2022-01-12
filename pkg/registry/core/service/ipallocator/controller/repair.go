@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -178,7 +178,7 @@ func (c *Repair) runOnce() error {
 	rebuiltByFamily := make(map[v1.IPFamily]*ipallocator.Range)
 
 	for family, network := range c.networkByFamily {
-		rebuilt, err := ipallocator.NewCIDRRange(network)
+		rebuilt, err := ipallocator.NewInMemory(network)
 		if err != nil {
 			return fmt.Errorf("unable to create CIDR range for family %v: %v", family, err)
 		}

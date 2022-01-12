@@ -119,6 +119,33 @@ func NewRandomNameMultipleVersionCustomResourceDefinition(scope apiextensionsv1.
 	}
 }
 
+// NewRandomNameV1CustomResourceDefinitionWithSchema generates a CRD with random name and the provided OpenAPIv3 schema to avoid name conflict in e2e tests
+func NewRandomNameV1CustomResourceDefinitionWithSchema(scope apiextensionsv1.ResourceScope, openAPIV3Schema *apiextensionsv1.JSONSchemaProps, enableStatus bool) *apiextensionsv1.CustomResourceDefinition {
+	crd := NewRandomNameV1CustomResourceDefinition(scope)
+	for i := range crd.Spec.Versions {
+		if enableStatus {
+			crd.Spec.Versions[i].Subresources = &apiextensionsv1.CustomResourceSubresources{
+				Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+			}
+		}
+		crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: openAPIV3Schema}
+	}
+	return crd
+}
+
+// GetGroupVersionResourcesOfCustomResource gets all GroupVersionResources for custom resources of the CustomResourceDefinition.
+func GetGroupVersionResourcesOfCustomResource(crd *apiextensionsv1.CustomResourceDefinition) []schema.GroupVersionResource {
+	var result []schema.GroupVersionResource
+	for _, v := range crd.Spec.Versions {
+		result = append(result, schema.GroupVersionResource{
+			Group:    crd.Spec.Group,
+			Version:  v.Name,
+			Resource: crd.Spec.Names.Plural,
+		})
+	}
+	return result
+}
+
 // NewNoxuV1CustomResourceDefinition returns a WishIHadChosenNoxu CRD.
 func NewNoxuV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
 	return &apiextensionsv1.CustomResourceDefinition{

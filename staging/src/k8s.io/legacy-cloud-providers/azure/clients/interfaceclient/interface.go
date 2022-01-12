@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mockinterfaceclient/interface.go -package=mockinterfaceclient Interface
 package interfaceclient
 
 import (
@@ -35,8 +36,6 @@ const (
 )
 
 // Interface is the client interface for NetworkInterface.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/interface.go -package=mockinterfaceclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient/interface.go
 type Interface interface {
 	// Get gets a network.Interface.
 	Get(ctx context.Context, resourceGroupName string, networkInterfaceName string, expand string) (result network.Interface, rerr *retry.Error)

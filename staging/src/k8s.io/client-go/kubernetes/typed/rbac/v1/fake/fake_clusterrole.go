@@ -102,7 +102,7 @@ func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *rbacv1.Clust
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &rbacv1.ClusterRole{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterrolesResource, name, opts), &rbacv1.ClusterRole{})
 	return err
 }
 

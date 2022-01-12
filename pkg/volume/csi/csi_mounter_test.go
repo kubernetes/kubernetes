@@ -828,7 +828,6 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 	for i, tc := range testCases {
 		t.Logf("Running test %s", tc.name)
 
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeFSGroupPolicy, tc.driverFSGroupPolicy)()
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
 
 		volName := fmt.Sprintf("test-vol-%d", i)

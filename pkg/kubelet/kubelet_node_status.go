@@ -34,16 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/managed"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -332,17 +331,8 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		node.Labels[label] = value
 	}
 
-	nodeTaints := make([]v1.Taint, 0)
-	if len(kl.registerWithTaints) > 0 {
-		taints := make([]v1.Taint, len(kl.registerWithTaints))
-		for i := range kl.registerWithTaints {
-			if err := k8s_api_v1.Convert_core_Taint_To_v1_Taint(&kl.registerWithTaints[i], &taints[i], nil); err != nil {
-				return nil, err
-			}
-		}
-		nodeTaints = append(nodeTaints, taints...)
-	}
-
+	nodeTaints := make([]v1.Taint, len(kl.registerWithTaints))
+	copy(nodeTaints, kl.registerWithTaints)
 	unschedulableTaint := v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
@@ -536,11 +526,30 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		}
 	}
 
+	areRequiredLabelsNotPresent := false
+	osName, osLabelExists := node.Labels[v1.LabelOSStable]
+	if !osLabelExists || osName != goruntime.GOOS {
+		if len(node.Labels) == 0 {
+			node.Labels = make(map[string]string)
+		}
+		node.Labels[v1.LabelOSStable] = goruntime.GOOS
+		areRequiredLabelsNotPresent = true
+	}
+	// Set the arch if there is a mismatch
+	arch, archLabelExists := node.Labels[v1.LabelArchStable]
+	if !archLabelExists || arch != goruntime.GOARCH {
+		if len(node.Labels) == 0 {
+			node.Labels = make(map[string]string)
+		}
+		node.Labels[v1.LabelArchStable] = goruntime.GOARCH
+		areRequiredLabelsNotPresent = true
+	}
+
 	kl.setNodeStatus(node)
 
 	now := kl.clock.Now()
 	if now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
-		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
+		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) && !areRequiredLabelsNotPresent {
 			// We must mark the volumes as ReportedInUse in volume manager's dsw even
 			// if no changes were made to the node status (no volumes were added or removed
 			// from the VolumesInUse list).

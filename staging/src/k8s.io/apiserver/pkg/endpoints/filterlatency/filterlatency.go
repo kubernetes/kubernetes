@@ -18,14 +18,15 @@ package filterlatency
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 type requestFilterRecordKeyType int
@@ -54,22 +55,22 @@ func requestFilterRecordFrom(ctx context.Context) *requestFilterRecord {
 // TrackStarted measures the timestamp the given handler has started execution
 // by attaching a handler to the chain.
 func TrackStarted(handler http.Handler, name string) http.Handler {
-	return trackStarted(handler, name, utilclock.RealClock{})
+	return trackStarted(handler, name, clock.RealClock{})
 }
 
 // TrackCompleted measures the timestamp the given handler has completed execution and then
 // it updates the corresponding metric with the filter latency duration.
 func TrackCompleted(handler http.Handler) http.Handler {
-	return trackCompleted(handler, utilclock.RealClock{}, func(ctx context.Context, fr *requestFilterRecord, completedAt time.Time) {
+	return trackCompleted(handler, clock.RealClock{}, func(ctx context.Context, fr *requestFilterRecord, completedAt time.Time) {
 		latency := completedAt.Sub(fr.startedTimestamp)
 		metrics.RecordFilterLatency(ctx, fr.name, latency)
 		if klog.V(3).Enabled() && latency > minFilterLatencyToLog {
-			httplog.AddInfof(ctx, "%s=%s", fr.name, latency.String())
+			httplog.AddKeyValue(ctx, fmt.Sprintf("fl_%s", fr.name), latency.String())
 		}
 	})
 }
 
-func trackStarted(handler http.Handler, name string, clock utilclock.PassiveClock) http.Handler {
+func trackStarted(handler http.Handler, name string, clock clock.PassiveClock) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if fr := requestFilterRecordFrom(ctx); fr != nil {
@@ -89,7 +90,7 @@ func trackStarted(handler http.Handler, name string, clock utilclock.PassiveCloc
 	})
 }
 
-func trackCompleted(handler http.Handler, clock utilclock.PassiveClock, action func(context.Context, *requestFilterRecord, time.Time)) http.Handler {
+func trackCompleted(handler http.Handler, clock clock.PassiveClock, action func(context.Context, *requestFilterRecord, time.Time)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The previous filter has just completed.
 		completedAt := clock.Now()

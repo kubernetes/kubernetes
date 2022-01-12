@@ -76,8 +76,10 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
-	successCases := []apps.StatefulSet{
-		{
+	const enableStatefulSetAutoDeletePVC = "[enable StatefulSetAutoDeletePVC]"
+
+	successCases := map[string]apps.StatefulSet{
+		"alpha name": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -86,7 +88,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
-		{
+		"alphanumeric name": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -95,7 +97,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
-		{
+		"parallel pod management": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.ParallelPodManagement,
@@ -104,7 +106,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
-		{
+		"ordered ready pod management": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -113,7 +115,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType},
 			},
 		},
-		{
+		"update strategy": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -127,11 +129,29 @@ func TestValidateStatefulSet(t *testing.T) {
 					}()},
 			},
 		},
+		"PVC policy " + enableStatefulSetAutoDeletePVC: {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				},
+			},
+		},
 	}
 
-	for i, successCase := range successCases {
-		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
-			if errs := ValidateStatefulSet(&successCase, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+	for name, successCase := range successCases {
+		name := name
+		set := successCase
+		t.Run("success case "+name, func(t *testing.T) {
+			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			}
+			if errs := ValidateStatefulSet(&set, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -352,10 +372,35 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
+		"empty PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC: {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{},
+				PodManagementPolicy:                  apps.OrderedReadyPodManagement,
+				Selector:                             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:                             validPodTemplate.Template,
+				UpdateStrategy:                       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+		"invalid PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC: {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenScaled: apps.PersistentVolumeClaimRetentionPolicyType("invalid-delete-policy"),
+				},
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
+			if strings.Contains(k, enableStatefulSetAutoDeletePVC) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			}
 			errs := ValidateStatefulSet(&v, corevalidation.PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
@@ -378,6 +423,9 @@ func TestValidateStatefulSet(t *testing.T) {
 					field != "spec.updateStrategy.rollingUpdate" &&
 					field != "spec.updateStrategy.rollingUpdate.partition" &&
 					field != "spec.podManagementPolicy" &&
+					field != "spec.persistentVolumeClaimRetentionPolicy" &&
+					field != "spec.persistentVolumeClaimRetentionPolicy.whenDeleted" &&
+					field != "spec.persistentVolumeClaimRetentionPolicy.whenScaled" &&
 					field != "spec.template.spec.activeDeadlineSeconds" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
@@ -736,6 +784,53 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 					Template:            addContainersValidTemplate.Template,
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+		},
+		{
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            addContainersValidTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+		},
+		{
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            addContainersValidTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 			update: apps.StatefulSet{

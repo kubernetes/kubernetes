@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -45,15 +45,15 @@ import (
 
 // This file tests the scheduler priority functions.
 func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				Score: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				Score: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: scorePluginName, Weight: pointer.Int32Ptr(1)},
 					},
-					Disabled: []v1beta2.Plugin{
+					Disabled: []v1beta3.Plugin{
 						{Name: "*"},
 					},
 				},
@@ -63,7 +63,6 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, strings.ToLower(scorePluginName), nil),
-		nil,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
 	testutils.SyncInformerFactory(testCtx)

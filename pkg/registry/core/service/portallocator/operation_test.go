@@ -31,7 +31,7 @@ func TestDryRunAllocate(t *testing.T) {
 
 	// Allocate some ports before calling
 	previouslyAllocated := []int{10000, 10010, 10020}
-	r, err := NewPortAllocator(*pr)
+	r, err := NewInMemory(*pr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestDryRunAllocateNext(t *testing.T) {
 
 	// Allocate some ports before calling
 	previouslyAllocated := []int{10000, 10010, 10020}
-	r, err := NewPortAllocator(*pr)
+	r, err := NewInMemory(*pr)
 	if err != nil {
 		t.Fatal(err)
 	}

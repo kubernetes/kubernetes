@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -31,7 +31,7 @@ func TestContainerLabels(t *testing.T) {
 	terminationGracePeriod := int64(10)
 	lifecycle := &v1.Lifecycle{
 		// Left PostStart as nil
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"action1", "action2"},
 			},
@@ -100,7 +100,7 @@ func TestContainerAnnotations(t *testing.T) {
 	}
 	lifecycle := &v1.Lifecycle{
 		// Left PostStart as nil
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"action1", "action2"},
 			},

@@ -1206,6 +1206,7 @@ const (
 	RTF_DONE                          = 0x40
 	RTF_DYNAMIC                       = 0x10
 	RTF_GATEWAY                       = 0x2
+	RTF_GLOBAL                        = 0x40000000
 	RTF_HOST                          = 0x4
 	RTF_IFREF                         = 0x4000000
 	RTF_IFSCOPE                       = 0x1000000

@@ -20,8 +20,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -35,17 +47,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
-
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -132,6 +133,7 @@ type joinOptions struct {
 	externalcfg           *kubeadmapiv1.JoinConfiguration
 	joinControlPlane      *kubeadmapiv1.JoinControlPlane
 	patchesDir            string
+	dryRun                bool
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -147,6 +149,8 @@ type joinData struct {
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
 	patchesDir            string
+	dryRun                bool
+	dryRunDir             string
 }
 
 // newCmdJoin returns "kubeadm join" command.
@@ -294,6 +298,10 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 	flagSet.BoolVar(
 		&joinOptions.controlPlane, options.ControlPlane, joinOptions.controlPlane,
 		"Create a new control plane instance on this node",
+	)
+	flagSet.BoolVar(
+		&joinOptions.dryRun, options.DryRun, joinOptions.dryRun,
+		"Don't apply any changes; just output what would be done.",
 	)
 	options.AddPatchesFlag(flagSet, &joinOptions.patchesDir)
 }
@@ -445,12 +453,22 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		}
 	}
 
+	// if dry running, creates a temporary folder to save kubeadm generated files
+	dryRunDir := ""
+	if opt.dryRun {
+		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-join-dryrun"); err != nil {
+			return nil, errors.Wrap(err, "couldn't create a temporary directory on dryrun")
+		}
+	}
+
 	return &joinData{
 		cfg:                   cfg,
 		tlsBootstrapCfg:       tlsBootstrapCfg,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
 		patchesDir:            opt.patchesDir,
+		dryRun:                opt.dryRun,
+		dryRunDir:             dryRunDir,
 	}, nil
 }
 
@@ -465,6 +483,43 @@ func (j *joinData) CertificateKey() string {
 // Cfg returns the JoinConfiguration.
 func (j *joinData) Cfg() *kubeadmapi.JoinConfiguration {
 	return j.cfg
+}
+
+// DryRun returns the DryRun flag.
+func (j *joinData) DryRun() bool {
+	return j.dryRun
+}
+
+// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
+func (j *joinData) KubeConfigDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return kubeadmconstants.KubernetesDir
+}
+
+// KubeletDir returns the path of the kubelet configuration folder or the temporary folder in case of DryRun.
+func (j *joinData) KubeletDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return kubeadmconstants.KubeletRunDirectory
+}
+
+// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+func (j *joinData) ManifestDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return kubeadmconstants.GetStaticPodDirectory()
+}
+
+// CertificateWriteDir returns the path where certs should be stored or the temporary folder path in case of DryRun.
+func (j *joinData) CertificateWriteDir() string {
+	if j.dryRun {
+		return j.dryRunDir
+	}
+	return j.initCfg.CertificatesDir
 }
 
 // TLSBootstrapCfg returns the cluster-info (kubeconfig).
@@ -497,7 +552,8 @@ func (j *joinData) ClientSet() (*clientset.Clientset, error) {
 	if j.clientSet != nil {
 		return j.clientSet, nil
 	}
-	path := kubeadmconstants.GetAdminKubeConfigPath()
+	path := filepath.Join(j.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
+
 	client, err := kubeconfigutil.ClientSetFromFile(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "[preflight] couldn't create Kubernetes client")

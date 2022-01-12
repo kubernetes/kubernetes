@@ -273,8 +273,8 @@ func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm
 	}
 
 	var terms []AffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i])
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
@@ -291,13 +291,13 @@ func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm)
 	}
 
 	var terms []WeightedAffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term.PodAffinityTerm)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i].PodAffinityTerm)
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
 		}
-		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: term.Weight})
+		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: v1Terms[i].Weight})
 	}
 	return terms, nil
 }
@@ -746,10 +746,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
 func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
-	for j := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[j]
-		for k := range container.Ports {
-			podPort := &container.Ports[k]
+	for _, container := range pod.Spec.Containers {
+		for _, podPort := range container.Ports {
 			if add {
 				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			} else {

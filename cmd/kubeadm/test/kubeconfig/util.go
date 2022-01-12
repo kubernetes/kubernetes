@@ -21,9 +21,9 @@ import (
 	"encoding/pem"
 	"testing"
 
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
-
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 )
 
 // AssertKubeConfigCurrentCluster is a utility function for kubeadm testing that asserts if the CurrentCluster in

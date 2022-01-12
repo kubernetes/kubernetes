@@ -155,7 +155,7 @@ func TestCreatePVCPatch(t *testing.T) {
 	pvc2.Status.Capacity = v1.ResourceList{
 		v1.ResourceName("size"): resource.MustParse("10G"),
 	}
-	patchBytes, err := createPVCPatch(pvc1, pvc2)
+	patchBytes, err := createPVCPatch(pvc1, pvc2, true /* addResourceVersionCheck */)
 	if err != nil {
 		t.Errorf("error creating patch bytes %v", err)
 	}

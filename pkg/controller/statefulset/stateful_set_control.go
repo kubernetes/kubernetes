@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"sort"
 
 	apps "k8s.io/api/apps/v1"
@@ -38,7 +39,7 @@ type StatefulSetControlInterface interface {
 	// If an implementation returns a non-nil error, the invocation will be retried using a rate-limited strategy.
 	// Implementors should sink any errors that they do not wish to trigger a retry, and they may feel free to
 	// exit exceptionally at any point provided they wish the update to be re-run at a later point in time.
-	UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) (*apps.StatefulSetStatus, error)
+	UpdateStatefulSet(ctx context.Context, set *apps.StatefulSet, pods []*v1.Pod) (*apps.StatefulSetStatus, error)
 	// ListRevisions returns a array of the ControllerRevisions that represent the revisions of set. If the returned
 	// error is nil, the returns slice of ControllerRevisions is valid.
 	ListRevisions(set *apps.StatefulSet) ([]*apps.ControllerRevision, error)
@@ -53,7 +54,7 @@ type StatefulSetControlInterface interface {
 // to update the status of StatefulSets. You should use an instance returned from NewRealStatefulPodControl() for any
 // scenario other than testing.
 func NewDefaultStatefulSetControl(
-	podControl StatefulPodControlInterface,
+	podControl *StatefulPodControl,
 	statusUpdater StatefulSetStatusUpdaterInterface,
 	controllerHistory history.Interface,
 	recorder record.EventRecorder) StatefulSetControlInterface {
@@ -61,7 +62,7 @@ func NewDefaultStatefulSetControl(
 }
 
 type defaultStatefulSetControl struct {
-	podControl        StatefulPodControlInterface
+	podControl        *StatefulPodControl
 	statusUpdater     StatefulSetStatusUpdaterInterface
 	controllerHistory history.Interface
 	recorder          record.EventRecorder
@@ -73,7 +74,9 @@ type defaultStatefulSetControl struct {
 // strategy allows these constraints to be relaxed - pods will be created and deleted eagerly and
 // in no particular order. Clients using the burst strategy should be careful to ensure they
 // understand the consistency implications of having unpredictable numbers of pods available.
-func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) (*apps.StatefulSetStatus, error) {
+func (ssc *defaultStatefulSetControl) UpdateStatefulSet(ctx context.Context, set *apps.StatefulSet, pods []*v1.Pod) (*apps.StatefulSetStatus, error) {
+	set = set.DeepCopy() // set is modified when a new revision is created in performUpdate. Make a copy now to avoid mutation errors.
+
 	// list all revisions and sort them
 	revisions, err := ssc.ListRevisions(set)
 	if err != nil {
@@ -81,7 +84,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	}
 	history.SortControllerRevisions(revisions)
 
-	currentRevision, updateRevision, status, err := ssc.performUpdate(set, pods, revisions)
+	currentRevision, updateRevision, status, err := ssc.performUpdate(ctx, set, pods, revisions)
 	if err != nil {
 		return nil, utilerrors.NewAggregate([]error{err, ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)})
 	}
@@ -91,7 +94,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 }
 
 func (ssc *defaultStatefulSetControl) performUpdate(
-	set *apps.StatefulSet, pods []*v1.Pod, revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, *apps.StatefulSetStatus, error) {
+	ctx context.Context, set *apps.StatefulSet, pods []*v1.Pod, revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, *apps.StatefulSetStatus, error) {
 	var currentStatus *apps.StatefulSetStatus
 	// get the current, and update revisions
 	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)
@@ -100,12 +103,12 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 	}
 
 	// perform the main update function and get the status
-	currentStatus, err = ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods)
+	currentStatus, err = ssc.updateStatefulSet(ctx, set, currentRevision, updateRevision, collisionCount, pods)
 	if err != nil {
 		return currentRevision, updateRevision, currentStatus, err
 	}
 	// update the set's status
-	err = ssc.updateStatefulSetStatus(set, currentStatus)
+	err = ssc.updateStatefulSetStatus(ctx, set, currentStatus)
 	if err != nil {
 		return currentRevision, updateRevision, currentStatus, err
 	}
@@ -268,6 +271,7 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 // Pods must be at Status.UpdateRevision. If the returned error is nil, the returned StatefulSetStatus is valid and the
 // update must be recorded. If the error is not nil, the method should be retried until successful.
 func (ssc *defaultStatefulSetControl) updateStatefulSet(
+	ctx context.Context,
 	set *apps.StatefulSet,
 	currentRevision *apps.ControllerRevision,
 	updateRevision *apps.ControllerRevision,
@@ -331,7 +335,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			// if the ordinal of the pod is within the range of the current number of replicas,
 			// insert it at the indirection of its ordinal
 			replicas[ord] = pods[i]
-
 		} else if ord >= replicaCount {
 			// if the ordinal is greater than the number of replicas add it to the condemned list
 			condemned = append(condemned, pods[i])
@@ -416,7 +419,15 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// If we find a Pod that has not been created we create the Pod
 		if !isCreated(replicas[i]) {
-			if err := ssc.podControl.CreateStatefulPod(set, replicas[i]); err != nil {
+			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+				if isStale, err := ssc.podControl.PodClaimIsStale(set, replicas[i]); err != nil {
+					return &status, err
+				} else if isStale {
+					// If a pod has a stale PVC, no more work can be done this round.
+					return &status, err
+				}
+			}
+			if err := ssc.podControl.CreateStatefulPod(ctx, set, replicas[i]); err != nil {
 				return &status, err
 			}
 			status.Replicas++
@@ -426,7 +437,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas++
 			}
-
 			// if the set does not allow bursting, return immediately
 			if monotonic {
 				return &status, nil
@@ -469,13 +479,35 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// Enforce the StatefulSet invariants
-		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) {
+		retentionMatch := true
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+			var err error
+			retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(updateSet, replicas[i])
+			// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
+			if err != nil {
+				retentionMatch = true
+			}
+		}
+		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && retentionMatch {
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
 		replica := replicas[i].DeepCopy()
 		if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
 			return &status, err
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		// Ensure ownerRefs are set correctly for the condemned pods.
+		for i := range condemned {
+			if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(updateSet, condemned[i]); err != nil {
+				return &status, err
+			} else if !matchPolicy {
+				if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(updateSet, condemned[i]); err != nil {
+					return &status, err
+				}
+			}
 		}
 	}
 
@@ -579,6 +611,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 // mutated to indicate completion. If status is semantically equivalent to set's Status no update is performed. If the
 // returned error is nil, the update is successful.
 func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
+	ctx context.Context,
 	set *apps.StatefulSet,
 	status *apps.StatefulSetStatus) error {
 	// complete any in progress rolling update if necessary
@@ -591,7 +624,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 
 	// copy set and update its status
 	set = set.DeepCopy()
-	if err := ssc.statusUpdater.UpdateStatefulSetStatus(set, status); err != nil {
+	if err := ssc.statusUpdater.UpdateStatefulSetStatus(ctx, set, status); err != nil {
 		return err
 	}
 

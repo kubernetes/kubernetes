@@ -94,7 +94,7 @@ func (c *FakeClusterVersions) UpdateStatus(ctx context.Context, clusterVersion *
 // Delete takes name of the clusterVersion and deletes it. Returns an error if one occurs.
 func (c *FakeClusterVersions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterversionsResource, name), &configv1.ClusterVersion{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterversionsResource, name, opts), &configv1.ClusterVersion{})
 	return err
 }
 

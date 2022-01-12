@@ -18,5 +18,5 @@ limitations under the License.
 */
 
 // Package dockershim implements a container runtime interface
-// Docker integration using k8s.io/cri-api/pkg/apis/runtime/v1alpha2/api.pb.go
+// Docker integration using k8s.io/cri-api/pkg/apis/runtime/v1/api.pb.go
 package dockershim

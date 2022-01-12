@@ -101,7 +101,6 @@ run_kubectl_apply_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
   # apply dry-run
-  kubectl apply --dry-run=true -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
   kubectl apply --dry-run=client -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
   kubectl apply --dry-run=server -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
   # No pod exists

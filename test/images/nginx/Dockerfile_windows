@@ -24,5 +24,4 @@ COPY --from=nginx-source /nginx /usr/share/nginx
 
 USER ContainerAdministrator
 EXPOSE 80
-LABEL image_version="1.14-1"
 ENTRYPOINT ["/bin/sh", "-c", " cd /usr/share/nginx && ./nginx.exe"]

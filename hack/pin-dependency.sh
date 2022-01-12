@@ -40,12 +40,31 @@ kube::util::require-jq
 
 dep="${1:-}"
 sha="${2:-}"
-if [[ -z "${dep}" || -z "${sha}" ]]; then
+
+# Specifying a different repo is optional.
+replacement=
+case ${dep} in
+    *=*)
+        # shellcheck disable=SC2001
+        replacement=$(echo "${dep}" | sed -e 's/.*=//')
+        # shellcheck disable=SC2001
+        dep=$(echo "${dep}" | sed -e 's/=.*//')
+        ;;
+    *)
+        replacement="${dep}"
+        ;;
+esac
+
+if [[ -z "${dep}" || -z "${replacement}" || -z "${sha}" ]]; then
   echo "Usage:"
-  echo "  hack/pin-dependency.sh \$MODULE \$SHA-OR-TAG"
+  echo "  hack/pin-dependency.sh \$MODULE[=\$REPLACEMENT] \$SHA-OR-TAG"
   echo ""
-  echo "Example:"
+  echo "Examples:"
   echo "  hack/pin-dependency.sh github.com/docker/docker 501cb131a7b7"
+  echo "  hack/pin-dependency.sh github.com/docker/docker=github.com/johndoe/docker my-experimental-branch"
+  echo ""
+  echo "Replacing with a different repository is useful for testing but"
+  echo "the result should never be merged into Kubernetes!"
   echo ""
   exit 1
 fi
@@ -58,41 +77,44 @@ trap "cleanup" EXIT SIGINT
 cleanup
 mkdir -p "${_tmp}"
 
+
+# Find the resolved version before trying to use it.
+echo "Running: go mod download ${replacement}@${sha}"
+if meta=$(go mod download -json "${replacement}@${sha}"); then
+    rev=$(echo "${meta}" | jq -r ".Version")
+else
+    error=$(echo "${meta}" | jq -r ".Error")
+    echo "Download failed: ${error}" >&2
+    exit 1
+fi
+echo "Resolved to ${replacement}@${rev}"
+
 # Add the require directive
-echo "Running: go get ${dep}@${sha}"
-go get -d "${dep}@${sha}"
-
-# Find the resolved version
-rev=$(go mod edit -json | jq -r ".Require[] | select(.Path == \"${dep}\") | .Version")
-
-# No entry in go.mod, we must be using the natural version indirectly
-if [[ -z "${rev}" ]]; then
-  # backup the go.mod file, since go list modifies it
-  cp go.mod "${_tmp}/go.mod.bak"
-  # find the revision
-  rev=$(go list -m -json "${dep}" | jq -r .Version)
-  # restore the go.mod file
-  mv "${_tmp}/go.mod.bak" go.mod
-fi
-
-# No entry found
-if [[ -z "${rev}" ]]; then
-  echo "Could not resolve ${sha}"
-  exit 1
-fi
-
-echo "Resolved to ${dep}@${rev}"
+echo "Running: go mod edit -require ${dep}@${rev}"
+go mod edit -require "${dep}@${rev}"
 
 # Add the replace directive
-echo "Running: go mod edit -replace ${dep}=${dep}@${rev}"
-go mod edit -replace "${dep}=${dep}@${rev}"
+echo "Running: go mod edit -replace ${dep}=${replacement}@${rev}"
+go mod edit -replace "${dep}=${replacement}@${rev}"
 
 # Propagate pinned version to staging repos that also have that dependency
 for repo in $(kube::util::list_staging_repos); do
   pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
     if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null 2>&1; then
       go mod edit -require "${dep}@${rev}"
-      go mod edit -replace "${dep}=${dep}@${rev}"
+      go mod edit -replace "${dep}=${replacement}@${rev}"
+    fi
+
+    # When replacing with a fork, always add a replace statement in all go.mod
+    # files (not just the root of the staging repos!) because there might be
+    # indirect dependencies on the fork.
+    #
+    # This is excessive, but the resulting commit should never be merged, so it
+    # isn't that important to get this exactly right.
+    if [ "${replacement}" != "${dep}" ]; then
+        find . -name go.mod -print | while read -r modfile; do
+            (cd "$(dirname "${modfile}")" && go mod edit -replace "${dep}=${replacement}@${rev}")
+        done
     fi
   popd >/dev/null 2>&1
 done

@@ -104,7 +104,7 @@ func InitNFSDriver() storageframework.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
+			SupportedMountOption: sets.NewString("relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence: true,

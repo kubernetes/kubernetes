@@ -10,8 +10,8 @@ require (
 	github.com/stretchr/testify v1.7.0
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	k8s.io/klog/v2 v2.9.0
-	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
+	k8s.io/klog/v2 v2.30.0
+	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 )
 
 replace k8s.io/mount-utils => ../mount-utils

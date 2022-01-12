@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -741,6 +742,133 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 	_, err = bindingStorage.Create(ctx, binding.Name, &binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err == nil || !errors.IsConflict(err) {
 		t.Fatalf("expected resource conflict error, not: %v", err)
+	}
+}
+
+func validNewBinding() *api.Binding {
+	return &api.Binding{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Target:     api.ObjectReference{Name: "machine", Kind: "Node"},
+	}
+}
+
+func TestEtcdCreateBindingWithUIDAndResourceVersion(t *testing.T) {
+	originUID := func(pod *api.Pod) types.UID {
+		return pod.UID
+	}
+	emptyUID := func(pod *api.Pod) types.UID {
+		return ""
+	}
+	changedUID := func(pod *api.Pod) types.UID {
+		return pod.UID + "-changed"
+	}
+
+	originResourceVersion := func(pod *api.Pod) string {
+		return pod.ResourceVersion
+	}
+	emptyResourceVersion := func(pod *api.Pod) string {
+		return ""
+	}
+	changedResourceVersion := func(pod *api.Pod) string {
+		return pod.ResourceVersion + "-changed"
+	}
+
+	noError := func(err error) bool {
+		return err == nil
+	}
+	conflictError := func(err error) bool {
+		return err != nil && errors.IsConflict(err)
+	}
+
+	testCases := map[string]struct {
+		podUIDGetter             func(pod *api.Pod) types.UID
+		podResourceVersionGetter func(pod *api.Pod) string
+		errOK                    func(error) bool
+		expectedNodeName         string
+	}{
+		"originUID-originResourceVersion": {
+			podUIDGetter:             originUID,
+			podResourceVersionGetter: originResourceVersion,
+			errOK:                    noError,
+			expectedNodeName:         "machine",
+		},
+		"originUID-emptyResourceVersion": {
+			podUIDGetter:             originUID,
+			podResourceVersionGetter: emptyResourceVersion,
+			errOK:                    noError,
+			expectedNodeName:         "machine",
+		},
+		"originUID-changedResourceVersion": {
+			podUIDGetter:             originUID,
+			podResourceVersionGetter: changedResourceVersion,
+			errOK:                    conflictError,
+			expectedNodeName:         "",
+		},
+		"emptyUID-originResourceVersion": {
+			podUIDGetter:             emptyUID,
+			podResourceVersionGetter: originResourceVersion,
+			errOK:                    noError,
+			expectedNodeName:         "machine",
+		},
+		"emptyUID-emptyResourceVersion": {
+			podUIDGetter:             emptyUID,
+			podResourceVersionGetter: emptyResourceVersion,
+			errOK:                    noError,
+			expectedNodeName:         "machine",
+		},
+		"emptyUID-changedResourceVersion": {
+			podUIDGetter:             emptyUID,
+			podResourceVersionGetter: changedResourceVersion,
+			errOK:                    conflictError,
+			expectedNodeName:         "",
+		},
+		"changedUID-originResourceVersion": {
+			podUIDGetter:             changedUID,
+			podResourceVersionGetter: originResourceVersion,
+			errOK:                    conflictError,
+			expectedNodeName:         "",
+		},
+		"changedUID-emptyResourceVersion": {
+			podUIDGetter:             changedUID,
+			podResourceVersionGetter: emptyResourceVersion,
+			errOK:                    conflictError,
+			expectedNodeName:         "",
+		},
+		"changedUID-changedResourceVersion": {
+			podUIDGetter:             changedUID,
+			podResourceVersionGetter: changedResourceVersion,
+			errOK:                    conflictError,
+			expectedNodeName:         "",
+		},
+	}
+
+	storage, bindingStorage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	for k, testCase := range testCases {
+		pod := validNewPod()
+		pod.Namespace = fmt.Sprintf("namespace-%s", strings.ToLower(k))
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewDefaultContext(), pod.Namespace)
+
+		podCreated, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", k, err)
+		}
+
+		binding := validNewBinding()
+		binding.UID = testCase.podUIDGetter(podCreated.(*api.Pod))
+		binding.ResourceVersion = testCase.podResourceVersionGetter(podCreated.(*api.Pod))
+
+		if _, err := bindingStorage.Create(ctx, binding.Name, binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); !testCase.errOK(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		}
+
+		if pod, err := storage.Get(ctx, pod.Name, &metav1.GetOptions{}); err != nil {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		} else if pod.(*api.Pod).Spec.NodeName != testCase.expectedNodeName {
+			t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, testCase.expectedNodeName)
+		}
 	}
 }
 

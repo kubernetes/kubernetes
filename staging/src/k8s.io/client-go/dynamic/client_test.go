@@ -275,6 +275,11 @@ func TestDelete(t *testing.T) {
 				t.Errorf("Delete(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
+			content := r.Header.Get("Content-Type")
+			if content != runtime.ContentTypeJSON {
+				t.Errorf("Delete(%q) got Content-Type %s. wanted %s", tc.name, content, runtime.ContentTypeJSON)
+			}
+
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
 			unstructured.UnstructuredJSONScheme.Encode(statusOK, w)
 		})
@@ -321,6 +326,11 @@ func TestDeleteCollection(t *testing.T) {
 
 			if r.URL.Path != tc.path {
 				t.Errorf("DeleteCollection(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
+			}
+
+			content := r.Header.Get("Content-Type")
+			if content != runtime.ContentTypeJSON {
+				t.Errorf("DeleteCollection(%q) got Content-Type %s. wanted %s", tc.name, content, runtime.ContentTypeJSON)
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
@@ -387,6 +397,11 @@ func TestCreate(t *testing.T) {
 
 			if r.URL.Path != tc.path {
 				t.Errorf("Create(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
+			}
+
+			content := r.Header.Get("Content-Type")
+			if content != runtime.ContentTypeJSON {
+				t.Errorf("Create(%q) got Content-Type %s. wanted %s", tc.name, content, runtime.ContentTypeJSON)
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)
@@ -464,6 +479,11 @@ func TestUpdate(t *testing.T) {
 
 			if r.URL.Path != tc.path {
 				t.Errorf("Update(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
+			}
+
+			content := r.Header.Get("Content-Type")
+			if content != runtime.ContentTypeJSON {
+				t.Errorf("Uppdate(%q) got Content-Type %s. wanted %s", tc.name, content, runtime.ContentTypeJSON)
 			}
 
 			w.Header().Set("Content-Type", runtime.ContentTypeJSON)

@@ -293,7 +293,7 @@ func (d *deploymentTester) getNewReplicaSet() (*apps.ReplicaSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
 	}
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, d.c.AppsV1())
+	rs, err := testutil.GetNewReplicaSet(deployment, d.c)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving new replicaset of deployment %s: %v", d.deployment.Name, err)
 	}

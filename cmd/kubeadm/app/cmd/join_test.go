@@ -23,11 +23,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var testJoinConfig = fmt.Sprintf(`apiVersion: %s

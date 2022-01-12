@@ -103,18 +103,53 @@ type NetworkSpec struct {
 	// +optional
 	ExportNetworkFlows *ExportNetworkFlows `json:"exportNetworkFlows,omitempty"`
 
-	// migration enables and configures the cluster network migration.
-	// Setting this to the target network type to allow changing the default network.
-	// If unset, the operation of changing cluster default network plugin will be rejected.
+	// migration enables and configures the cluster network migration. The
+	// migration procedure allows to change the network type and the MTU.
 	// +optional
 	Migration *NetworkMigration `json:"migration,omitempty"`
 }
 
 // NetworkMigration represents the cluster network configuration.
 type NetworkMigration struct {
-	// networkType is the target type of network migration
+	// networkType is the target type of network migration. Set this to the
+	// target network type to allow changing the default network. If unset, the
+	// operation of changing cluster default network plugin will be rejected.
 	// The supported values are OpenShiftSDN, OVNKubernetes
-	NetworkType NetworkType `json:"networkType"`
+	// +optional
+	NetworkType string `json:"networkType,omitempty"`
+
+	// mtu contains the MTU migration configuration. Set this to allow changing
+	// the MTU values for the default network. If unset, the operation of
+	// changing the MTU for the default network will be rejected.
+	// +optional
+	MTU *MTUMigration `json:"mtu,omitempty"`
+}
+
+// MTUMigration MTU contains infomation about MTU migration.
+type MTUMigration struct {
+	// network contains information about MTU migration for the default network.
+	// Migrations are only allowed to MTU values lower than the machine's uplink
+	// MTU by the minimum appropriate offset.
+	// +optional
+	Network *MTUMigrationValues `json:"network,omitempty"`
+
+	// machine contains MTU migration configuration for the machine's uplink.
+	// Needs to be migrated along with the default network MTU unless the
+	// current uplink MTU already accommodates the default network MTU.
+	// +optional
+	Machine *MTUMigrationValues `json:"machine,omitempty"`
+}
+
+// MTUMigrationValues contains the values for a MTU migration.
+type MTUMigrationValues struct {
+	// to is the MTU to migrate to.
+	// +kubebuilder:validation:Minimum=0
+	To *uint32 `json:"to"`
+
+	// from is the MTU to migrate from.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	From *uint32 `json:"from,omitempty"`
 }
 
 // ClusterNetworkEntry is a subnet from which to allocate PodIPs. A network of size
@@ -139,8 +174,7 @@ type DefaultNetworkDefinition struct {
 	// +optional
 	OpenShiftSDNConfig *OpenShiftSDNConfig `json:"openshiftSDNConfig,omitempty"`
 
-	// oVNKubernetesConfig configures the ovn-kubernetes plugin. This is currently
-	// not implemented.
+	// ovnKubernetesConfig configures the ovn-kubernetes plugin.
 	// +optional
 	OVNKubernetesConfig *OVNKubernetesConfig `json:"ovnKubernetesConfig,omitempty"`
 
@@ -374,6 +408,9 @@ type OVNKubernetesConfig struct {
 	// reported defaults are used.
 	// +optional
 	PolicyAuditConfig *PolicyAuditConfig `json:"policyAuditConfig,omitempty"`
+	// gatewayConfig holds the configuration for node gateway options.
+	// +optional
+	GatewayConfig *GatewayConfig `json:"gatewayConfig,omitempty"`
 }
 
 type HybridOverlayConfig struct {
@@ -386,6 +423,17 @@ type HybridOverlayConfig struct {
 }
 
 type IPsecConfig struct {
+}
+
+// GatewayConfig holds node gateway-related parsed config file parameters and command-line overrides
+type GatewayConfig struct {
+	// RoutingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port
+	// into the host before sending it out. If this is not set, traffic will always egress directly
+	// from OVN to outside without touching the host stack. Setting this to true means hardware
+	// offload will not be supported. Default is false if GatewayConfig is specified.
+	// +kubebuilder:default:=false
+	// +optional
+	RoutingViaHost bool `json:"routingViaHost,omitempty"`
 }
 
 type ExportNetworkFlows struct {

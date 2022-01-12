@@ -19,14 +19,14 @@ package node
 import (
 	"context"
 
-	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 
-	"github.com/pkg/errors"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 // CreateNewTokens tries to create a token and fails if one with the same ID already exists

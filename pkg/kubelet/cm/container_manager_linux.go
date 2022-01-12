@@ -48,6 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -70,7 +71,6 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 
 const (
@@ -1064,7 +1064,7 @@ func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.Conta
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	if cm.cpuManager != nil {
-		return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+		return cm.cpuManager.GetExclusiveCPUs(podUID, containerName).ToSliceNoSortInt64()
 	}
 	return []int64{}
 }

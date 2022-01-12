@@ -23,10 +23,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/clock"
 )
 
 // ProxierHealthUpdater allows callers to update healthz timestamp only.
@@ -104,7 +104,7 @@ func (hs *proxierHealthServer) Run() error {
 		return fmt.Errorf("%v", msg)
 	}
 
-	klog.V(3).Infof("starting healthz on %s", hs.addr)
+	klog.V(3).InfoS("Starting healthz HTTP server", "address", hs.addr)
 
 	if err := server.Serve(listener); err != nil {
 		return fmt.Errorf("proxier healthz closed with error: %v", err)

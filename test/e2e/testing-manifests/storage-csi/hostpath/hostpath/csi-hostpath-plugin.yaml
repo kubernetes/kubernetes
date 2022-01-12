@@ -319,7 +319,7 @@ spec:
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
-          image: k8s.gcr.io/sig-storage/livenessprobe:v2.3.0
+          image: k8s.gcr.io/sig-storage/livenessprobe:v2.4.0
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898

@@ -83,7 +83,7 @@ func (c *FakeIdentities) Update(ctx context.Context, identity *userv1.Identity, 
 // Delete takes name of the identity and deletes it. Returns an error if one occurs.
 func (c *FakeIdentities) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(identitiesResource, name), &userv1.Identity{})
+		Invokes(testing.NewRootDeleteActionWithOptions(identitiesResource, name, opts), &userv1.Identity{})
 	return err
 }
 

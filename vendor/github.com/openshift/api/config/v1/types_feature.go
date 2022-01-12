@@ -111,14 +111,21 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 		Disabled: []string{},
 	},
 	TechPreviewNoUpgrade: newDefaultFeatures().
-		with("CSIDriverAzureDisk").         // sig-storage, jsafrane, OCP specific
-		with("CSIDriverVSphere").           // sig-storage, jsafrane, OCP specific
-		with("CSIMigrationAWS").            // sig-storage, jsafrane, Kubernetes feature gate
-		with("CSIMigrationOpenStack").      // sig-storage, jsafrane, Kubernetes feature gate
-		with("CSIMigrationGCE").            // sig-storage, fbertina, Kubernetes feature gate
-		with("CSIMigrationAzureDisk").      // sig-storage, fbertina, Kubernetes feature gate
-		with("ExternalCloudProvider").      // sig-cloud-provider, jspeed, OCP specific
-		with("InsightsOperatorPullingSCA"). // insights-operator/ccx, tremes, OCP specific
+		with("CSIDriverAzureDisk").          // sig-storage, jsafrane, OCP specific
+		with("CSIDriverAzureFile").          // sig-storage, fbertina, OCP specific
+		with("CSIDriverVSphere").            // sig-storage, jsafrane, OCP specific
+		with("CSIMigrationAWS").             // sig-storage, jsafrane, Kubernetes feature gate
+		with("CSIMigrationOpenStack").       // sig-storage, jsafrane, Kubernetes feature gate
+		with("CSIMigrationGCE").             // sig-storage, fbertina, Kubernetes feature gate
+		with("CSIMigrationAzureDisk").       // sig-storage, fbertina, Kubernetes feature gate
+		with("CSIMigrationAzureFile").       // sig-storage, fbertina, Kubernetes feature gate
+		with("CSIMigrationvSphere").         // sig-storage, fbertina, Kubernetes feature gate
+		with("ExternalCloudProvider").       // sig-cloud-provider, jspeed, OCP specific
+		with("InsightsOperatorPullingSCA").  // insights-operator/ccx, tremes, OCP specific
+		with("CSIDriverSharedResource").     // sig-build, adkaplan, OCP specific
+		with("BuildCSIVolumes").             // sig-build, adkaplan, OCP specific
+		with("NodeSwap").                    // sig-node, ehashman, Kubernetes feature gate
+		with("MachineAPIProviderOpenStack"). // openstack, egarcia (#forum-openstack), OCP specific
 		toFeatures(),
 	LatencySensitive: newDefaultFeatures().
 		with(

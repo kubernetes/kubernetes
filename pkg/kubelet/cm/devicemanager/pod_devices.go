@@ -344,18 +344,20 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 		devicePluginMap := make(map[string]pluginapi.Device)
 		for numaid, devlist := range allocateInfo.deviceIds {
 			for _, devId := range devlist {
-				NUMANodes := []*pluginapi.NUMANode{{ID: numaid}}
-				if pDev, ok := devicePluginMap[devId]; ok && pDev.Topology != nil {
-					if nodes := pDev.Topology.GetNodes(); nodes != nil {
-						NUMANodes = append(NUMANodes, nodes...)
+				var topology *pluginapi.TopologyInfo
+				if numaid != nodeWithoutTopology {
+					NUMANodes := []*pluginapi.NUMANode{{ID: numaid}}
+					if pDev, ok := devicePluginMap[devId]; ok && pDev.Topology != nil {
+						if nodes := pDev.Topology.GetNodes(); nodes != nil {
+							NUMANodes = append(NUMANodes, nodes...)
+						}
 					}
-				}
 
-				devicePluginMap[devId] = pluginapi.Device{
 					// ID and Healthy are not relevant here.
-					Topology: &pluginapi.TopologyInfo{
-						Nodes: NUMANodes,
-					},
+					topology = &pluginapi.TopologyInfo{Nodes: NUMANodes}
+				}
+				devicePluginMap[devId] = pluginapi.Device{
+					Topology: topology,
 				}
 			}
 		}
@@ -383,4 +385,22 @@ func (rdev ResourceDeviceInstances) Clone() ResourceDeviceInstances {
 		}
 	}
 	return clone
+}
+
+// Filter takes a condition set expressed as map[string]sets.String and returns a new
+// ResourceDeviceInstances with only the devices matching the condition set.
+func (rdev ResourceDeviceInstances) Filter(cond map[string]sets.String) ResourceDeviceInstances {
+	filtered := NewResourceDeviceInstances()
+	for resourceName, filterIDs := range cond {
+		if _, exists := rdev[resourceName]; !exists {
+			continue
+		}
+		filtered[resourceName] = DeviceInstances{}
+		for instanceID, instance := range rdev[resourceName] {
+			if filterIDs.Has(instanceID) {
+				filtered[resourceName][instanceID] = instance
+			}
+		}
+	}
+	return filtered
 }

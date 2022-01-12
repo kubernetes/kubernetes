@@ -23,6 +23,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra/doc"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
 )
@@ -46,6 +47,6 @@ func main() {
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	kubectl := cmd.NewKubectlCommand(bytes.NewReader(nil), ioutil.Discard, ioutil.Discard)
+	kubectl := cmd.NewKubectlCommand(cmd.KubectlOptions{IOStreams: genericclioptions.IOStreams{In: bytes.NewReader(nil), Out: ioutil.Discard, ErrOut: ioutil.Discard}})
 	doc.GenMarkdownTree(kubectl, outDir)
 }

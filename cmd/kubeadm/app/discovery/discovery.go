@@ -19,17 +19,17 @@ package discovery
 import (
 	"net/url"
 
+	"github.com/pkg/errors"
+
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2"
-
-	"github.com/pkg/errors"
 )
 
 // TokenUser defines token user

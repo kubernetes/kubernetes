@@ -22,26 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
-
+	"github.com/golang/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	summaryprovidertest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 )
-
-type mockSummaryProvider struct {
-	mock.Mock
-}
-
-func (m *mockSummaryProvider) Get(updateStats bool) (*statsapi.Summary, error) {
-	args := m.Called(updateStats)
-	return args.Get(0).(*statsapi.Summary), args.Error(1)
-}
-
-func (m *mockSummaryProvider) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
-	args := m.Called()
-	return args.Get(0).(*statsapi.Summary), args.Error(1)
-}
 
 func TestCollectResourceMetrics(t *testing.T) {
 	// a static timestamp: 2021-06-23 05:11:18.302091597 +0800
@@ -57,6 +43,8 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"pod_cpu_usage_seconds_total",
 		"pod_memory_working_set_bytes",
 	}
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
 
 	tests := []struct {
 		name            string
@@ -219,8 +207,8 @@ func TestCollectResourceMetrics(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockSummaryProvider{}
-			provider.On("GetCPUAndMemoryStats").Return(tc.summary, tc.summaryErr)
+			provider := summaryprovidertest.NewMockSummaryProvider(mockCtrl)
+			provider.EXPECT().GetCPUAndMemoryStats().Return(tc.summary, tc.summaryErr).AnyTimes()
 			collector := NewResourceMetricsCollector(provider)
 
 			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(tc.expectedMetrics), interestedMetrics...); err != nil {

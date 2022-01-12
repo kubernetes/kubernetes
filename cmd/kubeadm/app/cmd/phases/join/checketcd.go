@@ -19,10 +19,10 @@ package phases
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-
-	"github.com/pkg/errors"
 )
 
 // NewCheckEtcdPhase is a hidden phase that runs after the control-plane-prepare and
@@ -66,5 +66,5 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 		return err
 	}
 
-	return etcdphase.CheckLocalEtcdClusterStatus(client, &cfg.ClusterConfiguration)
+	return etcdphase.CheckLocalEtcdClusterStatus(client, data.CertificateWriteDir())
 }

@@ -29,11 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
+	"k8s.io/utils/clock"
+	testclocks "k8s.io/utils/clock/testing"
 )
 
 type testEventSink struct {
@@ -109,7 +110,7 @@ func TestNonRacyShutdown(t *testing.T) {
 	// in a goroutine.
 
 	caster := NewBroadcasterForTests(0)
-	clock := clock.NewFakeClock(time.Now())
+	clock := testclocks.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, caster, clock)
 
 	var wg sync.WaitGroup
@@ -373,7 +374,7 @@ func TestEventf(t *testing.T) {
 	eventBroadcaster := NewBroadcasterForTests(0)
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	clock := clock.NewFakeClock(time.Now())
+	clock := testclocks.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
 		clock.Step(1 * time.Second)
@@ -438,7 +439,7 @@ func TestWriteEventError(t *testing.T) {
 		},
 	}
 
-	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
+	clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: time.Second}
 	eventCorrelator := NewEventCorrelator(&clock)
 
 	for caseName, ent := range table {
@@ -461,7 +462,7 @@ func TestWriteEventError(t *testing.T) {
 }
 
 func TestUpdateExpiredEvent(t *testing.T) {
-	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
+	clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: time.Second}
 	eventCorrelator := NewEventCorrelator(&clock)
 
 	var createdEvent *v1.Event
@@ -618,7 +619,7 @@ func TestEventfNoNamespace(t *testing.T) {
 	eventBroadcaster := NewBroadcasterForTests(0)
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
-	clock := clock.NewFakeClock(time.Now())
+	clock := testclocks.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	for index, item := range table {
@@ -906,7 +907,7 @@ func TestMultiSinkCache(t *testing.T) {
 	}
 
 	eventBroadcaster := NewBroadcasterForTests(0)
-	clock := clock.NewFakeClock(time.Now())
+	clock := testclocks.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)

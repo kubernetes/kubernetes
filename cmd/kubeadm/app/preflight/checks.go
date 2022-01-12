@@ -34,16 +34,13 @@ import (
 	"strings"
 	"time"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -51,8 +48,12 @@ import (
 	utilsexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 
-	"github.com/PuerkitoBio/purell"
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 const (
@@ -605,6 +606,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
+	minKubeletVersion *version.Version
 	exec              utilsexec.Interface
 }
 
@@ -620,7 +622,10 @@ func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
 	if err != nil {
 		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
 	}
-	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
+	if kubever.minKubeletVersion == nil {
+		kubever.minKubeletVersion = constants.MinimumKubeletVersion
+	}
+	if kubeletVersion.LessThan(kubever.minKubeletVersion) {
 		return nil, []error{errors.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
 	}
 
@@ -659,11 +664,11 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 		buf = append(buf, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, []error{errors.Wrap(err, "error parsing /proc/swaps")}
+		return []error{errors.Wrap(err, "error parsing /proc/swaps")}, nil
 	}
 
 	if len(buf) > 1 {
-		return nil, []error{errors.New("running with swap on is not supported. Please disable swap")}
+		return []error{errors.New("swap is enabled; production deployments should disable swap unless testing the NodeSwap feature gate of the kubelet")}, nil
 	}
 
 	return nil, nil
@@ -714,7 +719,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 		resp := etcdVersionResponse{}
 		var err error
 		versionURL := fmt.Sprintf("%s/%s", endpoint, "version")
-		if tmpVersionURL, err := purell.NormalizeURLString(versionURL, purell.FlagRemoveDuplicateSlashes); err != nil {
+		if tmpVersionURL, err := normalizeURLString(versionURL); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to normalize external etcd version url %s", versionURL))
 			continue
 		} else {
@@ -803,10 +808,9 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 				loopCount--
 				return false, err
 			}
-			//lint:ignore SA5011 If err != nil we are already returning.
 			defer r.Body.Close()
 
-			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {
+			if r.StatusCode >= 500 && r.StatusCode <= 599 {
 				loopCount--
 				return false, errors.Errorf("server responded with non-successful status: %s", r.Status)
 			}
@@ -985,7 +989,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 	}
 
 	checks := []Checker{
-		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
@@ -1118,4 +1121,17 @@ func setHasItemOrAll(s sets.String, item string) bool {
 		return true
 	}
 	return false
+}
+
+// normalizeURLString returns the normalized string, or an error if it can't be parsed into an URL object.
+// It takes an URL string as input.
+func normalizeURLString(s string) (string, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return "", err
+	}
+	if len(u.Path) > 0 {
+		u.Path = strings.ReplaceAll(u.Path, "//", "/")
+	}
+	return u.String(), nil
 }

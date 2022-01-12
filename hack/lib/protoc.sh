@@ -43,7 +43,7 @@ function kube::protoc::check_protoc() {
     echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
     echo "install the platform appropriate Protobuf package for your OS: "
     echo
-    echo "  https://github.com/google/protobuf/releases"
+    echo "  https://github.com/protocolbuffers/protobuf/releases"
     echo
     echo "WARNING: Protobuf changes are not being validated"
     exit 1

@@ -50,6 +50,6 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	IPv6DualStack:                    {Default: true, PreRelease: featuregate.Beta},
+	IPv6DualStack:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ControllerManagerLeaderMigration: {Default: true, PreRelease: featuregate.Beta},
 }

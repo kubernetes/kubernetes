@@ -1045,7 +1045,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 						},
 					},
 					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						ProbeHandler: v1.ProbeHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{

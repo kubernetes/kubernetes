@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 
@@ -46,7 +45,7 @@ func checkAllProviders(e2eFile string) error {
 	regEndConformance := regexp.MustCompile(patternEndConformance)
 	regSkip := regexp.MustCompile(patternSkip)
 
-	fileInput, err := ioutil.ReadFile(e2eFile)
+	fileInput, err := os.ReadFile(e2eFile)
 	if err != nil {
 		return fmt.Errorf("Failed to read file %s: %w", e2eFile, err)
 	}
@@ -84,7 +83,7 @@ func checkAllProviders(e2eFile string) error {
 func processFile(e2ePath string) error {
 	regGoFile := regexp.MustCompile(`.*\.go`)
 
-	files, err := ioutil.ReadDir(e2ePath)
+	files, err := os.ReadDir(e2ePath)
 	if err != nil {
 		return fmt.Errorf("Failed to read dir %s: %w", e2ePath, err)
 	}
@@ -111,7 +110,7 @@ func processDir(e2ePath string) error {
 	}
 
 	// Search sub directories if exist
-	files, err := ioutil.ReadDir(e2ePath)
+	files, err := os.ReadDir(e2ePath)
 	if err != nil {
 		return fmt.Errorf("Failed to read dir %s: %w", e2ePath, err)
 	}

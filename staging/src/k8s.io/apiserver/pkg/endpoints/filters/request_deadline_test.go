@@ -32,10 +32,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestParseTimeout(t *testing.T) {
@@ -177,8 +178,8 @@ func TestWithRequestDeadline(t *testing.T) {
 			})
 
 			fakeSink := &fakeAuditSink{}
-			fakeChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-			withDeadline := WithRequestDeadline(handler, fakeSink, fakeChecker,
+			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+			withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
 				func(_ *http.Request, _ *request.RequestInfo) bool { return test.longRunning },
 				newSerializer(), requestTimeoutMaximum)
 			withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
@@ -227,11 +228,11 @@ func TestWithRequestDeadlineWithClock(t *testing.T) {
 	// if the deadline filter uses the clock instead of using the request started timestamp from the context
 	// then we will see a request deadline of about a minute.
 	receivedTimestampExpected := time.Now().Add(time.Minute)
-	fakeClock := utilclock.NewFakeClock(receivedTimestampExpected)
+	fakeClock := testingclock.NewFakeClock(receivedTimestampExpected)
 
 	fakeSink := &fakeAuditSink{}
-	fakeChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-	withDeadline := withRequestDeadline(handler, fakeSink, fakeChecker,
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	withDeadline := withRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
 		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), time.Minute, fakeClock)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
@@ -259,8 +260,8 @@ func TestWithRequestDeadlineWithFailedRequestIsAudited(t *testing.T) {
 	})
 
 	fakeSink := &fakeAuditSink{}
-	fakeChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-	withDeadline := WithRequestDeadline(handler, fakeSink, fakeChecker,
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
 		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), time.Minute)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
@@ -295,8 +296,8 @@ func TestWithRequestDeadlineWithPanic(t *testing.T) {
 	})
 
 	fakeSink := &fakeAuditSink{}
-	fakeChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-	withDeadline := WithRequestDeadline(handler, fakeSink, fakeChecker,
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
 		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), 1*time.Minute)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 	withPanicRecovery := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -332,8 +333,8 @@ func TestWithRequestDeadlineWithRequestTimesOut(t *testing.T) {
 	})
 
 	fakeSink := &fakeAuditSink{}
-	fakeChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-	withDeadline := WithRequestDeadline(handler, fakeSink, fakeChecker,
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	withDeadline := WithRequestDeadline(handler, fakeSink, fakeRuleEvaluator,
 		func(_ *http.Request, _ *request.RequestInfo) bool { return false }, newSerializer(), 1*time.Minute)
 	withDeadline = WithRequestInfo(withDeadline, &fakeRequestResolver{})
 
@@ -380,9 +381,9 @@ func TestWithFailedRequestAudit(t *testing.T) {
 			})
 
 			fakeSink := &fakeAuditSink{}
-			fakeChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
+			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 
-			withAudit := withFailedRequestAudit(errorHandler, test.statusErr, fakeSink, fakeChecker)
+			withAudit := withFailedRequestAudit(errorHandler, test.statusErr, fakeSink, fakeRuleEvaluator)
 
 			w := httptest.NewRecorder()
 			testRequest, err := http.NewRequest(http.MethodGet, "/apis/v1/namespaces/default/pods", nil)
@@ -410,7 +411,7 @@ func TestWithFailedRequestAudit(t *testing.T) {
 					t.Errorf("expected an http.ResponseWriter of type: %T but got: %T", &auditResponseWriter{}, rwGot)
 				}
 
-				auditEventGot := request.AuditEventFrom(requestGot.Context())
+				auditEventGot := audit.AuditEventFrom(requestGot.Context())
 				if auditEventGot == nil {
 					t.Fatal("expected an audit event object but got nil")
 				}

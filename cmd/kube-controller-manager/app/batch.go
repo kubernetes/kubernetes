@@ -21,42 +21,33 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
-func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
+func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go job.NewController(
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Batch().V1().Jobs(),
-		ctx.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(ctx.ComponentConfig.JobController.ConcurrentJobSyncs), ctx.Stop)
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Batch().V1().Jobs(),
+		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
+	).Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
 }
 
-func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CronJobControllerV2) {
-		cj2c, err := cronjob.NewControllerV2(ctx.InformerFactory.Batch().V1().Jobs(),
-			ctx.InformerFactory.Batch().V1().CronJobs(),
-			ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
-		)
-		if err != nil {
-			return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
-		}
-		go cj2c.Run(int(ctx.ComponentConfig.CronJobController.ConcurrentCronJobSyncs), ctx.Stop)
-		return nil, true, nil
-	}
-	cjc, err := cronjob.NewController(
-		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
+func startCronJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+
+	cj2c, err := cronjob.NewControllerV2(controllerContext.InformerFactory.Batch().V1().Jobs(),
+		controllerContext.InformerFactory.Batch().V1().CronJobs(),
+		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating CronJob controller: %v", err)
+		return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
 	}
-	go cjc.Run(ctx.Stop)
+
+	go cj2c.Run(ctx, int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs))
 	return nil, true, nil
 }

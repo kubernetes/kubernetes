@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	gomock "github.com/golang/mock/gomock"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
@@ -52,17 +53,19 @@ func TestSummaryProvider(t *testing.T) {
 
 	assert := assert.New(t)
 
-	mockStatsProvider := new(statstest.StatsProvider)
-	mockStatsProvider.
-		On("GetNode").Return(node, nil).
-		On("GetNodeConfig").Return(nodeConfig).
-		On("GetPodCgroupRoot").Return(cgroupRoot).
-		On("ListPodStats").Return(podStats, nil).
-		On("ListPodStatsAndUpdateCPUNanoCoreUsage").Return(podStats, nil).
-		On("ImageFsStats").Return(imageFsStats, nil).
-		On("RootFsStats").Return(rootFsStats, nil).
-		On("RlimitStats").Return(nil, nil).
-		On("GetCgroupStats", "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	mockStatsProvider.EXPECT().GetNode().Return(node, nil).AnyTimes()
+	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).AnyTimes()
+	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats().Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage().Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ImageFsStats().Return(imageFsStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).AnyTimes()
+	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).AnyTimes()
 
 	provider := NewSummaryProvider(mockStatsProvider)
 	summary, err := provider.Get(true)

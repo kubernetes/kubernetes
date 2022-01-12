@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 func TestCleanVerb(t *testing.T) {
@@ -63,6 +64,16 @@ func TestCleanVerb(t *testing.T) {
 				},
 			},
 			expectedVerb: "LIST",
+		},
+		{
+			desc:        "GET isn't be transformed to WATCH if we have the right query param on the request",
+			initialVerb: "GET",
+			request: &http.Request{
+				URL: &url.URL{
+					RawQuery: "watch=true",
+				},
+			},
+			expectedVerb: "GET",
 		},
 		{
 			desc:          "LIST is transformed to WATCH for the old pattern watch",
@@ -179,5 +190,16 @@ func TestCleanScope(t *testing.T) {
 				t.Errorf("failed to clean scope: %v", test.requestInfo)
 			}
 		})
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &ResponseWriterDelegator{
+		ResponseWriter: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.ResponseWriter {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }

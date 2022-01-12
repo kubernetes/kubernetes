@@ -108,7 +108,7 @@ func (c *FakeEvents) Update(ctx context.Context, event *corev1.Event, opts v1.Up
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
 func (c *FakeEvents) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(eventsResource, c.ns, name), &corev1.Event{})
+		Invokes(testing.NewDeleteActionWithOptions(eventsResource, c.ns, name, opts), &corev1.Event{})
 
 	return err
 }

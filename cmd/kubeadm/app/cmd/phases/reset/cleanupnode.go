@@ -22,6 +22,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"k8s.io/klog/v2"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -30,9 +33,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
-
-	"k8s.io/klog/v2"
-	utilsexec "k8s.io/utils/exec"
 )
 
 // NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node

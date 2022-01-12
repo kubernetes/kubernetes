@@ -26,47 +26,36 @@ import (
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
-	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/api/authorization/v1"
-	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
+	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1 "k8s.io/api/certificates/v1"
-	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationapiv1 "k8s.io/api/coordination/v1"
-	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
-	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
-	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1 "k8s.io/api/policy/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
-	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -86,6 +75,7 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -94,6 +84,7 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/utils/clock"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -108,7 +99,6 @@ import (
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
-	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
@@ -132,6 +122,8 @@ const (
 	KubeAPIServer = "kube-apiserver"
 	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
 	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
+	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
+	repairLoopInterval = 3 * time.Minute
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -211,6 +203,10 @@ type ExtraConfig struct {
 
 	IdentityLeaseDurationSeconds      int
 	IdentityLeaseRenewIntervalSeconds int
+
+	// RepairServicesInterval interval used by the repair loops for
+	// the Services NodePort and ClusterIP resources
+	RepairServicesInterval time.Duration
 }
 
 // Config defines configuration for the master
@@ -334,6 +330,10 @@ func (c *Config) Complete() CompletedConfig {
 		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
 	}
 
+	if cfg.ExtraConfig.RepairServicesInterval == 0 {
+		cfg.ExtraConfig.RepairServicesInterval = repairLoopInterval
+	}
+
 	return CompletedConfig{&cfg}
 }
 
@@ -429,7 +429,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		certificatesrest.RESTStorageProvider{},
 		coordinationrest.RESTStorageProvider{},
 		discoveryrest.StorageProvider{},
-		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
@@ -644,51 +643,38 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
 		admissionregistrationv1.SchemeGroupVersion,
-		admissionregistrationv1beta1.SchemeGroupVersion,
 		apiv1.SchemeGroupVersion,
 		appsv1.SchemeGroupVersion,
 		authenticationv1.SchemeGroupVersion,
-		authenticationv1beta1.SchemeGroupVersion,
 		authorizationapiv1.SchemeGroupVersion,
-		authorizationapiv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
+		autoscalingapiv2.SchemeGroupVersion,
 		autoscalingapiv2beta1.SchemeGroupVersion,
 		autoscalingapiv2beta2.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
 		batchapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1.SchemeGroupVersion,
-		certificatesapiv1beta1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
-		coordinationapiv1beta1.SchemeGroupVersion,
 		discoveryv1.SchemeGroupVersion,
 		discoveryv1beta1.SchemeGroupVersion,
 		eventsv1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
-		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
-		networkingapiv1beta1.SchemeGroupVersion,
 		nodev1.SchemeGroupVersion,
 		nodev1beta1.SchemeGroupVersion,
 		policyapiv1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
-		rbacv1beta1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
-		schedulingapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		flowcontrolv1beta2.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
-	)
-	// enable non-deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
-	ret.EnableResources(
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
-		rbacv1alpha1.SchemeGroupVersion,
-		schedulingv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
 	)

@@ -28,7 +28,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	netutils "k8s.io/utils/net"
@@ -300,15 +300,20 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 // the background.
 func (pf *PortForwarder) waitForConnection(listener net.Listener, port ForwardedPort) {
 	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
-			if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
-				runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
-			}
+		select {
+		case <-pf.streamConn.CloseChan():
 			return
+		default:
+			conn, err := listener.Accept()
+			if err != nil {
+				// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
+				if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
+					runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
+				}
+				return
+			}
+			go pf.handleConnection(conn, port)
 		}
-		go pf.handleConnection(conn, port)
 	}
 }
 
@@ -399,6 +404,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	err = <-errorChan
 	if err != nil {
 		runtime.HandleError(err)
+		pf.streamConn.Close()
 	}
 }
 

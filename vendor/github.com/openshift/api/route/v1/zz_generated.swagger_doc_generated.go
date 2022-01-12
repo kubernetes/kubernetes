@@ -114,7 +114,7 @@ func (RouterShard) SwaggerDoc() map[string]string {
 var map_TLSConfig = map[string]string{
 	"":                              "TLSConfig defines config used to secure a route and provide termination",
 	"termination":                   "termination indicates termination type.\n\n* edge - TLS termination is done by the router and http is used to communicate with the backend (default) * passthrough - Traffic is sent straight to the destination without the router providing TLS termination * reencrypt - TLS termination is done by the router and https is used to communicate with the backend",
-	"certificate":                   "certificate provides certificate contents",
+	"certificate":                   "certificate provides certificate contents. This should be a single serving certificate, not a certificate chain. Do not include a CA certificate.",
 	"key":                           "key provides key file contents",
 	"caCertificate":                 "caCertificate provides the cert authority certificate contents",
 	"destinationCACertificate":      "destinationCACertificate provides the contents of the ca certificate of the final destination.  When using reencrypt termination this file should be provided in order to have routers use it for health checks on the secure connection. If this field is not specified, the router may provide its own destination CA and perform hostname validation using the short service name (service.namespace.svc), which allows infrastructure generated certificates to automatically verify.",

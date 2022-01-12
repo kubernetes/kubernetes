@@ -18,7 +18,9 @@ package auth
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -67,6 +70,8 @@ func TestPodSecurity(t *testing.T) {
 		ExemptRuntimeClasses: []string{},
 	}
 	podsecuritytest.Run(t, opts)
+
+	ValidatePluginMetrics(t, opts.ClientConfig)
 }
 
 // TestPodSecurityGAOnly ensures policies pass with only GA features enabled
@@ -88,6 +93,8 @@ func TestPodSecurityGAOnly(t *testing.T) {
 		Features: utilfeature.DefaultFeatureGate,
 	}
 	podsecuritytest.Run(t, opts)
+
+	ValidatePluginMetrics(t, opts.ClientConfig)
 }
 
 func TestPodSecurityWebhook(t *testing.T) {
@@ -95,14 +102,14 @@ func TestPodSecurityWebhook(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
-	// The webhook should pass tests even when PodSecurity is disabled.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSecurity, false)()
 
 	// Start test API server.
 	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--anonymous-auth=false",
 		"--allow-privileged=true",
+		// The webhook should pass tests even when PodSecurity is disabled.
+		"--disable-admission-plugins=PodSecurity",
 	}, framework.SharedEtcd())
 	t.Cleanup(testServer.TearDownFn)
 
@@ -125,6 +132,8 @@ func TestPodSecurityWebhook(t *testing.T) {
 		ExemptRuntimeClasses: []string{},
 	}
 	podsecuritytest.Run(t, opts)
+
+	ValidateWebhookMetrics(t, webhookAddr)
 }
 
 func startPodSecurityServer(t *testing.T) *kubeapiservertesting.TestServer {
@@ -284,4 +293,57 @@ func installWebhook(t *testing.T, clientConfig *rest.Config, addr string) error 
 	}
 
 	return nil
+}
+
+func ValidatePluginMetrics(t *testing.T, clientConfig *rest.Config) {
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatalf("Error creating client: %v", err)
+	}
+	ctx := context.Background()
+	data, err := client.CoreV1().RESTClient().Get().AbsPath("metrics").DoRaw(ctx)
+	if err != nil {
+		t.Fatalf("Failed to read metrics: %v", err)
+	}
+	validateMetrics(t, data)
+}
+
+func ValidateWebhookMetrics(t *testing.T, webhookAddr string) {
+	endpoint := &url.URL{
+		Scheme: "https",
+		Host:   webhookAddr,
+		Path:   "/metrics",
+	}
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}}
+	resp, err := client.Get(endpoint.String())
+	if err != nil {
+		t.Fatalf("Failed to fetch metrics from %s: %v", endpoint.String(), err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Non-200 response trying to scrape metrics from %s: %v", endpoint.String(), resp)
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Unable to read metrics response: %v", err)
+	}
+	validateMetrics(t, data)
+}
+
+func validateMetrics(t *testing.T, rawMetrics []byte) {
+	metrics := testutil.NewMetrics()
+	if err := testutil.ParseMetrics(string(rawMetrics), &metrics); err != nil {
+		t.Fatalf("Failed to parse metrics: %v", err)
+	}
+
+	if err := testutil.ValidateMetrics(metrics, "pod_security_evaluations_total",
+		"decision", "policy_level", "policy_version", "mode", "request_operation", "resource", "subresource"); err != nil {
+		t.Errorf("Metric validation failed: %v", err)
+	}
+	if err := testutil.ValidateMetrics(metrics, "pod_security_exemptions_total",
+		"request_operation", "resource", "subresource"); err != nil {
+		t.Errorf("Metric validation failed: %v", err)
+	}
 }

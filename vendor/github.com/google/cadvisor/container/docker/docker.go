@@ -25,7 +25,7 @@ import (
 
 	"time"
 
-	"github.com/google/cadvisor/info/v1"
+	v1 "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
 )
 

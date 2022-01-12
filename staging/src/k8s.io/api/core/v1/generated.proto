@@ -908,15 +908,11 @@ message ContainerStatus {
   // Specifies whether the container has passed its readiness probe.
   optional bool ready = 4;
 
-  // The number of times the container has been restarted, currently based on
-  // the number of dead containers that have not yet been removed.
-  // Note that this is calculated from dead containers. But those containers are subject to
-  // garbage collection. This value will get capped at 5 by GC.
+  // The number of times the container has been restarted.
   optional int32 restartCount = 5;
 
   // The image the container is running.
-  // More info: https://kubernetes.io/docs/concepts/containers/images
-  // TODO(dchen1107): Which image the container is running with?
+  // More info: https://kubernetes.io/docs/concepts/containers/images.
   optional string image = 6;
 
   // ImageID of the container's image.
@@ -1190,15 +1186,16 @@ message EnvVarSource {
   optional SecretKeySelector secretKeyRef = 4;
 }
 
-// An EphemeralContainer is a container that may be added temporarily to an existing pod for
+// An EphemeralContainer is a temporary container that you may add to an existing Pod for
 // user-initiated activities such as debugging. Ephemeral containers have no resource or
-// scheduling guarantees, and they will not be restarted when they exit or when a pod is
-// removed or restarted. If an ephemeral container causes a pod to exceed its resource
-// allocation, the pod may be evicted.
-// Ephemeral containers may not be added by directly updating the pod spec. They must be added
-// via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
-// once added.
-// This is an alpha feature enabled by the EphemeralContainers feature flag.
+// scheduling guarantees, and they will not be restarted when they exit or when a Pod is
+// removed or restarted. The kubelet may evict a Pod if an ephemeral container causes the
+// Pod to exceed its resource allocation.
+//
+// To add an ephemeral container, use the ephemeralcontainers subresource of an existing
+// Pod. Ephemeral containers may not be removed or restarted.
+//
+// This is a beta feature available on clusters that haven't disabled the EphemeralContainers feature gate.
 message EphemeralContainer {
   // Ephemeral containers have all of the fields of Container, plus additional fields
   // specific to ephemeral containers. Fields in common with Container are in the
@@ -1208,8 +1205,10 @@ message EphemeralContainer {
 
   // If set, the name of the container from PodSpec that this ephemeral container targets.
   // The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
-  // If not set then the ephemeral container is run in whatever namespaces are shared
-  // for the pod. Note that the container runtime must support this feature.
+  // If not set then the ephemeral container uses the namespaces configured in the Pod spec.
+  //
+  // The container runtime must implement support for this feature. If the runtime does not
+  // support namespace targeting then the result of setting this field is undefined.
   // +optional
   optional string targetContainerName = 2;
 }
@@ -1257,6 +1256,12 @@ message EphemeralContainerCommon {
   optional string workingDir = 5;
 
   // Ports are not allowed for ephemeral containers.
+  // +optional
+  // +patchMergeKey=containerPort
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=containerPort
+  // +listMapKey=protocol
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
@@ -1280,7 +1285,7 @@ message EphemeralContainerCommon {
   // +optional
   optional ResourceRequirements resources = 8;
 
-  // Pod volumes to mount into the container's filesystem.
+  // Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
   // Cannot be updated.
   // +optional
   // +patchMergeKey=mountPath
@@ -1641,6 +1646,19 @@ message GCEPersistentDiskVolumeSource {
   optional bool readOnly = 4;
 }
 
+message GRPCAction {
+  // Port number of the gRPC service. Number must be in the range 1 to 65535.
+  optional int32 port = 1;
+
+  // Service is the name of the service to place in the gRPC HealthCheckRequest
+  // (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+  //
+  // If this is not specified, the default behavior is defined by gRPC.
+  // +optional
+  // +default=""
+  optional string service = 2;
+}
+
 // Represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
@@ -1739,25 +1757,6 @@ message HTTPHeader {
 
   // The header field value
   optional string value = 2;
-}
-
-// Handler defines a specific action that should be taken
-// TODO: pass structured data to these actions, and document that data here.
-message Handler {
-  // One and only one of the following should be specified.
-  // Exec specifies the action to take.
-  // +optional
-  optional ExecAction exec = 1;
-
-  // HTTPGet specifies the http request to perform.
-  // +optional
-  optional HTTPGetAction httpGet = 2;
-
-  // TCPSocket specifies an action involving a TCP port.
-  // TCP hooks not yet supported
-  // TODO: implement a realistic TCP lifecycle hook
-  // +optional
-  optional TCPSocketAction tcpSocket = 3;
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -1927,20 +1926,37 @@ message Lifecycle {
   // Other management of the container blocks until the hook completes.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler postStart = 1;
+  optional LifecycleHandler postStart = 1;
 
   // PreStop is called immediately before a container is terminated due to an
   // API request or management event such as liveness/startup probe failure,
   // preemption, resource contention, etc. The handler is not called if the
-  // container crashes or exits. The reason for termination is passed to the
-  // handler. The Pod's termination grace period countdown begins before the
-  // PreStop hooked is executed. Regardless of the outcome of the handler, the
+  // container crashes or exits. The Pod's termination grace period countdown begins before the
+  // PreStop hook is executed. Regardless of the outcome of the handler, the
   // container will eventually terminate within the Pod's termination grace
-  // period. Other management of the container blocks until the hook completes
+  // period (unless delayed by finalizers). Other management of the container blocks until the hook completes
   // or until the termination grace period is reached.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler preStop = 2;
+  optional LifecycleHandler preStop = 2;
+}
+
+// LifecycleHandler defines a specific action that should be taken in a lifecycle
+// hook. One and only one of the fields, except TCPSocket must be specified.
+message LifecycleHandler {
+  // Exec specifies the action to take.
+  // +optional
+  optional ExecAction exec = 1;
+
+  // HTTPGet specifies the http request to perform.
+  // +optional
+  optional HTTPGetAction httpGet = 2;
+
+  // Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
+  // for the backward compatibility. There are no validation of this field and
+  // lifecycle hooks will fail in runtime when tcp handler is specified.
+  // +optional
+  optional TCPSocketAction tcpSocket = 3;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -2059,7 +2075,7 @@ message LocalVolumeSource {
   // Filesystem type to mount.
   // It applies only when the Path is a block device.
   // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a fileystem if unspecified.
+  // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a filesystem if unspecified.
   // +optional
   optional string fsType = 2;
 }
@@ -2662,6 +2678,9 @@ message PersistentVolumeClaimSpec {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
 
   // Resources represents the minimum resources the volume should have.
+  // If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
+  // that are lower than previous value but must still be higher than capacity recorded in the
+  // status field of the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
   // +optional
   optional ResourceRequirements resources = 2;
@@ -2732,6 +2751,26 @@ message PersistentVolumeClaimStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated PersistentVolumeClaimCondition conditions = 4;
+
+  // The storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may
+  // be larger than the actual capacity when a volume expansion operation is requested.
+  // For storage quota, the larger value from allocatedResources and PVC.spec.resources is used.
+  // If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.
+  // If a volume expansion capacity request is lowered, allocatedResources is only
+  // lowered if there are no expansion operations in progress and if the actual volume capacity
+  // is equal or lower than the requested capacity.
+  // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
+  // +featureGate=RecoverVolumeExpansionFailure
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
+
+  // ResizeStatus stores status of resize operation.
+  // ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty
+  // string by resize controller or kubelet.
+  // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
+  // +featureGate=RecoverVolumeExpansionFailure
+  // +optional
+  optional string resizeStatus = 6;
 }
 
 // PersistentVolumeClaimTemplate is used to produce
@@ -3176,12 +3215,10 @@ message PodExecOptions {
   optional bool stdin = 1;
 
   // Redirect the standard output stream of the pod for this call.
-  // Defaults to true.
   // +optional
   optional bool stdout = 2;
 
   // Redirect the standard error stream of the pod for this call.
-  // Defaults to true.
   // +optional
   optional bool stderr = 3;
 
@@ -3273,6 +3310,15 @@ message PodLogOptions {
   optional bool insecureSkipTLSVerifyBackend = 9;
 }
 
+// PodOS defines the OS parameters of a pod.
+message PodOS {
+  // Name is the name of the operating system. The currently supported values are linux and windows.
+  // Additional value may be defined in future and can be one of:
+  // https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
+  // Clients should expect to handle additional values and treat unrecognized values in this field as os: null
+  optional string name = 1;
+}
+
 // PodPortForwardOptions is the query options to a Pod's port forward call
 // when using WebSockets.
 // The `port` query parameter must specify the port or
@@ -3308,12 +3354,14 @@ message PodSecurityContext {
   // container.  May also be set in SecurityContext.  If set in
   // both SecurityContext and PodSecurityContext, the value specified in SecurityContext
   // takes precedence for that container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SELinuxOptions seLinuxOptions = 1;
 
   // The Windows specific settings applied to all containers.
   // If unspecified, the options within a container's SecurityContext will be used.
   // If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is linux.
   // +optional
   optional WindowsSecurityContextOptions windowsOptions = 8;
 
@@ -3322,6 +3370,7 @@ message PodSecurityContext {
   // May also be set in SecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence
   // for that container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsUser = 2;
 
@@ -3330,6 +3379,7 @@ message PodSecurityContext {
   // May also be set in SecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence
   // for that container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsGroup = 6;
 
@@ -3345,6 +3395,7 @@ message PodSecurityContext {
   // A list of groups applied to the first process run in each container, in addition
   // to the container's primary GID.  If unspecified, no groups will be added to
   // any container.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   repeated int64 supplementalGroups = 4;
 
@@ -3357,11 +3408,13 @@ message PodSecurityContext {
   // 3. The permission bits are OR'd with rw-rw----
   //
   // If unset, the Kubelet will not modify the ownership and permissions of any volume.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 fsGroup = 5;
 
   // Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
   // sysctls (by the container runtime) might fail to launch.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   repeated Sysctl sysctls = 7;
 
@@ -3371,10 +3424,12 @@ message PodSecurityContext {
   // It will have no effect on ephemeral volume types such as: secret, configmaps
   // and emptydir.
   // Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional string fsGroupChangePolicy = 9;
 
   // The seccomp options to use by the containers in this pod.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 10;
 }
@@ -3425,7 +3480,7 @@ message PodSpec {
   // pod to perform user-initiated actions such as debugging. This list cannot be specified when
   // creating a pod, and it cannot be modified by updating the pod spec. In order to add an
   // ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
-  // This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
+  // This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
@@ -3645,6 +3700,37 @@ message PodSpec {
   // Default to false.
   // +optional
   optional bool setHostnameAsFQDN = 35;
+
+  // Specifies the OS of the containers in the pod.
+  // Some pod and container fields are restricted if this is set.
+  //
+  // If the OS field is set to linux, the following fields must be unset:
+  // -securityContext.windowsOptions
+  //
+  // If the OS field is set to windows, following fields must be unset:
+  // - spec.hostPID
+  // - spec.hostIPC
+  // - spec.securityContext.seLinuxOptions
+  // - spec.securityContext.seccompProfile
+  // - spec.securityContext.fsGroup
+  // - spec.securityContext.fsGroupChangePolicy
+  // - spec.securityContext.sysctls
+  // - spec.shareProcessNamespace
+  // - spec.securityContext.runAsUser
+  // - spec.securityContext.runAsGroup
+  // - spec.securityContext.supplementalGroups
+  // - spec.containers[*].securityContext.seLinuxOptions
+  // - spec.containers[*].securityContext.seccompProfile
+  // - spec.containers[*].securityContext.capabilities
+  // - spec.containers[*].securityContext.readOnlyRootFilesystem
+  // - spec.containers[*].securityContext.privileged
+  // - spec.containers[*].securityContext.allowPrivilegeEscalation
+  // - spec.containers[*].securityContext.procMount
+  // - spec.containers[*].securityContext.runAsUser
+  // - spec.containers[*].securityContext.runAsGroup
+  // +optional
+  // This is an alpha field and requires the IdentifyPodOS feature
+  optional PodOS os = 36;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -3739,7 +3825,7 @@ message PodStatus {
   optional string qosClass = 9;
 
   // Status for any ephemeral containers that have run in this pod.
-  // This field is alpha-level and is only populated by servers that enable the EphemeralContainers feature.
+  // This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
   // +optional
   repeated ContainerStatus ephemeralContainerStatuses = 13;
 }
@@ -3876,7 +3962,7 @@ message PreferredSchedulingTerm {
 // alive or ready to receive traffic.
 message Probe {
   // The action taken to determine the health of a container
-  optional Handler handler = 1;
+  optional ProbeHandler handler = 1;
 
   // Number of seconds after the container has started before liveness probes are initiated.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
@@ -3916,6 +4002,28 @@ message Probe {
   // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
   // +optional
   optional int64 terminationGracePeriodSeconds = 7;
+}
+
+// ProbeHandler defines a specific action that should be taken in a probe.
+// One and only one of the fields must be specified.
+message ProbeHandler {
+  // Exec specifies the action to take.
+  // +optional
+  optional ExecAction exec = 1;
+
+  // HTTPGet specifies the http request to perform.
+  // +optional
+  optional HTTPGetAction httpGet = 2;
+
+  // TCPSocket specifies an action involving a TCP port.
+  // +optional
+  optional TCPSocketAction tcpSocket = 3;
+
+  // GRPC specifies an action involving a GRPC port.
+  // This is an alpha field and requires enabling GRPCContainerProbe feature gate.
+  // +featureGate=GRPCContainerProbe
+  // +optional
+  optional GRPCAction grpc = 4;
 }
 
 // Represents a projected volume source
@@ -4479,6 +4587,7 @@ message Secret {
   map<string, string> stringData = 4;
 
   // Used to facilitate programmatic handling of secret data.
+  // More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
   // +optional
   optional string type = 3;
 }
@@ -4602,12 +4711,14 @@ message SecretVolumeSource {
 message SecurityContext {
   // The capabilities to add/drop when running containers.
   // Defaults to the default set of capabilities granted by the container runtime.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional Capabilities capabilities = 1;
 
   // Run container in privileged mode.
   // Processes in privileged containers are essentially equivalent to root on the host.
   // Defaults to false.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional bool privileged = 2;
 
@@ -4615,12 +4726,14 @@ message SecurityContext {
   // If unspecified, the container runtime will allocate a random SELinux context for each
   // container.  May also be set in PodSecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SELinuxOptions seLinuxOptions = 3;
 
   // The Windows specific settings applied to all containers.
   // If unspecified, the options from the PodSecurityContext will be used.
   // If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is linux.
   // +optional
   optional WindowsSecurityContextOptions windowsOptions = 10;
 
@@ -4628,6 +4741,7 @@ message SecurityContext {
   // Defaults to user specified in image metadata if unspecified.
   // May also be set in PodSecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsUser = 4;
 
@@ -4635,6 +4749,7 @@ message SecurityContext {
   // Uses runtime default if unset.
   // May also be set in PodSecurityContext.  If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional int64 runAsGroup = 8;
 
@@ -4649,6 +4764,7 @@ message SecurityContext {
 
   // Whether this container has a read-only root filesystem.
   // Default is false.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional bool readOnlyRootFilesystem = 6;
 
@@ -4658,6 +4774,7 @@ message SecurityContext {
   // AllowPrivilegeEscalation is true always when the container is:
   // 1) run as Privileged
   // 2) has CAP_SYS_ADMIN
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional bool allowPrivilegeEscalation = 7;
 
@@ -4665,12 +4782,14 @@ message SecurityContext {
   // The default is DefaultProcMount which uses the container runtime defaults for
   // readonly paths and masked paths.
   // This requires the ProcMountType feature flag to be enabled.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional string procMount = 9;
 
   // The seccomp options to use by this container. If seccomp options are
   // provided at both the pod & container level, the container options
   // override the pod options.
+  // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 11;
 }
@@ -4904,12 +5023,9 @@ message ServiceSpec {
   // clients must ensure that clusterIPs[0] and clusterIP have the same
   // value.
   //
-  // Unless the "IPv6DualStack" feature gate is enabled, this field is
-  // limited to one value, which must be the same as the clusterIP field.  If
-  // the feature gate is enabled, this field may hold a maximum of two
-  // entries (dual-stack IPs, in either order).  These IPs must correspond to
-  // the values of the ipFamilies field. Both clusterIPs and ipFamilies are
-  // governed by the ipFamilyPolicy field.
+  // This field may hold a maximum of two entries (dual-stack IPs, in either order).
+  // These IPs must correspond to the values of the ipFamilies field. Both
+  // clusterIPs and ipFamilies are governed by the ipFamilyPolicy field.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
   // +listType=atomic
   // +optional
@@ -5009,17 +5125,16 @@ message ServiceSpec {
   optional SessionAffinityConfig sessionAffinityConfig = 14;
 
   // IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
-  // service, and is gated by the "IPv6DualStack" feature gate.  This field
-  // is usually assigned automatically based on cluster configuration and the
-  // ipFamilyPolicy field. If this field is specified manually, the requested
-  // family is available in the cluster, and ipFamilyPolicy allows it, it
-  // will be used; otherwise creation of the service will fail.  This field
-  // is conditionally mutable: it allows for adding or removing a secondary
-  // IP family, but it does not allow changing the primary IP family of the
-  // Service.  Valid values are "IPv4" and "IPv6".  This field only applies
-  // to Services of types ClusterIP, NodePort, and LoadBalancer, and does
-  // apply to "headless" services.  This field will be wiped when updating a
-  // Service to type ExternalName.
+  // service. This field is usually assigned automatically based on cluster
+  // configuration and the ipFamilyPolicy field. If this field is specified
+  // manually, the requested family is available in the cluster,
+  // and ipFamilyPolicy allows it, it will be used; otherwise creation of
+  // the service will fail. This field is conditionally mutable: it allows
+  // for adding or removing a secondary IP family, but it does not allow
+  // changing the primary IP family of the Service. Valid values are "IPv4"
+  // and "IPv6".  This field only applies to Services of types ClusterIP,
+  // NodePort, and LoadBalancer, and does apply to "headless" services.
+  // This field will be wiped when updating a Service to type ExternalName.
   //
   // This field may hold a maximum of two entries (dual-stack families, in
   // either order).  These families must correspond to the values of the
@@ -5030,14 +5145,13 @@ message ServiceSpec {
   repeated string ipFamilies = 19;
 
   // IPFamilyPolicy represents the dual-stack-ness requested or required by
-  // this Service, and is gated by the "IPv6DualStack" feature gate.  If
-  // there is no value provided, then this field will be set to SingleStack.
-  // Services can be "SingleStack" (a single IP family), "PreferDualStack"
-  // (two IP families on dual-stack configured clusters or a single IP family
-  // on single-stack clusters), or "RequireDualStack" (two IP families on
-  // dual-stack configured clusters, otherwise fail). The ipFamilies and
-  // clusterIPs fields depend on the value of this field.  This field will be
-  // wiped when updating a service to type ExternalName.
+  // this Service. If there is no value provided, then this field will be set
+  // to SingleStack. Services can be "SingleStack" (a single IP family),
+  // "PreferDualStack" (two IP families on dual-stack configured clusters or
+  // a single IP family on single-stack clusters), or "RequireDualStack"
+  // (two IP families on dual-stack configured clusters, otherwise fail). The
+  // ipFamilies and clusterIPs fields depend on the value of this field. This
+  // field will be wiped when updating a service to type ExternalName.
   // +optional
   optional string ipFamilyPolicy = 17;
 
@@ -5298,7 +5412,7 @@ message TopologySpreadConstraint {
   //   but giving higher precedence to topologies that would help reduce the
   //   skew.
   // A constraint is considered "Unsatisfiable" for an incoming pod
-  // if and only if every possible node assigment for that pod would violate
+  // if and only if every possible node assignment for that pod would violate
   // "MaxSkew" on some topology.
   // For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
   // labelSelector spread as 3/1/1:
@@ -5581,9 +5695,6 @@ message VolumeSource {
   //
   // A pod can use both types of ephemeral volumes and
   // persistent volumes at the same time.
-  //
-  // This is a beta feature and only available when the GenericEphemeralVolume
-  // feature gate is enabled.
   //
   // +optional
   optional EphemeralVolumeSource ephemeral = 29;

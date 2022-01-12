@@ -17,13 +17,13 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
-
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // WorkArgs keeps arguments that will be passed to the function executed by the worker.
@@ -50,13 +50,13 @@ type TimedWorker struct {
 }
 
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
-func createWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(args *WorkArgs) error, clock clock.Clock) *TimedWorker {
+func createWorker(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
 	delay := fireAt.Sub(createdAt)
 	if delay <= 0 {
-		go f(args)
+		go f(ctx, args)
 		return nil
 	}
-	timer := clock.AfterFunc(delay, func() { f(args) })
+	timer := clock.AfterFunc(delay, func() { f(ctx, args) })
 	return &TimedWorker{
 		WorkItem:  args,
 		CreatedAt: createdAt,
@@ -77,13 +77,13 @@ type TimedWorkerQueue struct {
 	sync.Mutex
 	// map of workers keyed by string returned by 'KeyFromWorkArgs' from the given worker.
 	workers  map[string]*TimedWorker
-	workFunc func(args *WorkArgs) error
-	clock    clock.Clock
+	workFunc func(ctx context.Context, args *WorkArgs) error
+	clock    clock.WithDelayedExecution
 }
 
 // CreateWorkerQueue creates a new TimedWorkerQueue for workers that will execute
 // given function `f`.
-func CreateWorkerQueue(f func(args *WorkArgs) error) *TimedWorkerQueue {
+func CreateWorkerQueue(f func(ctx context.Context, args *WorkArgs) error) *TimedWorkerQueue {
 	return &TimedWorkerQueue{
 		workers:  make(map[string]*TimedWorker),
 		workFunc: f,
@@ -91,9 +91,9 @@ func CreateWorkerQueue(f func(args *WorkArgs) error) *TimedWorkerQueue {
 	}
 }
 
-func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs) error {
-	return func(args *WorkArgs) error {
-		err := q.workFunc(args)
+func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Context, args *WorkArgs) error {
+	return func(ctx context.Context, args *WorkArgs) error {
+		err := q.workFunc(ctx, args)
 		q.Lock()
 		defer q.Unlock()
 		if err == nil {
@@ -108,7 +108,7 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs)
 }
 
 // AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
-func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt time.Time) {
+func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
 	klog.V(4).Infof("Adding TimedWorkerQueue item %v at %v to be fired at %v", key, createdAt, fireAt)
 
@@ -118,7 +118,7 @@ func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt t
 		klog.Warningf("Trying to add already existing work for %+v. Skipping.", args)
 		return
 	}
-	worker := createWorker(args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
+	worker := createWorker(ctx, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
 	q.workers[key] = worker
 }
 

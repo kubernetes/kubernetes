@@ -347,8 +347,12 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 
 	resp, err := nodeClient.NodeExpandVolume(ctx, req)
 	if err != nil {
+		if !isFinalError(err) {
+			return opts.newSize, volumetypes.NewUncertainProgressError(err.Error())
+		}
 		return opts.newSize, err
 	}
+
 	updatedQuantity := resource.NewQuantity(resp.CapacityBytes, resource.BinarySI)
 	return *updatedQuantity, nil
 }

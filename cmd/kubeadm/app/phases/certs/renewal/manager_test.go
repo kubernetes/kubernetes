@@ -26,13 +26,13 @@ import (
 	"testing"
 	"time"
 
+	certutil "k8s.io/client-go/util/cert"
+	netutils "k8s.io/utils/net"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	netutils "k8s.io/utils/net"
-
-	certutil "k8s.io/client-go/util/cert"
 )
 
 var (

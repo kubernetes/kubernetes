@@ -22,6 +22,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	podsecurityapi "k8s.io/pod-security-admission/admission/api"
 	podsecurityv1alpha1 "k8s.io/pod-security-admission/admission/api/v1alpha1"
+	podsecurityv1beta1 "k8s.io/pod-security-admission/admission/api/v1beta1"
 )
 
 var (
@@ -40,5 +41,6 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(podsecurityapi.AddToScheme(scheme))
 	utilruntime.Must(podsecurityv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(podsecurityv1alpha1.SchemeGroupVersion))
+	utilruntime.Must(podsecurityv1beta1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(podsecurityv1beta1.SchemeGroupVersion, podsecurityv1alpha1.SchemeGroupVersion))
 }

@@ -12,7 +12,7 @@ import (
 // the given id.
 func UnprepareLayer(ctx context.Context, path string) (err error) {
 	title := "hcsshim::UnprepareLayer"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute("path", path))

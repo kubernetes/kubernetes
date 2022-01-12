@@ -27,12 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
+	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +38,12 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
 
 var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
@@ -545,7 +545,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 				{
-					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion), // Kubelet component config from corresponding ConfigMap.
+					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion, false), // Kubelet component config from corresponding ConfigMap.
 					Data: map[string]string{
 						kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(cfgFiles["Kubelet_componentconfig"]),
 					},
@@ -589,7 +589,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 				{
-					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion), // Kubelet component config from corresponding ConfigMap.
+					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion, false), // Kubelet component config from corresponding ConfigMap.
 					Data: map[string]string{
 						kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(cfgFiles["Kubelet_componentconfig"]),
 					},
@@ -622,7 +622,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 				{
-					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion), // Kubelet component config from corresponding ConfigMap.
+					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion, false), // Kubelet component config from corresponding ConfigMap.
 					Data: map[string]string{
 						kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(cfgFiles["Kubelet_componentconfig"]),
 					},
@@ -666,7 +666,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 				{
-					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion), // Kubelet component config from corresponding ConfigMap.
+					Name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion, false), // Kubelet component config from corresponding ConfigMap.
 					Data: map[string]string{
 						kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(cfgFiles["Kubelet_componentconfig"]),
 					},

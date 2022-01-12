@@ -20,13 +20,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-
-	"github.com/spf13/cobra"
 )
 
 type testCertsData struct {

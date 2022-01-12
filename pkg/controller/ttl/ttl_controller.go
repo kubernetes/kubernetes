@@ -114,22 +114,22 @@ var (
 )
 
 // Run begins watching and syncing.
-func (ttlc *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (ttlc *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer ttlc.queue.ShutDown()
 
 	klog.Infof("Starting TTL controller")
 	defer klog.Infof("Shutting down TTL controller")
 
-	if !cache.WaitForNamedCacheSync("TTL", stopCh, ttlc.hasSynced) {
+	if !cache.WaitForNamedCacheSync("TTL", ctx.Done(), ttlc.hasSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(ttlc.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, ttlc.worker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (ttlc *Controller) addNode(obj interface{}) {
@@ -201,19 +201,19 @@ func (ttlc *Controller) enqueueNode(node *v1.Node) {
 	ttlc.queue.Add(key)
 }
 
-func (ttlc *Controller) worker() {
-	for ttlc.processItem() {
+func (ttlc *Controller) worker(ctx context.Context) {
+	for ttlc.processItem(ctx) {
 	}
 }
 
-func (ttlc *Controller) processItem() bool {
+func (ttlc *Controller) processItem(ctx context.Context) bool {
 	key, quit := ttlc.queue.Get()
 	if quit {
 		return false
 	}
 	defer ttlc.queue.Done(key)
 
-	err := ttlc.updateNodeIfNeeded(key.(string))
+	err := ttlc.updateNodeIfNeeded(ctx, key.(string))
 	if err == nil {
 		ttlc.queue.Forget(key)
 		return true
@@ -254,7 +254,7 @@ func setIntAnnotation(node *v1.Node, annotationKey string, value int) {
 	node.Annotations[annotationKey] = strconv.Itoa(value)
 }
 
-func (ttlc *Controller) patchNodeWithAnnotation(node *v1.Node, annotationKey string, value int) error {
+func (ttlc *Controller) patchNodeWithAnnotation(ctx context.Context, node *v1.Node, annotationKey string, value int) error {
 	oldData, err := json.Marshal(node)
 	if err != nil {
 		return err
@@ -268,7 +268,7 @@ func (ttlc *Controller) patchNodeWithAnnotation(node *v1.Node, annotationKey str
 	if err != nil {
 		return err
 	}
-	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(ctx, node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		klog.V(2).InfoS("Failed to change ttl annotation for node", "node", klog.KObj(node), "err", err)
 		return err
@@ -277,7 +277,7 @@ func (ttlc *Controller) patchNodeWithAnnotation(node *v1.Node, annotationKey str
 	return nil
 }
 
-func (ttlc *Controller) updateNodeIfNeeded(key string) error {
+func (ttlc *Controller) updateNodeIfNeeded(ctx context.Context, key string) error {
 	node, err := ttlc.nodeStore.Get(key)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -292,5 +292,5 @@ func (ttlc *Controller) updateNodeIfNeeded(key string) error {
 		return nil
 	}
 
-	return ttlc.patchNodeWithAnnotation(node.DeepCopy(), v1.ObjectTTLAnnotationKey, desiredTTL)
+	return ttlc.patchNodeWithAnnotation(ctx, node.DeepCopy(), v1.ObjectTTLAnnotationKey, desiredTTL)
 }

@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
 	v1 "k8s.io/api/core/v1"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // ChecksumForConfigMap calculates a checksum for the supplied config map. The exact algorithm depends on hash and prefix parameters

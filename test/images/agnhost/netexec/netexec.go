@@ -106,11 +106,13 @@ will be upgraded to HTTPS. The image has default, "localhost"-based cert/privkey
 If "--http-override" is set, the HTTP(S) server will always serve the override path & options,
 ignoring the request URL.
 
-It will also start a UDP server on the indicated UDP port that responds to the following commands:
+It will also start a UDP server on the indicated UDP port and addresses that responds to the following commands:
 
 - "hostname": Returns the server's hostname
 - "echo <msg>": Returns the given <msg>
 - "clientip": Returns the request's IP address
+
+The UDP server can be disabled by setting --udp-port to -1.
 
 Additionally, if (and only if) --sctp-port is passed, it will start an SCTP server on that port,
 responding to the same commands as the UDP server.
@@ -168,14 +170,19 @@ func main(cmd *cobra.Command, args []string) {
 		addRoutes(http.DefaultServeMux, exitCh)
 	}
 
-	udpBindTo, err := parseAddresses(udpListenAddresses)
-	if err != nil {
-		log.Fatal(err)
+	// UDP server
+	if udpPort != -1 {
+		udpBindTo, err := parseAddresses(udpListenAddresses)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, address := range udpBindTo {
+			go startUDPServer(address, udpPort)
+		}
 	}
 
-	for _, address := range udpBindTo {
-		go startUDPServer(address, udpPort)
-	}
+	// SCTP server
 	if sctpPort != -1 {
 		go startSCTPServer(sctpPort)
 	}

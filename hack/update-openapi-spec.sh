@@ -96,9 +96,20 @@ if ! kube::util::wait_for_url "https://${API_HOST}:${API_PORT}/healthz" "apiserv
   exit 1
 fi
 
-kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"
 
 curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
+
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR}/v3 for OpenAPI v3"
+
+mkdir -p "${OPENAPI_ROOT_DIR}/v3"
+curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3" | jq '.Paths' | jq -r '.[]' | while read -r group; do
+    kube::log::status "Updating OpenAPI spec for group ${group}"
+    OPENAPI_FILENAME="${group}_openapi.json"
+    OPENAPI_FILENAME_ESCAPED="${OPENAPI_FILENAME//\//__}"
+    OPENAPI_PATH="${OPENAPI_ROOT_DIR}/v3/${OPENAPI_FILENAME_ESCAPED}"
+    curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3/{$group}" | jq -S '.info.version="unversioned"' > "$OPENAPI_PATH"
+done
 
 kube::log::status "SUCCESS"
 

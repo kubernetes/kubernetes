@@ -117,7 +117,7 @@ func (c *FakeFlunders) UpdateStatus(ctx context.Context, flunder *v1alpha1.Flund
 // Delete takes name of the flunder and deletes it. Returns an error if one occurs.
 func (c *FakeFlunders) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(flundersResource, c.ns, name), &v1alpha1.Flunder{})
+		Invokes(testing.NewDeleteActionWithOptions(flundersResource, c.ns, name, opts), &v1alpha1.Flunder{})
 
 	return err
 }

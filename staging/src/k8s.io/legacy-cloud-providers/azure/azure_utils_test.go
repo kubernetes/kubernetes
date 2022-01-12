@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -151,5 +152,65 @@ func TestConvertTagsToMap(t *testing.T) {
 				t.Errorf("got: %v, expected: %v, desc: %v", m, c.expectedOutput, c.desc)
 			}
 		}
+	}
+}
+
+func TestReconcileTags(t *testing.T) {
+	for _, testCase := range []struct {
+		description                                  string
+		currentTagsOnResource, newTags, expectedTags map[string]*string
+		expectedChanged                              bool
+	}{
+		{
+			description: "reconcileTags should add missing tags and update existing tags",
+			currentTagsOnResource: map[string]*string{
+				"a": to.StringPtr("b"),
+			},
+			newTags: map[string]*string{
+				"a": to.StringPtr("c"),
+				"b": to.StringPtr("d"),
+			},
+			expectedTags: map[string]*string{
+				"a": to.StringPtr("c"),
+				"b": to.StringPtr("d"),
+			},
+			expectedChanged: true,
+		},
+		{
+			description: "reconcileTags should ignore the case of keys when comparing",
+			currentTagsOnResource: map[string]*string{
+				"A": to.StringPtr("b"),
+				"c": to.StringPtr("d"),
+			},
+			newTags: map[string]*string{
+				"a": to.StringPtr("b"),
+				"C": to.StringPtr("d"),
+			},
+			expectedTags: map[string]*string{
+				"A": to.StringPtr("b"),
+				"c": to.StringPtr("d"),
+			},
+		},
+		{
+			description: "reconcileTags should ignore the case of values when comparing",
+			currentTagsOnResource: map[string]*string{
+				"A": to.StringPtr("b"),
+				"c": to.StringPtr("d"),
+			},
+			newTags: map[string]*string{
+				"a": to.StringPtr("B"),
+				"C": to.StringPtr("D"),
+			},
+			expectedTags: map[string]*string{
+				"A": to.StringPtr("b"),
+				"c": to.StringPtr("d"),
+			},
+		},
+	} {
+		t.Run(testCase.description, func(t *testing.T) {
+			tags, changed := reconcileTags(testCase.currentTagsOnResource, testCase.newTags)
+			assert.Equal(t, testCase.expectedChanged, changed)
+			assert.Equal(t, testCase.expectedTags, tags)
+		})
 	}
 }

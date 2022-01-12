@@ -54,7 +54,7 @@ func (pl *TaintToleration) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *TaintToleration) EventsToRegister() []framework.ClusterEvent {
+func (pl *TaintToleration) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint},
 	}

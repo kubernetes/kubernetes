@@ -1,0 +1,15 @@
+after_success:
+- bash <(curl -s https://codecov.io/bash)
+go:
+- 1.14.x
+- 1.15.x
+install:
+- GO111MODULE=off go get -u gotest.tools/gotestsum
+env:
+- GO111MODULE=on
+language: go
+notifications:
+  slack:
+    secure: a5VgoiwB1G/AZqzmephPZIhEB9avMlsWSlVnM1dSAtYAwdrQHGTQxAmpOxYIoSPDhWNN5bfZmjd29++UlTwLcHSR+e0kJhH6IfDlsHj/HplNCJ9tyI0zYc7XchtdKgeMxMzBKCzgwFXGSbQGydXTliDNBo0HOzmY3cou/daMFTP60K+offcjS+3LRAYb1EroSRXZqrk1nuF/xDL3792DZUdPMiFR/L/Df6y74D6/QP4sTkTDFQitz4Wy/7jbsfj8dG6qK2zivgV6/l+w4OVjFkxVpPXogDWY10vVXNVynqxfJ7to2d1I9lNCHE2ilBCkWMIPdyJF7hjF8pKW+82yP4EzRh0vu8Xn0HT5MZpQxdRY/YMxNrWaG7SxsoEaO4q5uhgdzAqLYY3TRa7MjIK+7Ur+aqOeTXn6OKwVi0CjvZ6mIU3WUKSwiwkFZMbjRAkSb5CYwMEfGFO/z964xz83qGt6WAtBXNotqCQpTIiKtDHQeLOMfksHImCg6JLhQcWBVxamVgu0G3Pdh8Y6DyPnxraXY95+QDavbjqv7TeYT9T/FNnrkXaTTK0s4iWE5H4ACU0Qvz0wUYgfQrZv0/Hp7V17+rabUwnzYySHCy9SWX/7OV9Cfh31iMp9ZIffr76xmmThtOEqs8TrTtU6BWI3rWwvA9cXQipZTVtL0oswrGw=
+script:
+- gotestsum -f short-verbose -- -race -coverprofile=coverage.txt -covermode=atomic ./...

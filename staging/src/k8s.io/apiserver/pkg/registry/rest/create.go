@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -109,6 +110,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	objectMeta.SetDeletionGracePeriodSeconds(nil)
 	strategy.PrepareForCreate(ctx, obj)
 	FillObjectMetaSystemFields(objectMeta)
+
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
 	}
@@ -145,21 +147,31 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 
 // CheckGeneratedNameError checks whether an error that occurred creating a resource is due
 // to generation being unable to pick a valid name.
-func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime.Object) error {
+func CheckGeneratedNameError(ctx context.Context, strategy RESTCreateStrategy, err error, obj runtime.Object) error {
 	if !errors.IsAlreadyExists(err) {
 		return err
 	}
 
-	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
+	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
 	}
 
 	if len(objectMeta.GetGenerateName()) == 0 {
+		// If we don't have a generated name, return the original error (AlreadyExists).
+		// When we're here, the user picked a name that is causing a conflict.
 		return err
 	}
 
-	return errors.NewServerTimeoutForKind(kind.GroupKind(), "POST", 0)
+	// Get the group resource information from the context, if populated.
+	gr := schema.GroupResource{}
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		gr = schema.GroupResource{Group: gvk.Group, Resource: requestInfo.Resource}
+	}
+
+	// If we have a name and generated name, the server picked a name
+	// that already exists.
+	return errors.NewGenerateNameConflict(gr, objectMeta.GetName(), 1)
 }
 
 // objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.

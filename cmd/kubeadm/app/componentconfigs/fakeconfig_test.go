@@ -24,12 +24,7 @@ import (
 	"testing"
 	"time"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"github.com/lithammer/dedent"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +32,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/lithammer/dedent"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // All tests in this file use an alternative set of `known` component configs.
@@ -108,6 +108,10 @@ func (cc *clusterConfig) Set(cfg interface{}) {
 func (cc *clusterConfig) Default(_ *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
 	cc.config.ClusterName = "foo"
 	cc.config.KubernetesVersion = "bar"
+}
+
+func (cc *clusterConfig) Mutate() error {
+	return nil
 }
 
 // fakeKnown replaces temporarily during the execution of each test here known (in configset.go)
@@ -357,7 +361,8 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 				}
 
 				client := clientsetfake.NewSimpleClientset(configMap)
-				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg())
+				legacyKubeletConfigMap := true
+				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
 				if err != nil {
 					t.Fatalf("unexpected failure of FromCluster: %v", err)
 				}
@@ -453,7 +458,7 @@ func runClusterConfigFromTest(t *testing.T, perform func(t *testing.T, in string
 									t.Errorf("unexpected result: %v", got)
 								} else {
 									if !reflect.DeepEqual(test.out, got) {
-										t.Errorf("missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
+										t.Errorf("mismatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
 									}
 								}
 							}
@@ -482,7 +487,8 @@ func TestLoadingFromCluster(t *testing.T) {
 			testClusterConfigMap(in, false),
 		)
 
-		return clusterConfigHandler.FromCluster(client, testClusterCfg())
+		legacyKubeletConfigMap := true
+		return clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
 	})
 }
 
@@ -575,7 +581,8 @@ func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				clusterCfg := testClusterCfg()
+				legacyKubeletConfigMap := true
+				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
 
 				err = FetchFromClusterWithLocalOverwrites(clusterCfg, client, docmap)
 				if err != nil {
@@ -709,7 +716,8 @@ func TestGetVersionStates(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				clusterCfg := testClusterCfg()
+				legacyKubeletConfigMap := true
+				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
 
 				got, err := GetVersionStates(clusterCfg, client, docmap)
 				if err != nil {

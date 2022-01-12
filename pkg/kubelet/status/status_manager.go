@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=status_manager.go -destination=testing/mock_pod_status_provider.go -package=testing PodStatusProvider
 package status
 
 import (
@@ -156,8 +157,10 @@ func (m *manager) Start() {
 	}
 
 	klog.InfoS("Starting to sync pod status with apiserver")
-	//lint:ignore SA1015 Ticker can link since this is only called once and doesn't handle termination.
-	syncTicker := time.Tick(syncPeriod)
+
+	//nolint:staticcheck // SA1015 Ticker can leak since this is only called once and doesn't handle termination.
+	syncTicker := time.NewTicker(syncPeriod).C
+
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
 		for {

@@ -145,5 +145,33 @@ type NetworkMigration struct {
 	// NetworkType is the target plugin that is to be deployed.
 	// Currently supported values are: OpenShiftSDN, OVNKubernetes
 	// +kubebuilder:validation:Enum={"OpenShiftSDN","OVNKubernetes"}
-	NetworkType string `json:"networkType"`
+	// +optional
+	NetworkType string `json:"networkType,omitempty"`
+
+	// MTU contains the MTU migration configuration.
+	// +optional
+	MTU *MTUMigration `json:"mtu,omitempty"`
+}
+
+// MTUMigration contains infomation about MTU migration.
+type MTUMigration struct {
+	// Network contains MTU migration configuration for the default network.
+	// +optional
+	Network *MTUMigrationValues `json:"network,omitempty"`
+
+	// Machine contains MTU migration configuration for the machine's uplink.
+	// +optional
+	Machine *MTUMigrationValues `json:"machine,omitempty"`
+}
+
+// MTUMigrationValues contains the values for a MTU migration.
+type MTUMigrationValues struct {
+	// To is the MTU to migrate to.
+	// +kubebuilder:validation:Minimum=0
+	To *uint32 `json:"to"`
+
+	// From is the MTU to migrate from.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	From *uint32 `json:"from,omitempty"`
 }

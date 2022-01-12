@@ -1,4 +1,13 @@
 {
   "type": "2",
-  "object": {"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}}
+  "object": {
+    "apiVersion": "example.com/v1",
+    "kind": "CustomType",
+    "spec": {
+      "replicas": 1
+    },
+    "status": {
+      "available": 1
+    }
+  }
 }

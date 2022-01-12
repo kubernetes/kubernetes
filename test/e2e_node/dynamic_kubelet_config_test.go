@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -70,7 +71,7 @@ type nodeConfigTestCase struct {
 }
 
 // This test is marked [Disruptive] because the Kubelet restarts several times during this test.
-var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Serial][Disruptive]", func() {
+var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Deprecated][Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 	var beforeNode *v1.Node
 	var beforeConfigMap *v1.ConfigMap
@@ -83,11 +84,13 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			// make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to test
 			enabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
+
 			if !enabled {
-				framework.ExpectNoError(fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
+				e2eskipper.Skipf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 					"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet and API server to enable this feature.\n" +
-					"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`."))
+					"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
 			}
+
 			// record before state so we can restore it after the test
 			if beforeNode == nil {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
@@ -136,7 +139,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			restore.run(f, setConfigSourceFunc, false, 0)
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: state transitions:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: state transitions:", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -301,7 +304,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			})
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -365,7 +368,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			})
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
 			ginkgo.It(itDescription, func() {
 				const badConfigKey = "bad"
 				var err error
@@ -420,7 +423,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 		})
 
 		// previously, we missed a panic because we were not exercising this path
-		ginkgo.Context("update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test

@@ -26,6 +26,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/client-go/tools/clientcmd"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -34,13 +41,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
-
-	"k8s.io/client-go/tools/clientcmd"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCommandsGenerated(t *testing.T) {
@@ -266,31 +266,6 @@ func TestRunRenewCommands(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestRenewUsingCSR(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
-	cert := certsphase.KubeadmCertEtcdServer()
-
-	cfg := testutil.GetDefaultInternalConfig(t)
-	cfg.CertificatesDir = tmpDir
-
-	caCert, caKey, err := certsphase.KubeadmCertEtcdCA().CreateAsCA(cfg)
-	if err != nil {
-		t.Fatalf("couldn't write out CA %s: %v", certsphase.KubeadmCertEtcdCA().Name, err)
-	}
-
-	if err := cert.CreateFromCA(cfg, caCert, caKey); err != nil {
-		t.Fatalf("couldn't write certificate %s: %v", cert.Name, err)
-	}
-
-	renewCmds := getRenewSubCommands(os.Stdout, tmpDir)
-	cmdtestutil.RunSubCommand(t, renewCmds, cert.Name, "--csr-only", "--csr-dir="+tmpDir, fmt.Sprintf("--cert-dir=%s", tmpDir))
-
-	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpDir, cert.Name); err != nil {
-		t.Fatalf("couldn't load certificate %q: %v", cert.Name, err)
 	}
 }
 

@@ -73,6 +73,7 @@ type KubeControllerManagerOptions struct {
 	EndpointController               *EndpointControllerOptions
 	EndpointSliceController          *EndpointSliceControllerOptions
 	EndpointSliceMirroringController *EndpointSliceMirroringControllerOptions
+	EphemeralVolumeController        *EphemeralVolumeControllerOptions
 	GarbageCollectorController       *GarbageCollectorControllerOptions
 	HPAController                    *HPAControllerOptions
 	JobController                    *JobControllerOptions
@@ -139,6 +140,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		EndpointSliceMirroringController: &EndpointSliceMirroringControllerOptions{
 			&componentConfig.EndpointSliceMirroringController,
+		},
+		EphemeralVolumeController: &EphemeralVolumeControllerOptions{
+			&componentConfig.EphemeralVolumeController,
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&componentConfig.GarbageCollectorController,
@@ -256,6 +260,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.EndpointController.AddFlags(fss.FlagSet("endpoint controller"))
 	s.EndpointSliceController.AddFlags(fss.FlagSet("endpointslice controller"))
 	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet("endpointslicemirroring controller"))
+	s.EphemeralVolumeController.AddFlags(fss.FlagSet("ephemeralvolume controller"))
 	s.GarbageCollectorController.AddFlags(fss.FlagSet("garbagecollector controller"))
 	s.HPAController.AddFlags(fss.FlagSet("horizontalpodautoscaling controller"))
 	s.JobController.AddFlags(fss.FlagSet("job controller"))
@@ -320,6 +325,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 		return err
 	}
 	if err := s.EndpointSliceMirroringController.ApplyTo(&c.ComponentConfig.EndpointSliceMirroringController); err != nil {
+		return err
+	}
+	if err := s.EphemeralVolumeController.ApplyTo(&c.ComponentConfig.EphemeralVolumeController); err != nil {
 		return err
 	}
 	if err := s.GarbageCollectorController.ApplyTo(&c.ComponentConfig.GarbageCollectorController); err != nil {
@@ -399,6 +407,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.EndpointController.Validate()...)
 	errs = append(errs, s.EndpointSliceController.Validate()...)
 	errs = append(errs, s.EndpointSliceMirroringController.Validate()...)
+	errs = append(errs, s.EphemeralVolumeController.Validate()...)
 	errs = append(errs, s.GarbageCollectorController.Validate()...)
 	errs = append(errs, s.HPAController.Validate()...)
 	errs = append(errs, s.JobController.Validate()...)
@@ -418,7 +427,6 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)
-	errs = append(errs, s.Logs.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig
 
@@ -469,8 +477,6 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 	s.Metrics.Apply()
-
-	s.Logs.Apply()
 
 	return c, nil
 }

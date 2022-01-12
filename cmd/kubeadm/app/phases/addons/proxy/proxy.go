@@ -20,12 +20,7 @@ import (
 	"bytes"
 	"fmt"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -35,7 +30,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 const (
@@ -43,8 +43,14 @@ const (
 	// TODO: This k8s-generic, well-known constant should be fetchable from another source, not be in this package
 	KubeProxyClusterRoleName = "system:node-proxier"
 
+	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
+	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
+
 	// KubeProxyServiceAccountName describes the name of the ServiceAccount for the kube-proxy addon
 	KubeProxyServiceAccountName = "kube-proxy"
+
+	// KubeProxyConfigMapRoleName sets the name of ClusterRole for ConfigMap
+	KubeProxyConfigMapRoleName = "kube-proxy"
 )
 
 // EnsureProxyAddon creates the kube-proxy addons
@@ -157,7 +163,7 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 func createClusterRoleBindings(client clientset.Interface) error {
 	if err := apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "kubeadm:node-proxier",
+			Name: KubeProxyClusterRoleBindingName,
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
@@ -178,7 +184,7 @@ func createClusterRoleBindings(client clientset.Interface) error {
 	// Create a role for granting read only access to the kube-proxy component config ConfigMap
 	if err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.KubeProxyConfigMap,
+			Name:      KubeProxyConfigMapRoleName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
@@ -196,13 +202,13 @@ func createClusterRoleBindings(client clientset.Interface) error {
 	// Bind the role to bootstrap tokens for allowing fetchConfiguration during join
 	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.KubeProxyConfigMap,
+			Name:      KubeProxyConfigMapRoleName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "Role",
-			Name:     constants.KubeProxyConfigMap,
+			Name:     KubeProxyConfigMapRoleName,
 		},
 		Subjects: []rbac.Subject{
 			{

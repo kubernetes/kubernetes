@@ -94,7 +94,7 @@ func (c *FakeOAuths) UpdateStatus(ctx context.Context, oAuth *configv1.OAuth, op
 // Delete takes name of the oAuth and deletes it. Returns an error if one occurs.
 func (c *FakeOAuths) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(oauthsResource, name), &configv1.OAuth{})
+		Invokes(testing.NewRootDeleteActionWithOptions(oauthsResource, name, opts), &configv1.OAuth{})
 	return err
 }
 

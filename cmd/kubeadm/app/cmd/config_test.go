@@ -29,6 +29,12 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/lithammer/dedent"
+	"github.com/spf13/cobra"
+
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
+
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
@@ -37,12 +43,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
-
-	"github.com/lithammer/dedent"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -208,8 +208,8 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestConfigImagesListOutput(t *testing.T) {
 
-	etcdVersion, ok := constants.SupportedEtcdVersion[uint8(dummyKubernetesVersion.Minor())]
-	if !ok {
+	etcdVersion, _, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, dummyKubernetesVersionStr)
+	if err != nil {
 		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)
 	}
 	versionMapping := struct {
@@ -218,7 +218,7 @@ func TestConfigImagesListOutput(t *testing.T) {
 		PauseVersion   string
 		CoreDNSVersion string
 	}{
-		EtcdVersion:    etcdVersion,
+		EtcdVersion:    etcdVersion.String(),
 		KubeVersion:    "v" + dummyKubernetesVersionStr,
 		PauseVersion:   constants.PauseVersion,
 		CoreDNSVersion: constants.CoreDNSVersion,
@@ -253,7 +253,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 			outputFormat: "json",
 			expectedOutput: `{
     "kind": "Images",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
     "images": [
         "k8s.gcr.io/kube-apiserver:{{.KubeVersion}}",
         "k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}",
@@ -272,7 +272,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "yaml",
-			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha2
 images:
 - k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
 - k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}

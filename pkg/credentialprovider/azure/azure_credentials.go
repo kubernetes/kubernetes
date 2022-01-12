@@ -27,6 +27,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
@@ -53,6 +54,7 @@ const (
 var (
 	containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
 	acrRE                 = regexp.MustCompile(`.*\.azurecr\.io|.*\.azurecr\.cn|.*\.azurecr\.de|.*\.azurecr\.us`)
+	warnOnce              sync.Once
 )
 
 // init registers the various means by which credentials may
@@ -184,6 +186,13 @@ func (a *acrProvider) Enabled() bool {
 		return false
 	}
 
+	if credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
+		warnOnce.Do(func() {
+			klog.V(4).Infof("Azure credential provider is now disabled. Please refer to sig-cloud-provider for guidance on external credential provider integration for Azure")
+		})
+		return false
+	}
+
 	f, err := os.Open(*a.file)
 	if err != nil {
 		klog.Errorf("Failed to load config from file: %s", *a.file)
@@ -204,6 +213,7 @@ func (a *acrProvider) Enabled() bool {
 	}
 
 	a.registryClient = newAzRegistriesClient(a.config.SubscriptionID, a.environment.ResourceManagerEndpoint, a.servicePrincipalToken)
+
 	return true
 }
 

@@ -120,7 +120,7 @@ func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
 func (c *FakeStatefulSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(statefulsetsResource, c.ns, name), &v1beta2.StatefulSet{})
+		Invokes(testing.NewDeleteActionWithOptions(statefulsetsResource, c.ns, name, opts), &v1beta2.StatefulSet{})
 
 	return err
 }

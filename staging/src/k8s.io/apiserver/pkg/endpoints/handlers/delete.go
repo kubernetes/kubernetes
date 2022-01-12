@@ -67,7 +67,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
@@ -103,9 +103,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 				}
 				trace.Step("Decoded delete options")
 
-				ae := request.AuditEventFrom(ctx)
 				objGV := gvk.GroupVersion()
-				audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
+				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 				trace.Step("Recorded the audit event")
 			} else {
 				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
@@ -144,7 +143,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 		// that will break existing clients.
 		// Other cases where resource is not instantly deleted are: namespace deletion
 		// and pod graceful deletion.
-		//lint:ignore SA1019 backwards compatibility
+		//nolint:staticcheck // SA1019 backwards compatibility
 		//nolint: staticcheck
 		if !wasDeleted && options.OrphanDependents != nil && !*options.OrphanDependents {
 			status = http.StatusAccepted
@@ -189,7 +188,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -250,9 +249,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 					return
 				}
 
-				ae := request.AuditEventFrom(ctx)
 				objGV := gvk.GroupVersion()
-				audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
+				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 			} else {
 				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
 					err = errors.NewBadRequest(err.Error())

@@ -20,7 +20,6 @@ package options
 import (
 	"fmt"
 	_ "net/http/pprof" // Enable pprof HTTP handlers.
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -33,7 +32,6 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -41,7 +39,6 @@ import (
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
 const defaultRootDir = "/var/lib/kubelet"
@@ -98,14 +95,6 @@ type KubeletFlags struct {
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
 
-	// registerNode enables automatic registration with the apiserver.
-	RegisterNode bool
-
-	// registerWithTaints are an array of taints to add to a node object when
-	// the kubelet registers itself. This only takes effect when registerNode
-	// is true and upon the initial registration of the node.
-	RegisterWithTaints []core.Taint
-
 	// WindowsService should be set to true if kubelet is running as a service on Windows.
 	// Its corresponding flag only gets registered in Windows builds.
 	WindowsService bool
@@ -141,9 +130,6 @@ type KubeletFlags struct {
 	// This will cause the kubelet to listen to inotify events on the lock file,
 	// releasing it and exiting when another process tries to open that file.
 	ExitOnLockContention bool
-	// seccompProfileRoot is the directory path for seccomp profiles.
-	SeccompProfileRoot string
-
 	// DEPRECATED FLAGS
 	// minimumGCAge is the minimum age for a finished container before it is
 	// garbage collected.
@@ -192,8 +178,6 @@ func NewKubeletFlags() *KubeletFlags {
 		RegisterSchedulable:     true,
 		RemoteRuntimeEndpoint:   remoteRuntimeEndpoint,
 		NodeLabels:              make(map[string]string),
-		RegisterNode:            true,
-		SeccompProfileRoot:      filepath.Join(defaultRootDir, "seccomp"),
 	}
 }
 
@@ -344,9 +328,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.Var(&f.DynamicConfigDir, "dynamic-config-dir", "The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health. The Kubelet will create this directory if it does not already exist. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Providing this flag enables dynamic Kubelet configuration. The DynamicKubeletConfig feature gate must be enabled to pass this flag.")
 	fs.MarkDeprecated("dynamic-config-dir", "Feature DynamicKubeletConfig is deprecated in 1.22 and will not move to GA. It is planned to be removed from Kubernetes in the version 1.23. Please use alternative ways to update kubelet configuration.")
 
-	fs.BoolVar(&f.RegisterNode, "register-node", f.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with.")
-	fs.Var(utiltaints.NewTaintsVar(&f.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
-
 	// EXPERIMENTAL FLAGS
 	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "[Experimental] The endpoint of remote runtime service. Currently unix socket endpoint is supported on Linux, while npipe and tcp endpoints are supported on windows. Note: When using docker as container runtime this specifies the dockershim socket location which kubelet itself creates.  Examples:'unix:///var/run/dockershim.sock', 'npipe:////./pipe/dockershim'")
 	fs.StringVar(&f.RemoteImageEndpoint, "image-service-endpoint", f.RemoteImageEndpoint, "[Experimental] The endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. Currently unix socket endpoint is supported on Linux, while npipe and tcp endpoints are supported on windows.  Examples:'unix:///var/run/dockershim.sock', 'npipe:////./pipe/dockershim'")
@@ -357,8 +338,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.BoolVar(&f.SeccompDefault, "seccomp-default", f.SeccompDefault, "<Warning: Alpha feature> Enable the use of `RuntimeDefault` as the default seccomp profile for all workloads. The SeccompDefault feature gate must be enabled to allow this flag, which is disabled per default.")
 
 	// DEPRECATED FLAGS
-	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")
-	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
@@ -375,8 +354,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.MarkDeprecated("really-crash-for-testing", "will be removed in a future version.")
-	fs.StringVar(&f.SeccompProfileRoot, "seccomp-profile-root", f.SeccompProfileRoot, "<Warning: Alpha feature> Directory path for seccomp profiles.")
-	fs.MarkDeprecated("seccomp-profile-root", "will be removed in 1.23, in favor of using the `<root-dir>/seccomp` directory")
 	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
 	fs.MarkDeprecated("experimental-mounter-path", "will be removed in 1.23. in favor of using CSI.")
 	fs.BoolVar(&f.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", f.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required components (binaries, etc.) before performing the mount")
@@ -400,7 +377,20 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 		// e.g. if a flag was added after this deprecation function, it may not be at the end
 		// of its lifetime yet, even if the rest are.
 		deprecated := "This parameter should be set via the config file specified by the Kubelet's --config flag. See https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/ for more information."
+		// Some flags are permanently (?) meant to be available. In
+		// Kubernetes 1.23, the following options were added to
+		// LoggingConfiguration (long-term goal, more complete
+		// configuration file) but deprecating the flags seemed
+		// premature.
+		notDeprecated := map[string]bool{
+			"v":                   true,
+			"vmodule":             true,
+			"log-flush-frequency": true,
+		}
 		fs.VisitAll(func(f *pflag.Flag) {
+			if notDeprecated[f.Name] {
+				return
+			}
 			f.Deprecated = deprecated
 		})
 		mainfs.AddFlagSet(fs)
@@ -415,7 +405,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.DurationVar(&c.HTTPCheckFrequency.Duration, "http-check-frequency", c.HTTPCheckFrequency.Duration, "Duration between checking http for new data")
 	fs.StringVar(&c.StaticPodURL, "manifest-url", c.StaticPodURL, "URL for accessing additional Pod specifications to run")
 	fs.Var(cliflag.NewColonSeparatedMultimapStringString(&c.StaticPodURLHeader), "manifest-url-header", "Comma-separated list of HTTP headers to use when accessing the url provided to --manifest-url. Multiple headers with the same name will be added in the same order provided. This flag can be repeatedly invoked. For example: --manifest-url-header 'a:hello,b:again,c:world' --manifest-url-header 'b:beautiful'")
-	fs.Var(utilflag.IPVar{Val: &c.Address}, "address", "The IP address for the Kubelet to serve on (set to '0.0.0.0' or '::' for listening in all interfaces and IP families)")
+	fs.Var(&utilflag.IPVar{Val: &c.Address}, "address", "The IP address for the Kubelet to serve on (set to '0.0.0.0' or '::' for listening in all interfaces and IP families)")
 	fs.Int32Var(&c.Port, "port", c.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&c.ReadOnlyPort, "read-only-port", c.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
 
@@ -469,13 +459,13 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.BoolVar(&c.EnableDebuggingHandlers, "enable-debugging-handlers", c.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.BoolVar(&c.EnableContentionProfiling, "contention-profiling", c.EnableContentionProfiling, "Enable lock contention profiling, if profiling is enabled")
 	fs.Int32Var(&c.HealthzPort, "healthz-port", c.HealthzPort, "The port of the localhost healthz endpoint (set to 0 to disable)")
-	fs.Var(utilflag.IPVar{Val: &c.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on (set to '0.0.0.0' or '::' for listening in all interfaces and IP families)")
+	fs.Var(&utilflag.IPVar{Val: &c.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on (set to '0.0.0.0' or '::' for listening in all interfaces and IP families)")
 	fs.Int32Var(&c.OOMScoreAdj, "oom-score-adj", c.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&c.ClusterDomain, "cluster-domain", c.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 
 	fs.StringVar(&c.VolumePluginDir, "volume-plugin-dir", c.VolumePluginDir, "The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringSliceVar(&c.ClusterDNS, "cluster-dns", c.ClusterDNS, "Comma-separated list of DNS server IP address.  This value is used for containers DNS server in case of Pods with \"dnsPolicy=ClusterFirst\". Note: all DNS servers appearing in the list MUST serve the same set of records otherwise name resolution within the cluster may not work correctly. There is no guarantee as to which DNS server may be contacted for name resolution.")
-	fs.DurationVar(&c.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", c.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'")
+	fs.DurationVar(&c.StreamingConnectionIdleTimeout.Duration, "streaming-connection-idle-timeout", c.StreamingConnectionIdleTimeout.Duration, "Maximum time a streaming connection can be idle before the connection is automatically closed. 0 indicates no timeout. Example: '5m'. Note: All connections to the kubelet server have a maximum duration of 4 hours.")
 	fs.DurationVar(&c.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", c.NodeStatusUpdateFrequency.Duration, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.")
 	fs.DurationVar(&c.ImageMinimumGCAge.Duration, "minimum-image-ttl-duration", c.ImageMinimumGCAge.Duration, "Minimum age for an unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'.")
 	fs.Int32Var(&c.ImageGCHighThresholdPercent, "image-gc-high-threshold", c.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Values must be within the range [0, 100], To disable image garbage collection, set to 100. ")
@@ -552,4 +542,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	// Memory Manager Flags
 	fs.StringVar(&c.MemoryManagerPolicy, "memory-manager-policy", c.MemoryManagerPolicy, "Memory Manager policy to use. Possible values: 'None', 'Static'.")
 	fs.Var(&utilflag.ReservedMemoryVar{Value: &c.ReservedMemory}, "reserved-memory", "A comma separated list of memory reservations for NUMA nodes. (e.g. --reserved-memory 0:memory=1Gi,hugepages-1M=2Gi --reserved-memory 1:memory=2Gi). The total sum for each memory type should be equal to the sum of kube-reserved, system-reserved and eviction-threshold. See https://kubernetes.io/docs/tasks/administer-cluster/memory-manager/#reserved-memory-flag for more details.")
+
+	fs.BoolVar(&c.RegisterNode, "register-node", c.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with.")
+
+	fs.Var(&utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
 }

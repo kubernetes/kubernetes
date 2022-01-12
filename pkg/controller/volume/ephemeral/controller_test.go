@@ -160,7 +160,7 @@ func TestSyncHandler(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, pvcInformer.Informer().HasSynced)
 
-			err = ec.syncHandler(tc.podKey)
+			err = ec.syncHandler(context.TODO(), tc.podKey)
 			if err != nil && !tc.expectedError {
 				t.Fatalf("unexpected error while running handler: %v", err)
 			}

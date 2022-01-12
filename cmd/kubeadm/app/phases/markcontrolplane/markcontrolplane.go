@@ -19,11 +19,11 @@ package markcontrolplane
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 var labelsToAdd = []string{

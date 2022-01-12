@@ -78,7 +78,7 @@ func NewStorageVersionGC(clientset kubernetes.Interface, leaseInformer coordinfo
 }
 
 // Run starts one worker.
-func (c *Controller) Run(stopCh <-chan struct{}) {
+func (c *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.leaseQueue.ShutDown()
 	defer c.storageVersionQueue.ShutDown()
@@ -86,7 +86,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 	klog.Infof("Starting storage version garbage collector")
 
-	if !cache.WaitForCacheSync(stopCh, c.leasesSynced, c.storageVersionSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.leasesSynced, c.storageVersionSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
@@ -96,25 +96,25 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	// runLeaseWorker handles legit identity lease deletion, while runStorageVersionWorker
 	// handles storageversion creation/update with non-existing id. The latter should rarely
 	// happen. It's okay for the two workers to conflict on update.
-	go wait.Until(c.runLeaseWorker, time.Second, stopCh)
-	go wait.Until(c.runStorageVersionWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, c.runLeaseWorker, time.Second)
+	go wait.UntilWithContext(ctx, c.runStorageVersionWorker, time.Second)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *Controller) runLeaseWorker() {
-	for c.processNextLease() {
+func (c *Controller) runLeaseWorker(ctx context.Context) {
+	for c.processNextLease(ctx) {
 	}
 }
 
-func (c *Controller) processNextLease() bool {
+func (c *Controller) processNextLease(ctx context.Context) bool {
 	key, quit := c.leaseQueue.Get()
 	if quit {
 		return false
 	}
 	defer c.leaseQueue.Done(key)
 
-	err := c.processDeletedLease(key.(string))
+	err := c.processDeletedLease(ctx, key.(string))
 	if err == nil {
 		c.leaseQueue.Forget(key)
 		return true
@@ -125,19 +125,19 @@ func (c *Controller) processNextLease() bool {
 	return true
 }
 
-func (c *Controller) runStorageVersionWorker() {
-	for c.processNextStorageVersion() {
+func (c *Controller) runStorageVersionWorker(ctx context.Context) {
+	for c.processNextStorageVersion(ctx) {
 	}
 }
 
-func (c *Controller) processNextStorageVersion() bool {
+func (c *Controller) processNextStorageVersion(ctx context.Context) bool {
 	key, quit := c.storageVersionQueue.Get()
 	if quit {
 		return false
 	}
 	defer c.storageVersionQueue.Done(key)
 
-	err := c.syncStorageVersion(key.(string))
+	err := c.syncStorageVersion(ctx, key.(string))
 	if err == nil {
 		c.storageVersionQueue.Forget(key)
 		return true
@@ -148,8 +148,8 @@ func (c *Controller) processNextStorageVersion() bool {
 	return true
 }
 
-func (c *Controller) processDeletedLease(name string) error {
-	_, err := c.kubeclientset.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), name, metav1.GetOptions{})
+func (c *Controller) processDeletedLease(ctx context.Context, name string) error {
+	_, err := c.kubeclientset.CoordinationV1().Leases(metav1.NamespaceSystem).Get(ctx, name, metav1.GetOptions{})
 	// the lease isn't deleted, nothing we need to do here
 	if err == nil {
 		return nil
@@ -158,7 +158,7 @@ func (c *Controller) processDeletedLease(name string) error {
 		return err
 	}
 	// the frequency of this call won't be too high because we only trigger on identity lease deletions
-	storageVersionList, err := c.kubeclientset.InternalV1alpha1().StorageVersions().List(context.TODO(), metav1.ListOptions{})
+	storageVersionList, err := c.kubeclientset.InternalV1alpha1().StorageVersions().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (c *Controller) processDeletedLease(name string) error {
 		if !hasStaleRecord {
 			continue
 		}
-		if err := c.updateOrDeleteStorageVersion(&sv, serverStorageVersions); err != nil {
+		if err := c.updateOrDeleteStorageVersion(ctx, &sv, serverStorageVersions); err != nil {
 			errors = append(errors, err)
 		}
 	}
@@ -185,8 +185,8 @@ func (c *Controller) processDeletedLease(name string) error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func (c *Controller) syncStorageVersion(name string) error {
-	sv, err := c.kubeclientset.InternalV1alpha1().StorageVersions().Get(context.TODO(), name, metav1.GetOptions{})
+func (c *Controller) syncStorageVersion(ctx context.Context, name string) error {
+	sv, err := c.kubeclientset.InternalV1alpha1().StorageVersions().Get(ctx, name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// The problematic storage version that was added/updated recently is gone.
 		// Nothing we need to do here.
@@ -199,7 +199,7 @@ func (c *Controller) syncStorageVersion(name string) error {
 	hasInvalidID := false
 	var serverStorageVersions []apiserverinternalv1alpha1.ServerStorageVersion
 	for _, v := range sv.Status.StorageVersions {
-		lease, err := c.kubeclientset.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), v.APIServerID, metav1.GetOptions{})
+		lease, err := c.kubeclientset.CoordinationV1().Leases(metav1.NamespaceSystem).Get(ctx, v.APIServerID, metav1.GetOptions{})
 		if err != nil || lease == nil || lease.Labels == nil ||
 			lease.Labels[controlplane.IdentityLeaseComponentLabelKey] != controlplane.KubeAPIServer {
 			// We cannot find a corresponding identity lease from apiserver as well.
@@ -212,7 +212,7 @@ func (c *Controller) syncStorageVersion(name string) error {
 	if !hasInvalidID {
 		return nil
 	}
-	return c.updateOrDeleteStorageVersion(sv, serverStorageVersions)
+	return c.updateOrDeleteStorageVersion(ctx, sv, serverStorageVersions)
 }
 
 func (c *Controller) onAddStorageVersion(obj interface{}) {
@@ -266,14 +266,14 @@ func (c *Controller) enqueueLease(obj *coordinationv1.Lease) {
 	c.leaseQueue.Add(obj.Name)
 }
 
-func (c *Controller) updateOrDeleteStorageVersion(sv *apiserverinternalv1alpha1.StorageVersion, serverStorageVersions []apiserverinternalv1alpha1.ServerStorageVersion) error {
+func (c *Controller) updateOrDeleteStorageVersion(ctx context.Context, sv *apiserverinternalv1alpha1.StorageVersion, serverStorageVersions []apiserverinternalv1alpha1.ServerStorageVersion) error {
 	if len(serverStorageVersions) == 0 {
 		return c.kubeclientset.InternalV1alpha1().StorageVersions().Delete(
-			context.TODO(), sv.Name, metav1.DeleteOptions{})
+			ctx, sv.Name, metav1.DeleteOptions{})
 	}
 	sv.Status.StorageVersions = serverStorageVersions
 	storageversion.SetCommonEncodingVersion(sv)
 	_, err := c.kubeclientset.InternalV1alpha1().StorageVersions().UpdateStatus(
-		context.TODO(), sv, metav1.UpdateOptions{})
+		ctx, sv, metav1.UpdateOptions{})
 	return err
 }

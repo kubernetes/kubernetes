@@ -19,19 +19,15 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -39,17 +35,17 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -61,6 +57,9 @@ const (
 	SchedulerError = "SchedulerError"
 	// Percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent = 10
+	// Duration the scheduler will wait before expiring an assumed pod.
+	// See issue #106361 for more details about this parameter and its value.
+	durationToExpireAssumedPod = 15 * time.Minute
 )
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -99,7 +98,6 @@ type Scheduler struct {
 type schedulerOptions struct {
 	componentConfigVersion   string
 	kubeConfig               *restclient.Config
-	legacyPolicySource       *schedulerapi.SchedulerPolicySource
 	percentageOfNodesToScore int32
 	podInitialBackoffSeconds int64
 	podMaxBackoffSeconds     int64
@@ -145,13 +143,6 @@ func WithProfiles(p ...schedulerapi.KubeSchedulerProfile) Option {
 func WithParallelism(threads int32) Option {
 	return func(o *schedulerOptions) {
 		o.parallelism = threads
-	}
-}
-
-// WithLegacyPolicySource sets legacy policy config file source.
-func WithLegacyPolicySource(source *schedulerapi.SchedulerPolicySource) Option {
-	return func(o *schedulerOptions) {
-		o.legacyPolicySource = source
 	}
 }
 
@@ -216,6 +207,7 @@ var defaultSchedulerOptions = schedulerOptions{
 // New returns a Scheduler
 func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
+	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
@@ -231,7 +223,7 @@ func New(client clientset.Interface,
 	}
 
 	if options.applyDefaultProfile {
-		var versionedCfg v1beta2.KubeSchedulerConfiguration
+		var versionedCfg v1beta3.KubeSchedulerConfiguration
 		scheme.Scheme.Default(&versionedCfg)
 		cfg := config.KubeSchedulerConfiguration{}
 		if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
@@ -239,7 +231,7 @@ func New(client clientset.Interface,
 		}
 		options.profiles = cfg.Profiles
 	}
-	schedulerCache := internalcache.New(30*time.Second, stopEverything)
+	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
 
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
@@ -271,51 +263,18 @@ func New(client clientset.Interface,
 
 	metrics.Register()
 
-	var sched *Scheduler
-	if options.legacyPolicySource == nil {
-		// Create the config from component config
-		sc, err := configurator.create()
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler: %v", err)
-		}
-		sched = sc
-	} else {
-		// Create the config from a user specified policy source.
-		policy := &schedulerapi.Policy{}
-		switch {
-		case options.legacyPolicySource.File != nil:
-			if err := initPolicyFromFile(options.legacyPolicySource.File.Path, policy); err != nil {
-				return nil, err
-			}
-		case options.legacyPolicySource.ConfigMap != nil:
-			if err := initPolicyFromConfigMap(client, options.legacyPolicySource.ConfigMap, policy); err != nil {
-				return nil, err
-			}
-		}
-		// Set extenders on the configurator now that we've decoded the policy
-		// In this case, c.extenders should be nil since we're using a policy (and therefore not componentconfig,
-		// which would have set extenders in the above instantiation of Configurator from CC options)
-		configurator.extenders = policy.Extenders
-		sc, err := configurator.createFromPolicy(*policy)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
-		}
-		sched = sc
+	// Create the config from component config
+	sched, err := configurator.create()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create scheduler: %v", err)
 	}
 
 	// Additional tweaks to the config produced by the configurator.
 	sched.StopEverything = stopEverything
 	sched.client = client
 
-	// Build dynamic client and dynamic informer factory
-	var dynInformerFactory dynamicinformer.DynamicSharedInformerFactory
-	// options.kubeConfig can be nil in tests.
-	if options.kubeConfig != nil {
-		dynClient := dynamic.NewForConfigOrDie(options.kubeConfig)
-		dynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
-	}
-
 	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
+
 	return sched, nil
 }
 
@@ -329,42 +288,6 @@ func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]fra
 		}
 	}
 	return gvkMap
-}
-
-// initPolicyFromFile initialize policy from file
-func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
-	// Use a policy serialized in a file.
-	_, err := os.Stat(policyFile)
-	if err != nil {
-		return fmt.Errorf("missing policy config file %s", policyFile)
-	}
-	data, err := ioutil.ReadFile(policyFile)
-	if err != nil {
-		return fmt.Errorf("couldn't read policy config: %v", err)
-	}
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
-	if err != nil {
-		return fmt.Errorf("invalid policy: %v", err)
-	}
-	return nil
-}
-
-// initPolicyFromConfigMap initialize policy from configMap
-func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi.SchedulerPolicyConfigMapSource, policy *schedulerapi.Policy) error {
-	// Use a policy serialized in a config map value.
-	policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(context.TODO(), policyRef.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
-	}
-	data, found := policyConfigMap.Data[schedulerapi.SchedulerPolicyConfigMapKey]
-	if !found {
-		return fmt.Errorf("missing policy config map value at key %q", schedulerapi.SchedulerPolicyConfigMapKey)
-	}
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
-	if err != nil {
-		return fmt.Errorf("invalid policy: %v", err)
-	}
-	return nil
 }
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
@@ -435,7 +358,7 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	assumed.Spec.NodeName = host
 
 	if err := sched.SchedulerCache.AssumePod(assumed); err != nil {
-		klog.ErrorS(err, "scheduler cache AssumePod failed")
+		klog.ErrorS(err, "Scheduler cache AssumePod failed")
 		return err
 	}
 	// if "assumed" is a nominated pod, we should remove it from internal cache
@@ -484,7 +407,7 @@ func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error)
 
 func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, targetNode string, err error) {
 	if finErr := sched.SchedulerCache.FinishBinding(assumed); finErr != nil {
-		klog.ErrorS(finErr, "scheduler cache FinishBinding failed")
+		klog.ErrorS(finErr, "Scheduler cache FinishBinding failed")
 	}
 	if err != nil {
 		klog.V(1).InfoS("Failed to bind pod", "pod", klog.KObj(assumed))
@@ -539,7 +462,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				// Run PostFilter plugins to try to make the pod schedulable in a future scheduling cycle.
 				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.Diagnosis.NodeToStatusMap)
 				if status.Code() == framework.Error {
-					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", klog.KObj(pod), "status", status)
+					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				} else {
 					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				}
@@ -585,7 +508,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// trigger un-reserve to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
-			klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 		sched.recordSchedulingFailure(fwk, assumedPodInfo, sts.AsError(), SchedulerError, "")
 		return
@@ -605,7 +528,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// One of the plugins returned status different than success or wait.
 		fwk.RunReservePluginsUnreserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
-			klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 		sched.recordSchedulingFailure(fwk, assumedPodInfo, runPermitStatus.AsError(), reason, "")
 		return
@@ -639,6 +562,16 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
 				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			} else {
+				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
+				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
+				// TODO(#103853): de-duplicate the logic.
+				// Avoid moving the assumed Pod itself as it's always Unschedulable.
+				// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
+				// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
+				defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, func(pod *v1.Pod) bool {
+					return assumedPod.UID != pod.UID
+				})
 			}
 			sched.recordSchedulingFailure(fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, "")
 			return
@@ -652,6 +585,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if forgetErr := sched.SchedulerCache.ForgetPod(assumedPod); forgetErr != nil {
 				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+			} else {
+				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
+				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
+				// TODO(#103853): de-duplicate the logic.
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 			sched.recordSchedulingFailure(fwk, assumedPodInfo, preBindStatus.AsError(), SchedulerError, "")
 			return
@@ -664,6 +602,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if err := sched.SchedulerCache.ForgetPod(assumedPod); err != nil {
 				klog.ErrorS(err, "scheduler cache ForgetPod failed")
+			} else {
+				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
+				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
+				// TODO(#103853): de-duplicate the logic.
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 			sched.recordSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, "")
 		} else {
@@ -714,7 +657,7 @@ func (sched *Scheduler) skipPodSchedule(fwk framework.Framework, pod *v1.Pod) bo
 		return true
 	}
 
-	// Case 2: pod has been assumed could be skipped.
+	// Case 2: pod that has been assumed could be skipped.
 	// An assumed pod can be added again to the scheduling queue if it got an update event
 	// during its previous scheduling cycle but before getting assumed.
 	isAssumed, err := sched.SchedulerCache.IsAssumedPod(pod)

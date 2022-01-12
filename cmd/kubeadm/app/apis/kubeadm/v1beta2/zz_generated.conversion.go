@@ -25,10 +25,10 @@ import (
 	unsafe "unsafe"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	v1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -204,6 +204,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*v1.BootstrapToken)(nil), (*BootstrapToken)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_BootstrapToken_To_v1beta2_BootstrapToken(a.(*v1.BootstrapToken), b.(*BootstrapToken), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*BootstrapToken)(nil), (*v1.BootstrapToken)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_BootstrapToken_To_v1_BootstrapToken(a.(*BootstrapToken), b.(*v1.BootstrapToken), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*ClusterConfiguration)(nil), (*kubeadm.ClusterConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(a.(*ClusterConfiguration), b.(*kubeadm.ClusterConfiguration), scope)
 	}); err != nil {
@@ -249,7 +259,7 @@ func autoConvert_v1beta2_APIServer_To_kubeadm_APIServer(in *APIServer, out *kube
 		return err
 	}
 	out.CertSANs = *(*[]string)(unsafe.Pointer(&in.CertSANs))
-	out.TimeoutForControlPlane = (*v1.Duration)(unsafe.Pointer(in.TimeoutForControlPlane))
+	out.TimeoutForControlPlane = (*metav1.Duration)(unsafe.Pointer(in.TimeoutForControlPlane))
 	return nil
 }
 
@@ -263,7 +273,7 @@ func autoConvert_kubeadm_APIServer_To_v1beta2_APIServer(in *kubeadm.APIServer, o
 		return err
 	}
 	out.CertSANs = *(*[]string)(unsafe.Pointer(&in.CertSANs))
-	out.TimeoutForControlPlane = (*v1.Duration)(unsafe.Pointer(in.TimeoutForControlPlane))
+	out.TimeoutForControlPlane = (*metav1.Duration)(unsafe.Pointer(in.TimeoutForControlPlane))
 	return nil
 }
 
@@ -414,7 +424,7 @@ func autoConvert_v1beta2_Discovery_To_kubeadm_Discovery(in *Discovery, out *kube
 	out.BootstrapToken = (*kubeadm.BootstrapTokenDiscovery)(unsafe.Pointer(in.BootstrapToken))
 	out.File = (*kubeadm.FileDiscovery)(unsafe.Pointer(in.File))
 	out.TLSBootstrapToken = in.TLSBootstrapToken
-	out.Timeout = (*v1.Duration)(unsafe.Pointer(in.Timeout))
+	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
@@ -427,7 +437,7 @@ func autoConvert_kubeadm_Discovery_To_v1beta2_Discovery(in *kubeadm.Discovery, o
 	out.BootstrapToken = (*BootstrapTokenDiscovery)(unsafe.Pointer(in.BootstrapToken))
 	out.File = (*FileDiscovery)(unsafe.Pointer(in.File))
 	out.TLSBootstrapToken = in.TLSBootstrapToken
-	out.Timeout = (*v1.Duration)(unsafe.Pointer(in.Timeout))
+	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
@@ -555,7 +565,17 @@ func Convert_kubeadm_ImageMeta_To_v1beta2_ImageMeta(in *kubeadm.ImageMeta, out *
 }
 
 func autoConvert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
-	out.BootstrapTokens = *(*[]bootstraptokenv1.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
+	if in.BootstrapTokens != nil {
+		in, out := &in.BootstrapTokens, &out.BootstrapTokens
+		*out = make([]v1.BootstrapToken, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta2_BootstrapToken_To_v1_BootstrapToken(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.BootstrapTokens = nil
+	}
 	if err := Convert_v1beta2_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
@@ -568,7 +588,17 @@ func autoConvert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 
 func autoConvert_kubeadm_InitConfiguration_To_v1beta2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	// WARNING: in.ClusterConfiguration requires manual conversion: does not exist in peer-type
-	out.BootstrapTokens = *(*[]BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
+	if in.BootstrapTokens != nil {
+		in, out := &in.BootstrapTokens, &out.BootstrapTokens
+		*out = make([]BootstrapToken, len(*in))
+		for i := range *in {
+			if err := Convert_v1_BootstrapToken_To_v1beta2_BootstrapToken(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.BootstrapTokens = nil
+	}
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}

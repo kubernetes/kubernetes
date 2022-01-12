@@ -51,7 +51,7 @@ func init() {
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = restricted_1_0
 
-	// 1.8+: runAsNonRoot=true
+	// 1.8+: allowPrivilegeEscalation=false
 	restricted_1_8 := tweak(restricted_1_0, func(p *corev1.Pod) {
 		p.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.BoolPtr(false)}
 		p.Spec.InitContainers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.BoolPtr(false)}
@@ -75,8 +75,8 @@ func init() {
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 22)] = restricted_1_22
 }
 
-// getValidPod returns a minimal valid pod for the specified level and version.
-func getMinimalValidPod(level api.Level, version api.Version) (*corev1.Pod, error) {
+// GetMinimalValidPod returns a minimal valid pod for the specified level and version.
+func GetMinimalValidPod(level api.Level, version api.Version) (*corev1.Pod, error) {
 	originalVersion := version
 	for {
 		pod, exists := minimalValidPods[level][version]
@@ -169,7 +169,7 @@ func getFixtures(key fixtureKey) (fixtureData, error) {
 		return fixtureData{}, err
 	}
 
-	validPodForLevel, err := getMinimalValidPod(key.level, key.version)
+	validPodForLevel, err := GetMinimalValidPod(key.level, key.version)
 	if err != nil {
 		return fixtureData{}, err
 	}

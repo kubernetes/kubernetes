@@ -38,8 +38,12 @@ var deprecatedApiRemovedRelease = map[schema.GroupVersionResource]string{
 	{Group: "storage.k8s.io", Version: "v1beta1", Resource: "csinodes"}:                                      "1.22",
 	{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}:                                               "1.25",
 	{Group: "discovery.k8s.io", Version: "v1beta1", Resource: "endpointslices"}:                              "1.25",
+	{Group: "events.k8s.io", Version: "v1beta1", Resource: "events"}:                                         "1.25",
+	{Group: "autoscaling", Version: "v2beta1", Resource: "horizontalpodautoscalers"}:                         "1.25",
 	{Group: "policy", Version: "v1beta1", Resource: "poddisruptionbudgets"}:                                  "1.25",
 	{Group: "policy", Version: "v1beta1", Resource: "podsecuritypolicies"}:                                   "1.25",
+	{Group: "node.k8s.io", Version: "v1beta1", Resource: "runtimeclasses"}:                                   "1.25",
+	{Group: "autoscaling", Version: "v2beta2", Resource: "horizontalpodautoscalers"}:                         "1.26",
 	// OpenShift APIs
 	{Group: "operator.openshift.io", Version: "v1beta1", Resource: "kubedeschedulers"}: "1.22",
 }

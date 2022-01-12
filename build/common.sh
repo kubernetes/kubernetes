@@ -52,6 +52,10 @@ readonly KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-k8s.gcr.io/build-
 readonly KUBE_BUILD_IMAGE_VERSION_BASE="$(cat "${KUBE_ROOT}/build/build-image/VERSION")"
 readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
+# Make it possible to override the `kube-cross` image, and tag independent of `KUBE_BASE_IMAGE_REGISTRY`
+readonly KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
+readonly KUBE_CROSS_VERSION="${KUBE_CROSS_VERSION:-"${KUBE_BUILD_IMAGE_CROSS_TAG}"}"
+
 # Here we map the output directories across both the local and remote _output
 # directories:
 #
@@ -86,9 +90,9 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_debian_iptables_version=buster-v1.6.5
-readonly __default_go_runner_version=v2.3.1-go1.16.7-buster.0
-readonly __default_setcap_version=buster-v2.0.3
+readonly __default_debian_iptables_version=bullseye-v1.1.0
+readonly __default_go_runner_version=v2.3.1-go1.17.3-bullseye.0
+readonly __default_setcap_version=bullseye-v1.0.0
 
 # These are the base images for the Docker-wrapped binaries.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
@@ -373,7 +377,7 @@ function kube::build::build_image() {
   dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
   chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false' "--build-arg=KUBE_BUILD_IMAGE_CROSS_TAG=${KUBE_BUILD_IMAGE_CROSS_TAG} --build-arg=KUBE_BASE_IMAGE_REGISTRY=${KUBE_BASE_IMAGE_REGISTRY}"
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false' "--build-arg=KUBE_CROSS_IMAGE=${KUBE_CROSS_IMAGE} --build-arg=KUBE_CROSS_VERSION=${KUBE_CROSS_VERSION}"
 
   # Clean up old versions of everything
   kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
@@ -391,6 +395,8 @@ function kube::build::build_image() {
 # $3 is the value to set the --pull flag for docker build; true by default
 # $4 is the set of --build-args for docker.
 function kube::build::docker_build() {
+  kube::util::ensure-docker-buildx
+
   local -r image=$1
   local -r context_dir=$2
   local -r pull="${3:-true}"
@@ -519,6 +525,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
     --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
     --env "KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-}"
+    --env "KUBE_CGO_OVERRIDES=' ${KUBE_CGO_OVERRIDES[*]:-} '"
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"

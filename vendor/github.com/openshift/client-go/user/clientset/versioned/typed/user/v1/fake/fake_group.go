@@ -83,7 +83,7 @@ func (c *FakeGroups) Update(ctx context.Context, group *userv1.Group, opts v1.Up
 // Delete takes name of the group and deletes it. Returns an error if one occurs.
 func (c *FakeGroups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(groupsResource, name), &userv1.Group{})
+		Invokes(testing.NewRootDeleteActionWithOptions(groupsResource, name, opts), &userv1.Group{})
 	return err
 }
 

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
@@ -708,7 +709,7 @@ func TestGetVMSS(t *testing.T) {
 			existedVMSSName: "vmss-1",
 			vmssName:        "vmss-1",
 			vmssListError:   &retry.Error{RawError: fmt.Errorf("error during vmss list")},
-			expectedErr:     fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error during vmss list"),
+			expectedErr:     fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error during vmss list")),
 		},
 	}
 
@@ -836,6 +837,57 @@ func TestGetPowerStatusByNodeName(t *testing.T) {
 	}
 }
 
+func TestGetProvisioningStateByNodeName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	testCases := []struct {
+		description               string
+		vmList                    []string
+		provisioningState         string
+		expectedProvisioningState string
+		expectedErr               error
+	}{
+		{
+			description:               "GetProvisioningStateByNodeName should return empty value when the vm.ProvisioningState is nil",
+			provisioningState:         "",
+			vmList:                    []string{"vmss-vm-000001"},
+			expectedProvisioningState: "",
+		},
+		{
+			description:               "GetProvisioningStateByNodeName should return Succeeded when the vm is running",
+			provisioningState:         "Succeeded",
+			vmList:                    []string{"vmss-vm-000001"},
+			expectedProvisioningState: "Succeeded",
+		},
+	}
+
+	for _, test := range testCases {
+		ss, err := newTestScaleSet(ctrl)
+		assert.NoError(t, err, "unexpected error when creating test VMSS")
+
+		expectedVMSS := buildTestVMSS(testVMSSName, "vmss-vm-")
+		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
+		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
+
+		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, testVMSSName, "", 0, test.vmList, "", false)
+		mockVMSSVMClient := ss.cloud.VirtualMachineScaleSetVMsClient.(*mockvmssvmclient.MockInterface)
+		if test.provisioningState != "" {
+			expectedVMSSVMs[0].ProvisioningState = to.StringPtr(test.provisioningState)
+		} else {
+			expectedVMSSVMs[0].ProvisioningState = nil
+		}
+		mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
+
+		mockVMsClient := ss.cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		mockVMsClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachine{}, nil).AnyTimes()
+
+		provisioningState, err := ss.GetProvisioningStateByNodeName("vmss-vm-000001")
+		assert.Equal(t, test.expectedErr, err, test.description+", but an error occurs")
+		assert.Equal(t, test.expectedProvisioningState, provisioningState, test.description)
+	}
+}
+
 func TestGetVmssVMByInstanceID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -897,7 +949,7 @@ func TestGetInstanceTypeByNodeName(t *testing.T) {
 			vmList:       []string{"vmss-vm-000000"},
 			vmClientErr:  &retry.Error{RawError: fmt.Errorf("error")},
 			expectedType: "",
-			expectedErr:  fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:  fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 	}
 
@@ -1019,7 +1071,7 @@ func TestGetPrimaryInterface(t *testing.T) {
 			vmList:              []string{"vmss-vm-000000"},
 			hasPrimaryInterface: true,
 			vmClientErr:         &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:         fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:         fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 		{
 			description:         "GetPrimaryInterface should report the error if vmss client returns retry error",
@@ -1027,7 +1079,7 @@ func TestGetPrimaryInterface(t *testing.T) {
 			vmList:              []string{"vmss-vm-000000"},
 			hasPrimaryInterface: true,
 			vmssClientErr:       &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:         fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:         fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 		{
 			description:         "GetPrimaryInterface should report the error if there is no primary interface",
@@ -1050,7 +1102,7 @@ func TestGetPrimaryInterface(t *testing.T) {
 			vmList:              []string{"vmss-vm-000000"},
 			hasPrimaryInterface: true,
 			nicClientErr:        &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:         fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:         fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 		{
 			description:         "GetPrimaryInterface should report the error if the NIC instance is not found",
@@ -1125,7 +1177,7 @@ func TestGetVMSSPublicIPAddress(t *testing.T) {
 			pipName:      "pip",
 			found:        false,
 			pipClientErr: &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:  fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:  fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 		{
 			description: "GetVMSSPublicIPAddress should not report errors if the pip cannot be found",
@@ -1181,7 +1233,7 @@ func TestGetPrivateIPsByNodeName(t *testing.T) {
 			vmList:             []string{"vmss-vm-000000"},
 			vmClientErr:        &retry.Error{RawError: fmt.Errorf("error")},
 			expectedPrivateIPs: []string{},
-			expectedErr:        fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:        fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 	}
 
@@ -1293,7 +1345,7 @@ func TestListScaleSets(t *testing.T) {
 		{
 			description:   "listScaleSets should report the error if vmss client returns an retry.Error",
 			vmssClientErr: &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 	}
 
@@ -1330,7 +1382,7 @@ func TestListScaleSetVMs(t *testing.T) {
 		{
 			description:     "listScaleSetVMs should report the error that the vmss vm client hits",
 			vmssVMClientErr: &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:     fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:     fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error")),
 		},
 	}
 
@@ -1355,12 +1407,14 @@ func TestGetAgentPoolScaleSets(t *testing.T) {
 
 	testCases := []struct {
 		description       string
+		excludeLBNodes    []string
 		nodes             []*v1.Node
 		expectedVMSSNames *[]string
 		expectedErr       error
 	}{
 		{
-			description: "getAgentPoolScaleSets should return the correct vmss names",
+			description:    "getAgentPoolScaleSets should return the correct vmss names",
+			excludeLBNodes: []string{"vmss-vm-000000", "vmss-vm-000001"},
 			nodes: []*v1.Node{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1382,11 +1436,30 @@ func TestGetAgentPoolScaleSets(t *testing.T) {
 			},
 			expectedVMSSNames: &[]string{"vmss"},
 		},
+		{
+			description:    "getAgentPoolScaleSets should return the correct vmss names",
+			excludeLBNodes: []string{"vmss-vm-000001"},
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "vmss-vm-000001",
+						Labels: map[string]string{v1.LabelNodeExcludeBalancers: "true"},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vmss-vm-000002",
+					},
+				},
+			},
+			expectedVMSSNames: &[]string{"vmss"},
+		},
 	}
 
 	for _, test := range testCases {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
+		ss.excludeLoadBalancerNodes = sets.NewString(test.excludeLBNodes...)
 
 		expectedVMSS := buildTestVMSS(testVMSSName, "vmss-vm-")
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
@@ -2094,7 +2167,7 @@ func TestEnsureHostsInPool(t *testing.T) {
 			expectedVMSSVMPutTimes: 1,
 		},
 		{
-			description: "EnsureHostsInPool should gather report the error if something goes wrong in EnsureHostInPool",
+			description: "EnsureHostsInPool should skip not found nodes",
 			nodes: []*v1.Node{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2108,7 +2181,7 @@ func TestEnsureHostsInPool(t *testing.T) {
 			backendpoolID:          testLBBackendpoolID1,
 			vmSetName:              testVMSSName,
 			expectedVMSSVMPutTimes: 0,
-			expectedErr:            true,
+			expectedErr:            false,
 		},
 	}
 
@@ -2154,9 +2227,8 @@ func TestEnsureBackendPoolDeletedFromNode(t *testing.T) {
 		expectedErr               error
 	}{
 		{
-			description: "ensureBackendPoolDeletedFromNode should report the error that occurs during getVmssVM",
+			description: "ensureBackendPoolDeletedFromNode should skip not found nodes",
 			nodeName:    "vmss-vm-000001",
-			expectedErr: cloudprovider.InstanceNotFound,
 		},
 		{
 			description:           "ensureBackendPoolDeletedFromNode skip the node if the VM's NIC config is nil",
@@ -2285,7 +2357,7 @@ func TestEnsureBackendPoolDeletedFromVMSS(t *testing.T) {
 			backendPoolID:      testLBBackendpoolID0,
 			expectedPutVMSS:    true,
 			vmssClientErr:      &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:        utilerrors.NewAggregate([]error{fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error")}),
+			expectedErr:        utilerrors.NewAggregate([]error{fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("error"))}),
 		},
 	}
 
@@ -2383,6 +2455,26 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 			expectedErr:            true,
 			vmClientErr:            &retry.Error{RawError: fmt.Errorf("error")},
 		},
+		{
+			description:   "EnsureBackendPoolDeleted should skip the node that doesn't exist",
+			backendpoolID: testLBBackendpoolID0,
+			backendAddressPools: &[]network.BackendAddressPool{
+				{
+					ID: to.StringPtr(testLBBackendpoolID0),
+					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+							{
+								Name: to.StringPtr("ip-1"),
+								ID:   to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/6/networkInterfaces/nic"),
+							},
+						},
+					},
+				},
+				{
+					ID: to.StringPtr(testLBBackendpoolID1),
+				},
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -2401,7 +2493,7 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
 		mockVMSSVMClient.EXPECT().UpdateVMs(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any(), gomock.Any()).Return(test.vmClientErr).Times(test.expectedVMSSVMPutTimes)
 
-		err = ss.EnsureBackendPoolDeleted(&v1.Service{}, test.backendpoolID, testVMSSName, test.backendAddressPools)
+		err = ss.EnsureBackendPoolDeleted(&v1.Service{}, test.backendpoolID, testVMSSName, test.backendAddressPools, true)
 		assert.Equal(t, test.expectedErr, err != nil, test.description+", but an error occurs")
 	}
 }
@@ -2437,7 +2529,6 @@ func TestEnsureBackendPoolDeletedConcurrently(t *testing.T) {
 			},
 		},
 		{
-			// this would fail
 			ID: to.StringPtr(testLBBackendpoolID2),
 			BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
 				BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
@@ -2476,13 +2567,13 @@ func TestEnsureBackendPoolDeletedConcurrently(t *testing.T) {
 	mockVMSSVMClient.EXPECT().UpdateVMs(gomock.Any(), ss.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	backendpoolAddressIDs := []string{testLBBackendpoolID0, testLBBackendpoolID1, testLBBackendpoolID2}
-	testVMSSNames := []string{"vmss-0", "vmss-1", "vmss-0"}
+	testVMSSNames := []string{"vmss-0", "vmss-1", "vmss-2"}
 	testFunc := make([]func() error, 0)
 	for i, id := range backendpoolAddressIDs {
 		i := i
 		id := id
 		testFunc = append(testFunc, func() error {
-			return ss.EnsureBackendPoolDeleted(&v1.Service{}, id, testVMSSNames[i], backendAddressPools)
+			return ss.EnsureBackendPoolDeleted(&v1.Service{}, id, testVMSSNames[i], backendAddressPools, true)
 		})
 	}
 	errs := utilerrors.AggregateGoroutines(testFunc...)

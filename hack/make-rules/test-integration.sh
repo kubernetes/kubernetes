@@ -64,6 +64,9 @@ runTests() {
   kube::log::status "Starting etcd instance"
   CLEANUP_REQUIRED=1
   kube::etcd::start
+  # shellcheck disable=SC2034
+  local ETCD_SCRAPE_PID # Set in kube::etcd::start_scraping, used in cleanup
+  kube::etcd::start_scraping
   kube::log::status "Running integration test cases"
 
   make -C "${KUBE_ROOT}" test \

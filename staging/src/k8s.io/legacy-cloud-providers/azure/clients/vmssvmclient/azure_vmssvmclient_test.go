@@ -707,7 +707,7 @@ func TestUpdateVMsThrottle(t *testing.T) {
 	vmssvmClient := getTestVMSSVMClient(armClient)
 	rerr := vmssvmClient.UpdateVMs(context.TODO(), "rg", "vmss1", instances, "test")
 	assert.NotNil(t, rerr)
-	assert.Equal(t, throttleErr.Error(), fmt.Errorf(rerr.RawError.Error()))
+	assert.EqualError(t, throttleErr.Error(), rerr.RawError.Error())
 }
 
 func getTestVMSSVM(vmssName, instanceID string) compute.VirtualMachineScaleSetVM {

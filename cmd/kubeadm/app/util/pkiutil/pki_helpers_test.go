@@ -29,10 +29,10 @@ import (
 	"reflect"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	certutil "k8s.io/client-go/util/cert"
 	netutils "k8s.io/utils/net"
 
-	certutil "k8s.io/client-go/util/cert"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 var (

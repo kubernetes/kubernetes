@@ -180,16 +180,16 @@ func TestEnsureLoadBalancerDeletedDeletesInternalLb(t *testing.T) {
 	assertInternalLbResourcesDeleted(t, gce, apiService, vals, true)
 }
 
-func TestBasePath(t *testing.T) {
+func TestProjectsBasePath(t *testing.T) {
 	t.Parallel()
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	// Loadbalancer controller code expects basepath to contain the projects string.
-	expectBasePath := "https://compute.googleapis.com/compute/v1/projects/"
+	expectProjectsBasePath := "https://compute.googleapis.com/compute/v1/projects/"
 	// See https://github.com/kubernetes/kubernetes/issues/102757, the endpoint can have mtls in some cases.
-	expectMtlsBasePath := "https://compute.mtls.googleapis.com/compute/v1/projects/"
+	expectMtlsProjectsBasePath := "https://compute.mtls.googleapis.com/compute/v1/projects/"
 	require.NoError(t, err)
-	if gce.service.BasePath != expectBasePath && gce.service.BasePath != expectMtlsBasePath {
-		t.Errorf("Compute basePath has changed. Got %q, want %q or %q", gce.service.BasePath, expectBasePath, expectMtlsBasePath)
+	if gce.projectsBasePath != expectProjectsBasePath && gce.projectsBasePath != expectMtlsProjectsBasePath {
+		t.Errorf("Compute projectsBasePath has changed. Got %q, want %q or %q", gce.projectsBasePath, expectProjectsBasePath, expectMtlsProjectsBasePath)
 	}
 }

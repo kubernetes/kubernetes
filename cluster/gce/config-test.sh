@@ -212,7 +212,7 @@ HEAPSTER_MACHINE_TYPE=${HEAPSTER_MACHINE_TYPE:-}
 NUM_ADDITIONAL_NODES=${NUM_ADDITIONAL_NODES:-}
 ADDITIONAL_MACHINE_TYPE=${ADDITIONAL_MACHINE_TYPE:-}
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. v3.5.0-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. v3.5.1-0) if you need
 # non-default version.
 export ETCD_IMAGE=${TEST_ETCD_IMAGE:-}
 export ETCD_DOCKER_REPOSITORY=${TEST_ETCD_DOCKER_REPOSITORY:-}
@@ -471,7 +471,7 @@ EVICTION_HARD=${EVICTION_HARD:-memory.available<250Mi,nodefs.available<10%,nodef
 SCHEDULING_ALGORITHM_PROVIDER=${SCHEDULING_ALGORITHM_PROVIDER:-}
 
 # Optional: install a default StorageClass
-ENABLE_DEFAULT_STORAGE_CLASS=${ENABLE_DEFAULT_STORAGE_CLASS:-true}
+ENABLE_DEFAULT_STORAGE_CLASS=${ENABLE_DEFAULT_STORAGE_CLASS:-false}
 
 # Optional: install volume snapshot CRDs
 ENABLE_VOLUME_SNAPSHOTS=${ENABLE_VOLUME_SNAPSHOTS:-true}

@@ -882,7 +882,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	testPodContainerRestartWithHooks(f, pod, &podContainerRestartHooks{
 		AddLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
 			p.Spec.Containers[0].LivenessProbe = &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"cat", probeFilePath},
 					},
@@ -936,7 +936,7 @@ func TestPodContainerRestartWithConfigmapModified(f *framework.Framework, origin
 	testPodContainerRestartWithHooks(f, pod, &podContainerRestartHooks{
 		AddLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
 			p.Spec.Containers[0].LivenessProbe = &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					Exec: &v1.ExecAction{
 						// Expect probe file exist or configmap mounted file has been modified.
 						Command: []string{"sh", "-c", fmt.Sprintf("cat %s || test `cat %s` = '%s'", probeFilePath, volumePath, modifiedValue)},

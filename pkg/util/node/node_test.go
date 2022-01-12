@@ -23,9 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -99,7 +96,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 	testcases := []struct {
 		name      string
 		addresses []v1.NodeAddress
-		dualStack bool
 
 		expectIPs []net.IP
 	}{
@@ -141,7 +137,7 @@ func TestGetNodeHostIPs(t *testing.T) {
 			expectIPs: []net.IP{netutils.ParseIPSloppy("4.3.2.1")},
 		},
 		{
-			name: "dual-stack node, single-stack cluster",
+			name: "dual-stack node",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
@@ -149,52 +145,50 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4")},
-		},
-		{
-			name: "dual-stack node, dual-stack cluster",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-			},
-			dualStack: true,
 			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node, different order, single-stack cluster",
+			name: "dual-stack node",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4")},
-		},
-		{
-			name: "dual-stack node, different order, dual-stack cluster",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
-			dualStack: true,
 			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node, IPv6-first, no internal IPv4, single-stack cluster",
+			name: "dual-stack node, different order",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
+		},
+		{
+			name: "dual-stack node, different order",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+			},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
+		},
+		{
+			name: "dual-stack node, IPv6-first, no internal IPv4",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d"), netutils.ParseIPSloppy("4.3.2.1")},
 		},
 		{
 			name: "dual-stack node, IPv6-first, no internal IPv4, dual-stack cluster",
@@ -204,14 +198,12 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 			},
-			dualStack: true,
 			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d"), netutils.ParseIPSloppy("4.3.2.1")},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.dualStack)()
 			node := &v1.Node{
 				Status: v1.NodeStatus{Addresses: tc.addresses},
 			}

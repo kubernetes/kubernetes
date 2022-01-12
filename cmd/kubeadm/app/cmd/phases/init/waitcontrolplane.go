@@ -19,20 +19,19 @@ package phases
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"text/template"
 	"time"
+
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -80,9 +79,12 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.New("wait-control-plane phase invoked with an invalid data struct")
 	}
 
-	// If we're dry-running, print the generated manifests
-	if err := printFilesIfDryRunning(data); err != nil {
-		return errors.Wrap(err, "error printing files on dryrun")
+	// If we're dry-running, print the generated manifests.
+	// TODO: think of a better place to move this call - e.g. a hidden phase.
+	if data.DryRun() {
+		if err := dryrunutil.PrintFilesIfDryRunning(true /* needPrintManifest */, data.ManifestDir(), data.OutputWriter()); err != nil {
+			return errors.Wrap(err, "error printing files on dryrun")
+		}
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
@@ -117,36 +119,6 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	return nil
-}
-
-// printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
-func printFilesIfDryRunning(data InitData) error {
-	if !data.DryRun() {
-		return nil
-	}
-	manifestDir := data.ManifestDir()
-
-	fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
-	fmt.Println("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature")
-	fmt.Printf("[dryrun] Please examine the %q directory for details about what would be written\n", manifestDir)
-
-	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
-	files := []dryrunutil.FileToPrint{}
-	// Print static pod manifests
-	for _, component := range kubeadmconstants.ControlPlaneComponents {
-		realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
-		outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
-		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
-	}
-	// Print kubelet config manifests
-	kubeletConfigFiles := []string{kubeadmconstants.KubeletConfigurationFileName, kubeadmconstants.KubeletEnvFileName}
-	for _, filename := range kubeletConfigFiles {
-		realPath := filepath.Join(manifestDir, filename)
-		outputPath := filepath.Join(kubeadmconstants.KubeletRunDirectory, filename)
-		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
-	}
-
-	return dryrunutil.PrintDryRunFiles(files, data.OutputWriter())
 }
 
 // newControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.

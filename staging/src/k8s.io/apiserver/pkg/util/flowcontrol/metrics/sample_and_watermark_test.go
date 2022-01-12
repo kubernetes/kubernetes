@@ -17,15 +17,15 @@ limitations under the License.
 package metrics
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	compbasemetrics "k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	testclock "k8s.io/utils/clock/testing"
 )
 
 const (
@@ -35,6 +35,8 @@ const (
 	ddtOffsetCentiPeriods = 50
 	numIterations         = 100
 )
+
+var errMetricNotFound = errors.New("not found")
 
 /* TestSampler does a rough behavioral test of the sampling in a
    SampleAndWatermarkHistograms.  The test creates one and exercises
@@ -52,16 +54,17 @@ const (
 */
 func TestSampler(t *testing.T) {
 	t0 := time.Now()
-	clk := clock.NewFakePassiveClock(t0)
+	clk := testclock.NewFakePassiveClock(t0)
 	buckets := []float64{0, 1}
 	gen := NewSampleAndWaterMarkHistogramsGenerator(clk, samplingPeriod,
 		&compbasemetrics.HistogramOpts{Name: samplesHistName, Buckets: buckets},
 		&compbasemetrics.HistogramOpts{Name: "marks", Buckets: buckets},
 		[]string{})
 	saw := gen.Generate(0, 1, []string{})
-	regs := gen.metrics()
-	for _, reg := range regs {
-		legacyregistry.MustRegister(reg)
+	toRegister := gen.metrics()
+	registry := compbasemetrics.NewKubeRegistry()
+	for _, reg := range toRegister {
+		registry.MustRegister(reg)
 	}
 	// `dt` is the admitted cumulative difference in fake time
 	// since the start of the test.  "admitted" means this is
@@ -81,10 +84,10 @@ func TestSampler(t *testing.T) {
 			dt = diff
 		}
 		clk.SetTime(t1)
-		saw.Set(1)
+		saw.Observe(1)
 		expectedCount := int64(dt / samplingPeriod)
-		actualCount, err := getHistogramCount(regs, samplesHistName)
-		if err != nil {
+		actualCount, err := getHistogramCount(registry, samplesHistName)
+		if err != nil && !(err == errMetricNotFound && expectedCount == 0) {
 			t.Fatalf("For t0=%s, t1=%s, failed to getHistogramCount: %#+v", t0, t1, err)
 		}
 		t.Logf("For i=%d, ddt=%s, t1=%s, diff=%s, dt=%s, count=%d", i, ddt, t1, diff, dt, actualCount)
@@ -94,28 +97,26 @@ func TestSampler(t *testing.T) {
 	}
 }
 
-/* getHistogramCount returns the count of the named histogram */
-func getHistogramCount(regs Registerables, metricName string) (int64, error) {
-	considered := []string{}
-	mfs, err := legacyregistry.DefaultGatherer.Gather()
+/* getHistogramCount returns the count of the named histogram or an error (if any) */
+func getHistogramCount(registry compbasemetrics.KubeRegistry, metricName string) (int64, error) {
+	mfs, err := registry.Gather()
 	if err != nil {
-		return 0, fmt.Errorf("failed to gather metrics: %s", err)
+		return 0, fmt.Errorf("failed to gather metrics: %w", err)
 	}
 	for _, mf := range mfs {
 		thisName := mf.GetName()
 		if thisName != metricName {
-			considered = append(considered, thisName)
 			continue
 		}
 		metric := mf.GetMetric()[0]
 		hist := metric.GetHistogram()
 		if hist == nil {
-			return 0, fmt.Errorf("dto.Metric has nil Histogram")
+			return 0, errors.New("dto.Metric has nil Histogram")
 		}
 		if hist.SampleCount == nil {
-			return 0, fmt.Errorf("dto.Histogram has nil SampleCount")
+			return 0, errors.New("dto.Histogram has nil SampleCount")
 		}
 		return int64(*hist.SampleCount), nil
 	}
-	return 0, fmt.Errorf("not found, considered=%#+v", considered)
+	return 0, errMetricNotFound
 }

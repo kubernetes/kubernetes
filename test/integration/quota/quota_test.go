@@ -95,8 +95,8 @@ func TestQuota(t *testing.T) {
 	ns2 := framework.CreateTestingNamespace("non-quotaed", s, t)
 	defer framework.DeleteTestingNamespace(ns2, s, t)
 
-	controllerCh := make(chan struct{})
-	defer close(controllerCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
@@ -106,7 +106,7 @@ func TestQuota(t *testing.T) {
 		replicationcontroller.BurstReplicas,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	go rm.Run(3, controllerCh)
+	go rm.Run(ctx, 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -127,13 +127,13 @@ func TestQuota(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	go resourceQuotaController.Run(2, controllerCh)
+	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
 
-	internalInformers.Start(controllerCh)
-	informers.Start(controllerCh)
+	internalInformers.Start(ctx.Done())
+	informers.Start(ctx.Done())
 	close(informersStarted)
 
 	startTime := time.Now()
@@ -326,8 +326,8 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	ns := framework.CreateTestingNamespace("quota", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	controllerCh := make(chan struct{})
-	defer close(controllerCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
@@ -337,7 +337,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		replicationcontroller.BurstReplicas,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	go rm.Run(3, controllerCh)
+	go rm.Run(ctx, 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -358,13 +358,13 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	go resourceQuotaController.Run(2, controllerCh)
+	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
 
-	externalInformers.Start(controllerCh)
-	informers.Start(controllerCh)
+	externalInformers.Start(ctx.Done())
+	informers.Start(ctx.Done())
 	close(informersStarted)
 
 	// try to create a pod
@@ -382,7 +382,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 			},
 		},
 	}
-	if _, err := clientset.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err == nil {
+	if _, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err == nil {
 		t.Fatalf("expected error for insufficient quota")
 	}
 
@@ -405,7 +405,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	// attempt to create a new pod once the quota is propagated
 	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
 		// retry until we succeed (to allow time for all changes to propagate)
-		if _, err := clientset.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err == nil {
+		if _, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err == nil {
 			return true, nil
 		}
 		return false, nil
@@ -456,8 +456,8 @@ func TestQuotaLimitService(t *testing.T) {
 	ns := framework.CreateTestingNamespace("quota", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	controllerCh := make(chan struct{})
-	defer close(controllerCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
@@ -467,7 +467,7 @@ func TestQuotaLimitService(t *testing.T) {
 		replicationcontroller.BurstReplicas,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	go rm.Run(3, controllerCh)
+	go rm.Run(ctx, 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -488,13 +488,13 @@ func TestQuotaLimitService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	go resourceQuotaController.Run(2, controllerCh)
+	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerCh)
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
 
-	externalInformers.Start(controllerCh)
-	informers.Start(controllerCh)
+	externalInformers.Start(ctx.Done())
+	informers.Start(ctx.Done())
 	close(informersStarted)
 
 	// now create a covering quota
@@ -517,14 +517,14 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating the first node port service should succeed
 	nodePortService := newService("np-svc", v1.ServiceTypeNodePort, true)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), nodePortService, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, nodePortService, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating first node port Service should not have returned error: %v", err)
 	}
 
 	// Creating the first loadbalancer service should succeed
 	lbServiceWithNodePort1 := newService("lb-svc-withnp1", v1.ServiceTypeLoadBalancer, true)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithNodePort1, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, lbServiceWithNodePort1, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating first loadbalancer Service should not have returned error: %v", err)
 	}
@@ -543,7 +543,7 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating a loadbalancer Service without node ports should succeed
 	lbServiceWithoutNodePort1 := newService("lb-svc-wonp1", v1.ServiceTypeLoadBalancer, false)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), lbServiceWithoutNodePort1, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, lbServiceWithoutNodePort1, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating another loadbalancer Service without node ports should not have returned error: %v", err)
 	}
@@ -562,7 +562,7 @@ func TestQuotaLimitService(t *testing.T) {
 
 	// Creating a ClusterIP Service should succeed
 	clusterIPService1 := newService("clusterip-svc1", v1.ServiceTypeClusterIP, false)
-	_, err = clientset.CoreV1().Services(ns.Name).Create(context.TODO(), clusterIPService1, metav1.CreateOptions{})
+	_, err = clientset.CoreV1().Services(ns.Name).Create(ctx, clusterIPService1, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("creating a cluster IP Service should not have returned error: %v", err)
 	}

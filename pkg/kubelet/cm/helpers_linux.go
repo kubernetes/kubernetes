@@ -156,6 +156,21 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 		}
 	}
 
+	for _, container := range pod.Spec.InitContainers {
+		if container.Resources.Limits.Cpu().IsZero() {
+			cpuLimitsDeclared = false
+		}
+		if container.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = false
+		}
+		containerHugePageLimits := HugePageLimits(container.Resources.Requests)
+		for k, v := range containerHugePageLimits {
+			if value, exists := hugePageLimits[k]; !exists || v > value {
+				hugePageLimits[k] = v
+			}
+		}
+	}
+
 	// quota is not capped when cfs quota is disabled
 	if !enforceCPULimits {
 		cpuQuota = int64(-1)

@@ -94,7 +94,7 @@ func (c *FakeInfrastructures) UpdateStatus(ctx context.Context, infrastructure *
 // Delete takes name of the infrastructure and deletes it. Returns an error if one occurs.
 func (c *FakeInfrastructures) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(infrastructuresResource, name), &configv1.Infrastructure{})
+		Invokes(testing.NewRootDeleteActionWithOptions(infrastructuresResource, name, opts), &configv1.Infrastructure{})
 	return err
 }
 

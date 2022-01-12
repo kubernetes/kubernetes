@@ -118,10 +118,10 @@ func computeVersionsToTest(t *testing.T, checks []policy.Check) []api.Version {
 	alwaysIncludeVersions := []api.Version{
 		// include the oldest version by default
 		api.MajorMinorVersion(1, 0),
-		// include the release under development (1.22 at time of writing).
+		// include the release under development (1.23 at time of writing).
 		// this can be incremented to the current version whenever is convenient.
 		// TODO: find a way to use api.LatestVersion() here
-		api.MajorMinorVersion(1, 22),
+		api.MajorMinorVersion(1, 23),
 	}
 	for _, version := range alwaysIncludeVersions {
 		seenVersions[version] = true
@@ -296,7 +296,7 @@ func Run(t *testing.T, opts Options) {
 				}
 			}
 
-			minimalValidPod, err := getMinimalValidPod(level, version)
+			minimalValidPod, err := GetMinimalValidPod(level, version)
 			if err != nil {
 				t.Fatal(err)
 			}

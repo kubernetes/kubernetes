@@ -20,14 +20,14 @@ import (
 	"crypto/x509"
 	"sort"
 
+	"github.com/pkg/errors"
+
+	certutil "k8s.io/client-go/util/cert"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-
-	certutil "k8s.io/client-go/util/cert"
-
-	"github.com/pkg/errors"
 )
 
 // Manager can be used to coordinate certificate renewal and related processes,

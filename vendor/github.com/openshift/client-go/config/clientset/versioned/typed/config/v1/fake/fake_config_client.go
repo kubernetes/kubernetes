@@ -48,6 +48,10 @@ func (c *FakeConfigV1) Images() v1.ImageInterface {
 	return &FakeImages{c}
 }
 
+func (c *FakeConfigV1) ImageContentPolicies() v1.ImageContentPolicyInterface {
+	return &FakeImageContentPolicies{c}
+}
+
 func (c *FakeConfigV1) Infrastructures() v1.InfrastructureInterface {
 	return &FakeInfrastructures{c}
 }

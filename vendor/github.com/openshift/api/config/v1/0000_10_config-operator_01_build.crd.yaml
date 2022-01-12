@@ -61,7 +61,7 @@ spec:
                           description: httpsProxy is the URL of the proxy for HTTPS requests.  Empty means unset and will not result in an env var.
                           type: string
                         noProxy:
-                          description: noProxy is a comma-separated list of hostnames and/or CIDRs for which the proxy should not be used. Empty means unset and will not result in an env var.
+                          description: noProxy is a comma-separated list of hostnames and/or CIDRs and/or IPs for which the proxy should not be used. Empty means unset and will not result in an env var.
                           type: string
                         readinessEndpoints:
                           description: readinessEndpoints is a list of endpoints used to verify readiness of the proxy.
@@ -168,7 +168,7 @@ spec:
                           description: httpsProxy is the URL of the proxy for HTTPS requests.  Empty means unset and will not result in an env var.
                           type: string
                         noProxy:
-                          description: noProxy is a comma-separated list of hostnames and/or CIDRs for which the proxy should not be used. Empty means unset and will not result in an env var.
+                          description: noProxy is a comma-separated list of hostnames and/or CIDRs and/or IPs for which the proxy should not be used. Empty means unset and will not result in an env var.
                           type: string
                         readinessEndpoints:
                           description: readinessEndpoints is a list of endpoints used to verify readiness of the proxy.

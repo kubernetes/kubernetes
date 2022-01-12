@@ -39,13 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 var (
@@ -619,12 +619,12 @@ type throttleSettings struct {
 }
 
 type throttledLogger struct {
-	clock    utilclock.PassiveClock
+	clock    clock.PassiveClock
 	settings []*throttleSettings
 }
 
 var globalThrottledLogger = &throttledLogger{
-	clock: utilclock.RealClock{},
+	clock: clock.RealClock{},
 	settings: []*throttleSettings{
 		{
 			logLevel:       2,

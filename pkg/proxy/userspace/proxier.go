@@ -487,10 +487,10 @@ func (proxier *Proxier) addServiceOnPortInternal(service proxy.ServicePortName, 
 
 func (proxier *Proxier) cleanupPortalAndProxy(serviceName proxy.ServicePortName, info *ServiceInfo) error {
 	if err := proxier.closePortal(serviceName, info); err != nil {
-		return fmt.Errorf("Failed to close portal for %q: %v", serviceName, err)
+		return fmt.Errorf("failed to close portal for %q: %w", serviceName, err)
 	}
 	if err := proxier.stopProxy(serviceName, info); err != nil {
-		return fmt.Errorf("Failed to stop service %q: %v", serviceName, err)
+		return fmt.Errorf("failed to stop service %q: %w", serviceName, err)
 	}
 	return nil
 }
@@ -1141,7 +1141,7 @@ func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, add
 	}
 
 	if destIP != nil {
-		args = append(args, "-d", utilproxy.ToCIDR(destIP))
+		args = append(args, "-d", destIP.String())
 	}
 
 	if addPhysicalInterfaceMatch {

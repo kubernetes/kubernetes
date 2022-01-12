@@ -36,12 +36,7 @@ import (
 var _ = SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 
-	/*
-		Release: v1.9
-		Testname: Pod events, verify event from Scheduler and Kubelet
-		Description: Create a Pod, make sure that the Pod can be queried. Create a event selector for the kind=Pod and the source is the Scheduler. List of the events MUST be at least one. Create a event selector for kind=Pod and the source is the Kubelet. List of the events MUST be at least one. Both Scheduler and Kubelet MUST send events when scheduling and running a Pod.
-	*/
-	framework.ConformanceIt("should be sent by kubelets and the scheduler about pods scheduling and running ", func() {
+	ginkgo.It("should be sent by kubelets and the scheduler about pods scheduling and running ", func() {
 
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 
@@ -95,7 +90,7 @@ var _ = SIGDescribe("Events", func() {
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		ginkgo.By("checking for scheduler event about the pod")
-		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(framework.Poll, 5*time.Minute, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
 				"involvedObject.uid":       string(podWithUID.UID),
@@ -115,7 +110,7 @@ var _ = SIGDescribe("Events", func() {
 		}))
 		// Check for kubelet event about the pod.
 		ginkgo.By("checking for kubelet event about the pod")
-		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(framework.Poll, 5*time.Minute, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.kind":      "Pod",

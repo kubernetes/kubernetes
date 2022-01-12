@@ -77,7 +77,7 @@ func NewSimpleProvider(scc *securityv1.SecurityContextConstraints) (SecurityCont
 		return nil, err
 	}
 
-	sysctlsStrat, err := createSysctlsStrategy(sysctl.SafeSysctlWhitelist(), scc.AllowedUnsafeSysctls, scc.ForbiddenSysctls)
+	sysctlsStrat, err := createSysctlsStrategy(sysctl.SafeSysctlAllowlist(), scc.AllowedUnsafeSysctls, scc.ForbiddenSysctls)
 	if err != nil {
 		return nil, err
 	}

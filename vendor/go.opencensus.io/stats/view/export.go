@@ -14,13 +14,6 @@
 
 package view
 
-import "sync"
-
-var (
-	exportersMu sync.RWMutex // guards exporters
-	exporters   = make(map[Exporter]struct{})
-)
-
 // Exporter exports the collected records as view data.
 //
 // The ExportView method should return quickly; if an
@@ -43,16 +36,10 @@ type Exporter interface {
 //
 // Binaries can register exporters, libraries shouldn't register exporters.
 func RegisterExporter(e Exporter) {
-	exportersMu.Lock()
-	defer exportersMu.Unlock()
-
-	exporters[e] = struct{}{}
+	defaultWorker.RegisterExporter(e)
 }
 
 // UnregisterExporter unregisters an exporter.
 func UnregisterExporter(e Exporter) {
-	exportersMu.Lock()
-	defer exportersMu.Unlock()
-
-	delete(exporters, e)
+	defaultWorker.UnregisterExporter(e)
 }

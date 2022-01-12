@@ -30,6 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	api "k8s.io/kubernetes/pkg/apis/core"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // ServiceHealthServer serves HTTP endpoints for each service name, with results
@@ -48,26 +52,46 @@ type ServiceHealthServer interface {
 	SyncEndpoints(newEndpoints map[types.NamespacedName]int) error
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory) ServiceHealthServer {
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses []string) ServiceHealthServer {
+
+	nodeAddresses, err := utilproxy.GetNodeAddresses(nodePortAddresses, utilproxy.RealNetwork{})
+	if err != nil || nodeAddresses.Len() == 0 {
+		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
+		nodeAddresses = sets.NewString()
+		nodeAddresses.Insert(utilproxy.IPv4ZeroCIDR)
+	}
+
+	// if any of the addresses is zero cidr then we listen
+	// to old style :<port>
+	for _, addr := range nodeAddresses.List() {
+		if utilproxy.IsZeroCIDR(addr) {
+			nodeAddresses = sets.NewString("")
+			break
+		}
+	}
+
 	return &server{
-		hostname:    hostname,
-		recorder:    recorder,
-		listener:    listener,
-		httpFactory: factory,
-		services:    map[types.NamespacedName]*hcInstance{},
+		hostname:      hostname,
+		recorder:      recorder,
+		listener:      listener,
+		httpFactory:   factory,
+		services:      map[types.NamespacedName]*hcInstance{},
+		nodeAddresses: nodeAddresses,
 	}
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder) ServiceHealthServer {
-	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{})
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses []string) ServiceHealthServer {
+	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses)
 }
 
 type server struct {
-	hostname    string
-	recorder    events.EventRecorder // can be nil
-	listener    listener
-	httpFactory httpServerFactory
+	hostname string
+	// node addresses where health check port will listen on
+	nodeAddresses sets.String
+	recorder      events.EventRecorder // can be nil
+	listener      listener
+	httpFactory   httpServerFactory
 
 	lock     sync.RWMutex
 	services map[types.NamespacedName]*hcInstance
@@ -80,27 +104,28 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 	// Remove any that are not needed any more.
 	for nsn, svc := range hcs.services {
 		if port, found := newServices[nsn]; !found || port != svc.port {
-			klog.V(2).Infof("Closing healthcheck %q on port %d", nsn.String(), svc.port)
-			if err := svc.listener.Close(); err != nil {
-				klog.Errorf("Close(%v): %v", svc.listener.Addr(), err)
-			}
+			klog.V(2).InfoS("Closing healthcheck", "service", nsn, "port", svc.port)
+
+			// errors are loged in closeAll()
+			_ = svc.closeAll()
+
 			delete(hcs.services, nsn)
+
 		}
 	}
 
 	// Add any that are needed.
 	for nsn, port := range newServices {
 		if hcs.services[nsn] != nil {
-			klog.V(3).Infof("Existing healthcheck %q on port %d", nsn.String(), port)
+			klog.V(3).InfoS("Existing healthcheck", "service", nsn, "port", port)
 			continue
 		}
 
-		klog.V(2).Infof("Opening healthcheck %q on port %d", nsn.String(), port)
-		svc := &hcInstance{port: port}
-		addr := fmt.Sprintf(":%d", port)
-		svc.server = hcs.httpFactory.New(addr, hcHandler{name: nsn, hcs: hcs})
-		var err error
-		svc.listener, err = hcs.listener.Listen(addr)
+		klog.V(2).InfoS("Opening healthcheck", "service", nsn, "port", port)
+
+		svc := &hcInstance{nsn: nsn, port: port}
+		err := svc.listenAndServeAll(hcs)
+
 		if err != nil {
 			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.hostname, nsn.String(), port, err)
 
@@ -113,29 +138,79 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 						UID:       types.UID(nsn.String()),
 					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
-			klog.Error(msg)
+			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.hostname, "service", nsn, "port", port)
 			continue
 		}
 		hcs.services[nsn] = svc
-
-		go func(nsn types.NamespacedName, svc *hcInstance) {
-			// Serve() will exit when the listener is closed.
-			klog.V(3).Infof("Starting goroutine for healthcheck %q on port %d", nsn.String(), svc.port)
-			if err := svc.server.Serve(svc.listener); err != nil {
-				klog.V(3).Infof("Healthcheck %q closed: %v", nsn.String(), err)
-				return
-			}
-			klog.V(3).Infof("Healthcheck %q closed", nsn.String())
-		}(nsn, svc)
 	}
 	return nil
 }
 
 type hcInstance struct {
-	port      uint16
-	listener  net.Listener
-	server    httpServer
+	nsn  types.NamespacedName
+	port uint16
+
+	listeners   []net.Listener
+	httpServers []httpServer
+
 	endpoints int // number of local endpoints for a service
+}
+
+// listenAll opens health check port on all the addresses provided
+func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
+	var err error
+	var listener net.Listener
+
+	addresses := hcs.nodeAddresses.List()
+	hcI.listeners = make([]net.Listener, 0, len(addresses))
+	hcI.httpServers = make([]httpServer, 0, len(addresses))
+
+	// for each of the node addresses start listening and serving
+	for _, address := range addresses {
+		addr := net.JoinHostPort(address, fmt.Sprint(hcI.port))
+		// create http server
+		httpSrv := hcs.httpFactory.New(addr, hcHandler{name: hcI.nsn, hcs: hcs})
+		// start listener
+		listener, err = hcs.listener.Listen(addr)
+		if err != nil {
+			// must close whatever have been previously opened
+			// to allow a retry/or port ownership change as needed
+			_ = hcI.closeAll()
+			return err
+		}
+
+		// start serving
+		go func(hcI *hcInstance, listener net.Listener, httpSrv httpServer) {
+			// Serve() will exit when the listener is closed.
+			klog.V(3).InfoS("Starting goroutine for healthcheck", "service", hcI.nsn, "address", listener.Addr())
+			if err := httpSrv.Serve(listener); err != nil {
+				klog.ErrorS(err, "Healthcheck closed", "service", hcI.nsn)
+				return
+			}
+			klog.V(3).InfoS("Healthcheck closed", "service", hcI.nsn, "address", listener.Addr())
+		}(hcI, listener, httpSrv)
+
+		hcI.listeners = append(hcI.listeners, listener)
+		hcI.httpServers = append(hcI.httpServers, httpSrv)
+	}
+
+	return nil
+}
+
+func (hcI *hcInstance) closeAll() error {
+	errors := []error{}
+	for _, listener := range hcI.listeners {
+		if err := listener.Close(); err != nil {
+			klog.ErrorS(err, "Error closing listener for health check service", "service", hcI.nsn, "address", listener.Addr())
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) > 0 {
+		return utilerrors.NewAggregate(errors)
+	}
+
+	return nil
 }
 
 type hcHandler struct {
@@ -150,7 +225,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	svc, ok := h.hcs.services[h.name]
 	if !ok || svc == nil {
 		h.hcs.lock.RUnlock()
-		klog.Errorf("Received request for closed healthcheck %q", h.name.String())
+		klog.ErrorS(nil, "Received request for closed healthcheck", "service", h.name)
 		return
 	}
 	count := svc.endpoints
@@ -180,10 +255,10 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 
 	for nsn, count := range newEndpoints {
 		if hcs.services[nsn] == nil {
-			klog.V(3).Infof("Not saving endpoints for unknown healthcheck %q", nsn.String())
+			klog.V(3).InfoS("Not saving endpoints for unknown healthcheck", "service", nsn)
 			continue
 		}
-		klog.V(3).Infof("Reporting %d endpoints for healthcheck %q", count, nsn.String())
+		klog.V(3).InfoS("Reporting endpoints for healthcheck", "endpointCount", count, "service", nsn)
 		hcs.services[nsn].endpoints = count
 	}
 	for nsn, hci := range hcs.services {

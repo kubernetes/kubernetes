@@ -104,23 +104,6 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 		node.Spec.ConfigSource = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !multiNodeCIDRsInUse(oldNode) {
-		if len(node.Spec.PodCIDRs) > 1 {
-			node.Spec.PodCIDRs = node.Spec.PodCIDRs[0:1]
-		}
-	}
-}
-
-// multiNodeCIDRsInUse returns true if Node.Spec.PodCIDRs is greater than one
-func multiNodeCIDRsInUse(node *api.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	if len(node.Spec.PodCIDRs) > 1 {
-		return true
-	}
-	return false
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)

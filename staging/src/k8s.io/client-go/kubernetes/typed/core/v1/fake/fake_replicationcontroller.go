@@ -121,7 +121,7 @@ func (c *FakeReplicationControllers) UpdateStatus(ctx context.Context, replicati
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
 func (c *FakeReplicationControllers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(replicationcontrollersResource, c.ns, name), &corev1.ReplicationController{})
+		Invokes(testing.NewDeleteActionWithOptions(replicationcontrollersResource, c.ns, name, opts), &corev1.ReplicationController{})
 
 	return err
 }

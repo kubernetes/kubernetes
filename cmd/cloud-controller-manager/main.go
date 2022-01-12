@@ -25,19 +25,15 @@ limitations under the License.
 package main
 
 import (
-	"math/rand"
 	"os"
-	"time"
-
-	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
+	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/klog/v2"
@@ -46,10 +42,6 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -68,16 +60,19 @@ func main() {
 	nodeIpamController.nodeIPAMControllerOptions.NodeIPAMControllerConfiguration = &nodeIpamController.nodeIPAMControllerConfiguration
 	fss := cliflag.NamedFlagSets{}
 	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fss.FlagSet("nodeipam controller"))
-	controllerInitializers["nodeipam"] = nodeIpamController.startNodeIpamControllerWrapper
+
+	controllerInitializers["nodeipam"] = app.ControllerInitFuncConstructor{
+		// "node-controller" is the shared identity of all node controllers, including node, node lifecycle, and node ipam.
+		// See https://github.com/kubernetes/kubernetes/pull/72764#issuecomment-453300990 for more context.
+		InitContext: app.ControllerInitContext{
+			ClientName: "node-controller",
+		},
+		Constructor: nodeIpamController.StartNodeIpamControllerWrapper,
+	}
 
 	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
-
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }
 
 func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {

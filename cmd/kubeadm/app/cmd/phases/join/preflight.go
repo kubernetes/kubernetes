@@ -21,18 +21,18 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+
+	"k8s.io/klog/v2"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-
-	"k8s.io/klog/v2"
-	utilsexec "k8s.io/utils/exec"
-
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -123,6 +123,11 @@ func runPreflight(c workflow.RunData) error {
 			return err
 		}
 
+		if j.DryRun() {
+			fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
+			return nil
+		}
+
 		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
 		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
@@ -138,11 +143,11 @@ func runPreflight(c workflow.RunData) error {
 func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.ClusterConfiguration, hasCertificateKey bool) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
-		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
+		return errors.New("unable to add a new control plane instance to a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
 	if !hasCertificateKey {
-		// checks if the certificates that must be equal across controlplane instances are provided
+		// checks if the certificates are provided and are still valid, not expired yet.
 		if ret, err := certs.SharedCertificateExists(initConfiguration); !ret {
 			return err
 		}

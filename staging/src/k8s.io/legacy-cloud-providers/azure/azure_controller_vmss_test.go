@@ -89,7 +89,7 @@ func TestAttachDiskWithVMSS(t *testing.T) {
 			isManagedDisk:  false,
 			existedDisk:    compute.Disk{Name: to.StringPtr("disk-name")},
 			expectedErr:    true,
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 404, RawError: instance not found"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 404, RawError: %w", cloudprovider.InstanceNotFound),
 		},
 	}
 
@@ -177,7 +177,7 @@ func TestDetachDiskWithVMSS(t *testing.T) {
 			vmssvmName:     "vmss00-vm-000000",
 			existedDisk:    compute.Disk{Name: to.StringPtr(diskName)},
 			expectedErr:    true,
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 404, RawError: instance not found"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 404, RawError: %w", cloudprovider.InstanceNotFound),
 		},
 		{
 			desc:        "no error shall be returned if everything is good and the attaching disk does not match data disk",

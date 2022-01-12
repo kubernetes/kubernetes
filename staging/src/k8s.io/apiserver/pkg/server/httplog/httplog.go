@@ -24,15 +24,20 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/klog/v2"
 )
 
 // StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
+
+// ShouldLogRequestPred returns true if logging should be enabled for this request
+type ShouldLogRequestPred func() bool
 
 type logger interface {
 	Addf(format string, data ...interface{})
@@ -54,23 +59,32 @@ type respLogger struct {
 	statusRecorded bool
 	status         int
 	statusStack    string
-	addedInfo      strings.Builder
-	startTime      time.Time
-	isTerminating  bool
+	// mutex is used when accessing addedInfo and addedKeyValuePairs.
+	// They can be modified by other goroutine when logging happens (in case of request timeout)
+	mutex              sync.Mutex
+	addedInfo          strings.Builder
+	addedKeyValuePairs []interface{}
+	startTime          time.Time
+	isTerminating      bool
 
 	captureErrorOutput bool
 
-	req *http.Request
-	w   http.ResponseWriter
+	req       *http.Request
+	userAgent string
+	w         http.ResponseWriter
 
 	logStacktracePred StacktracePred
 }
 
+var _ http.ResponseWriter = &respLogger{}
+var _ responsewriter.UserProvidedDecorator = &respLogger{}
+
+func (rl *respLogger) Unwrap() http.ResponseWriter {
+	return rl.w
+}
+
 // Simple logger that logs immediately when Addf is called
 type passthroughLogger struct{}
-
-//lint:ignore SA1019 Interface implementation check to make sure we don't drop CloseNotifier again
-var _ http.CloseNotifier = &respLogger{}
 
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
@@ -84,7 +98,18 @@ func DefaultStacktracePred(status int) bool {
 
 // WithLogging wraps the handler with logging.
 func WithLogging(handler http.Handler, pred StacktracePred, isTerminatingFn func() bool) http.Handler {
+	return withLogging(handler, pred, func() bool {
+		return klog.V(3).Enabled()
+	}, isTerminatingFn)
+}
+
+func withLogging(handler http.Handler, stackTracePred StacktracePred, shouldLogRequest ShouldLogRequestPred, isTerminatingFn func() bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !shouldLogRequest() {
+			handler.ServeHTTP(w, req)
+			return
+		}
+
 		ctx := req.Context()
 		if old := respLoggerFromRequest(req); old != nil {
 			panic("multiple WithLogging calls!")
@@ -98,13 +123,15 @@ func WithLogging(handler http.Handler, pred StacktracePred, isTerminatingFn func
 		if isTerminatingFn != nil {
 			isTerminating = isTerminatingFn()
 		}
-		rl := newLoggedWithStartTime(req, w, startTime).StacktraceWhen(pred).IsTerminating(isTerminating)
+		rl := newLoggedWithStartTime(req, w, startTime).StacktraceWhen(stackTracePred).IsTerminating(isTerminating)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
+		defer rl.Log()
 
 		if klog.V(3).Enabled() || (rl.isTerminating && klog.V(1).Enabled()) {
 			defer rl.Log()
 		}
-		handler.ServeHTTP(rl, req)
+		w = responsewriter.WrapForHTTP1Or2(rl)
+		handler.ServeHTTP(w, req)
 	})
 }
 
@@ -122,12 +149,14 @@ func respLoggerFromRequest(req *http.Request) *respLogger {
 }
 
 func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime time.Time) *respLogger {
-	return &respLogger{
+	logger := &respLogger{
 		startTime:         startTime,
 		req:               req,
+		userAgent:         req.UserAgent(),
 		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
+	return logger
 }
 
 // newLogged turns a normal response writer into a logged response writer.
@@ -193,6 +222,8 @@ func StatusIsNot(statuses ...int) StacktracePred {
 
 // Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
 	rl.addedInfo.WriteString("\n")
 	rl.addedInfo.WriteString(fmt.Sprintf(format, data...))
 }
@@ -200,6 +231,22 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 func AddInfof(ctx context.Context, format string, data ...interface{}) {
 	if rl := respLoggerFromContext(ctx); rl != nil {
 		rl.Addf(format, data...)
+	}
+}
+
+func (rl *respLogger) AddKeyValue(key string, value interface{}) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+	rl.addedKeyValuePairs = append(rl.addedKeyValuePairs, key, value)
+}
+
+// AddKeyValue adds a (key, value) pair to the httplog associated
+// with the request.
+// Use this function if you want your data to show up in httplog
+// in a more structured and readable way.
+func AddKeyValue(ctx context.Context, key string, value interface{}) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.AddKeyValue(key, value)
 	}
 }
 
@@ -222,10 +269,19 @@ func (rl *respLogger) Log() {
 		"verb", verb,
 		"URI", rl.req.RequestURI,
 		"latency", latency,
-		"userAgent", rl.req.UserAgent(),
+		// We can't get UserAgent from rl.req.UserAgent() here as it accesses headers map,
+		// which can be modified in another goroutine when apiserver request times out.
+		// For example authentication filter modifies request's headers,
+		// This can cause apiserver to crash with unrecoverable fatal error.
+		// More info about concurrent read and write for maps: https://golang.org/doc/go1.6#runtime
+		"userAgent", rl.userAgent,
 		"audit-ID", auditID,
 		"srcIP", rl.req.RemoteAddr,
 	}
+	// Lock for accessing addedKeyValuePairs and addedInfo
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+	keysAndValues = append(keysAndValues, rl.addedKeyValuePairs...)
 
 	if rl.hijacked {
 		keysAndValues = append(keysAndValues, "hijacked", true)
@@ -259,32 +315,18 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 	return rl.w.Write(b)
 }
 
-// Flush implements http.Flusher even if the underlying http.Writer doesn't implement it.
-// Flush is used for streaming purposes and allows to flush buffered data to the client.
-func (rl *respLogger) Flush() {
-	if flusher, ok := rl.w.(http.Flusher); ok {
-		flusher.Flush()
-	} else if klog.V(2).Enabled() {
-		klog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
-	}
-}
-
 // WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
 	rl.recordStatus(status)
 	rl.w.WriteHeader(status)
 }
 
-// Hijack implements http.Hijacker.
 func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	rl.hijacked = true
-	return rl.w.(http.Hijacker).Hijack()
-}
 
-// CloseNotify implements http.CloseNotifier
-func (rl *respLogger) CloseNotify() <-chan bool {
-	//lint:ignore SA1019 There are places in the code base requiring the CloseNotifier interface to be implemented.
-	return rl.w.(http.CloseNotifier).CloseNotify()
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.Hijacker if the inner object (rl.w) implements http.Hijacker.
+	return rl.w.(http.Hijacker).Hijack()
 }
 
 func (rl *respLogger) recordStatus(status int) {

@@ -36,6 +36,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
@@ -44,12 +45,11 @@ import (
 	"k8s.io/component-base/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
-	testutils "k8s.io/kubernetes/test/utils"
 	utilnet "k8s.io/utils/net"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -63,6 +63,9 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
+
+	// Ensure that logging flags are part of the command line.
+	_ "k8s.io/component-base/logs/testinit"
 )
 
 const (
@@ -128,39 +131,6 @@ func RunE2ETests(t *testing.T) {
 
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
-}
-
-// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
-// to flip to Ready, log its output and delete it.
-func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
-	path := "test/images/clusterapi-tester/pod.yaml"
-	framework.Logf("Parsing pod from %v", path)
-	p, err := e2emanifest.PodFromManifest(path)
-	if err != nil {
-		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
-		return
-	}
-	p.Namespace = ns
-	if _, err := c.CoreV1().Pods(ns).Create(context.TODO(), p, metav1.CreateOptions{}); err != nil {
-		framework.Logf("Failed to create %v: %v", p.Name, err)
-		return
-	}
-	defer func() {
-		if err := c.CoreV1().Pods(ns).Delete(context.TODO(), p.Name, metav1.DeleteOptions{}); err != nil {
-			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
-		}
-	}()
-	timeout := 5 * time.Minute
-	if err := e2epod.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
-		framework.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
-		return
-	}
-	logs, err := e2epod.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
-	if err != nil {
-		framework.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
-	} else {
-		framework.Logf("Output of clusterapi-tester:\n%v", logs)
-	}
 }
 
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
@@ -282,12 +252,16 @@ func setupSuite() {
 	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		e2ekubectl.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
-		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
 	if err := waitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
+	}
+
+	if framework.TestContext.PrepullImages {
+		framework.Logf("Pre-pulling images so that they are cached for the tests.")
+		prepullImages(c)
 	}
 
 	// Log the version of the server and this client.
@@ -311,17 +285,17 @@ func setupSuite() {
 
 // logClusterImageSources writes out cluster image sources.
 func logClusterImageSources() {
-	masterImg, nodeImg, err := lookupClusterImageSources()
+	controlPlaneNodeImg, workerNodeImg, err := lookupClusterImageSources()
 	if err != nil {
 		framework.Logf("Cluster image sources lookup failed: %v\n", err)
 		return
 	}
-	framework.Logf("cluster-master-image: %s", masterImg)
-	framework.Logf("cluster-node-image: %s", nodeImg)
+	framework.Logf("cluster-control-plane-node-image: %s", controlPlaneNodeImg)
+	framework.Logf("cluster-worker-node-image: %s", workerNodeImg)
 
 	images := map[string]string{
-		"master_os_image": masterImg,
-		"node_os_image":   nodeImg,
+		"control_plane_node_os_image": controlPlaneNodeImg,
+		"worker_node_os_image":        workerNodeImg,
 	}
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
@@ -334,7 +308,7 @@ func logClusterImageSources() {
 // TODO: These should really just use the GCE API client library or at least use
 // better formatted output from the --format flag.
 
-// Returns master & node image string, or error
+// Returns control plane node & worker node image string, or error
 func lookupClusterImageSources() (string, string, error) {
 	// Given args for a gcloud compute command, run it with other args, and return the values,
 	// whether separated by newlines, commas or semicolons.
@@ -383,35 +357,35 @@ func lookupClusterImageSources() (string, string, error) {
 	}
 
 	// gcloud compute instance-groups list-instances {GROUPNAME} --format="get(instance)"
-	nodeName := ""
+	workerNodeName := ""
 	instGroupName := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")[0]
 	if lines, err := gcloudf("instance-groups", "list-instances", instGroupName, "--format=get(instance)"); err != nil {
 		return "", "", err
 	} else if len(lines) == 0 {
 		return "", "", fmt.Errorf("no instances inside instance-group %q", instGroupName)
 	} else {
-		nodeName = lines[0]
+		workerNodeName = lines[0]
 	}
 
-	nodeImg, err := host2image(nodeName)
+	workerNodeImg, err := host2image(workerNodeName)
 	if err != nil {
 		return "", "", err
 	}
-	frags := strings.Split(nodeImg, "/")
-	nodeImg = frags[len(frags)-1]
+	frags := strings.Split(workerNodeImg, "/")
+	workerNodeImg = frags[len(frags)-1]
 
-	// For GKE clusters, MasterName will not be defined; we just leave masterImg blank.
-	masterImg := ""
-	if masterName := framework.TestContext.CloudConfig.MasterName; masterName != "" {
-		img, err := host2image(masterName)
+	// For GKE clusters, controlPlaneNodeName will not be defined; we just leave controlPlaneNodeImg blank.
+	controlPlaneNodeImg := ""
+	if controlPlaneNodeName := framework.TestContext.CloudConfig.MasterName; controlPlaneNodeName != "" {
+		img, err := host2image(controlPlaneNodeName)
 		if err != nil {
 			return "", "", err
 		}
 		frags = strings.Split(img, "/")
-		masterImg = frags[len(frags)-1]
+		controlPlaneNodeImg = frags[len(frags)-1]
 	}
 
-	return masterImg, nodeImg, nil
+	return controlPlaneNodeImg, workerNodeImg, nil
 }
 
 // setupSuitePerGinkgoNode is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
@@ -432,4 +406,43 @@ func setupSuitePerGinkgoNode() {
 	}
 	framework.TestContext.IPFamily = getDefaultClusterIPFamily(c)
 	framework.Logf("Cluster IP family: %s", framework.TestContext.IPFamily)
+}
+
+func prepullImages(c clientset.Interface) {
+	namespace, err := framework.CreateTestingNS("img-puller", c, map[string]string{
+		"e2e-framework": "img-puller",
+	})
+	framework.ExpectNoError(err)
+	ns := namespace.Name
+	defer c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
+
+	images := commontest.PrePulledImages
+	if framework.NodeOSDistroIs("windows") {
+		images = commontest.WindowsPrePulledImages
+	}
+
+	label := map[string]string{"app": "prepull-daemonset"}
+	var imgPullers []*appsv1.DaemonSet
+	for _, img := range images.List() {
+		dsName := fmt.Sprintf("img-pull-%s", strings.ReplaceAll(strings.ReplaceAll(img, "/", "-"), ":", "-"))
+
+		dsSpec := daemonset.NewDaemonSet(dsName, img, label, nil, nil, nil)
+		ds, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), dsSpec, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		imgPullers = append(imgPullers, ds)
+	}
+
+	// this should not be a multiple of 5, because node status updates
+	// every 5 seconds. See https://github.com/kubernetes/kubernetes/pull/14915.
+	dsRetryPeriod := 9 * time.Second
+	dsRetryTimeout := 5 * time.Minute
+
+	for _, imgPuller := range imgPullers {
+		checkDaemonset := func() (bool, error) {
+			return daemonset.CheckPresentOnNodes(c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
+		}
+		framework.Logf("Waiting for %s", imgPuller.Name)
+		err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonset)
+		framework.ExpectNoError(err, "error waiting for image to be pulled")
+	}
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/klog/v2"
 )
@@ -263,7 +264,7 @@ func handleRootHealth(name string, firstTimeHealthy func(), disableStacktraceFor
 				httplog.DisableStackTraceForRequest(r)
 			}
 			klog.V(2).Infof("%s check failed: %s\n%v", strings.Join(failedChecks, ","), name, failedVerboseLogOutput.String())
-			http.Error(w, fmt.Sprintf("%s%s check failed", individualCheckOutput.String(), name), http.StatusInternalServerError)
+			http.Error(responsewriter.GetOriginal(w), fmt.Sprintf("%s%s check failed", individualCheckOutput.String(), name), http.StatusInternalServerError)
 			return
 		}
 

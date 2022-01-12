@@ -434,6 +434,7 @@ func autoConvert_v1_JobStatus_To_batch_JobStatus(in *v1.JobStatus, out *batch.Jo
 	out.Failed = in.Failed
 	out.CompletedIndexes = in.CompletedIndexes
 	out.UncountedTerminatedPods = (*batch.UncountedTerminatedPods)(unsafe.Pointer(in.UncountedTerminatedPods))
+	out.Ready = (*int32)(unsafe.Pointer(in.Ready))
 	return nil
 }
 
@@ -447,6 +448,7 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *v1.Jo
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
+	out.Ready = (*int32)(unsafe.Pointer(in.Ready))
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
 	out.CompletedIndexes = in.CompletedIndexes

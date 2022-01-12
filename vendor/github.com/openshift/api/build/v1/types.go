@@ -177,7 +177,7 @@ type BitbucketWebHookCause struct {
 // ImageChangeCause contains information about the image that triggered a
 // build
 type ImageChangeCause struct {
-	// imageID is the ID of the image that triggered a a new build.
+	// imageID is the ID of the image that triggered a new build.
 	ImageID string `json:"imageID,omitempty" protobuf:"bytes,1,opt,name=imageID"`
 
 	// fromRef contains detailed information about an image that triggered a

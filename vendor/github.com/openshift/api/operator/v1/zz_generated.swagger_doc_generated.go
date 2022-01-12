@@ -422,10 +422,13 @@ func (DNSNodePlacement) SwaggerDoc() map[string]string {
 }
 
 var map_DNSSpec = map[string]string{
-	"":                "DNSSpec is the specification of the desired behavior of the DNS.",
-	"servers":         "servers is a list of DNS resolvers that provide name query delegation for one or more subdomains outside the scope of the cluster domain. If servers consists of more than one Server, longest suffix match will be used to determine the Server.\n\nFor example, if there are two Servers, one for \"foo.com\" and another for \"a.foo.com\", and the name query is for \"www.a.foo.com\", it will be routed to the Server with Zone \"a.foo.com\".\n\nIf this field is nil, no servers are created.",
-	"nodePlacement":   "nodePlacement provides explicit control over the scheduling of DNS pods.\n\nGenerally, it is useful to run a DNS pod on every node so that DNS queries are always handled by a local DNS pod instead of going over the network to a DNS pod on another node.  However, security policies may require restricting the placement of DNS pods to specific nodes. For example, if a security policy prohibits pods on arbitrary nodes from communicating with the API, a node selector can be specified to restrict DNS pods to nodes that are permitted to communicate with the API.  Conversely, if running DNS pods on nodes with a particular taint is desired, a toleration can be specified for that taint.\n\nIf unset, defaults are used. See nodePlacement for more details.",
-	"managementState": "managementState indicates whether the DNS operator should manage cluster DNS",
+	"":                  "DNSSpec is the specification of the desired behavior of the DNS.",
+	"servers":           "servers is a list of DNS resolvers that provide name query delegation for one or more subdomains outside the scope of the cluster domain. If servers consists of more than one Server, longest suffix match will be used to determine the Server.\n\nFor example, if there are two Servers, one for \"foo.com\" and another for \"a.foo.com\", and the name query is for \"www.a.foo.com\", it will be routed to the Server with Zone \"a.foo.com\".\n\nIf this field is nil, no servers are created.",
+	"upstreamResolvers": "upstreamResolvers defines a schema for configuring CoreDNS to proxy DNS messages to upstream resolvers for the case of the default (\".\") server\n\nIf this field is not specified, the upstream used will default to /etc/resolv.conf, with policy \"sequential\"",
+	"nodePlacement":     "nodePlacement provides explicit control over the scheduling of DNS pods.\n\nGenerally, it is useful to run a DNS pod on every node so that DNS queries are always handled by a local DNS pod instead of going over the network to a DNS pod on another node.  However, security policies may require restricting the placement of DNS pods to specific nodes. For example, if a security policy prohibits pods on arbitrary nodes from communicating with the API, a node selector can be specified to restrict DNS pods to nodes that are permitted to communicate with the API.  Conversely, if running DNS pods on nodes with a particular taint is desired, a toleration can be specified for that taint.\n\nIf unset, defaults are used. See nodePlacement for more details.",
+	"managementState":   "managementState indicates whether the DNS operator should manage cluster DNS",
+	"operatorLogLevel":  "operatorLogLevel controls the logging level of the DNS Operator. Valid values are: \"Normal\", \"Debug\", \"Trace\". Defaults to \"Normal\". setting operatorLogLevel: Trace will produce extremely verbose logs.",
+	"logLevel":          "logLevel describes the desired logging verbosity for CoreDNS. Any one of the following values may be specified: * Normal logs errors from upstream resolvers. * Debug logs errors, NXDOMAIN responses, and NODATA responses. * Trace logs errors and all responses.\n Setting logLevel: Trace will produce extremely verbose logs.\nValid values are: \"Normal\", \"Debug\", \"Trace\". Defaults to \"Normal\".",
 }
 
 func (DNSSpec) SwaggerDoc() map[string]string {
@@ -445,7 +448,8 @@ func (DNSStatus) SwaggerDoc() map[string]string {
 
 var map_ForwardPlugin = map[string]string{
 	"":          "ForwardPlugin defines a schema for configuring the CoreDNS forward plugin.",
-	"upstreams": "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Upstreams are randomized when more than 1 upstream is specified. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
+	"upstreams": "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin.",
+	"policy":    "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Random\"",
 }
 
 func (ForwardPlugin) SwaggerDoc() map[string]string {
@@ -461,6 +465,27 @@ var map_Server = map[string]string{
 
 func (Server) SwaggerDoc() map[string]string {
 	return map_Server
+}
+
+var map_Upstream = map[string]string{
+	"":        "Upstream can either be of type SystemResolvConf, or of type Network.\n\n* For an Upstream of type SystemResolvConf, no further fields are necessary:\n  The upstream will be configured to use /etc/resolv.conf.\n* For an Upstream of type Network, a NetworkResolver field needs to be defined\n  with an IP address or IP:port if the upstream listens on a port other than 53.",
+	"type":    "Type defines whether this upstream contains an IP/IP:port resolver or the local /etc/resolv.conf. Type accepts 2 possible values: SystemResolvConf or Network.\n\n* When SystemResolvConf is used, the Upstream structure does not require any further fields to be defined:\n  /etc/resolv.conf will be used\n* When Network is used, the Upstream structure must contain at least an Address",
+	"address": "Address must be defined when Type is set to Network. It will be ignored otherwise. It must be a valid ipv4 or ipv6 address.",
+	"port":    "Port may be defined when Type is set to Network. It will be ignored otherwise. Port must be between 65535",
+}
+
+func (Upstream) SwaggerDoc() map[string]string {
+	return map_Upstream
+}
+
+var map_UpstreamResolvers = map[string]string{
+	"":          "UpstreamResolvers defines a schema for configuring the CoreDNS forward plugin in the specific case of the default (\".\") server. It defers from ForwardPlugin in the default values it accepts: * At least one upstream should be specified. * the default policy is Sequential",
+	"upstreams": "Upstreams is a list of resolvers to forward name queries for the \".\" domain. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy.\n\nA maximum of 15 upstreams is allowed per ForwardPlugin. If no Upstreams are specified, /etc/resolv.conf is used by default",
+	"policy":    "Policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified:\n\n* \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query.\n\nThe default value is \"Sequential\"",
+}
+
+func (UpstreamResolvers) SwaggerDoc() map[string]string {
+	return map_UpstreamResolvers
 }
 
 var map_Etcd = map[string]string{
@@ -559,6 +584,15 @@ var map_GCPLoadBalancerParameters = map[string]string{
 
 func (GCPLoadBalancerParameters) SwaggerDoc() map[string]string {
 	return map_GCPLoadBalancerParameters
+}
+
+var map_HTTPCompressionPolicy = map[string]string{
+	"":          "httpCompressionPolicy turns on compression for the specified MIME types.\n\nThis field is optional, and its absence implies that compression should not be enabled globally in HAProxy.\n\nIf httpCompressionPolicy exists, compression should be enabled only for the specified MIME types.",
+	"mimeTypes": "mimeTypes is a list of MIME types that should have compression applied. This list can be empty, in which case the ingress controller does not apply compression.\n\nNote: Not all MIME types benefit from compression, but HAProxy will still use resources to try to compress if instructed to.  Generally speaking, text (html, css, js, etc.) formats benefit from compression, but formats that are already compressed (image, audio, video, etc.) benefit little in exchange for the time and cpu spent on compressing again. See https://joehonton.medium.com/the-gzip-penalty-d31bd697f1a2",
+}
+
+func (HTTPCompressionPolicy) SwaggerDoc() map[string]string {
+	return map_HTTPCompressionPolicy
 }
 
 var map_HostNetworkStrategy = map[string]string{
@@ -676,6 +710,7 @@ var map_IngressControllerSpec = map[string]string{
 	"httpEmptyRequestsPolicy":    "httpEmptyRequestsPolicy describes how HTTP connections should be handled if the connection times out before a request is received. Allowed values for this field are \"Respond\" and \"Ignore\".  If the field is set to \"Respond\", the ingress controller sends an HTTP 400 or 408 response, logs the connection (if access logging is enabled), and counts the connection in the appropriate metrics.  If the field is set to \"Ignore\", the ingress controller closes the connection without sending a response, logging the connection, or incrementing metrics.  The default value is \"Respond\".\n\nTypically, these connections come from load balancers' health probes or Web browsers' speculative connections (\"preconnect\") and can be safely ignored.  However, these requests may also be caused by network errors, and so setting this field to \"Ignore\" may impede detection and diagnosis of problems.  In addition, these requests may be caused by port scans, in which case logging empty requests may aid in detecting intrusion attempts.",
 	"tuningOptions":              "tuningOptions defines parameters for adjusting the performance of ingress controller pods. All fields are optional and will use their respective defaults if not set. See specific tuningOptions fields for more details.\n\nSetting fields within tuningOptions is generally not recommended. The default values are suitable for most configurations.",
 	"unsupportedConfigOverrides": "unsupportedConfigOverrides allows specifying unsupported configuration options.  Its use is unsupported.",
+	"httpCompression":            "httpCompression defines a policy for HTTP traffic compression. By default, there is no HTTP compression.",
 }
 
 func (IngressControllerSpec) SwaggerDoc() map[string]string {
@@ -784,10 +819,11 @@ func (RouteAdmissionPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_SyslogLoggingDestinationParameters = map[string]string{
-	"":         "SyslogLoggingDestinationParameters describes parameters for the Syslog logging destination type.",
-	"address":  "address is the IP address of the syslog endpoint that receives log messages.",
-	"port":     "port is the UDP port number of the syslog endpoint that receives log messages.",
-	"facility": "facility specifies the syslog facility of log messages.\n\nIf this field is empty, the facility is \"local1\".",
+	"":          "SyslogLoggingDestinationParameters describes parameters for the Syslog logging destination type.",
+	"address":   "address is the IP address of the syslog endpoint that receives log messages.",
+	"port":      "port is the UDP port number of the syslog endpoint that receives log messages.",
+	"facility":  "facility specifies the syslog facility of log messages.\n\nIf this field is empty, the facility is \"local1\".",
+	"maxLength": "maxLength is the maximum length of the syslog message\n\nIf this field is empty, the maxLength is set to \"1024\".",
 }
 
 func (SyslogLoggingDestinationParameters) SwaggerDoc() map[string]string {
@@ -882,7 +918,7 @@ var map_DefaultNetworkDefinition = map[string]string{
 	"":                    "DefaultNetworkDefinition represents a single network plugin's configuration. type must be specified, along with exactly one \"Config\" that matches the type.",
 	"type":                "type is the type of network All NetworkTypes are supported except for NetworkTypeRaw",
 	"openshiftSDNConfig":  "openShiftSDNConfig configures the openshift-sdn plugin",
-	"ovnKubernetesConfig": "oVNKubernetesConfig configures the ovn-kubernetes plugin. This is currently not implemented.",
+	"ovnKubernetesConfig": "ovnKubernetesConfig configures the ovn-kubernetes plugin.",
 	"kuryrConfig":         "KuryrConfig configures the kuryr plugin",
 }
 
@@ -898,6 +934,15 @@ var map_ExportNetworkFlows = map[string]string{
 
 func (ExportNetworkFlows) SwaggerDoc() map[string]string {
 	return map_ExportNetworkFlows
+}
+
+var map_GatewayConfig = map[string]string{
+	"":               "GatewayConfig holds node gateway-related parsed config file parameters and command-line overrides",
+	"routingViaHost": "RoutingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port into the host before sending it out. If this is not set, traffic will always egress directly from OVN to outside without touching the host stack. Setting this to true means hardware offload will not be supported. Default is false if GatewayConfig is specified.",
+}
+
+func (GatewayConfig) SwaggerDoc() map[string]string {
+	return map_GatewayConfig
 }
 
 var map_HybridOverlayConfig = map[string]string{
@@ -943,6 +988,26 @@ func (KuryrConfig) SwaggerDoc() map[string]string {
 	return map_KuryrConfig
 }
 
+var map_MTUMigration = map[string]string{
+	"":        "MTUMigration MTU contains infomation about MTU migration.",
+	"network": "network contains information about MTU migration for the default network. Migrations are only allowed to MTU values lower than the machine's uplink MTU by the minimum appropriate offset.",
+	"machine": "machine contains MTU migration configuration for the machine's uplink. Needs to be migrated along with the default network MTU unless the current uplink MTU already accommodates the default network MTU.",
+}
+
+func (MTUMigration) SwaggerDoc() map[string]string {
+	return map_MTUMigration
+}
+
+var map_MTUMigrationValues = map[string]string{
+	"":     "MTUMigrationValues contains the values for a MTU migration.",
+	"to":   "to is the MTU to migrate to.",
+	"from": "from is the MTU to migrate from.",
+}
+
+func (MTUMigrationValues) SwaggerDoc() map[string]string {
+	return map_MTUMigrationValues
+}
+
 var map_NetFlowConfig = map[string]string{
 	"collectors": "netFlow defines the NetFlow collectors that will consume the flow data exported from OVS. It is a list of strings formatted as ip:port with a maximum of ten items",
 }
@@ -969,7 +1034,8 @@ func (NetworkList) SwaggerDoc() map[string]string {
 
 var map_NetworkMigration = map[string]string{
 	"":            "NetworkMigration represents the cluster network configuration.",
-	"networkType": "networkType is the target type of network migration The supported values are OpenShiftSDN, OVNKubernetes",
+	"networkType": "networkType is the target type of network migration. Set this to the target network type to allow changing the default network. If unset, the operation of changing cluster default network plugin will be rejected. The supported values are OpenShiftSDN, OVNKubernetes",
+	"mtu":         "mtu contains the MTU migration configuration. Set this to allow changing the MTU values for the default network. If unset, the operation of changing the MTU for the default network will be rejected.",
 }
 
 func (NetworkMigration) SwaggerDoc() map[string]string {
@@ -988,7 +1054,7 @@ var map_NetworkSpec = map[string]string{
 	"disableNetworkDiagnostics": "disableNetworkDiagnostics specifies whether or not PodNetworkConnectivityCheck CRs from a test pod to every node, apiserver and LB should be disabled or not. If unset, this property defaults to 'false' and network diagnostics is enabled. Setting this to 'true' would reduce the additional load of the pods performing the checks.",
 	"kubeProxyConfig":           "kubeProxyConfig lets us configure desired proxy configuration. If not specified, sensible defaults will be chosen by OpenShift directly. Not consumed by all network providers - currently only openshift-sdn.",
 	"exportNetworkFlows":        "exportNetworkFlows enables and configures the export of network flow metadata from the pod network by using protocols NetFlow, SFlow or IPFIX. Currently only supported on OVN-Kubernetes plugin. If unset, flows will not be exported to any collector.",
-	"migration":                 "migration enables and configures the cluster network migration. Setting this to the target network type to allow changing the default network. If unset, the operation of changing cluster default network plugin will be rejected.",
+	"migration":                 "migration enables and configures the cluster network migration. The migration procedure allows to change the network type and the MTU.",
 }
 
 func (NetworkSpec) SwaggerDoc() map[string]string {
@@ -1010,6 +1076,7 @@ var map_OVNKubernetesConfig = map[string]string{
 	"hybridOverlayConfig": "HybridOverlayConfig configures an additional overlay network for peers that are not using OVN.",
 	"ipsecConfig":         "ipsecConfig enables and configures IPsec for pods on the pod network within the cluster.",
 	"policyAuditConfig":   "policyAuditConfig is the configuration for network policy audit events. If unset, reported defaults are used.",
+	"gatewayConfig":       "gatewayConfig holds the configuration for node gateway options.",
 }
 
 func (OVNKubernetesConfig) SwaggerDoc() map[string]string {

@@ -1711,6 +1711,65 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c.EnsureLoadBalancer(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
 
+func TestCheckMixedProtocol(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		ports       []v1.ServicePort
+		wantErr     error
+	}{
+		{
+			name:        "TCP",
+			annotations: make(map[string]string),
+			ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     int32(8080),
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name:        "UDP",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolUDP,
+					Port:     int32(8080),
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name:        "TCP and UDP",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerType: "nlb"},
+			ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolUDP,
+					Port:     int32(53),
+				},
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     int32(53),
+				},
+			},
+			wantErr: errors.New("mixed protocol is not supported for LoadBalancer"),
+		},
+	}
+	for _, test := range tests {
+		tt := test
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := checkMixedProtocol(tt.ports)
+			if tt.wantErr != nil {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			} else {
+				assert.Equal(t, err, nil)
+			}
+		})
+	}
+}
+
 func TestCheckProtocol(t *testing.T) {
 	tests := []struct {
 		name        string

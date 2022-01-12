@@ -58,6 +58,7 @@ import (
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
+	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 	netutils "k8s.io/utils/net"
 )
@@ -83,6 +84,7 @@ var args = []string{
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
+	"--concurrent-ephemeralvolume-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
@@ -286,6 +288,11 @@ func TestAddFlags(t *testing.T) {
 			&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 				MirroringConcurrentServiceEndpointSyncs: 2,
 				MirroringMaxEndpointsPerSubset:          1000,
+			},
+		},
+		EphemeralVolumeController: &EphemeralVolumeControllerOptions{
+			&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
+				ConcurrentEphemeralVolumeSyncs: 10,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
@@ -544,6 +551,9 @@ func TestApplyTo(t *testing.T) {
 			EndpointSliceMirroringController: endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 				MirroringConcurrentServiceEndpointSyncs: 2,
 				MirroringMaxEndpointsPerSubset:          1000,
+			},
+			EphemeralVolumeController: ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
+				ConcurrentEphemeralVolumeSyncs: 10,
 			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,

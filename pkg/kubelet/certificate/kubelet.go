@@ -142,7 +142,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		},
 		func() float64 {
 			if c := m.Current(); c != nil && c.Leaf != nil {
-				return math.Trunc(c.Leaf.NotAfter.Sub(time.Now()).Seconds())
+				return math.Trunc(time.Until(c.Leaf.NotAfter).Seconds())
 			}
 			return math.Inf(1)
 		},

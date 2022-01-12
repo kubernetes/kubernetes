@@ -22,20 +22,22 @@ import (
 	"reflect"
 	"strings"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	netutils "k8s.io/utils/net"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	componentversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration or ClusterConfiguration, some extra logic is run
@@ -103,8 +105,23 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	if err != nil {
 		return errors.Wrapf(err, "couldn't parse Kubernetes version %q", cfg.KubernetesVersion)
 	}
-	if k8sVersion.LessThan(constants.MinimumControlPlaneVersion) {
-		return errors.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", constants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
+
+	// During the k8s release process, a kubeadm version in the main branch could be 1.23.0-pre,
+	// while the 1.22.0 version is not released yet. The MinimumControlPlaneVersion validation
+	// in such a case will not pass, since the value of MinimumControlPlaneVersion would be
+	// calculated as kubeadm version - 1 (1.22) and k8sVersion would still be at 1.21.x
+	// (fetched from the 'stable' marker). Handle this case by only showing a warning.
+	mcpVersion := constants.MinimumControlPlaneVersion
+	versionInfo := componentversion.Get()
+	if isKubeadmPrereleaseVersion(&versionInfo, k8sVersion, mcpVersion) {
+		klog.V(1).Infof("WARNING: tolerating control plane version %s, assuming that k8s version %s is not released yet",
+			cfg.KubernetesVersion, mcpVersion)
+		return nil
+	}
+	// If not a pre-release version, handle the validation normally.
+	if k8sVersion.LessThan(mcpVersion) {
+		return errors.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s",
+			mcpVersion, cfg.KubernetesVersion)
 	}
 	return nil
 }
@@ -204,4 +221,21 @@ func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 	}
 
 	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
+}
+
+// isKubeadmPrereleaseVersion returns true if the kubeadm version is a pre-release version and
+// the minimum control plane version is N+2 MINOR version of the given k8sVersion.
+func isKubeadmPrereleaseVersion(versionInfo *apimachineryversion.Info, k8sVersion, mcpVersion *version.Version) bool {
+	if len(versionInfo.Major) != 0 { // Make sure the component version is populated
+		kubeadmVersion := version.MustParseSemantic(versionInfo.String())
+		if len(kubeadmVersion.PreRelease()) != 0 { // Only handle this if the kubeadm binary is a pre-release
+			// After incrementing the k8s MINOR version by one, if this version is equal or greater than the
+			// MCP version, return true.
+			v := k8sVersion.WithMinor(k8sVersion.Minor() + 1)
+			if comp, _ := v.Compare(mcpVersion.String()); comp != -1 {
+				return true
+			}
+		}
+	}
+	return false
 }

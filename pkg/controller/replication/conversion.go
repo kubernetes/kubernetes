@@ -224,7 +224,7 @@ func (c conversionClient) UpdateStatus(ctx context.Context, rs *apps.ReplicaSet,
 }
 
 func (c conversionClient) Get(ctx context.Context, name string, options metav1.GetOptions) (*apps.ReplicaSet, error) {
-	rc, err := c.ReplicationControllerInterface.Get(context.TODO(), name, options)
+	rc, err := c.ReplicationControllerInterface.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (c conversionClient) Get(ctx context.Context, name string, options metav1.G
 }
 
 func (c conversionClient) List(ctx context.Context, opts metav1.ListOptions) (*apps.ReplicaSetList, error) {
-	rcList, err := c.ReplicationControllerInterface.List(context.TODO(), opts)
+	rcList, err := c.ReplicationControllerInterface.List(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -337,18 +337,18 @@ type podControlAdapter struct {
 	controller.PodControlInterface
 }
 
-func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (pc podControlAdapter) CreatePods(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
 		return err
 	}
-	return pc.PodControlInterface.CreatePods(namespace, template, rc, controllerRef)
+	return pc.PodControlInterface.CreatePods(ctx, namespace, template, rc, controllerRef)
 }
 
-func (pc podControlAdapter) DeletePod(namespace string, podID string, object runtime.Object) error {
+func (pc podControlAdapter) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
 		return err
 	}
-	return pc.PodControlInterface.DeletePod(namespace, podID, rc)
+	return pc.PodControlInterface.DeletePod(ctx, namespace, podID, rc)
 }

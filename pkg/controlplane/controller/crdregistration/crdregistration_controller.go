@@ -104,7 +104,7 @@ func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinit
 	return c
 }
 
-func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *crdRegistrationController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
@@ -131,8 +131,8 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	}
 	close(c.syncedInitialSet)
 
-	// start up your worker threads based on threadiness.  Some controllers have multiple kinds of workers
-	for i := 0; i < threadiness; i++ {
+	// start up your worker threads based on workers.  Some controllers have multiple kinds of workers
+	for i := 0; i < workers; i++ {
 		// runWorker will loop until "something bad" happens.  The .Until will then rekick the worker
 		// after one second
 		go wait.Until(c.runWorker, time.Second, stopCh)

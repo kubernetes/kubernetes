@@ -83,7 +83,7 @@ func (c *FakeClusterRoleBindings) Update(ctx context.Context, clusterRoleBinding
 // Delete takes name of the clusterRoleBinding and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrolebindingsResource, name), &authorizationv1.ClusterRoleBinding{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterrolebindingsResource, name, opts), &authorizationv1.ClusterRoleBinding{})
 	return err
 }
 

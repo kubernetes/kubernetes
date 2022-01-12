@@ -94,7 +94,7 @@ func (c *FakeProxies) UpdateStatus(ctx context.Context, proxy *configv1.Proxy, o
 // Delete takes name of the proxy and deletes it. Returns an error if one occurs.
 func (c *FakeProxies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(proxiesResource, name), &configv1.Proxy{})
+		Invokes(testing.NewRootDeleteActionWithOptions(proxiesResource, name, opts), &configv1.Proxy{})
 	return err
 }
 

@@ -637,7 +637,7 @@ func TestRunExposeService(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(test.ns)
 			defer tf.Cleanup()
 
-			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
 			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
@@ -663,6 +663,186 @@ func TestRunExposeService(t *testing.T) {
 				cmd.Flags().Set(flag, value)
 			}
 			cmd.Run(cmd, test.args)
+
+			out := buf.String()
+
+			if test.expected == "" {
+				t.Errorf("%s: Invalid test case. Specify expected result.\n", test.name)
+			}
+
+			if !strings.Contains(out, test.expected) {
+				t.Errorf("%s: Unexpected output! Expected\n%s\ngot\n%s", test.name, test.expected, out)
+			}
+		})
+	}
+}
+
+func TestExposeOverride(t *testing.T) {
+	tests := []struct {
+		name         string
+		overrides    string
+		overrideType string
+		expected     string
+	}{
+		{
+			name:         "expose with merge override type should replace the entire spec",
+			overrides:    `{"spec": {"ports": [{"protocol": "TCP", "port": 1111, "targetPort": 2222}]}, "selector": {"app": "go"}}`,
+			overrideType: "merge",
+			expected: `apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    svc: test
+  name: foo
+  namespace: test
+spec:
+  ports:
+  - port: 1111
+    protocol: TCP
+    targetPort: 2222
+  selector:
+    app: go
+status:
+  loadBalancer: {}
+`,
+		},
+		{
+			name:         "expose with strategic override type should add port before existing port",
+			overrides:    `{"spec": {"ports": [{"protocol": "TCP", "port": 1111, "targetPort": 2222}]}}`,
+			overrideType: "strategic",
+			expected: `apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    svc: test
+  name: foo
+  namespace: test
+spec:
+  ports:
+  - port: 1111
+    protocol: TCP
+    targetPort: 2222
+  - port: 14
+    protocol: UDP
+    targetPort: 14
+  selector:
+    app: go
+status:
+  loadBalancer: {}
+`,
+		},
+		{
+			name: "expose with json override type should add port before existing port",
+			overrides: `[
+				{"op": "add", "path": "/spec/ports/0", "value": {"port": 1111, "protocol": "TCP", "targetPort": 2222}}
+			]`,
+			overrideType: "json",
+			expected: `apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    svc: test
+  name: foo
+  namespace: test
+spec:
+  ports:
+  - port: 1111
+    protocol: TCP
+    targetPort: 2222
+  - port: 14
+    protocol: UDP
+    targetPort: 14
+  selector:
+    app: go
+status:
+  loadBalancer: {}
+`,
+		},
+		{
+			name: "expose with json override type should add port after existing port",
+			overrides: `[
+				{"op": "add", "path": "/spec/ports/1", "value": {"port": 1111, "protocol": "TCP", "targetPort": 2222}}
+			]`,
+			overrideType: "json",
+			expected: `apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    svc: test
+  name: foo
+  namespace: test
+spec:
+  ports:
+  - port: 14
+    protocol: UDP
+    targetPort: 14
+  - port: 1111
+    protocol: TCP
+    targetPort: 2222
+  selector:
+    app: go
+status:
+  loadBalancer: {}
+`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
+			ns := scheme.Codecs.WithoutConversion()
+
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == "/namespaces/test/services/baz" && m == "GET":
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Service{
+							ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+							Spec: corev1.ServiceSpec{
+								Selector: map[string]string{"app": "go"},
+							},
+						})}, nil
+					case p == "/namespaces/test/services" && m == "POST":
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Service{
+							ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+							Spec: corev1.ServiceSpec{
+								Ports: []corev1.ServicePort{
+									{
+										Protocol:   corev1.ProtocolUDP,
+										Port:       14,
+										TargetPort: intstr.FromInt(14),
+									},
+								},
+								Selector: map[string]string{"app": "go"},
+							},
+						})}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdExposeService(tf, ioStreams)
+			cmd.SetOut(buf)
+			cmd.Flags().Set("protocol", "UDP")
+			cmd.Flags().Set("port", "14")
+			cmd.Flags().Set("name", "foo")
+			cmd.Flags().Set("labels", "svc=test")
+			cmd.Flags().Set("dry-run", "client")
+			cmd.Flags().Set("overrides", test.overrides)
+			cmd.Flags().Set("override-type", test.overrideType)
+			cmd.Flags().Set("output", "yaml")
+			cmd.Run(cmd, []string{"service", "baz"})
 
 			out := buf.String()
 

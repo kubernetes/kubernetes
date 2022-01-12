@@ -6,18 +6,20 @@ go 1.16
 
 require (
 	github.com/google/go-cmp v0.5.5
-	k8s.io/api v0.22.1
-	k8s.io/apimachinery v0.22.1
-	k8s.io/client-go v0.22.1
-	k8s.io/klog/v2 v2.9.0
-	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
+	k8s.io/api v0.23.0
+	k8s.io/apimachinery v0.23.0
+	k8s.io/client-go v0.23.0
+	k8s.io/klog/v2 v2.30.0
+	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 )
 
 replace (
+	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.0
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-helpers => ../component-helpers
+	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 )

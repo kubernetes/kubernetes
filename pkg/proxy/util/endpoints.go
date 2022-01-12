@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 
@@ -36,13 +35,13 @@ func IPPart(s string) string {
 	// Must be IP:port
 	host, _, err := net.SplitHostPort(s)
 	if err != nil {
-		klog.Errorf("Error parsing '%s': %v", s, err)
+		klog.ErrorS(err, "Failed to parse host-port", "input", s)
 		return ""
 	}
 	// Check if host string is a valid IP address
 	ip := netutils.ParseIPSloppy(host)
 	if ip == nil {
-		klog.Errorf("invalid IP part '%s'", host)
+		klog.ErrorS(nil, "Failed to parse IP", "input", host)
 		return ""
 	}
 	return ip.String()
@@ -53,23 +52,13 @@ func PortPart(s string) (int, error) {
 	// Must be IP:port
 	_, port, err := net.SplitHostPort(s)
 	if err != nil {
-		klog.Errorf("Error parsing '%s': %v", s, err)
+		klog.ErrorS(err, "Failed to parse host-port", "input", s)
 		return -1, err
 	}
 	portNumber, err := strconv.Atoi(port)
 	if err != nil {
-		klog.Errorf("Error parsing '%s': %v", port, err)
+		klog.ErrorS(err, "Failed to parse port", "input", port)
 		return -1, err
 	}
 	return portNumber, nil
-}
-
-// ToCIDR returns a host address of the form <ip-address>/32 for
-// IPv4 and <ip-address>/128 for IPv6
-func ToCIDR(ip net.IP) string {
-	len := 32
-	if ip.To4() == nil {
-		len = 128
-	}
-	return fmt.Sprintf("%s/%d", ip.String(), len)
 }

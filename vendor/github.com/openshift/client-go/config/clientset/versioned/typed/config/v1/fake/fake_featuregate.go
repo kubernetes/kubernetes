@@ -94,7 +94,7 @@ func (c *FakeFeatureGates) UpdateStatus(ctx context.Context, featureGate *config
 // Delete takes name of the featureGate and deletes it. Returns an error if one occurs.
 func (c *FakeFeatureGates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(featuregatesResource, name), &configv1.FeatureGate{})
+		Invokes(testing.NewRootDeleteActionWithOptions(featuregatesResource, name, opts), &configv1.FeatureGate{})
 	return err
 }
 

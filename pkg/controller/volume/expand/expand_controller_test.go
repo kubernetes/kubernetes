@@ -17,6 +17,7 @@ limitations under the License.
 package expand
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -157,7 +158,7 @@ func TestSyncHandler(t *testing.T) {
 			return true, pvc, nil
 		})
 
-		err = expController.syncHandler(test.pvcKey)
+		err = expController.syncHandler(context.TODO(), test.pvcKey)
 		if err != nil && !test.hasError {
 			t.Fatalf("for: %s; unexpected error while running handler : %v", test.name, err)
 		}

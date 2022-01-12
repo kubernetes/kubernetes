@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -44,12 +43,6 @@ const (
 var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]", func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 	ginkgo.Context("when we need to admit a critical pod", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			if initialConfig.FeatureGates == nil {
-				initialConfig.FeatureGates = make(map[string]bool)
-			}
-		})
-
 		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func() {
 			configEnabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)

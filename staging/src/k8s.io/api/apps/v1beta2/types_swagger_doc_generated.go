@@ -100,7 +100,7 @@ var map_DaemonSetStatus = map[string]string{
 	"currentNumberScheduled": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"numberMisscheduled":     "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"desiredNumberScheduled": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
-	"numberReady":            "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+	"numberReady":            "Total number of nodes that should be running the daemon pod and have one or more of the daemon pod running with a Ready Condition by passing the readinessProbe.",
 	"observedGeneration":     "The most recent generation observed by the daemon set controller.",
 	"updatedNumberScheduled": "The total number of nodes that are running updated daemon pod",
 	"numberAvailable":        "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
@@ -179,7 +179,7 @@ var map_DeploymentStatus = map[string]string{
 	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
-	"readyReplicas":       "Total number of ready pods targeted by this deployment.",
+	"readyReplicas":       "readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.",
 	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",
@@ -250,7 +250,7 @@ var map_ReplicaSetStatus = map[string]string{
 	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
 	"replicas":             "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
 	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
-	"readyReplicas":        "The number of ready replicas for this replica set.",
+	"readyReplicas":        "readyReplicas is the number of pods targeted by this ReplicaSet controller with a Ready Condition.",
 	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
 	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
 	"conditions":           "Represents the latest available observations of a replica set's current state.",
@@ -351,17 +351,28 @@ func (StatefulSetList) SwaggerDoc() map[string]string {
 	return map_StatefulSetList
 }
 
+var map_StatefulSetPersistentVolumeClaimRetentionPolicy = map[string]string{
+	"":            "StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.",
+	"whenDeleted": "WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted. The default policy of `Retain` causes PVCs to not be affected by StatefulSet deletion. The `Delete` policy causes those PVCs to be deleted.",
+	"whenScaled":  "WhenScaled specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is scaled down. The default policy of `Retain` causes PVCs to not be affected by a scaledown. The `Delete` policy causes the associated PVCs for any excess pods above the replica count to be deleted.",
+}
+
+func (StatefulSetPersistentVolumeClaimRetentionPolicy) SwaggerDoc() map[string]string {
+	return map_StatefulSetPersistentVolumeClaimRetentionPolicy
+}
+
 var map_StatefulSetSpec = map[string]string{
-	"":                     "A StatefulSetSpec is the specification of a StatefulSet.",
-	"replicas":             "replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
-	"selector":             "selector is a label query over pods that should match the replica count. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
-	"template":             "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
-	"volumeClaimTemplates": "volumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
-	"serviceName":          "serviceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
-	"podManagementPolicy":  "podManagementPolicy controls how pods are created during initial scale up, when replacing pods on nodes, or when scaling down. The default policy is `OrderedReady`, where pods are created in increasing order (pod-0, then pod-1, etc) and the controller will wait until each pod is ready before continuing. When scaling down, the pods are removed in the opposite order. The alternative policy is `Parallel` which will create pods in parallel to match the desired scale without waiting, and on scale down will delete all pods at once.",
-	"updateStrategy":       "updateStrategy indicates the StatefulSetUpdateStrategy that will be employed to update Pods in the StatefulSet when a revision is made to Template.",
-	"revisionHistoryLimit": "revisionHistoryLimit is the maximum number of revisions that will be maintained in the StatefulSet's revision history. The revision history consists of all revisions not represented by a currently applied StatefulSetSpec version. The default value is 10.",
-	"minReadySeconds":      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready) This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.",
+	"":                                     "A StatefulSetSpec is the specification of a StatefulSet.",
+	"replicas":                             "replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
+	"selector":                             "selector is a label query over pods that should match the replica count. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+	"template":                             "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
+	"volumeClaimTemplates":                 "volumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
+	"serviceName":                          "serviceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
+	"podManagementPolicy":                  "podManagementPolicy controls how pods are created during initial scale up, when replacing pods on nodes, or when scaling down. The default policy is `OrderedReady`, where pods are created in increasing order (pod-0, then pod-1, etc) and the controller will wait until each pod is ready before continuing. When scaling down, the pods are removed in the opposite order. The alternative policy is `Parallel` which will create pods in parallel to match the desired scale without waiting, and on scale down will delete all pods at once.",
+	"updateStrategy":                       "updateStrategy indicates the StatefulSetUpdateStrategy that will be employed to update Pods in the StatefulSet when a revision is made to Template.",
+	"revisionHistoryLimit":                 "revisionHistoryLimit is the maximum number of revisions that will be maintained in the StatefulSet's revision history. The revision history consists of all revisions not represented by a currently applied StatefulSetSpec version. The default value is 10.",
+	"minReadySeconds":                      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready) This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.",
+	"persistentVolumeClaimRetentionPolicy": "PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates. This requires the StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.",
 }
 
 func (StatefulSetSpec) SwaggerDoc() map[string]string {
@@ -372,14 +383,14 @@ var map_StatefulSetStatus = map[string]string{
 	"":                   "StatefulSetStatus represents the current state of a StatefulSet.",
 	"observedGeneration": "observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the StatefulSet's generation, which is updated on mutation by the API Server.",
 	"replicas":           "replicas is the number of Pods created by the StatefulSet controller.",
-	"readyReplicas":      "readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.",
+	"readyReplicas":      "readyReplicas is the number of pods created by this StatefulSet controller with a Ready Condition.",
 	"currentReplicas":    "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
 	"updatedReplicas":    "updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by updateRevision.",
 	"currentRevision":    "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).",
 	"updateRevision":     "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)",
 	"collisionCount":     "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
 	"conditions":         "Represents the latest available observations of a statefulset's current state.",
-	"availableReplicas":  "Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet. This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate. Remove omitempty when graduating to beta",
+	"availableReplicas":  "Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet. This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.",
 }
 
 func (StatefulSetStatus) SwaggerDoc() map[string]string {

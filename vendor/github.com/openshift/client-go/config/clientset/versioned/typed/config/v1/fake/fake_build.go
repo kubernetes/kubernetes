@@ -83,7 +83,7 @@ func (c *FakeBuilds) Update(ctx context.Context, build *configv1.Build, opts v1.
 // Delete takes name of the build and deletes it. Returns an error if one occurs.
 func (c *FakeBuilds) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(buildsResource, name), &configv1.Build{})
+		Invokes(testing.NewRootDeleteActionWithOptions(buildsResource, name, opts), &configv1.Build{})
 	return err
 }
 

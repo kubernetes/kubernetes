@@ -94,7 +94,7 @@ func (c *FakeAPIRequestCounts) UpdateStatus(ctx context.Context, aPIRequestCount
 // Delete takes name of the aPIRequestCount and deletes it. Returns an error if one occurs.
 func (c *FakeAPIRequestCounts) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(apirequestcountsResource, name), &apiserverv1.APIRequestCount{})
+		Invokes(testing.NewRootDeleteActionWithOptions(apirequestcountsResource, name, opts), &apiserverv1.APIRequestCount{})
 	return err
 }
 

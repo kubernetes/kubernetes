@@ -485,9 +485,9 @@ func podListForEachNode(cs clientset.Interface) map[string][]*v1.Pod {
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
-	for _, pod := range allPods.Items {
+	for i, pod := range allPods.Items {
 		nodeName := pod.Spec.NodeName
-		nodeNameToPodList[nodeName] = append(nodeNameToPodList[nodeName], &pod)
+		nodeNameToPodList[nodeName] = append(nodeNameToPodList[nodeName], &allPods.Items[i])
 	}
 	return nodeNameToPodList
 }

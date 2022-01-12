@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"sigs.k8s.io/kustomize/api/internal/utils"
+	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -48,6 +49,17 @@ func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targets []*types.T
 			if err != nil {
 				return nil, err
 			}
+
+			// filter targets by label and annotation selectors
+			selectByAnnoAndLabel, err := selectByAnnoAndLabel(n, t)
+			if err != nil {
+				return nil, err
+			}
+			if !selectByAnnoAndLabel {
+				continue
+			}
+
+			// filter targets by matching resource IDs
 			for _, id := range ids {
 				if id.IsSelectedBy(t.Select.ResId) && !rejectId(t.Reject, &id) {
 					err := applyToNode(n, value, t)
@@ -62,9 +74,37 @@ func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targets []*types.T
 	return nodes, nil
 }
 
+func selectByAnnoAndLabel(n *yaml.RNode, t *types.TargetSelector) (bool, error) {
+	if matchesSelect, err := matchesAnnoAndLabelSelector(n, t.Select); !matchesSelect || err != nil {
+		return false, err
+	}
+	for _, reject := range t.Reject {
+		if reject.AnnotationSelector == "" && reject.LabelSelector == "" {
+			continue
+		}
+		if m, err := matchesAnnoAndLabelSelector(n, reject); m || err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func matchesAnnoAndLabelSelector(n *yaml.RNode, selector *types.Selector) (bool, error) {
+	r := resource.Resource{RNode: *n}
+	annoMatch, err := r.MatchesAnnotationSelector(selector.AnnotationSelector)
+	if err != nil {
+		return false, err
+	}
+	labelMatch, err := r.MatchesLabelSelector(selector.LabelSelector)
+	if err != nil {
+		return false, err
+	}
+	return annoMatch && labelMatch, nil
+}
+
 func rejectId(rejects []*types.Selector, id *resid.ResId) bool {
 	for _, r := range rejects {
-		if id.IsSelectedBy(r.ResId) {
+		if !r.ResId.IsEmpty() && id.IsSelectedBy(r.ResId) {
 			return true
 		}
 	}
@@ -131,10 +171,11 @@ func getReplacement(nodes []*yaml.RNode, r *types.Replacement) (*yaml.RNode, err
 	if err != nil {
 		return nil, err
 	}
-	if !rn.IsNilOrEmpty() {
-		return getRefinedValue(r.Source.Options, rn)
+	if rn.IsNilOrEmpty() {
+		return nil, fmt.Errorf("fieldPath `%s` is missing for replacement source %s", r.Source.FieldPath, r.Source)
 	}
-	return rn, nil
+
+	return getRefinedValue(r.Source.Options, rn)
 }
 
 func getRefinedValue(options *types.FieldOptions, rn *yaml.RNode) (*yaml.RNode, error) {

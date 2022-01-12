@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -179,72 +178,111 @@ func TestStatefulSetStrategy(t *testing.T) {
 			if len(errs) == 0 {
 				t.Errorf("updating only spec.Replicas is allowed on a statefulset: %v", errs)
 			}
-			expectedUpdateErrorString := "spec: Forbidden: updates to statefulset spec for fields other than 'replicas'," +
-				" 'template', 'updateStrategy' and 'minReadySeconds' are forbidden"
+			expectedUpdateErrorString := "spec: Forbidden: updates to statefulset spec for fields other than" +
+				" 'replicas', 'template', 'updateStrategy' and 'persistentVolumeClaimRetentionPolicy' are forbidden"
 			if errs[0].Error() != expectedUpdateErrorString {
 				t.Errorf("expected error string %v", errs[0].Error())
 			}
 		})
+
+	validPs = &apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
+		Spec: apps.StatefulSetSpec{
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Selector:            ps.Spec.Selector,
+			Template:            validPodTemplate.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+		},
+		Status: apps.StatefulSetStatus{Replicas: 4},
+	}
+
+	t.Run("when StatefulSetAutoDeletePVC feature gate is enabled, PersistentVolumeClaimRetentionPolicy should be updated", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		// Test creation
+		ps := &apps.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            ps.Spec.Selector,
+				Template:            validPodTemplate.Template,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: apps.PersistentVolumeClaimRetentionPolicyType("invalid policy"),
+				},
+			},
+		}
+		Strategy.PrepareForCreate(ctx, ps)
+		errs := Strategy.Validate(ctx, ps)
+		if len(errs) == 0 {
+			t.Errorf("expected failure when PersistentVolumeClaimRetentionPolicy is invalid")
+		}
+		expectedCreateErrorString := "spec.persistentVolumeClaimRetentionPolicy.whenDeleted: Unsupported value: \"invalid policy\": supported values: \"Retain\", \"Delete\""
+		if errs[0].Error() != expectedCreateErrorString {
+			t.Errorf("mismatched error string %v (expected %v)", errs[0].Error(), expectedCreateErrorString)
+		}
+		Strategy.PrepareForUpdate(ctx, validPs, ps)
+		errs = Strategy.ValidateUpdate(ctx, validPs, ps)
+		if len(errs) != 0 {
+			t.Errorf("updates to PersistentVolumeClaimRetentionPolicy should be allowed: %v", errs)
+		}
+		invalidPs := ps
+		invalidPs.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.PersistentVolumeClaimRetentionPolicyType("invalid type")
+		Strategy.PrepareForUpdate(ctx, validPs, invalidPs)
+		errs = Strategy.ValidateUpdate(ctx, validPs, ps)
+		if len(errs) != 0 {
+			t.Errorf("invalid updates to PersistentVolumeClaimRetentionPolicyType should be allowed: %v", errs)
+		}
+		if validPs.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != apps.RetainPersistentVolumeClaimRetentionPolicyType || validPs.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled != apps.DeletePersistentVolumeClaimRetentionPolicyType {
+			t.Errorf("expected PersistentVolumeClaimRetentionPolicy to be updated: %v", errs)
+		}
+	})
+	t.Run("when StatefulSetAutoDeletePVC feature gate is disabled, PersistentVolumeClaimRetentionPolicy should not be updated", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		// Test creation
+		ps := &apps.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            ps.Spec.Selector,
+				Template:            validPodTemplate.Template,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+				},
+			},
+		}
+		Strategy.PrepareForCreate(ctx, ps)
+		errs := Strategy.Validate(ctx, ps)
+		if len(errs) != 0 {
+			t.Errorf("unexpected failure with PersistentVolumeClaimRetentionPolicy: %v", errs)
+		}
+		if ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != apps.RetainPersistentVolumeClaimRetentionPolicyType || ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled != apps.DeletePersistentVolumeClaimRetentionPolicyType {
+			t.Errorf("expected invalid PersistentVolumeClaimRetentionPolicy to be defaulted to Retain, but got %v", ps.Spec.PersistentVolumeClaimRetentionPolicy)
+		}
+		Strategy.PrepareForUpdate(ctx, validPs, ps)
+		errs = Strategy.ValidateUpdate(ctx, validPs, ps)
+		if len(errs) != 0 {
+			t.Errorf("updates to PersistentVolumeClaimRetentionPolicy should be allowed: %v", errs)
+		}
+		invalidPs := ps
+		invalidPs.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.PersistentVolumeClaimRetentionPolicyType("invalid type")
+		Strategy.PrepareForUpdate(ctx, validPs, invalidPs)
+		errs = Strategy.ValidateUpdate(ctx, validPs, ps)
+		if len(errs) != 0 {
+			t.Errorf("should ignore updates to PersistentVolumeClaimRetentionPolicyType")
+		}
+	})
 
 	validPs.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}
 	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) == 0 {
 		t.Errorf("expected a validation error since updates are disallowed on statefulsets.")
-	}
-}
-
-func TestStatefulsetDefaultGarbageCollectionPolicy(t *testing.T) {
-	// Make sure we correctly implement the interface.
-	// Otherwise a typo could silently change the default.
-	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	tests := []struct {
-		requestInfo      genericapirequest.RequestInfo
-		expectedGCPolicy rest.GarbageCollectionPolicy
-		isNilRequestInfo bool
-	}{
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1beta1",
-				Resource:   "statefulsets",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1beta2",
-				Resource:   "statefulsets",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1",
-				Resource:   "statefulsets",
-			},
-			rest.DeleteDependents,
-			false,
-		},
-		{
-			expectedGCPolicy: rest.DeleteDependents,
-			isNilRequestInfo: true,
-		},
-	}
-
-	for _, test := range tests {
-		context := genericapirequest.NewContext()
-		if !test.isNilRequestInfo {
-			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
-		}
-		if got, want := gcds.DefaultGarbageCollectionPolicy(context), test.expectedGCPolicy; got != want {
-			t.Errorf("%s/%s: DefaultGarbageCollectionPolicy() = %#v, want %#v", test.requestInfo.APIGroup,
-				test.requestInfo.APIVersion, got, want)
-		}
 	}
 }
 

@@ -1,9 +1,0 @@
-= vendor/github.com/coreos/go-systemd licensed under: =
-
-CoreOS Project
-Copyright 2018 CoreOS, Inc
-
-This product includes software developed at CoreOS, Inc.
-(http://www.coreos.com/).
-
-= vendor/github.com/coreos/go-systemd/v22/NOTICE 71fd50a7bd34670ef7cd3a7740046f77

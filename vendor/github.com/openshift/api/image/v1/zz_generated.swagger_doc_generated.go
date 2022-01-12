@@ -153,7 +153,7 @@ func (ImageStreamImage) SwaggerDoc() map[string]string {
 var map_ImageStreamImport = map[string]string{
 	"":       "The image stream import resource provides an easy way for a user to find and import container images from other container image registries into the server. Individual images or an entire image repository may be imported, and users may choose to see the results of the import prior to tagging the resulting images into the specified image stream.\n\nThis API is intended for end-user tools that need to see the metadata of the image prior to import (for instance, to generate an application from it). Clients that know the desired image can continue to create spec.tags directly into their image streams.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"spec":   "Spec is a description of the images that the user wishes to import",
-	"status": "Status is the the result of importing the image",
+	"status": "Status is the result of importing the image",
 }
 
 func (ImageStreamImport) SwaggerDoc() map[string]string {

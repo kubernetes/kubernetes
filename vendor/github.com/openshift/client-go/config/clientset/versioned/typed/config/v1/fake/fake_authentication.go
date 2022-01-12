@@ -94,7 +94,7 @@ func (c *FakeAuthentications) UpdateStatus(ctx context.Context, authentication *
 // Delete takes name of the authentication and deletes it. Returns an error if one occurs.
 func (c *FakeAuthentications) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(authenticationsResource, name), &configv1.Authentication{})
+		Invokes(testing.NewRootDeleteActionWithOptions(authenticationsResource, name, opts), &configv1.Authentication{})
 	return err
 }
 

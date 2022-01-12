@@ -638,7 +638,7 @@ func (g *Cloud) updateTargetPool(loadBalancerName string, hosts []*gceInstance) 
 }
 
 func (g *Cloud) targetPoolURL(name string) string {
-	return g.service.BasePath + strings.Join([]string{g.projectID, "regions", g.region, "targetPools", name}, "/")
+	return g.projectsBasePath + strings.Join([]string{g.projectID, "regions", g.region, "targetPools", name}, "/")
 }
 
 func makeHTTPHealthCheck(name, path string, port int32) *compute.HttpHealthCheck {

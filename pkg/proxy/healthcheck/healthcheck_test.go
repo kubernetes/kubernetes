@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -58,6 +58,15 @@ type fakeNetListener struct {
 	addr   string
 }
 
+type fakeAddr struct {
+}
+
+func (fa fakeAddr) Network() string {
+	return "tcp"
+}
+func (fa fakeAddr) String() string {
+	return "<test>"
+}
 func (fake *fakeNetListener) Accept() (net.Conn, error) {
 	// Not implemented
 	return nil, nil
@@ -70,7 +79,7 @@ func (fake *fakeNetListener) Close() error {
 
 func (fake *fakeNetListener) Addr() net.Addr {
 	// Not implemented
-	return nil
+	return fakeAddr{}
 }
 
 type fakeHTTPServerFactory struct{}
@@ -119,7 +128,7 @@ func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{})
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -339,34 +348,38 @@ func TestServer(t *testing.T) {
 }
 
 func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, t *testing.T) {
-	handler := hcs.services[nsn].server.(*fakeHTTPServer).handler
-	req, err := http.NewRequest("GET", "/healthz", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp := httptest.NewRecorder()
+	instance := hcs.services[nsn]
+	for _, h := range instance.httpServers {
+		handler := h.(*fakeHTTPServer).handler
 
-	handler.ServeHTTP(resp, req)
+		req, err := http.NewRequest("GET", "/healthz", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp := httptest.NewRecorder()
 
-	if resp.Code != status {
-		t.Errorf("expected status code %v, got %v", status, resp.Code)
-	}
-	var payload hcPayload
-	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if payload.Service.Name != nsn.Name || payload.Service.Namespace != nsn.Namespace {
-		t.Errorf("expected payload name %q, got %v", nsn.String(), payload.Service)
-	}
-	if payload.LocalEndpoints != endpoints {
-		t.Errorf("expected %d endpoints, got %d", endpoints, payload.LocalEndpoints)
+		handler.ServeHTTP(resp, req)
+
+		if resp.Code != status {
+			t.Errorf("expected status code %v, got %v", status, resp.Code)
+		}
+		var payload hcPayload
+		if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Service.Name != nsn.Name || payload.Service.Namespace != nsn.Namespace {
+			t.Errorf("expected payload name %q, got %v", nsn.String(), payload.Service)
+		}
+		if payload.LocalEndpoints != endpoints {
+			t.Errorf("expected %d endpoints, got %d", endpoints, payload.LocalEndpoints)
+		}
 	}
 }
 
 func TestHealthzServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
@@ -410,4 +423,52 @@ func testHealthzHandler(server httpServer, status int, t *testing.T) {
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestServerWithSelectiveListeningAddress(t *testing.T) {
+	listener := newFakeListener()
+	httpFactory := newFakeHTTPServerFactory()
+
+	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
+	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
+
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{"127.0.0.0/8"})
+	hcs := hcsi.(*server)
+	if len(hcs.services) != 0 {
+		t.Errorf("expected 0 services, got %d", len(hcs.services))
+	}
+
+	// sync nothing
+	hcs.SyncServices(nil)
+	if len(hcs.services) != 0 {
+		t.Errorf("expected 0 services, got %d", len(hcs.services))
+	}
+	hcs.SyncEndpoints(nil)
+	if len(hcs.services) != 0 {
+		t.Errorf("expected 0 services, got %d", len(hcs.services))
+	}
+
+	// sync unknown endpoints, should be dropped
+	hcs.SyncEndpoints(map[types.NamespacedName]int{mknsn("a", "b"): 93})
+	if len(hcs.services) != 0 {
+		t.Errorf("expected 0 services, got %d", len(hcs.services))
+	}
+
+	// sync a real service
+	nsn := mknsn("a", "b")
+	hcs.SyncServices(map[types.NamespacedName]uint16{nsn: 9376})
+	if len(hcs.services) != 1 {
+		t.Errorf("expected 1 service, got %d", len(hcs.services))
+	}
+	if hcs.services[nsn].endpoints != 0 {
+		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn].endpoints)
+	}
+	if len(listener.openPorts) != 1 {
+		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), spew.Sdump(listener.openPorts))
+	}
+	if !listener.hasPort("127.0.0.1:9376") {
+		t.Errorf("expected port :9376 to be open\n%s", spew.Sdump(listener.openPorts))
+	}
+	// test the handler
+	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
 }

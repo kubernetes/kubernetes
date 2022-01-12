@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -114,8 +113,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 	start := time.Now()
 	e2elog.Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
 	var ignoreNotReady bool
 	badPods := []v1.Pod{}
 	desiredPods := 0
@@ -549,4 +546,27 @@ func WaitForPodContainerToFail(c clientset.Interface, namespace, podName string,
 // WaitForPodContainerStarted waits for the given Pod container to start, after a successful run of the startupProbe.
 func WaitForPodContainerStarted(c clientset.Interface, namespace, podName string, containerIndex int, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, podContainerStarted(c, namespace, podName, containerIndex))
+}
+
+// WaitForPodFailedReason wait for pod failed reason in status, for example "SysctlForbidden".
+func WaitForPodFailedReason(c clientset.Interface, pod *v1.Pod, reason string, timeout time.Duration) error {
+	waitErr := wait.PollImmediate(poll, timeout, func() (bool, error) {
+		pod, err := c.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if pod.Status.Reason == reason {
+			return true, nil
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for pod SysctlForbidden status: %v", waitErr)
+	}
+	return nil
+}
+
+// WaitForContainerRunning waits for the given Pod container to have a state of running
+func WaitForContainerRunning(c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	return wait.PollImmediate(poll, timeout, isContainerRunning(c, namespace, podName, containerName))
 }

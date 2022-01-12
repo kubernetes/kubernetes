@@ -25,7 +25,7 @@ import (
 	"os/exec"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -48,7 +48,8 @@ func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (r
 		}
 
 		runningPods = []*v1.Pod{}
-		for _, pod := range podList.Items {
+		for i := range podList.Items {
+			pod := podList.Items[i]
 			if r, err := testutils.PodRunningReadyOrSucceeded(&pod); err != nil || !r {
 				continue
 			}
@@ -83,6 +84,9 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 	ginkgo.Context("Container Runtime", func() {
 		ginkgo.Context("Network", func() {
 			ginkgo.It("should recover from ip leak", func() {
+				if framework.TestContext.ContainerRuntime == "docker" {
+					ginkgo.Skip("Test fails with in-tree docker. Skipping test.")
+				}
 
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
 				ginkgo.By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
@@ -146,6 +150,10 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			if numCpus < 1 {
 				e2eskipper.Skipf("insufficient CPU available for kubelet restart test")
 			}
+			if numCpus > 18 {
+				// 950m * 19 = 1805 CPUs -> not enough to block the scheduling of another 950m pod
+				e2eskipper.Skipf("test will return false positives on a machine with >18 cores")
+			}
 
 			// create as many restartNever pods as there are allocatable CPU
 			// nodes; if they are not correctly accounted for as terminated
@@ -157,13 +165,13 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				pod.Spec.RestartPolicy = "Never"
 				pod.Spec.Containers[0].Command = []string{"echo", "hi"}
 				pod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
-					v1.ResourceCPU: resource.MustParse("1"),
+					v1.ResourceCPU: resource.MustParse("950m"), // leave a little room for other workloads
 				}
 			}
 			createBatchPodWithRateControl(f, restartNeverPods, podCreationInterval)
 			defer deletePodsSync(f, restartNeverPods)
 
-			completedPods := waitForPods(f, podCountRestartNever, time.Minute)
+			completedPods := waitForPods(f, podCountRestartNever, startTimeout)
 			if len(completedPods) < podCountRestartNever {
 				framework.Failf("Failed to run sufficient restartNever pods, got %d but expected %d", len(completedPods), podCountRestartNever)
 			}
@@ -196,7 +204,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			// will get an OutOfCpu error.
 			ginkgo.By("verifying restartNever pods succeed and restartAlways pods stay running")
 			for start := time.Now(); time.Since(start) < startTimeout; time.Sleep(10 * time.Second) {
-				postRestartRunningPods := waitForPods(f, numAllPods, time.Minute)
+				postRestartRunningPods := waitForPods(f, numAllPods, recoverTimeout)
 				if len(postRestartRunningPods) < numAllPods {
 					framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
 				}

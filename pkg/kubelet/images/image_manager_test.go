@@ -24,11 +24,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type pullerExpects struct {
@@ -158,7 +158,7 @@ func pullerTestCases() []pullerTestCase {
 	}
 }
 
-func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fakeClock *clock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
+func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
 	container = &v1.Container{
 		Name:            "container_name",
 		Image:           c.containerImage,
@@ -166,7 +166,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	fakeClock = clock.NewFakeClock(time.Now())
+	fakeClock = testingclock.NewFakeClock(time.Now())
 	backOff.Clock = fakeClock
 
 	fakeRuntime = &ctest.FakeRuntime{}

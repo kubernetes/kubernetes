@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
@@ -48,6 +49,7 @@ const (
 	vol0          = "vol0"
 	vol1          = "vol1"
 	vol2          = "vol2"
+	vol3          = "vol3"
 	pvcClaimName0 = "pvc-fake0"
 	pvcClaimName1 = "pvc-fake1"
 )
@@ -80,6 +82,12 @@ var (
 				},
 			},
 		},
+		{
+			Name: vol3,
+			VolumeSource: k8sv1.VolumeSource{
+				Ephemeral: &k8sv1.EphemeralVolumeSource{},
+			},
+		},
 	}
 
 	fakePod = &k8sv1.Pod{
@@ -97,12 +105,15 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	// Setup mock stats provider
-	mockStats := new(statstest.StatsProvider)
-	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
-	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	mockStats := statstest.NewMockProvider(mockCtrl)
+	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}, vol3: &fakeVolume{}}
+	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
-	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
+	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 1)
 	fakeEventRecorder := record.FakeRecorder{
@@ -114,7 +125,7 @@ func TestPVCRef(t *testing.T) {
 	statsCalculator.calcAndStoreStats()
 	vs, _ := statsCalculator.GetLatest()
 
-	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 3)
+	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
 	// Verify 'vol0' doesn't have a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name:    vol0,
@@ -138,14 +149,26 @@ func TestPVCRef(t *testing.T) {
 		},
 		FsStats: expectedBlockStats(),
 	})
+	// Verify 'vol3' has a PVC reference
+	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
+		Name: vol3,
+		PVCRef: &kubestats.PVCReference{
+			Name:      pName0 + "-" + vol3,
+			Namespace: namespace0,
+		},
+		FsStats: expectedFSStats(),
+	})
 }
 
 func TestNormalVolumeEvent(t *testing.T) {
-	mockStats := new(statstest.StatsProvider)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStats := statstest.NewMockProvider(mockCtrl)
+
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
-	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
-	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
+	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
 	fakeEventRecorder := record.FakeRecorder{
@@ -163,12 +186,15 @@ func TestNormalVolumeEvent(t *testing.T) {
 
 func TestAbnormalVolumeEvent(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	// Setup mock stats provider
-	mockStats := new(statstest.StatsProvider)
+	mockStats := statstest.NewMockProvider(mockCtrl)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}}
-	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol1: &fakeBlockVolume{}}
-	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
+	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
 	fakeEventRecorder := record.FakeRecorder{

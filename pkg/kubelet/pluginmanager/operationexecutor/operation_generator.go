@@ -22,13 +22,13 @@ package operationexecutor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
 	"k8s.io/klog/v2"
 
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"k8s.io/client-go/tools/record"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -163,7 +163,7 @@ func (og *operationGenerator) notifyPlugin(client registerapi.RegistrationClient
 	}
 
 	if _, err := client.NotifyRegistrationStatus(ctx, status); err != nil {
-		return errors.Wrap(err, errStr)
+		return fmt.Errorf("%s: %w", errStr, err)
 	}
 
 	if errStr != "" {

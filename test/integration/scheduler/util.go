@@ -35,11 +35,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -83,7 +84,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 // initTest initializes a test environment and creates API server and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), nil, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -92,12 +93,12 @@ func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutil
 // initTestDisablePreemption initializes a test environment and creates API server and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestContext {
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				PostFilter: v1beta2.PluginSet{
-					Disabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				PostFilter: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
 						{Name: defaultpreemption.Name},
 					},
 				},
@@ -105,7 +106,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 		}},
 	})
 	testCtx := testutils.InitTestSchedulerWithOptions(
-		t, testutils.InitTestAPIServer(t, nsPrefix, nil), nil,
+		t, testutils.InitTestAPIServer(t, nsPrefix, nil),
 		scheduler.WithProfiles(cfg.Profiles...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
@@ -498,10 +499,7 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 			// This could be a connection error so we want to retry.
 			return false, nil
 		}
-		if pod.Spec.NodeName == "" {
-			return false, nil
-		}
-		return true, nil
+		return pod.Spec.NodeName != "", nil
 	}
 }
 
@@ -513,4 +511,55 @@ func createNamespacesWithLabels(cs clientset.Interface, namespaces []string, lab
 		}
 	}
 	return nil
+}
+
+// timeout returns a timeout error if the given `f` function doesn't
+// complete within `d` duration; otherwise it returns nil.
+func timeout(ctx context.Context, d time.Duration, f func()) error {
+	ctx, cancel := context.WithTimeout(ctx, d)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		f()
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// nextPodOrDie returns the next Pod in the scheduler queue.
+// The operation needs to be completed within 5 seconds; otherwise the test gets aborted.
+func nextPodOrDie(t *testing.T, testCtx *testutils.TestContext) *framework.QueuedPodInfo {
+	t.Helper()
+
+	var podInfo *framework.QueuedPodInfo
+	// NextPod() is a blocking operation. Wrap it in timeout() to avoid relying on
+	// default go testing timeout (10m) to abort.
+	if err := timeout(testCtx.Ctx, time.Second*5, func() {
+		podInfo = testCtx.Scheduler.NextPod()
+	}); err != nil {
+		t.Fatalf("Timed out waiting for the Pod to be popped: %v", err)
+	}
+	return podInfo
+}
+
+// nextPod returns the next Pod in the scheduler queue, with a 5 seconds timeout.
+func nextPod(t *testing.T, testCtx *testutils.TestContext) *framework.QueuedPodInfo {
+	t.Helper()
+
+	var podInfo *framework.QueuedPodInfo
+	// NextPod() is a blocking operation. Wrap it in timeout() to avoid relying on
+	// default go testing timeout (10m) to abort.
+	if err := timeout(testCtx.Ctx, time.Second*5, func() {
+		podInfo = testCtx.Scheduler.NextPod()
+	}); err != nil {
+		return nil
+	}
+	return podInfo
 }

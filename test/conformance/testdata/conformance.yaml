@@ -1271,8 +1271,9 @@
   description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
     The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
     discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
-    discovery document. API Server should create self referential Endpoints and EndpointSlices
-    named "kubernetes" in the default namespace.
+    discovery document. The cluster MUST have a service named "kubernetes" on the
+    default namespace referencing the API servers. The "kubernetes.default" service
+    MUST have Endpoints and EndpointSlices pointing to each API server instance.
   release: v1.21
   file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice API
@@ -1495,6 +1496,14 @@
     action MUST be validated.
   release: v1.21
   file: test/e2e/network/service.go
+- testname: Service, deletes a collection of services
+  codename: '[sig-network] Services should delete a collection of services [Conformance]'
+  description: Create three services with the required labels and ports. It MUST locate
+    three services in the test namespace. It MUST succeed at deleting a collection
+    of services via a label selector. It MUST locate only one service after deleting
+    the service collection.
+  release: v1.23
+  file: test/e2e/network/service.go
 - testname: Find Kubernetes Service in default Namespace
   codename: '[sig-network] Services should find a service from listing all namespaces
     [Conformance]'
@@ -1641,9 +1650,9 @@
     hook should execute poststart http hook properly [NodeConformance] [Conformance]'
   description: When a post start handler is specified in the container lifecycle using
     a HttpGet action, then the handler MUST be invoked after the start of the container.
-    A server pod is created that will serve http requests, create a second pod with
-    a container lifecycle specifying a post start that invokes the server pod to validate
-    that the post start is executed.
+    A server pod is created that will serve http requests, create a second pod on
+    the same node with a container lifecycle specifying a post start that invokes
+    the server pod to validate that the post start is executed.
   release: v1.9
   file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop exec hook
@@ -1661,42 +1670,11 @@
     hook should execute prestop http hook properly [NodeConformance] [Conformance]'
   description: When a pre-stop handler is specified in the container lifecycle using
     a 'HttpGet' action, then the handler MUST be invoked before the container is terminated.
-    A server pod is created that will serve http requests, create a second pod with
-    a container lifecycle specifying a pre-stop that invokes the server pod to validate
-    that the pre-stop is executed.
+    A server pod is created that will serve http requests, create a second pod on
+    the same node with a container lifecycle specifying a pre-stop that invokes the
+    server pod to validate that the pre-stop is executed.
   release: v1.9
   file: test/e2e/common/node/lifecycle_hook.go
-- testname: Container Runtime, TerminationMessage, from log output of succeeding container
-  codename: '[sig-node] Container Runtime blackbox test on terminated container should
-    report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    log and container exits successfully without an error. When container is terminated,
-    terminationMessage MUST have no content as container succeed. [LinuxOnly]: Cannot
-    mount files in Windows Containers.'
-  release: v1.15
-  file: test/e2e/common/node/runtime.go
-- testname: Container Runtime, TerminationMessage, from file of succeeding container
-  codename: '[sig-node] Container Runtime blackbox test on terminated container should
-    report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    a file and the container exits successfully without an error. When container is
-    terminated, terminationMessage MUST match with the content from file. [LinuxOnly]:
-    Cannot mount files in Windows Containers.'
-  release: v1.15
-  file: test/e2e/common/node/runtime.go
-- testname: Container Runtime, TerminationMessage, from container's log output of
-    failing container
-  codename: '[sig-node] Container Runtime blackbox test on terminated container should
-    report termination message [LinuxOnly] from log output if TerminationMessagePolicy
-    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    log and container exits with an error. When container is terminated, termination
-    message MUST match the expected output recorded from container''s log. [LinuxOnly]:
-    Cannot mount files in Windows Containers.'
-  release: v1.15
-  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessagePath, non-root user and non-default
     path
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
@@ -1707,6 +1685,37 @@
     successfully. When the container is terminated, the termination message MUST match
     the expected output logged in the provided custom path. [LinuxOnly]: Tagged LinuxOnly
     due to use of ''uid'' and unable to mount files in Windows Containers.'
+  release: v1.15
+  file: test/e2e/common/node/runtime.go
+- testname: Container Runtime, TerminationMessage, from log output of succeeding container
+  codename: '[sig-node] Container Runtime blackbox test on terminated container should
+    report termination message as empty when pod succeeds and TerminationMessagePolicy
+    FallbackToLogsOnError is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
+  description: 'Create a pod with an container. Container''s output is recorded in
+    log and container exits successfully without an error. When container is terminated,
+    terminationMessage MUST have no content as container succeed. [Excluded:WindowsDocker]:
+    Cannot mount files in Windows Containers created by Docker.'
+  release: v1.15
+  file: test/e2e/common/node/runtime.go
+- testname: Container Runtime, TerminationMessage, from file of succeeding container
+  codename: '[sig-node] Container Runtime blackbox test on terminated container should
+    report termination message from file when pod succeeds and TerminationMessagePolicy
+    FallbackToLogsOnError is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
+  description: 'Create a pod with an container. Container''s output is recorded in
+    a file and the container exits successfully without an error. When container is
+    terminated, terminationMessage MUST match with the content from file. [Excluded:WindowsDocker]:
+    Cannot mount files in Windows Containers created by Docker.'
+  release: v1.15
+  file: test/e2e/common/node/runtime.go
+- testname: Container Runtime, TerminationMessage, from container's log output of
+    failing container
+  codename: '[sig-node] Container Runtime blackbox test on terminated container should
+    report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError
+    is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
+  description: 'Create a pod with an container. Container''s output is recorded in
+    log and container exits with an error. When container is terminated, termination
+    message MUST match the expected output recorded from container''s log. [Excluded:WindowsDocker]:
+    Cannot mount files in Windows Containers created by Docker.'
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
@@ -1787,16 +1796,6 @@
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
-- testname: Pod events, verify event from Scheduler and Kubelet
-  codename: '[sig-node] Events should be sent by kubelets and the scheduler about
-    pods scheduling and running  [Conformance]'
-  description: Create a Pod, make sure that the Pod can be queried. Create a event
-    selector for the kind=Pod and the source is the Scheduler. List of the events
-    MUST be at least one. Create a event selector for kind=Pod and the source is the
-    Kubelet. List of the events MUST be at least one. Both Scheduler and Kubelet MUST
-    send events when scheduling and running a Pod.
-  release: v1.9
-  file: test/e2e/node/events.go
 - testname: init-container-starts-app-restartalways-pod
   codename: '[sig-node] InitContainer [NodeConformance] should invoke init containers
     on a RestartAlways pod [Conformance]'
@@ -3050,43 +3049,46 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod [LinuxOnly] [Conformance]'
+    configmap pod [Excluded:WindowsDocker] [Conformance]'
   description: Containers in a pod can read content from a configmap mounted volume
-    which was configured with a subpath. This test is marked LinuxOnly since Windows
-    cannot mount individual files in Containers.
+    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
+    since Docker does not support creating individual file mounts for containers on
+    Windows.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod with mountPath of existing file [LinuxOnly] [Conformance]'
+    configmap pod with mountPath of existing file [Excluded:WindowsDocker] [Conformance]'
   description: Containers in a pod can read content from a configmap mounted volume
     which was configured with a subpath and also using a mountpath that is a specific
-    file. This test is marked LinuxOnly since Windows cannot mount individual files
-    in Containers.
+    file. This test is marked [Excluded:WindowsDocker] since Docker does not support
+    creating individual file mounts for containers on Windows.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a downwardAPI volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    downward pod [LinuxOnly] [Conformance]'
+    downward pod [Excluded:WindowsDocker] [Conformance]'
   description: Containers in a pod can read content from a downwardAPI mounted volume
-    which was configured with a subpath. This test is marked LinuxOnly since Windows
-    cannot mount individual files in Containers.
+    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
+    since Docker does not support creating individual file mounts for containers on
+    Windows.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a projected volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    projected pod [LinuxOnly] [Conformance]'
+    projected pod [Excluded:WindowsDocker] [Conformance]'
   description: Containers in a pod can read content from a projected mounted volume
-    which was configured with a subpath. This test is marked LinuxOnly since Windows
-    cannot mount individual files in Containers.
+    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
+    since Docker does not support creating individual file mounts for containers on
+    Windows.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a secret volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    secret pod [LinuxOnly] [Conformance]'
+    secret pod [Excluded:WindowsDocker] [Conformance]'
   description: Containers in a pod can read content from a secret mounted volume which
-    was configured with a subpath. This test is marked LinuxOnly since Windows cannot
-    mount individual files in Containers.
+    was configured with a subpath. This test is marked [Excluded:WindowsDocker] since
+    Docker does not support creating individual file mounts for containers on Windows.
   release: v1.12
   file: test/e2e/storage/subpath.go
 

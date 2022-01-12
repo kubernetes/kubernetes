@@ -212,14 +212,14 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, selec
 
 	services, err := selectorCache.GetPodServiceMemberships(serviceLister, newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		return sets.String{}
 	}
 
 	if labelsChanged {
 		oldServices, err := selectorCache.GetPodServiceMemberships(serviceLister, oldPod)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
+			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		}
 		services = determineNeededServiceUpdates(oldServices, services, podChanged)
 	}
@@ -238,12 +238,12 @@ func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 		return nil
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
 		return nil
 	}
 	return pod
@@ -277,7 +277,7 @@ func (sl portsInOrder) Less(i, j int) bool {
 	return h1 < h2
 }
 
-// endpointsEqualBeyondHash returns true if endpoints have equal attributes
+// EndpointsEqualBeyondHash returns true if endpoints have equal attributes
 // but excludes equality checks that would have already been covered with
 // endpoint hashing (see hashEndpoint func for more info).
 func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {

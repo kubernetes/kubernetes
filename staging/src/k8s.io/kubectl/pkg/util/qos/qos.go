@@ -17,14 +17,14 @@ limitations under the License.
 package qos
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-var supportedQoSComputeResources = sets.NewString(string(corev1.ResourceCPU), string(corev1.ResourceMemory))
+var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 
-func isSupportedQoSComputeResource(name corev1.ResourceName) bool {
+func isSupportedQoSComputeResource(name core.ResourceName) bool {
 	return supportedQoSComputeResources.Has(string(name))
 }
 
@@ -32,12 +32,15 @@ func isSupportedQoSComputeResource(name corev1.ResourceName) bool {
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQOS(pod *corev1.Pod) corev1.PodQOSClass {
-	requests := corev1.ResourceList{}
-	limits := corev1.ResourceList{}
+func GetPodQOS(pod *core.Pod) core.PodQOSClass {
+	requests := core.ResourceList{}
+	limits := core.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
-	for _, container := range pod.Spec.Containers {
+	allContainers := []core.Container{}
+	allContainers = append(allContainers, pod.Spec.Containers...)
+	allContainers = append(allContainers, pod.Spec.InitContainers...)
+	for _, container := range allContainers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
 			if !isSupportedQoSComputeResource(name) {
@@ -71,12 +74,12 @@ func GetPodQOS(pod *corev1.Pod) corev1.PodQOSClass {
 			}
 		}
 
-		if !qosLimitsFound.HasAll(string(corev1.ResourceMemory), string(corev1.ResourceCPU)) {
+		if !qosLimitsFound.HasAll(string(core.ResourceMemory), string(core.ResourceCPU)) {
 			isGuaranteed = false
 		}
 	}
 	if len(requests) == 0 && len(limits) == 0 {
-		return corev1.PodQOSBestEffort
+		return core.PodQOSBestEffort
 	}
 	// Check is requests match limits for all resources.
 	if isGuaranteed {
@@ -89,7 +92,7 @@ func GetPodQOS(pod *corev1.Pod) corev1.PodQOSClass {
 	}
 	if isGuaranteed &&
 		len(requests) == len(limits) {
-		return corev1.PodQOSGuaranteed
+		return core.PodQOSGuaranteed
 	}
-	return corev1.PodQOSBurstable
+	return core.PodQOSBurstable
 }

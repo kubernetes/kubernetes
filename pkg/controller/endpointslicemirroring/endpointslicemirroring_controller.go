@@ -304,12 +304,11 @@ func (c *Controller) syncEndpoints(key string) error {
 		return err
 	}
 
-	// This means that if a Service transitions away from a nil selector, any
-	// mirrored EndpointSlices will not be cleaned up. #91072 tracks this issue
-	// for this controller along with the Endpoints and EndpointSlice
-	// controllers.
+	// If a selector is specified, clean up any mirrored slices.
 	if svc.Spec.Selector != nil {
-		return nil
+		klog.V(4).Infof("%s/%s Service now has selector, cleaning up any mirrored EndpointSlices", namespace, name)
+		c.endpointSliceTracker.DeleteService(namespace, name)
+		return c.deleteMirroredSlices(namespace, name)
 	}
 
 	endpointSlices, err := endpointSlicesMirroredForService(c.endpointSliceLister, namespace, name)
@@ -372,7 +371,7 @@ func (c *Controller) onServiceUpdate(prevObj, obj interface{}) {
 	service := obj.(*v1.Service)
 	prevService := prevObj.(*v1.Service)
 	if service == nil || prevService == nil {
-		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Endpoints, got %T, %T", prevObj, obj))
+		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Service, got %T, %T", prevObj, obj))
 		return
 	}
 	if (service.Spec.Selector == nil) != (prevService.Spec.Selector == nil) {

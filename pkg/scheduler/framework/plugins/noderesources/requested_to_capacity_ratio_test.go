@@ -19,104 +19,130 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestRequestedToCapacityRatio(t *testing.T) {
-	type test struct {
-		name               string
-		requestedPod       *v1.Pod
-		nodes              []*v1.Node
-		scheduledPods      []*v1.Pod
-		expectedPriorities framework.NodeScoreList
+func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
+	defaultResources := []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
 	}
 
-	tests := []test{
+	shape := []config.UtilizationShapePoint{
+		{Utilization: 0, Score: 10},
+		{Utilization: 100, Score: 0},
+	}
+
+	tests := []struct {
+		name           string
+		requestedPod   *v1.Pod
+		nodes          []*v1.Node
+		existingPods   []*v1.Pod
+		expectedScores framework.NodeScoreList
+		resources      []config.ResourceSpec
+		shape          []config.UtilizationShapePoint
+		wantErrs       field.ErrorList
+	}{
 		{
-			name:               "nothing scheduled, nothing requested (default - least requested nodes have priority)",
-			requestedPod:       makePod("", 0, 0),
-			nodes:              []*v1.Node{makeNode("node1", 4000, 10000), makeNode("node2", 4000, 10000)},
-			scheduledPods:      []*v1.Pod{makePod("node1", 0, 0), makePod("node2", 0, 0)},
-			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 100}, {Name: "node2", Score: 100}},
+			name:         "nothing scheduled, nothing requested (default - least requested nodes have priority)",
+			requestedPod: st.MakePod().Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Obj(),
+				st.MakePod().Node("node1").Obj(),
+			},
+			expectedScores: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: framework.MaxNodeScore}},
+			resources:      defaultResources,
+			shape:          shape,
 		},
 		{
-			name:               "nothing scheduled, resources requested, differently sized machines (default - least requested nodes have priority)",
-			requestedPod:       makePod("", 3000, 5000),
-			nodes:              []*v1.Node{makeNode("node1", 4000, 10000), makeNode("node2", 6000, 10000)},
-			scheduledPods:      []*v1.Pod{makePod("node1", 0, 0), makePod("node2", 0, 0)},
-			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 38}, {Name: "node2", Score: 50}},
+			name: "nothing scheduled, resources requested, differently sized machines (default - least requested nodes have priority)",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Obj(),
+				st.MakePod().Node("node1").Obj(),
+			},
+			expectedScores: []framework.NodeScore{{Name: "node1", Score: 38}, {Name: "node2", Score: 50}},
+			resources:      defaultResources,
+			shape:          shape,
 		},
 		{
-			name:               "no resources requested, pods scheduled with resources (default - least requested nodes have priority)",
-			requestedPod:       makePod("", 0, 0),
-			nodes:              []*v1.Node{makeNode("node1", 4000, 10000), makeNode("node2", 6000, 10000)},
-			scheduledPods:      []*v1.Pod{makePod("node1", 3000, 5000), makePod("node2", 3000, 5000)},
-			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 38}, {Name: "node2", Score: 50}},
+			name:         "no resources requested, pods scheduled with resources (default - least requested nodes have priority)",
+			requestedPod: st.MakePod().Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "5000"}).Obj(),
+			},
+			expectedScores: []framework.NodeScore{{Name: "node1", Score: 38}, {Name: "node2", Score: 50}},
+			resources:      defaultResources,
+			shape:          shape,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(test.scheduledPods, test.nodes)
+			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			args := config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{Utilization: 0, Score: 10},
-					{Utilization: 100, Score: 0},
+
+			p, err := NewFit(&config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: test.resources,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: shape,
+					},
 				},
-				Resources: []config.ResourceSpec{
-					{Name: "memory", Weight: 1},
-					{Name: "cpu", Weight: 1},
-				},
+			}, fh, plfeature.Features{EnablePodOverhead: true})
+
+			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("got err (-want,+got):\n%s", diff)
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				return
 			}
 
-			var gotPriorities framework.NodeScoreList
+			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.requestedPod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotPriorities = append(gotPriorities, framework.NodeScore{Name: n.Name, Score: score})
+				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}
 
-			if !reflect.DeepEqual(test.expectedPriorities, gotPriorities) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedPriorities, gotPriorities)
+			if diff := cmp.Diff(test.expectedScores, gotScores); diff != "" {
+				t.Errorf("Unexpected nodes (-want,+got):\n%s", diff)
 			}
 		})
-	}
-}
-
-func makePod(node string, milliCPU, memory int64) *v1.Pod {
-	return &v1.Pod{
-		Spec: v1.PodSpec{
-			NodeName: node,
-			Containers: []v1.Container{
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-							v1.ResourceMemory: *resource.NewQuantity(memory, resource.DecimalSI),
-						},
-					},
-				},
-			},
-		},
 	}
 }
 
@@ -195,9 +221,6 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 		"intel.com/foo": 8,
 	}
 
-	noResources := v1.PodSpec{
-		Containers: []v1.Container{},
-	}
 	extendedResourcePod1 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -223,18 +246,18 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 	machine2Pod := extendedResourcePod1
 	machine2Pod.NodeName = "machine2"
 	tests := []struct {
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
+		pod            *v1.Pod
+		pods           []*v1.Pod
+		nodes          []*v1.Node
+		expectedScores framework.NodeScoreList
+		name           string
 	}{
 		{
 			//  Node1 Score = Node2 Score = 0 as the incoming Pod doesn't request extended resource.
-			pod:          &v1.Pod{Spec: noResources},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
-			name:         "nothing scheduled, nothing requested",
+			pod:            st.MakePod().Obj(),
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
+			name:           "nothing scheduled, nothing requested",
 		},
 		{
 			// Node1 scores (used resources) on 0-MaxNodeScore scale
@@ -248,12 +271,12 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// resourceScoringFunction((0+2),4)
 			//  = 2/4 * maxUtilization = 50 = rawScoringFunction(50)
 			// Node2 Score: 5
-			pod:          &v1.Pod{Spec: extendedResourcePod1},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 5}},
-			name:         "resources requested, pods scheduled with less resources",
+			pod:            &v1.Pod{Spec: extendedResourcePod1},
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 5}},
+			name:           "resources requested, pods scheduled with less resources",
 			pods: []*v1.Pod{
-				{Spec: noResources},
+				st.MakePod().Obj(),
 			},
 		},
 		{
@@ -268,10 +291,10 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// resourceScoringFunction((2+2),4)
 			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
-			pod:          &v1.Pod{Spec: extendedResourcePod1},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 10}},
-			name:         "resources requested, pods scheduled with resources, on node with existing pod running ",
+			pod:            &v1.Pod{Spec: extendedResourcePod1},
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: 10}},
+			name:           "resources requested, pods scheduled with resources, on node with existing pod running ",
 			pods: []*v1.Pod{
 				{Spec: machine2Pod},
 			},
@@ -288,12 +311,12 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			// resourceScoringFunction((0+4),4)
 			//  = 4/4 * maxUtilization = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
-			pod:          &v1.Pod{Spec: extendedResourcePod2},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 10}},
-			name:         "resources requested, pods scheduled with more resources",
+			pod:            &v1.Pod{Spec: extendedResourcePod2},
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 10}},
+			name:           "resources requested, pods scheduled with more resources",
 			pods: []*v1.Pod{
-				{Spec: noResources},
+				st.MakePod().Obj(),
 			},
 		},
 	}
@@ -303,16 +326,21 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			args := config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{Utilization: 0, Score: 0},
-					{Utilization: 100, Score: 1},
-				},
-				Resources: []config.ResourceSpec{
-					{Name: "intel.com/foo", Weight: 1},
+			args := config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: config.RequestedToCapacityRatio,
+					Resources: []config.ResourceSpec{
+						{Name: "intel.com/foo", Weight: 1},
+					},
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 0},
+							{Utilization: 100, Score: 1},
+						},
+					},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
+			p, err := NewFit(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -326,8 +354,8 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 				gotList = append(gotList, framework.NodeScore{Name: n.Name, Score: score})
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected %#v, got %#v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedScores, gotList); diff != "" {
+				t.Errorf("Unexpected nodescore list (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -346,9 +374,6 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 		"intel.com/bar": 4,
 	}
 
-	noResources := v1.PodSpec{
-		Containers: []v1.Container{},
-	}
 	extnededResourcePod1 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -376,11 +401,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 	machine2Pod := extnededResourcePod1
 	machine2Pod.NodeName = "machine2"
 	tests := []struct {
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
+		pod            *v1.Pod
+		pods           []*v1.Pod
+		nodes          []*v1.Node
+		expectedScores framework.NodeScoreList
+		name           string
 	}{
 		{
 
@@ -410,10 +435,10 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			//  = 0/8 * 100 = 0 = rawScoringFunction(0)
 			// Node2 Score: (0 * 3) + (0 * 5) / 8 = 0
 
-			pod:          &v1.Pod{Spec: noResources},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
-			name:         "nothing scheduled, nothing requested",
+			pod:            st.MakePod().Obj(),
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
+			name:           "nothing scheduled, nothing requested",
 		},
 
 		{
@@ -444,12 +469,12 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// Node2 Score: (5 * 3) + (2 * 5) / 8 = 3
 
-			pod:          &v1.Pod{Spec: extnededResourcePod1},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 3}},
-			name:         "resources requested, pods scheduled with less resources",
+			pod:            &v1.Pod{Spec: extnededResourcePod1},
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 3}},
+			name:           "resources requested, pods scheduled with less resources",
 			pods: []*v1.Pod{
-				{Spec: noResources},
+				st.MakePod().Obj(),
 			},
 		},
 
@@ -480,10 +505,10 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			//  = 4/8 *100 = 50 = rawScoringFunction(50)
 			// Node2 Score: (10 * 3) + (5 * 5) / 8 = 7
 
-			pod:          &v1.Pod{Spec: extnededResourcePod1},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 7}},
-			name:         "resources requested, pods scheduled with resources, on node with existing pod running ",
+			pod:            &v1.Pod{Spec: extnededResourcePod1},
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 7}},
+			name:           "resources requested, pods scheduled with resources, on node with existing pod running ",
 			pods: []*v1.Pod{
 				{Spec: machine2Pod},
 			},
@@ -531,12 +556,12 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			//  = 2/8 * 100 = 25 = rawScoringFunction(25)
 			// Node2 Score: (10 * 3) + (2 * 5) / 8 = 5
 
-			pod:          &v1.Pod{Spec: extnededResourcePod2},
-			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 5}},
-			name:         "resources requested, pods scheduled with more resources",
+			pod:            &v1.Pod{Spec: extnededResourcePod2},
+			nodes:          []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedScores: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 5}},
+			name:           "resources requested, pods scheduled with more resources",
 			pods: []*v1.Pod{
-				{Spec: noResources},
+				st.MakePod().Obj(),
 			},
 		},
 	}
@@ -546,32 +571,39 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			args := config.RequestedToCapacityRatioArgs{
-				Shape: []config.UtilizationShapePoint{
-					{Utilization: 0, Score: 0},
-					{Utilization: 100, Score: 1},
-				},
-				Resources: []config.ResourceSpec{
-					{Name: "intel.com/foo", Weight: 3},
-					{Name: "intel.com/bar", Weight: 5},
+
+			args := config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: config.RequestedToCapacityRatio,
+					Resources: []config.ResourceSpec{
+						{Name: "intel.com/foo", Weight: 3},
+						{Name: "intel.com/bar", Weight: 5},
+					},
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 0},
+							{Utilization: 100, Score: 1},
+						},
+					},
 				},
 			}
-			p, err := NewRequestedToCapacityRatio(&args, fh, feature.Features{EnablePodOverhead: true})
+
+			p, err := NewFit(&args, fh, feature.Features{EnablePodOverhead: true})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			var gotList framework.NodeScoreList
+			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: n.Name, Score: score})
+				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected %#v, got %#v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedScores, gotScores); diff != "" {
+				t.Errorf("Unexpected nodescore list (-want,+got):\n%s", diff)
 			}
 		})
 	}

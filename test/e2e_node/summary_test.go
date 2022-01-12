@@ -115,9 +115,13 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UserDefinedMetrics": gomega.BeEmpty(),
 				})
 			}
-			expectedMajorPageFaultsUpperBound := 10
+			expectedPageFaultsUpperBound := 1000000
+			expectedMajorPageFaultsUpperBound := 15
 			if IsCgroup2UnifiedMode() {
-				expectedMajorPageFaultsUpperBound = 1000
+				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
+				// above for the container.
+				expectedPageFaultsUpperBound = 1e9
+				expectedMajorPageFaultsUpperBound = 100000
 			}
 
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -128,7 +132,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				"UsageBytes":      bounded(10*e2evolume.Kb, memoryLimit),
 				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
-				"PageFaults":      bounded(0, 1000000),
+				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -196,8 +200,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-							"PageFaults":      bounded(100, 1000000),
-							"MajorPageFaults": bounded(0, 10),
+							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
+							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
 						"Accelerators": gomega.BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
@@ -243,8 +247,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-					"PageFaults":      bounded(0, 1000000),
-					"MajorPageFaults": bounded(0, 10),
+					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
+					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{

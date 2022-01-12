@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
+	sysctltest "k8s.io/component-helpers/node/util/sysctl/testing"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -38,7 +39,6 @@ import (
 	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	sysctltest "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 	netutils "k8s.io/utils/net"

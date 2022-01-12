@@ -19,6 +19,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -27,12 +28,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -42,11 +41,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 )
 
 const queueMetricMetadata = `
-		# HELP scheduler_queue_incoming_pods_total [ALPHA] Number of pods added to scheduling queues by event and queue type.
+		# HELP scheduler_queue_incoming_pods_total [STABLE] Number of pods added to scheduling queues by event and queue type.
 		# TYPE scheduler_queue_incoming_pods_total counter
 	`
 
@@ -223,7 +223,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 // Pods in and before current scheduling cycle will be put back to activeQueue
 // if we were trying to schedule them when we received move request.
 func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
-	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(clock.NewFakeClock(time.Now())))
+	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(time.Now())))
 	totalNum := 10
 	expectedPods := make([]v1.Pod, 0, totalNum)
 	for i := 0; i < totalNum; i++ {
@@ -307,7 +307,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 
 func TestPriorityQueue_Update(t *testing.T) {
 	objs := []runtime.Object{highPriorityPodInfo.Pod, unschedulablePodInfo.Pod, medPriorityPodInfo.Pod}
-	c := clock.NewFakeClock(time.Now())
+	c := testingclock.NewFakeClock(time.Now())
 	q := NewTestQueueWithObjects(context.Background(), newDefaultQueueSort(), objs, WithClock(c))
 	q.Update(nil, highPriorityPodInfo.Pod)
 	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(highPriorityPodInfo.Pod)); !exists {
@@ -468,7 +468,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 			b.Run(fmt.Sprintf("%v-%v", tt.name, podsInUnschedulableQ), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					c := clock.NewFakeClock(time.Now())
+					c := testingclock.NewFakeClock(time.Now())
 
 					m := make(map[framework.ClusterEvent]sets.String)
 					// - All plugins registered for events[0], which is NodeAdd.
@@ -526,7 +526,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 }
 
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
-	c := clock.NewFakeClock(time.Now())
+	c := testingclock.NewFakeClock(time.Now())
 	m := map[framework.ClusterEvent]sets.String{
 		{Resource: framework.Node, ActionType: framework.Add}: sets.NewString("fooPlugin"),
 	}
@@ -615,7 +615,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 		Spec: v1.PodSpec{NodeName: "machine1"},
 	}
 
-	c := clock.NewFakeClock(time.Now())
+	c := testingclock.NewFakeClock(time.Now())
 	m := map[framework.ClusterEvent]sets.String{AssignedPodAdd: sets.NewString("fakePlugin")}
 	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
 	q.Add(medPriorityPodInfo.Pod)
@@ -650,10 +650,15 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
 	}
 	expectedList := []*framework.PodInfo{medPriorityPodInfo, unschedulablePodInfo}
-	if !reflect.DeepEqual(expectedList, q.NominatedPodsForNode("node1")) {
-		t.Error("Unexpected list of nominated Pods for node.")
+	podInfos := q.NominatedPodsForNode("node1")
+	if diff := cmp.Diff(expectedList, podInfos); diff != "" {
+		t.Errorf("Unexpected list of nominated Pods for node: (-want, +got):\n%s", diff)
 	}
-	if q.NominatedPodsForNode("node2") != nil {
+	podInfos[0].Pod.Name = "not mpp"
+	if diff := cmp.Diff(podInfos, q.NominatedPodsForNode("node1")); diff == "" {
+		t.Error("Expected list of nominated Pods for node2 is different from podInfos")
+	}
+	if len(q.NominatedPodsForNode("node2")) != 0 {
 		t.Error("Expected list of nominated Pods for node2 to be empty.")
 	}
 }
@@ -994,7 +999,7 @@ func TestSchedulingQueue_Close(t *testing.T) {
 // ensures that an unschedulable pod does not block head of the queue when there
 // are frequent events that move pods to the active queue.
 func TestRecentlyTriedPodsGoBack(t *testing.T) {
-	c := clock.NewFakeClock(time.Now())
+	c := testingclock.NewFakeClock(time.Now())
 	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c))
 	// Add a few pods to priority queue.
 	for i := 0; i < 5; i++ {
@@ -1051,7 +1056,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 // This behavior ensures that an unschedulable pod does not block head of the queue when there
 // are frequent events that move pods to the active queue.
 func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
-	c := clock.NewFakeClock(time.Now())
+	c := testingclock.NewFakeClock(time.Now())
 	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c))
 
 	// Add an unschedulable pod to a priority queue.
@@ -1206,7 +1211,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 // TestHighPriorityFlushUnschedulableQLeftover tests that pods will be moved to
 // activeQ after one minutes if it is in unschedulableQ
 func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
-	c := clock.NewFakeClock(time.Now())
+	c := testingclock.NewFakeClock(time.Now())
 	m := map[framework.ClusterEvent]sets.String{
 		NodeAdd: sets.NewString("fakePlugin"),
 	}
@@ -1302,11 +1307,11 @@ var (
 		queue.MoveAllToActiveOrBackoffQueue(UnschedulableTimeout, nil)
 	}
 	flushBackoffQ = func(queue *PriorityQueue, _ *framework.QueuedPodInfo) {
-		queue.clock.(*clock.FakeClock).Step(2 * time.Second)
+		queue.clock.(*testingclock.FakeClock).Step(2 * time.Second)
 		queue.flushBackoffQCompleted()
 	}
 	moveClockForward = func(queue *PriorityQueue, _ *framework.QueuedPodInfo) {
-		queue.clock.(*clock.FakeClock).Step(2 * time.Second)
+		queue.clock.(*testingclock.FakeClock).Step(2 * time.Second)
 	}
 )
 
@@ -1394,7 +1399,7 @@ func TestPodTimestamp(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(clock.NewFakeClock(timestamp)))
+			queue := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
 			var podInfoList []*framework.QueuedPodInfo
 
 			for i, op := range test.operations {
@@ -1445,7 +1450,7 @@ func TestPendingPodsMetric(t *testing.T) {
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 30
 scheduler_pending_pods{queue="backoff"} 0
@@ -1466,7 +1471,7 @@ scheduler_pending_pods{queue="unschedulable"} 20
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 15
 scheduler_pending_pods{queue="backoff"} 25
@@ -1487,7 +1492,7 @@ scheduler_pending_pods{queue="unschedulable"} 10
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 50
 scheduler_pending_pods{queue="backoff"} 0
@@ -1510,7 +1515,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 30
 scheduler_pending_pods{queue="backoff"} 20
@@ -1533,7 +1538,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 50
 scheduler_pending_pods{queue="backoff"} 0
@@ -1551,7 +1556,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
-			queue := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(clock.NewFakeClock(timestamp)))
+			queue := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(queue, pInfo)
@@ -1579,7 +1584,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 
 	// Case 1: A pod is created and scheduled after 1 attempt. The queue operations are
 	// Add -> Pop.
-	c := clock.NewFakeClock(timestamp)
+	c := testingclock.NewFakeClock(timestamp)
 	queue := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c))
 	queue.Add(pod)
 	pInfo, err := queue.Pop()
@@ -1590,7 +1595,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 
 	// Case 2: A pod is created and scheduled after 2 attempts. The queue operations are
 	// Add -> Pop -> AddUnschedulableIfNotPresent -> flushUnschedulableQLeftover -> Pop.
-	c = clock.NewFakeClock(timestamp)
+	c = testingclock.NewFakeClock(timestamp)
 	queue = NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c))
 	queue.Add(pod)
 	pInfo, err = queue.Pop()
@@ -1610,7 +1615,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 
 	// Case 3: Similar to case 2, but before the second pop, call update, the queue operations are
 	// Add -> Pop -> AddUnschedulableIfNotPresent -> flushUnschedulableQLeftover -> Update -> Pop.
-	c = clock.NewFakeClock(timestamp)
+	c = testingclock.NewFakeClock(timestamp)
 	queue = NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c))
 	queue.Add(pod)
 	pInfo, err = queue.Pop()
@@ -1709,7 +1714,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metrics.SchedulerQueueIncomingPods.Reset()
-			queue := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(clock.NewFakeClock(timestamp)))
+			queue := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
 			for _, op := range test.operations {
 				for _, pInfo := range pInfos {
 					op(queue, pInfo)
@@ -1734,7 +1739,7 @@ func checkPerPodSchedulingMetrics(name string, t *testing.T, pInfo *framework.Qu
 }
 
 func TestBackOffFlow(t *testing.T) {
-	cl := clock.NewFakeClock(time.Now())
+	cl := testingclock.NewFakeClock(time.Now())
 	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(cl))
 	steps := []struct {
 		wantBackoff time.Duration
@@ -1989,4 +1994,44 @@ func makeQueuedPodInfos(num int, timestamp time.Time) []*framework.QueuedPodInfo
 		pInfos = append(pInfos, p)
 	}
 	return pInfos
+}
+
+func TestPriorityQueue_calculateBackoffDuration(t *testing.T) {
+	tests := []struct {
+		name                   string
+		initialBackoffDuration time.Duration
+		maxBackoffDuration     time.Duration
+		podInfo                *framework.QueuedPodInfo
+		want                   time.Duration
+	}{
+		{
+			name:                   "normal",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     32 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{Attempts: 16},
+			want:                   32 * time.Nanosecond,
+		},
+		{
+			name:                   "overflow_32bit",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     math.MaxInt32 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{Attempts: 32},
+			want:                   math.MaxInt32 * time.Nanosecond,
+		},
+		{
+			name:                   "overflow_64bit",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     math.MaxInt64 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{Attempts: 64},
+			want:                   math.MaxInt64 * time.Nanosecond,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithPodInitialBackoffDuration(tt.initialBackoffDuration), WithPodMaxBackoffDuration(tt.maxBackoffDuration))
+			if got := q.calculateBackoffDuration(tt.podInfo); got != tt.want {
+				t.Errorf("PriorityQueue.calculateBackoffDuration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

@@ -19,12 +19,12 @@ package kubeadm
 import (
 	"crypto/x509"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -116,7 +116,7 @@ type ClusterConfiguration struct {
 	CertificatesDir string
 
 	// ImageRepository sets the container registry to pull images from.
-	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/` or `ci-cross/`)
+	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/`)
 	// `gcr.io/k8s-staging-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
 	// will be used for all the other images.
 	ImageRepository string
@@ -452,6 +452,9 @@ type ComponentConfig interface {
 
 	// SetUserSupplied sets the state of the component config "user supplied" flag to, either true, or false.
 	SetUserSupplied(userSupplied bool)
+
+	// Mutate allows applying pre-defined modifications to the config before it's marshaled.
+	Mutate() error
 
 	// Set can be used to set the internal configuration in the ComponentConfig
 	Set(interface{})

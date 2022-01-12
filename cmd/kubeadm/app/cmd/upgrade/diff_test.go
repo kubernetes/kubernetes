@@ -22,10 +22,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/pkg/errors"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
-	"github.com/pkg/errors"
 )
 
 func createTestRunDiffFile(contents []byte) (string, error) {

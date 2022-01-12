@@ -94,7 +94,7 @@ func (c *FakeSchedulers) UpdateStatus(ctx context.Context, scheduler *configv1.S
 // Delete takes name of the scheduler and deletes it. Returns an error if one occurs.
 func (c *FakeSchedulers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(schedulersResource, name), &configv1.Scheduler{})
+		Invokes(testing.NewRootDeleteActionWithOptions(schedulersResource, name, opts), &configv1.Scheduler{})
 	return err
 }
 

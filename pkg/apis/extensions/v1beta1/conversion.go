@@ -189,7 +189,7 @@ func Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.
 
 func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *extensionsv1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in, out, s); err != nil {
-		return nil
+		return err
 	}
 	if in.Backend != nil {
 		out.DefaultBackend = &networking.IngressBackend{}
@@ -202,7 +202,7 @@ func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *extensionsv1beta1
 
 func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *extensionsv1beta1.IngressSpec, s conversion.Scope) error {
 	if err := autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in, out, s); err != nil {
-		return nil
+		return err
 	}
 	if in.DefaultBackend != nil {
 		out.Backend = &extensionsv1beta1.IngressBackend{}

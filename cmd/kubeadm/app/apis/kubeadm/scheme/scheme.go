@@ -17,15 +17,15 @@ limitations under the License.
 package scheme
 
 import (
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
 // Scheme is the runtime.Scheme to which all kubeadm api types are registered.

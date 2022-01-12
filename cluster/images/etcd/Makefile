@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.0] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.1] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,10 +26,10 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.0
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.1
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.5.0
+LATEST_ETCD_VERSION?=3.5.1
 
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
@@ -62,27 +62,29 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.12.17
+GOLANG_VERSION?=1.16.10
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:buster-v1.8.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:buster-v1.8.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:buster-v1.8.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:buster-v1.8.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:buster-v1.8.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:bullseye-v1.0.0
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
+
+QEMUVERSION?=5.2.0-2
 
 build:
 	# Explicitly copy files to the temp directory
@@ -92,10 +94,10 @@ build:
 	# Compile migrate
 	migrate_tmp_dir=$(shell mktemp -d); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
@@ -143,13 +145,20 @@ else
 	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> Dockerfile
 endif
 
+	docker run --rm --privileged multiarch/qemu-user-static:$(QEMUVERSION) --reset -p yes
+	docker buildx version
+	BUILDER=$(shell docker buildx create --use)
+
 	# And build the image
-	docker build \
+	docker buildx build \
 		--pull \
+		--load \
+		--platform linux/$(ARCH) \
 		-t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) \
 		--build-arg BASEIMAGE=$(BASEIMAGE) \
 		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
 		$(TEMP_DIR)
+	docker buildx rm $$BUILDER
 
 push: build
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)

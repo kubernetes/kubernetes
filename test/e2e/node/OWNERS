@@ -7,11 +7,14 @@ approvers:
 - yujuhong
 - sjenning
 - mrunalp
+- ehashman
+- SergeyKanzhelev
 emeritus_approvers:
 - vishh
 - dchen1107
 - dashpole
 reviewers:
+- endocrimes
 - sig-node-reviewers
 labels:
 - sig/node

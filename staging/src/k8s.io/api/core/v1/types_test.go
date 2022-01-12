@@ -39,3 +39,22 @@ func Test_ServiceSpecRemovedFieldProtobufNumberReservation(t *testing.T) {
 		}
 	}
 }
+
+// TestEphemeralContainer ensures that the tags of Container and EphemeralContainerCommon are kept in sync.
+func TestEphemeralContainer(t *testing.T) {
+	ephemeralType := reflect.TypeOf(EphemeralContainerCommon{})
+	containerType := reflect.TypeOf(Container{})
+
+	ephemeralFields := ephemeralType.NumField()
+	containerFields := containerType.NumField()
+	if containerFields != ephemeralFields {
+		t.Fatalf("%v has %d fields, %v has %d fields", ephemeralType, ephemeralFields, containerType, containerFields)
+	}
+	for i := 0; i < ephemeralFields; i++ {
+		ephemeralField := ephemeralType.Field(i)
+		containerField := containerType.Field(i)
+		if !reflect.DeepEqual(ephemeralField, containerField) {
+			t.Errorf("field %v differs:\n\t%#v\n\t%#v", ephemeralField.Name, ephemeralField, containerField)
+		}
+	}
+}

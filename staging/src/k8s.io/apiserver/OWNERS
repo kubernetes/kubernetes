@@ -20,6 +20,7 @@ reviewers:
 - jennybuckley
 - apelisse
 - jpbetz
+- tkashem
 labels:
 - sig/api-machinery
 - area/apiserver

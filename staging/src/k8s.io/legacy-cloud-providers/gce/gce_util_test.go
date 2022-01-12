@@ -45,7 +45,7 @@ func TestLastIPInRange(t *testing.T) {
 	} {
 		_, c, err := netutils.ParseCIDRSloppy(tc.cidr)
 		if err != nil {
-			t.Errorf("net.ParseCIDR(%v) = _, %v, %v; want nil", tc.cidr, c, err)
+			t.Errorf("can't parse CIDR %v = _, %v, %v; want nil", tc.cidr, c, err)
 			continue
 		}
 

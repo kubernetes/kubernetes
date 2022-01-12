@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mockpublicipclient/interface.go -package=mockpublicipclient Interface
 package publicipclient
 
 import (
@@ -35,8 +36,6 @@ const (
 )
 
 // Interface is the client interface for PublicIPAddress.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/publicipclient/interface.go -package=mockpublicipclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient/interface.go
 type Interface interface {
 	// Get gets a PublicIPAddress.
 	Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, rerr *retry.Error)

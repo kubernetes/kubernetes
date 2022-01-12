@@ -29,7 +29,7 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -268,13 +268,12 @@ func TestCreateDisk_MultiZone(t *testing.T) {
 		nodeInformerSynced: func() bool { return true },
 	}
 
-	diskName := "disk"
 	diskType := DiskTypeStandard
 	const sizeGb int64 = 128
 
 	/* Act & Assert */
 	for _, zone := range gce.managedZones {
-		diskName = zone + "disk"
+		diskName := zone + "disk"
 		_, err := gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
 		if err != nil {
 			t.Errorf("Error creating disk in zone '%v'; error: \"%v\"", zone, err)
@@ -420,19 +419,19 @@ func TestDeleteDisk_DiffDiskMultiZone(t *testing.T) {
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}
-	diskName := "disk"
+
 	diskType := DiskTypeSSD
 	const sizeGb int64 = 128
 
 	for _, zone := range gce.managedZones {
-		diskName = zone + "disk"
+		diskName := zone + "disk"
 		gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
 	}
 
 	/* Act & Assert */
 	var err error
 	for _, zone := range gce.managedZones {
-		diskName = zone + "disk"
+		diskName := zone + "disk"
 		err = gce.DeleteDisk(diskName)
 		if err != nil {
 			t.Errorf("Error deleting disk in zone '%v'; error: \"%v\"", zone, err)

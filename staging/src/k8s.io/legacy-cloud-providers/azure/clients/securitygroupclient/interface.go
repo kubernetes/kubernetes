@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mocksecuritygroupclient/interface.go -package=mocksecuritygroupclient Interface
 package securitygroupclient
 
 import (
@@ -32,8 +33,6 @@ const (
 )
 
 // Interface is the client interface for SecurityGroups.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient/interface.go -package=mocksecuritygroupclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient/mocksecuritygroupclient/interface.go
 type Interface interface {
 	// Get gets a SecurityGroup.
 	Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, rerr *retry.Error)

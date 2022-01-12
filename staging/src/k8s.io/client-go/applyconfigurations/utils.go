@@ -26,6 +26,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	v2 "k8s.io/api/autoscaling/v2"
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -42,6 +43,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -68,6 +70,7 @@ import (
 	applyconfigurationsappsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
+	autoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	autoscalingv2beta1 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta1"
 	autoscalingv2beta2 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta2"
 	applyconfigurationsbatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
@@ -84,6 +87,7 @@ import (
 	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1alpha1"
 	applyconfigurationsflowcontrolv1beta1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1"
+	applyconfigurationsflowcontrolv1beta2 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2"
 	applyconfigurationsimagepolicyv1alpha1 "k8s.io/client-go/applyconfigurations/imagepolicy/v1alpha1"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
@@ -185,6 +189,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1.StatefulSetApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1.StatefulSetConditionApplyConfiguration{}
+	case appsv1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1.StatefulSetSpecApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -215,6 +221,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1beta1.StatefulSetConditionApplyConfiguration{}
+	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1beta1.StatefulSetSpecApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -265,6 +273,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &appsv1beta2.StatefulSetApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &appsv1beta2.StatefulSetConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &appsv1beta2.StatefulSetSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -287,6 +297,54 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsautoscalingv1.ScaleSpecApplyConfiguration{}
 	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleStatus"):
 		return &applyconfigurationsautoscalingv1.ScaleStatusApplyConfiguration{}
+
+		// Group=autoscaling, Version=v2
+	case v2.SchemeGroupVersion.WithKind("ContainerResourceMetricSource"):
+		return &autoscalingv2.ContainerResourceMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ContainerResourceMetricStatus"):
+		return &autoscalingv2.ContainerResourceMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("CrossVersionObjectReference"):
+		return &autoscalingv2.CrossVersionObjectReferenceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ExternalMetricSource"):
+		return &autoscalingv2.ExternalMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ExternalMetricStatus"):
+		return &autoscalingv2.ExternalMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscaler"):
+		return &autoscalingv2.HorizontalPodAutoscalerApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerBehavior"):
+		return &autoscalingv2.HorizontalPodAutoscalerBehaviorApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerCondition"):
+		return &autoscalingv2.HorizontalPodAutoscalerConditionApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerSpec"):
+		return &autoscalingv2.HorizontalPodAutoscalerSpecApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerStatus"):
+		return &autoscalingv2.HorizontalPodAutoscalerStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HPAScalingPolicy"):
+		return &autoscalingv2.HPAScalingPolicyApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HPAScalingRules"):
+		return &autoscalingv2.HPAScalingRulesApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricIdentifier"):
+		return &autoscalingv2.MetricIdentifierApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricSpec"):
+		return &autoscalingv2.MetricSpecApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricStatus"):
+		return &autoscalingv2.MetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricTarget"):
+		return &autoscalingv2.MetricTargetApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("MetricValueStatus"):
+		return &autoscalingv2.MetricValueStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ObjectMetricSource"):
+		return &autoscalingv2.ObjectMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ObjectMetricStatus"):
+		return &autoscalingv2.ObjectMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("PodsMetricSource"):
+		return &autoscalingv2.PodsMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("PodsMetricStatus"):
+		return &autoscalingv2.PodsMetricStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ResourceMetricSource"):
+		return &autoscalingv2.ResourceMetricSourceApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("ResourceMetricStatus"):
+		return &autoscalingv2.ResourceMetricStatusApplyConfiguration{}
 
 		// Group=autoscaling, Version=v2beta1
 	case v2beta1.SchemeGroupVersion.WithKind("ContainerResourceMetricSource"):
@@ -549,8 +607,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.GlusterfsPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("GlusterfsVolumeSource"):
 		return &applyconfigurationscorev1.GlusterfsVolumeSourceApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("Handler"):
-		return &applyconfigurationscorev1.HandlerApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("GRPCAction"):
+		return &applyconfigurationscorev1.GRPCActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostAlias"):
 		return &applyconfigurationscorev1.HostAliasApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostPathVolumeSource"):
@@ -567,6 +625,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.KeyToPathApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Lifecycle"):
 		return &applyconfigurationscorev1.LifecycleApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("LifecycleHandler"):
+		return &applyconfigurationscorev1.LifecycleHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRange"):
 		return &applyconfigurationscorev1.LimitRangeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRangeItem"):
@@ -659,6 +719,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodDNSConfigOptionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodIP"):
 		return &applyconfigurationscorev1.PodIPApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodOS"):
+		return &applyconfigurationscorev1.PodOSApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodReadinessGate"):
 		return &applyconfigurationscorev1.PodReadinessGateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSecurityContext"):
@@ -679,6 +741,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PreferredSchedulingTermApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Probe"):
 		return &applyconfigurationscorev1.ProbeApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ProbeHandler"):
+		return &applyconfigurationscorev1.ProbeHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ProjectedVolumeSource"):
 		return &applyconfigurationscorev1.ProjectedVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("QuobyteVolumeSource"):
@@ -1003,6 +1067,48 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta1.SubjectApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("UserSubject"):
 		return &applyconfigurationsflowcontrolv1beta1.UserSubjectApplyConfiguration{}
+
+		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta2
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
+		return &applyconfigurationsflowcontrolv1beta2.FlowDistinguisherMethodApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowSchema"):
+		return &applyconfigurationsflowcontrolv1beta2.FlowSchemaApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowSchemaCondition"):
+		return &applyconfigurationsflowcontrolv1beta2.FlowSchemaConditionApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowSchemaSpec"):
+		return &applyconfigurationsflowcontrolv1beta2.FlowSchemaSpecApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowSchemaStatus"):
+		return &applyconfigurationsflowcontrolv1beta2.FlowSchemaStatusApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("GroupSubject"):
+		return &applyconfigurationsflowcontrolv1beta2.GroupSubjectApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("LimitedPriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1beta2.LimitedPriorityLevelConfigurationApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("LimitResponse"):
+		return &applyconfigurationsflowcontrolv1beta2.LimitResponseApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("NonResourcePolicyRule"):
+		return &applyconfigurationsflowcontrolv1beta2.NonResourcePolicyRuleApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("PolicyRulesWithSubjects"):
+		return &applyconfigurationsflowcontrolv1beta2.PolicyRulesWithSubjectsApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("PriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1beta2.PriorityLevelConfigurationApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("PriorityLevelConfigurationCondition"):
+		return &applyconfigurationsflowcontrolv1beta2.PriorityLevelConfigurationConditionApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("PriorityLevelConfigurationReference"):
+		return &applyconfigurationsflowcontrolv1beta2.PriorityLevelConfigurationReferenceApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("PriorityLevelConfigurationSpec"):
+		return &applyconfigurationsflowcontrolv1beta2.PriorityLevelConfigurationSpecApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("PriorityLevelConfigurationStatus"):
+		return &applyconfigurationsflowcontrolv1beta2.PriorityLevelConfigurationStatusApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("QueuingConfiguration"):
+		return &applyconfigurationsflowcontrolv1beta2.QueuingConfigurationApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("ResourcePolicyRule"):
+		return &applyconfigurationsflowcontrolv1beta2.ResourcePolicyRuleApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("ServiceAccountSubject"):
+		return &applyconfigurationsflowcontrolv1beta2.ServiceAccountSubjectApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("Subject"):
+		return &applyconfigurationsflowcontrolv1beta2.SubjectApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("UserSubject"):
+		return &applyconfigurationsflowcontrolv1beta2.UserSubjectApplyConfiguration{}
 
 		// Group=imagepolicy.k8s.io, Version=v1alpha1
 	case imagepolicyv1alpha1.SchemeGroupVersion.WithKind("ImageReview"):

@@ -147,6 +147,7 @@ const (
 	NS_GET_USERNS                    = 0x2000b701
 	OLCUC                            = 0x4
 	ONLCR                            = 0x2
+	OTPERASE                         = 0x800c4d19
 	OTPGETREGIONCOUNT                = 0x80044d0e
 	OTPGETREGIONINFO                 = 0x800c4d0f
 	OTPLOCK                          = 0x400c4d10
@@ -367,6 +368,7 @@ const (
 	SO_MARK                          = 0x24
 	SO_MAX_PACING_RATE               = 0x2f
 	SO_MEMINFO                       = 0x37
+	SO_NETNS_COOKIE                  = 0x47
 	SO_NOFCS                         = 0x2b
 	SO_OOBINLINE                     = 0xa
 	SO_PASSCRED                      = 0x14

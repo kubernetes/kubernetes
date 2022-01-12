@@ -27,10 +27,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	. "k8s.io/kubernetes/pkg/apis/apps/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -193,10 +196,13 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		original *appsv1.StatefulSet
-		expected *appsv1.StatefulSet
+		name                    string
+		original                *appsv1.StatefulSet
+		expected                *appsv1.StatefulSet
+		enablePVCDeletionPolicy bool
 	}{
-		{ // labels and default update strategy
+		{
+			name: "labels and default update strategy",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -221,7 +227,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 			},
 		},
-		{ // Alternate update strategy
+		{
+			name: "Alternate update strategy",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -246,7 +253,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 			},
 		},
-		{ // Parallel pod management policy.
+		{
+			name: "Parallel pod management policy",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template:            defaultTemplate,
@@ -272,7 +280,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 			},
 		},
-		{ // UpdateStrategy.RollingUpdate.Partition is not lost when UpdateStrategy.Type is not set
+		{
+			name: "UpdateStrategy.RollingUpdate.Partition is not lost when UpdateStrategy.Type is not set",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -301,21 +310,152 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 				},
 			},
+		},
+		{
+			name: "PVC delete policy enabled, no policy specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enablePVCDeletionPolicy: true,
+		},
+		{
+			name: "PVC delete policy enabled, with scaledown policy specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enablePVCDeletionPolicy: true,
+		},
+		{
+			name: "PVC delete policy disabled, with set deletion policy specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enablePVCDeletionPolicy: true,
+		},
+		{
+			name: "PVC delete policy disabled, with policy specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enablePVCDeletionPolicy: false,
 		},
 	}
 
-	for i, test := range tests {
-		original := test.original
-		expected := test.expected
-		obj2 := roundTrip(t, runtime.Object(original))
-		got, ok := obj2.(*appsv1.StatefulSet)
-		if !ok {
-			t.Errorf("(%d) unexpected object: %v", i, got)
-			t.FailNow()
-		}
-		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
-			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
-		}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enablePVCDeletionPolicy)()
+
+			obj2 := roundTrip(t, runtime.Object(test.original))
+			got, ok := obj2.(*appsv1.StatefulSet)
+			if !ok {
+				t.Errorf("unexpected object: %v", got)
+				t.FailNow()
+			}
+			if !apiequality.Semantic.DeepEqual(got.Spec, test.expected.Spec) {
+				t.Errorf("got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", got.Spec, test.expected.Spec)
+			}
+		})
 	}
 }
 

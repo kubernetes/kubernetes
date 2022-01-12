@@ -612,14 +612,6 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	framework.ExpectNotEqual(len(claims), 0)
 	namespace := claims[0].Namespace
 
-	ginkgo.By("creating a storage class " + t.Class.Name)
-	class, err := t.Client.StorageV1().StorageClasses().Create(context.TODO(), t.Class, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	defer func() {
-		err = storageutils.DeleteStorageClass(t.Client, class.Name)
-		framework.ExpectNoError(err, "While deleting storage class")
-	}()
-
 	ginkgo.By("creating claims")
 	var claimNames []string
 	var createdClaims []*v1.PersistentVolumeClaim
@@ -706,6 +698,16 @@ func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, 
 // StartInPodWithVolume starts a command in a pod with given claim mounted to /mnt directory
 // The caller is responsible for checking the pod and deleting it.
 func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node e2epod.NodeSelection) *v1.Pod {
+	return StartInPodWithVolumeSource(c, v1.VolumeSource{
+		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+			ClaimName: claimName,
+		},
+	}, ns, podName, command, node)
+}
+
+// StartInPodWithVolumeSource starts a command in a pod with given volume mounted to /mnt directory
+// The caller is responsible for checking the pod and deleting it.
+func StartInPodWithVolumeSource(c clientset.Interface, volSrc v1.VolumeSource, ns, podName, command string, node e2epod.NodeSelection) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -734,13 +736,8 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			RestartPolicy: v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
-					Name: "my-volume",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: claimName,
-							ReadOnly:  false,
-						},
-					},
+					Name:         "my-volume",
+					VolumeSource: volSrc,
 				},
 			},
 		},

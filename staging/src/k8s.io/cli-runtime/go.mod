@@ -6,26 +6,26 @@ go 1.16
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/evanphx/json-patch v4.11.0+incompatible
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
-	github.com/spf13/cobra v1.1.3
+	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/text v0.3.6
+	golang.org/x/text v0.3.7
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.22.1
-	k8s.io/apimachinery v0.22.1
-	k8s.io/client-go v0.22.1
-	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
-	sigs.k8s.io/kustomize/api v0.8.11
-	sigs.k8s.io/kustomize/kyaml v0.11.0
+	k8s.io/api v0.23.0
+	k8s.io/apimachinery v0.23.0
+	k8s.io/client-go v0.23.0
+	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
+	sigs.k8s.io/kustomize/api v0.10.1
+	sigs.k8s.io/kustomize/kyaml v0.13.0
 	sigs.k8s.io/yaml v1.2.0
 )
 
 replace (
-	github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.33.2-0.20211111141403-f81b61d24fd4
+	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.0
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
@@ -54,4 +54,5 @@ replace (
 	k8s.io/mount-utils => ../mount-utils
 	k8s.io/pod-security-admission => ../pod-security-admission
 	k8s.io/sample-apiserver => ../sample-apiserver
+	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 )

@@ -24,18 +24,18 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/cadvisor/accelerators"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
-	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
 	"github.com/google/cadvisor/events"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
+	v2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/machine"
 	"github.com/google/cadvisor/nvm"
 	"github.com/google/cadvisor/perf"
@@ -47,8 +47,6 @@ import (
 	"github.com/google/cadvisor/watcher"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
-	"github.com/opencontainers/runc/libcontainer/intelrdt"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -60,6 +58,9 @@ var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log th
 var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h", "Max length of time for which to store events (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is a duration. Default is applied to all non-specified event types")
 var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 var applicationMetricsCountLimit = flag.Int("application_metrics_count_limit", 100, "Max number of application metrics to store (per container)")
+
+// The namespace under which Docker aliases are unique.
+const DockerNamespace = "docker"
 
 var HousekeepingConfigFlags = HouskeepingConfig{
 	flag.Duration("max_housekeeping_interval", 60*time.Second, "Largest interval to allow between container housekeepings"),
@@ -134,12 +135,6 @@ type Manager interface {
 
 	CloseEventChannel(watchID int)
 
-	// Get status information about docker.
-	DockerInfo() (info.DockerStatus, error)
-
-	// Get details about interesting docker images.
-	DockerImages() ([]info.DockerImage, error)
-
 	// Returns debugging information. Map of lines per category.
 	DebugInfo() map[string][]string
 }
@@ -151,7 +146,7 @@ type HouskeepingConfig = struct {
 }
 
 // New takes a memory storage and returns a new manager.
-func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig HouskeepingConfig, includedMetricsSet container.MetricSet, collectorHTTPClient *http.Client, rawContainerCgroupPathPrefixWhiteList []string, perfEventsFile string) (Manager, error) {
+func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig HouskeepingConfig, includedMetricsSet container.MetricSet, collectorHTTPClient *http.Client, rawContainerCgroupPathPrefixWhiteList, containerEnvMetadataWhiteList []string, perfEventsFile string, resctrlInterval time.Duration) (Manager, error) {
 	if memoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
 	}
@@ -208,6 +203,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 		collectorHTTPClient:                   collectorHTTPClient,
 		nvidiaManager:                         accelerators.NewNvidiaManager(includedMetricsSet),
 		rawContainerCgroupPathPrefixWhiteList: rawContainerCgroupPathPrefixWhiteList,
+		containerEnvMetadataWhiteList:         containerEnvMetadataWhiteList,
 	}
 
 	machineInfo, err := machine.Info(sysfs, fsInfo, inHostNamespace)
@@ -222,7 +218,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 		return nil, err
 	}
 
-	newManager.resctrlManager, err = resctrl.NewManager(selfContainer)
+	newManager.resctrlManager, err = resctrl.NewManager(resctrlInterval, resctrl.Setup, machineInfo.CPUVendorID, inHostNamespace)
 	if err != nil {
 		klog.V(4).Infof("Cannot gather resctrl metrics: %v", err)
 	}
@@ -267,9 +263,11 @@ type manager struct {
 	collectorHTTPClient      *http.Client
 	nvidiaManager            stats.Manager
 	perfManager              stats.Manager
-	resctrlManager           stats.Manager
+	resctrlManager           resctrl.Manager
 	// List of raw container cgroup path prefix whitelist.
 	rawContainerCgroupPathPrefixWhiteList []string
+	// List of container env prefix whitelist, the matched container envs would be collected into metrics as extra labels.
+	containerEnvMetadataWhiteList []string
 }
 
 // Start the container manager.
@@ -332,7 +330,7 @@ func (m *manager) Start() error {
 
 func (m *manager) Stop() error {
 	defer m.nvidiaManager.Destroy()
-	defer m.destroyPerfCollectors()
+	defer m.destroyCollectors()
 	// Stop and wait on all quit channels.
 	for i, c := range m.quitChannels {
 		// Send the exit signal and wait on the thread to exit (by closing the channel).
@@ -350,9 +348,10 @@ func (m *manager) Stop() error {
 	return nil
 }
 
-func (m *manager) destroyPerfCollectors() {
+func (m *manager) destroyCollectors() {
 	for _, container := range m.containers {
 		container.perfCollector.Destroy()
+		container.resctrlCollector.Destroy()
 	}
 }
 
@@ -595,7 +594,7 @@ func (m *manager) getAllDockerContainers() map[string]*containerData {
 
 	// Get containers in the Docker namespace.
 	for name, cont := range m.containers {
-		if name.Namespace == docker.DockerNamespace {
+		if name.Namespace == DockerNamespace {
 			containers[cont.info.Name] = cont
 		}
 	}
@@ -627,14 +626,14 @@ func (m *manager) getDockerContainer(containerName string) (*containerData, erro
 
 	// Check for the container in the Docker container namespace.
 	cont, ok := m.containers[namespacedContainerName{
-		Namespace: docker.DockerNamespace,
+		Namespace: DockerNamespace,
 		Name:      containerName,
 	}]
 
 	// Look for container by short prefix name if no exact match found.
 	if !ok {
 		for contName, c := range m.containers {
-			if contName.Namespace == docker.DockerNamespace && strings.HasPrefix(contName.Name, containerName) {
+			if contName.Namespace == DockerNamespace && strings.HasPrefix(contName.Name, containerName) {
 				if cont == nil {
 					cont = c
 				} else {
@@ -917,7 +916,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 		return nil
 	}
 
-	handler, accept, err := container.NewContainerHandler(containerName, watchSource, m.inHostNamespace)
+	handler, accept, err := container.NewContainerHandler(containerName, watchSource, m.containerEnvMetadataWhiteList, m.inHostNamespace)
 	if err != nil {
 		return err
 	}
@@ -937,13 +936,7 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 		return err
 	}
 
-	if cgroups.IsCgroup2UnifiedMode() {
-		perfCgroupPath := path.Join(fs2.UnifiedMountpoint, containerName)
-		cont.perfCollector, err = m.perfManager.GetCollector(perfCgroupPath)
-		if err != nil {
-			klog.Errorf("Perf event metrics will not be available for container %q: %v", containerName, err)
-		}
-	} else {
+	if !cgroups.IsCgroup2UnifiedMode() {
 		devicesCgroupPath, err := handler.GetCgroupPath("devices")
 		if err != nil {
 			klog.Warningf("Error getting devices cgroup path: %v", err)
@@ -953,6 +946,8 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 				klog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %s: %s", cont.info.Name, err)
 			}
 		}
+	}
+	if m.includedMetrics.Has(container.PerfMetrics) {
 		perfCgroupPath, err := handler.GetCgroupPath("perf_event")
 		if err != nil {
 			klog.Warningf("Error getting perf_event cgroup path: %q", err)
@@ -965,14 +960,11 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 
 	if m.includedMetrics.Has(container.ResctrlMetrics) {
-		resctrlPath, err := intelrdt.GetIntelRdtPath(containerName)
+		cont.resctrlCollector, err = m.resctrlManager.GetCollector(containerName, func() ([]string, error) {
+			return cont.getContainerPids(m.inHostNamespace)
+		}, len(m.machineInfo.Topology))
 		if err != nil {
-			klog.V(4).Infof("Error getting resctrl path: %q", err)
-		} else {
-			cont.resctrlCollector, err = m.resctrlManager.GetCollector(resctrlPath)
-			if err != nil {
-				klog.V(4).Infof("resctrl metrics will not be available for container %s: %s", cont.info.Name, err)
-			}
+			klog.V(4).Infof("resctrl metrics will not be available for container %s: %s", cont.info.Name, err)
 		}
 	}
 
@@ -1014,7 +1006,6 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	if err != nil {
 		return err
 	}
-
 	// Start the container's housekeeping.
 	return cont.Start()
 }
@@ -1246,6 +1237,24 @@ func (m *manager) watchForNewOoms() error {
 			if err != nil {
 				klog.Errorf("failed to add OOM kill event for %q: %v", oomInstance.ContainerName, err)
 			}
+
+			// Count OOM events for later collection by prometheus
+			request := v2.RequestOptions{
+				IdType: v2.TypeName,
+				Count:  1,
+			}
+			conts, err := m.getRequestedContainers(oomInstance.ContainerName, request)
+			if err != nil {
+				klog.V(2).Infof("failed getting container info for %q: %v", oomInstance.ContainerName, err)
+				continue
+			}
+			if len(conts) != 1 {
+				klog.V(2).Info("Expected the request to match only one container")
+				continue
+			}
+			for _, cont := range conts {
+				atomic.AddUint64(&cont.oomEvents, 1)
+			}
 		}
 	}()
 	return nil
@@ -1313,14 +1322,6 @@ func parseEventsStoragePolicy() events.StoragePolicy {
 	return policy
 }
 
-func (m *manager) DockerImages() ([]info.DockerImage, error) {
-	return docker.Images()
-}
-
-func (m *manager) DockerInfo() (info.DockerStatus, error) {
-	return docker.Status()
-}
-
 func (m *manager) DebugInfo() map[string][]string {
 	debugInfo := container.DebugInfo()
 
@@ -1377,20 +1378,10 @@ func getVersionInfo() (*info.VersionInfo, error) {
 
 	kernelVersion := machine.KernelVersion()
 	osVersion := machine.ContainerOsVersion()
-	dockerVersion, err := docker.VersionString()
-	if err != nil {
-		return nil, err
-	}
-	dockerAPIVersion, err := docker.APIVersionString()
-	if err != nil {
-		return nil, err
-	}
 
 	return &info.VersionInfo{
 		KernelVersion:      kernelVersion,
 		ContainerOsVersion: osVersion,
-		DockerVersion:      dockerVersion,
-		DockerAPIVersion:   dockerAPIVersion,
 		CadvisorVersion:    version.Info["version"],
 		CadvisorRevision:   version.Info["revision"],
 	}, nil

@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -148,6 +148,10 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		podSandboxConfig.Windows = wc
 	}
 
+	// Update config to include overhead, sandbox level resources
+	if err := m.applySandboxResources(pod, podSandboxConfig); err != nil {
+		return nil, err
+	}
 	return podSandboxConfig, nil
 }
 

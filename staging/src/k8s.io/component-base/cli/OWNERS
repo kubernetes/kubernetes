@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Currently assigned cli to sig-cli since:
+# (a) its literally named "cli"
+# (b) flags are the bread-and-butter of cli tools.
+
+approvers:
+- sig-cli-maintainers
+reviewers:
+- sig-cli
+labels:
+- sig/cli

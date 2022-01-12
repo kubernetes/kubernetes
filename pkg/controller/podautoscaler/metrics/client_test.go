@@ -17,12 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	autoscalingapi "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	autoscalingapi "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -239,7 +240,7 @@ func (tc *restClientTestCase) runTest(t *testing.T) {
 	isResource := len(tc.resourceName) > 0
 	isExternal := tc.metricSelector != nil
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(v1.ResourceName(tc.resourceName), tc.namespace, tc.selector, tc.container)
+		info, timestamp, err := metricsClient.GetResourceMetric(context.TODO(), v1.ResourceName(tc.resourceName), tc.namespace, tc.selector, tc.container)
 		tc.verifyResults(t, info, timestamp, err)
 	} else if isExternal {
 		tc.metricLabelSelector, err = metav1.LabelSelectorAsSelector(tc.metricSelector)

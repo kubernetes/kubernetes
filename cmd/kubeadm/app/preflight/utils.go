@@ -20,10 +20,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
-
-	"github.com/pkg/errors"
 )
 
 // GetKubeletVersion is helper function that returns version of kubelet available in $PATH

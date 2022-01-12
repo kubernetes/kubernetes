@@ -18,6 +18,7 @@ package bootstrap
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,7 +84,9 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		signedToken, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID]
-		framework.ExpectEqual(ok, true)
+		if !ok {
+			framework.Failf("expected signed token with key %q not found in %+v", bootstrapapi.JWSSignatureKeyPrefix+tokenID, cfgMap.Data)
+		}
 
 		ginkgo.By("update the cluster-info ConfigMap")
 		originalData := cfgMap.Data[bootstrapapi.KubeConfigKey]

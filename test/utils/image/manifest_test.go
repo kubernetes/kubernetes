@@ -24,7 +24,66 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
-// ToDo Add Benchmark
+func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
+	registryTests := []struct {
+		in  string
+		out string
+	}{
+		{
+			in:  "docker.io/library/test:123",
+			out: "test.io/library/test:123",
+		}, {
+			in:  "docker.io/library/test",
+			out: "test.io/library/test",
+		}, {
+			in:  "test",
+			out: "test.io/library/test",
+		}, {
+			in:  "k8s.gcr.io/test:123",
+			out: "test.io/test:123",
+		}, {
+			in:  "gcr.io/k8s-authenticated-test/test:123",
+			out: "test.io/k8s-authenticated-test/test:123",
+		}, {
+			in:  "k8s.gcr.io/sig-storage/test:latest",
+			out: "test.io/sig-storage/test:latest",
+		}, {
+			in:  "invalid.com/invalid/test:latest",
+			out: "test.io/invalid/test:latest",
+		}, {
+			in:  "mcr.microsoft.com/test:latest",
+			out: "test.io/microsoft/test:latest",
+		}, {
+			in:  "k8s.gcr.io/e2e-test-images/test:latest",
+			out: "test.io/promoter/test:latest",
+		}, {
+			in:  "k8s.gcr.io/build-image/test:latest",
+			out: "test.io/build/test:latest",
+		}, {
+			in:  "gcr.io/authenticated-image-pulling/test:latest",
+			out: "test.io/gcAuth/test:latest",
+		},
+	}
+	reg := RegistryList{
+		DockerLibraryRegistry:   "test.io/library",
+		GcRegistry:              "test.io",
+		PrivateRegistry:         "test.io/k8s-authenticated-test",
+		SigStorageRegistry:      "test.io/sig-storage",
+		InvalidRegistry:         "test.io/invalid",
+		MicrosoftRegistry:       "test.io/microsoft",
+		PromoterE2eRegistry:     "test.io/promoter",
+		BuildImageRegistry:      "test.io/build",
+		GcAuthenticatedRegistry: "test.io/gcAuth",
+	}
+	for i := 0; i < b.N; i++ {
+		tt := registryTests[i%len(registryTests)]
+		s, _ := replaceRegistryInImageURLWithList(tt.in, reg)
+		if s != tt.out {
+			b.Errorf("got %q, want %q", s, tt.out)
+		}
+	}
+}
+
 func TestReplaceRegistryInImageURL(t *testing.T) {
 	registryTests := []struct {
 		in        string
@@ -41,20 +100,11 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "test",
 			out: "test.io/library/test",
 		}, {
-			in:  "gcr.io/kubernetes-e2e-test-images/test:123",
-			out: "test.io/kubernetes-e2e-test-images/test:123",
-		}, {
 			in:  "k8s.gcr.io/test:123",
 			out: "test.io/test:123",
 		}, {
 			in:  "gcr.io/k8s-authenticated-test/test:123",
 			out: "test.io/k8s-authenticated-test/test:123",
-		}, {
-			in:  "gcr.io/google-samples/test:latest",
-			out: "test.io/google-samples/test:latest",
-		}, {
-			in:  "gcr.io/gke-release/test:latest",
-			out: "test.io/gke-release/test:latest",
 		}, {
 			in:  "k8s.gcr.io/sig-storage/test:latest",
 			out: "test.io/sig-storage/test:latest",
@@ -82,11 +132,8 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 	// Set custom registries
 	reg := RegistryList{
 		DockerLibraryRegistry:   "test.io/library",
-		E2eRegistry:             "test.io/kubernetes-e2e-test-images",
 		GcRegistry:              "test.io",
-		GcrReleaseRegistry:      "test.io/gke-release",
 		PrivateRegistry:         "test.io/k8s-authenticated-test",
-		SampleRegistry:          "test.io/google-samples",
 		SigStorageRegistry:      "test.io/sig-storage",
 		InvalidRegistry:         "test.io/invalid",
 		MicrosoftRegistry:       "test.io/microsoft",

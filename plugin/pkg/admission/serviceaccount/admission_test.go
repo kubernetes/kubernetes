@@ -22,8 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -32,8 +34,10 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	v1defaults "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestIgnoresNonCreate(t *testing.T) {
@@ -173,10 +177,15 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 		},
 	})
 
-	pod := &api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{{}},
+	v1PodIn := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{}},
 		},
+	}
+	v1defaults.SetObjectDefaults_Pod(v1PodIn)
+	pod := &api.Pod{}
+	if err := v1defaults.Convert_v1_Pod_To_core_Pod(v1PodIn, pod, nil); err != nil {
+		t.Fatal(err)
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
 	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
@@ -194,6 +203,7 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 					{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
 					{ConfigMap: &api.ConfigMapProjection{LocalObjectReference: api.LocalObjectReference{Name: "openshift-service-ca.crt"}, Items: []api.KeyToPath{{Key: "service-ca.crt", Path: "service-ca.crt"}}}},
 				},
+				DefaultMode: utilpointer.Int32(0644),
 			},
 		},
 	}}
@@ -220,6 +230,17 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 	}
 	if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
 		t.Errorf("unexpected volumes: %s", diff.ObjectReflectDiff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
+	}
+
+	// ensure result converted to v1 matches defaulted object
+	v1PodOut := &v1.Pod{}
+	if err := v1defaults.Convert_core_Pod_To_v1_Pod(pod, v1PodOut, nil); err != nil {
+		t.Fatal(err)
+	}
+	v1PodOutDefaulted := v1PodOut.DeepCopy()
+	v1defaults.SetObjectDefaults_Pod(v1PodOutDefaulted)
+	if !reflect.DeepEqual(v1PodOut, v1PodOutDefaulted) {
+		t.Error(cmp.Diff(v1PodOut, v1PodOutDefaulted))
 	}
 }
 

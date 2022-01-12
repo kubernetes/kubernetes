@@ -108,7 +108,7 @@ func (c *FakeEndpoints) Update(ctx context.Context, endpoints *corev1.Endpoints,
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
 func (c *FakeEndpoints) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(endpointsResource, c.ns, name), &corev1.Endpoints{})
+		Invokes(testing.NewDeleteActionWithOptions(endpointsResource, c.ns, name, opts), &corev1.Endpoints{})
 
 	return err
 }

@@ -72,12 +72,6 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
-}
-
 const (
 	AliceToken   string = "abc123" // username: alice.  Present in token file.
 	BobToken     string = "xyz987" // username: bob.  Present in token file.
@@ -910,13 +904,6 @@ func TestImpersonateWithUID(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	t.Cleanup(cancel)
 
-	setUIDWrapper := func(rt http.RoundTripper) http.RoundTripper {
-		return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-			req.Header.Set("Impersonate-Uid", "1234")
-			return rt.RoundTrip(req)
-		})
-	}
-
 	t.Run("impersonation with uid header", func(t *testing.T) {
 		adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
@@ -933,8 +920,8 @@ func TestImpersonateWithUID(t *testing.T) {
 		clientConfig := rest.CopyConfig(server.ClientConfig)
 		clientConfig.Impersonate = rest.ImpersonationConfig{
 			UserName: "alice",
+			UID:      "1234",
 		}
-		clientConfig.Wrap(setUIDWrapper)
 
 		client := clientset.NewForConfigOrDie(clientConfig)
 		createdCsr, err := client.CertificatesV1().CertificateSigningRequests().Create(
@@ -974,7 +961,9 @@ func TestImpersonateWithUID(t *testing.T) {
 
 	t.Run("impersonation with only UID fails", func(t *testing.T) {
 		clientConfig := rest.CopyConfig(server.ClientConfig)
-		clientConfig.Wrap(setUIDWrapper)
+		clientConfig.Impersonate = rest.ImpersonationConfig{
+			UID: "1234",
+		}
 
 		client := clientset.NewForConfigOrDie(clientConfig)
 		_, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
@@ -1007,8 +996,8 @@ func TestImpersonateWithUID(t *testing.T) {
 		clientConfig := rest.AnonymousClientConfig(server.ClientConfig)
 		clientConfig.Impersonate = rest.ImpersonationConfig{
 			UserName: "some-user-anonymous-can-impersonate",
+			UID:      "1234",
 		}
-		clientConfig.Wrap(setUIDWrapper)
 
 		client := clientset.NewForConfigOrDie(clientConfig)
 		_, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})

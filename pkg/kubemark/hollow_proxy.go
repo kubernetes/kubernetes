@@ -25,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -32,7 +33,6 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
@@ -132,8 +132,9 @@ func NewHollowProxyOrDie(
 	}, nil
 }
 
-func (hp *HollowProxy) Run() {
+func (hp *HollowProxy) Run() error {
 	if err := hp.ProxyServer.Run(); err != nil {
-		klog.Fatalf("Error while running proxy: %v\n", err)
+		return fmt.Errorf("Error while running proxy: %w", err)
 	}
+	return nil
 }

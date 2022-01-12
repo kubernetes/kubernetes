@@ -163,6 +163,7 @@ func TestServeHTTP(t *testing.T) {
 		expectedRespHeader    map[string]string
 		notExpectedRespHeader []string
 		upgradeRequired       bool
+		appendLocationPath    bool
 		expectError           func(err error) bool
 		useLocationHost       bool
 	}{
@@ -246,6 +247,27 @@ func TestServeHTTP(t *testing.T) {
 			expectedPath:    "/some/path",
 			useLocationHost: true,
 		},
+		{
+			name:               "append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base/base",
+			appendLocationPath: true,
+		},
+		{
+			name:               "append server path to request path with ending slash",
+			method:             "GET",
+			requestPath:        "/base/",
+			expectedPath:       "/base/base/",
+			appendLocationPath: true,
+		},
+		{
+			name:               "don't append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base",
+			appendLocationPath: false,
+		},
 	}
 
 	for i, test := range tests {
@@ -269,6 +291,7 @@ func TestServeHTTP(t *testing.T) {
 			backendURL.Path = test.requestPath
 			proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, test.upgradeRequired, responder)
 			proxyHandler.UseLocationHost = test.useLocationHost
+			proxyHandler.AppendLocationPath = test.appendLocationPath
 			proxyServer := httptest.NewServer(proxyHandler)
 			defer proxyServer.Close()
 			proxyURL, _ := url.Parse(proxyServer.URL)
@@ -1029,6 +1052,77 @@ func TestErrorPropagation(t *testing.T) {
 	}
 	if !strings.Contains(responder.err.Error(), expectedErr.Error()) {
 		t.Fatalf("responder got unexpected error: %v, expected the error to contain %q", responder.err.Error(), expectedErr.Error())
+	}
+}
+
+func TestProxyRedirectsforRootPath(t *testing.T) {
+
+	tests := []struct {
+		name               string
+		method             string
+		requestPath        string
+		expectedHeader     http.Header
+		expectedStatusCode int
+		redirect           bool
+	}{
+		{
+			name:               "root path, simple get",
+			method:             "GET",
+			requestPath:        "",
+			redirect:           true,
+			expectedStatusCode: 301,
+			expectedHeader: http.Header{
+				"Location": []string{"/"},
+			},
+		},
+		{
+			name:               "root path, simple put",
+			method:             "PUT",
+			requestPath:        "",
+			redirect:           false,
+			expectedStatusCode: 200,
+		},
+		{
+			name:               "root path, simple head",
+			method:             "HEAD",
+			requestPath:        "",
+			redirect:           true,
+			expectedStatusCode: 301,
+			expectedHeader: http.Header{
+				"Location": []string{"/"},
+			},
+		},
+		{
+			name:               "root path, simple delete with params",
+			method:             "DELETE",
+			requestPath:        "",
+			redirect:           false,
+			expectedStatusCode: 200,
+		},
+	}
+
+	for _, test := range tests {
+		func() {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(test.method, test.requestPath, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			redirect := proxyRedirectsforRootPath(test.requestPath, w, req)
+			if got, want := redirect, test.redirect; got != want {
+				t.Errorf("Expected redirect state %v; got %v", want, got)
+			}
+
+			res := w.Result()
+			if got, want := res.StatusCode, test.expectedStatusCode; got != want {
+				t.Errorf("Expected status code %d; got %d", want, got)
+			}
+
+			if res.StatusCode == 301 && !reflect.DeepEqual(res.Header, test.expectedHeader) {
+				t.Errorf("Expected location header to be %v, got %v", test.expectedHeader, res.Header)
+			}
+		}()
 	}
 }
 

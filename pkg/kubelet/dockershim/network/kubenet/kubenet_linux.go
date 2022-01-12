@@ -36,6 +36,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -43,12 +44,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
 	utilebtables "k8s.io/utils/net/ebtables"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -252,12 +250,6 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 
 	klog.V(4).InfoS("Kubenet: PodCIDR is set to new value", "podCIDR", podCIDR)
 	podCIDRs := strings.Split(podCIDR, ",")
-
-	// reset to one cidr if dual stack is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) && len(podCIDRs) > 1 {
-		klog.V(2).InfoS("This node has multiple pod cidrs assigned and dual stack is not enabled. ignoring all except first cidr")
-		podCIDRs = podCIDRs[0:1]
-	}
 
 	for idx, currentPodCIDR := range podCIDRs {
 		_, cidr, err := netutils.ParseCIDRSloppy(currentPodCIDR)

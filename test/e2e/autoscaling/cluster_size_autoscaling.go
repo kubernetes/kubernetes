@@ -888,14 +888,17 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// If new nodes are disconnected too soon, they'll be considered not started
 		// instead of unready, and cluster won't be considered unhealthy.
 		//
-		// More precisely, Cluster Autoscaler compares last transition time of
-		// several readiness conditions to node create time. If it's within
-		// 2 minutes, it'll assume node is just starting and not unhealthy.
+		// More precisely, Cluster Autoscaler will never consider a
+		// node to be unhealthy unless it was created more than 15m
+		// ago. Within that 15m window, it'll assume node is just
+		// starting and not unhealthy.
 		//
-		// Nodes become ready in less than 1 minute after being created,
-		// so waiting extra 2 minutes before breaking them (which triggers
-		// readiness condition transition) should be sufficient, while
-		// making no assumptions about minimal node startup time.
+		// However, waiting for 15m would allow scale down to kick in
+		// and remove recently added nodes, so here we just wait 2m for
+		// nodes to come up (1m should be enough, another 1m added as
+		// an extra buffer. Then, we break connectivity to a subset of
+		// nodes and only after that we wait for 15m, since scale down
+		// shouldn't happen when the cluster is unhealthy.
 		time.Sleep(2 * time.Minute)
 
 		ginkgo.By("Block network connectivity to some nodes to simulate unhealthy cluster")
@@ -919,7 +922,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			} else {
 				ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb, false, defaultTimeout)
 				defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "memory-reservation")
-				time.Sleep(scaleUpTimeout)
+				// Wait for 15m to ensure Cluster Autoscaler won't consider broken nodes as still starting.
+				time.Sleep(15 * time.Minute)
 				currentNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 				framework.ExpectNoError(err)
 				framework.Logf("Currently available nodes: %v, nodes available at the start of test: %v, disabled nodes: %v", len(currentNodes.Items), len(nodes.Items), nodesToBreakCount)
@@ -1246,6 +1250,7 @@ func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 	framework.ExpectNoErrorWithOffset(0, err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
+			node := node
 			nodes = append(nodes, &node)
 		}
 	}

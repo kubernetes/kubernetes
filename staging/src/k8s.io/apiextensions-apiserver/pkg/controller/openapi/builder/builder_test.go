@@ -45,37 +45,43 @@ func TestNewBuilder(t *testing.T) {
 		wantedSchema      string
 		wantedItemsSchema string
 
-		v2 bool // produce OpenAPIv2
+		v2                                            bool // produce OpenAPIv2
+		skipFilterSchemaForKubectlOpenAPIV2Validation bool // produce OpenAPIv2 without going through the ToStructuralOpenAPIV2 path
 	}{
 		{
 			"nil",
 			"",
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`, `{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
 		},
 		{"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
 		},
 		{"type only",
 			`{"type":"object"}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
 		},
 		{"preserve unknown at root v2",
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
 		},
 		{"preserve unknown at root v3",
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true,"properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
-			false,
+			true,
+			true,
 		},
 		{"with extensions",
 			`
@@ -179,6 +185,7 @@ func TestNewBuilder(t *testing.T) {
 }`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
 		},
 		{"with extensions as v3 schema",
 			`
@@ -344,7 +351,8 @@ func TestNewBuilder(t *testing.T) {
   "x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]
 }`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
-			false,
+			true,
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -384,7 +392,7 @@ func TestNewBuilder(t *testing.T) {
 					},
 					Scope: apiextensionsv1.NamespaceScoped,
 				},
-			}, "v1", schema, tt.v2)
+			}, "v1", schema, Options{V2: tt.v2, SkipFilterSchemaForKubectlOpenAPIV2Validation: tt.skipFilterSchemaForKubectlOpenAPIV2Validation})
 
 			var wantedSchema, wantedItemsSchema spec.Schema
 			if err := json.Unmarshal([]byte(tt.wantedSchema), &wantedSchema); err != nil {
@@ -500,7 +508,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 				},
 			},
 		}
-		swagger, err := BuildSwagger(testNamespacedCRD, testCRDVersion, Options{V2: true})
+		swagger, err := BuildOpenAPIV2(testNamespacedCRD, testCRDVersion, Options{V2: true})
 		require.NoError(t, err)
 		require.Equal(t, len(testCase.paths), len(swagger.Paths.Paths), testCase.scope)
 		for path, expected := range testCase.paths {
@@ -567,7 +575,7 @@ func schemaDiff(a, b *spec.Schema) string {
 	return diff.StringDiff(string(as), string(bs))
 }
 
-func TestBuildSwagger(t *testing.T) {
+func TestBuildOpenAPIV2(t *testing.T) {
 	tests := []struct {
 		name                  string
 		schema                string
@@ -622,7 +630,7 @@ func TestBuildSwagger(t *testing.T) {
 			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
 			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: false},
+			Options{V2: true, SkipFilterSchemaForKubectlOpenAPIV2Validation: true},
 		},
 	}
 	for _, tt := range tests {
@@ -642,7 +650,7 @@ func TestBuildSwagger(t *testing.T) {
 			}
 
 			// TODO: mostly copied from the test above. reuse code to cleanup
-			got, err := BuildSwagger(&apiextensionsv1.CustomResourceDefinition{
+			got, err := BuildOpenAPIV2(&apiextensionsv1.CustomResourceDefinition{
 				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 					Group: "bar.k8s.io",
 					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
@@ -670,6 +678,109 @@ func TestBuildSwagger(t *testing.T) {
 			}
 
 			gotSchema := got.Definitions["io.k8s.bar.v1.Foo"]
+			gotProperties := properties(gotSchema.Properties)
+			wantedProperties := properties(wantedSchema.Properties)
+			if !gotProperties.Equal(wantedProperties) {
+				t.Fatalf("unexpected properties, got: %s, expected: %s", gotProperties.List(), wantedProperties.List())
+			}
+
+			// wipe out TypeMeta/ObjectMeta content, with those many lines of descriptions. We trust that they match here.
+			for _, metaField := range []string{"kind", "apiVersion", "metadata"} {
+				if _, found := gotSchema.Properties["kind"]; found {
+					prop := gotSchema.Properties[metaField]
+					prop.Description = ""
+					gotSchema.Properties[metaField] = prop
+				}
+			}
+
+			if !reflect.DeepEqual(&wantedSchema, &gotSchema) {
+				t.Errorf("unexpected schema: %s\nwant = %#v\ngot = %#v", schemaDiff(&wantedSchema, &gotSchema), &wantedSchema, &gotSchema)
+			}
+		})
+	}
+}
+
+func TestBuildOpenAPIV3(t *testing.T) {
+	tests := []struct {
+		name                  string
+		schema                string
+		preserveUnknownFields *bool
+		wantedSchema          string
+		opts                  Options
+	}{
+		{
+			"nil",
+			"",
+			nil,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{},
+		},
+		{
+			"with properties",
+			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
+			nil,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{},
+		},
+		{
+			"with v3 nullable field",
+			`{"type":"object","properties":{"spec":{"type":"object", "nullable": true},"status":{"type":"object"}}}`,
+			nil,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object", "nullable": true},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{},
+		},
+		{
+			"with default not pruned for v3",
+			`{"type":"object","properties":{"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}}}`,
+			nil,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var validation *apiextensionsv1.CustomResourceValidation
+			if len(tt.schema) > 0 {
+				v1Schema := &apiextensionsv1.JSONSchemaProps{}
+				if err := json.Unmarshal([]byte(tt.schema), &v1Schema); err != nil {
+					t.Fatal(err)
+				}
+				validation = &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: v1Schema,
+				}
+			}
+			if tt.preserveUnknownFields != nil && *tt.preserveUnknownFields {
+				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.BoolPtr(true)
+			}
+
+			got, err := BuildOpenAPIV3(&apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Group: "bar.k8s.io",
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name:   "v1",
+							Schema: validation,
+						},
+					},
+					Names: apiextensionsv1.CustomResourceDefinitionNames{
+						Plural:   "foos",
+						Singular: "foo",
+						Kind:     "Foo",
+						ListKind: "FooList",
+					},
+					Scope: apiextensionsv1.NamespaceScoped,
+				},
+			}, "v1", tt.opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var wantedSchema spec.Schema
+			if err := json.Unmarshal([]byte(tt.wantedSchema), &wantedSchema); err != nil {
+				t.Fatal(err)
+			}
+
+			gotSchema := *got.Components.Schemas["io.k8s.bar.v1.Foo"]
 			gotProperties := properties(gotSchema.Properties)
 			wantedProperties := properties(wantedSchema.Properties)
 			if !gotProperties.Equal(wantedProperties) {

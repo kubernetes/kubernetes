@@ -603,3 +603,38 @@ func TestLastComponent(t *testing.T) {
 		}
 	}
 }
+
+func TestGetProjectsBasePath(t *testing.T) {
+	testCases := []struct {
+		basePath               string
+		expectProjectsBasePath string
+	}{
+		// basepath ends in `/projects/`
+		{
+			basePath:               "path/to/api/projects/",
+			expectProjectsBasePath: "path/to/api/projects/",
+		},
+		// basepath ends in `/projects`, without trailing /
+		{
+			basePath:               "path/to/api/projects",
+			expectProjectsBasePath: "path/to/api/projects/",
+		},
+		// basepath does not end in `/projects/`
+		{
+			basePath:               "path/to/api/",
+			expectProjectsBasePath: "path/to/api/projects/",
+		},
+		// basepath does not end in `/projects/` and does not have trailing /
+		{
+			basePath:               "path/to/api",
+			expectProjectsBasePath: "path/to/api/projects/",
+		},
+	}
+
+	for _, tc := range testCases {
+		projectsBasePath := getProjectsBasePath(tc.basePath)
+		if projectsBasePath != tc.expectProjectsBasePath {
+			t.Errorf("Expected projects base path %s; but got %s", tc.expectProjectsBasePath, projectsBasePath)
+		}
+	}
+}

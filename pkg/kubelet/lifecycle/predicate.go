@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"runtime"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -153,9 +154,56 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: message,
 		}
 	}
+	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "PodOSSelectorNodeLabelDoesNotMatch",
+			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
+		}
+	}
+	// By this time, node labels should have been synced, this helps in identifying the pod with the usage.
+	if rejectPodAdmissionBasedOnOSField(admitPod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "PodOSNotSupported",
+			Message: "Failed to admit pod as the OS field doesn't match node OS",
+		}
+	}
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// rejectPodAdmissionBasedOnOSSelector rejects pod if it's nodeSelector doesn't match
+// We expect the kubelet status reconcile which happens every 10sec to update the node labels if there is a mismatch.
+func rejectPodAdmissionBasedOnOSSelector(pod *v1.Pod, node *v1.Node) bool {
+	labels := node.Labels
+	osName, osLabelExists := labels[v1.LabelOSStable]
+	if !osLabelExists || osName != runtime.GOOS {
+		if len(labels) == 0 {
+			labels = make(map[string]string)
+		}
+		labels[v1.LabelOSStable] = runtime.GOOS
+	}
+	podLabelSelector, podOSLabelExists := pod.Labels[v1.LabelOSStable]
+	if !podOSLabelExists {
+		// If the labelselector didn't exist, let's keep the current behavior as is
+		return false
+	} else if podOSLabelExists && podLabelSelector != labels[v1.LabelOSStable] {
+		return true
+	}
+	return false
+}
+
+// rejectPodAdmissionBasedOnOSField rejects pods if their OS field doesn't match runtime.GOOS.
+// TODO: Relax this restriction when we start supporting LCOW in kubernetes where podOS may not match
+// 		 node's OS.
+func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
+	if pod.Spec.OS == nil {
+		return false
+	}
+	// If the pod OS doesn't match runtime.GOOS return false
+	return string(pod.Spec.OS.Name) != runtime.GOOS
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {

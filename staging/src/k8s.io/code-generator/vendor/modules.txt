@@ -1,0 +1,193 @@
+# github.com/PuerkitoBio/purell v1.1.1
+github.com/PuerkitoBio/purell
+# github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
+github.com/PuerkitoBio/urlesc
+# github.com/emicklei/go-restful v2.9.5+incompatible
+## explicit
+github.com/emicklei/go-restful
+github.com/emicklei/go-restful/log
+# github.com/go-logr/logr v1.2.0
+github.com/go-logr/logr
+# github.com/go-openapi/jsonpointer v0.19.5
+github.com/go-openapi/jsonpointer
+# github.com/go-openapi/jsonreference v0.19.5
+## explicit
+github.com/go-openapi/jsonreference
+# github.com/go-openapi/swag v0.19.14
+## explicit
+github.com/go-openapi/swag
+# github.com/gogo/protobuf v1.3.2
+## explicit
+github.com/gogo/protobuf/gogoproto
+github.com/gogo/protobuf/plugin/compare
+github.com/gogo/protobuf/plugin/defaultcheck
+github.com/gogo/protobuf/plugin/description
+github.com/gogo/protobuf/plugin/embedcheck
+github.com/gogo/protobuf/plugin/enumstringer
+github.com/gogo/protobuf/plugin/equal
+github.com/gogo/protobuf/plugin/face
+github.com/gogo/protobuf/plugin/gostring
+github.com/gogo/protobuf/plugin/marshalto
+github.com/gogo/protobuf/plugin/oneofcheck
+github.com/gogo/protobuf/plugin/populate
+github.com/gogo/protobuf/plugin/size
+github.com/gogo/protobuf/plugin/stringer
+github.com/gogo/protobuf/plugin/testgen
+github.com/gogo/protobuf/plugin/union
+github.com/gogo/protobuf/plugin/unmarshal
+github.com/gogo/protobuf/proto
+github.com/gogo/protobuf/protoc-gen-gogo/descriptor
+github.com/gogo/protobuf/protoc-gen-gogo/generator
+github.com/gogo/protobuf/protoc-gen-gogo/generator/internal/remap
+github.com/gogo/protobuf/protoc-gen-gogo/grpc
+github.com/gogo/protobuf/protoc-gen-gogo/plugin
+github.com/gogo/protobuf/sortkeys
+github.com/gogo/protobuf/vanity
+github.com/gogo/protobuf/vanity/command
+# github.com/golang/protobuf v1.5.2
+github.com/golang/protobuf/proto
+github.com/golang/protobuf/ptypes
+github.com/golang/protobuf/ptypes/any
+github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/timestamp
+# github.com/googleapis/gnostic v0.5.5
+## explicit
+github.com/googleapis/gnostic/compiler
+github.com/googleapis/gnostic/extensions
+github.com/googleapis/gnostic/jsonschema
+github.com/googleapis/gnostic/openapiv2
+# github.com/hpcloud/tail v1.0.0
+## explicit
+# github.com/josharian/intern v1.0.0
+github.com/josharian/intern
+# github.com/json-iterator/go v1.1.12
+## explicit
+github.com/json-iterator/go
+# github.com/mailru/easyjson v0.7.6
+github.com/mailru/easyjson/buffer
+github.com/mailru/easyjson/jlexer
+github.com/mailru/easyjson/jwriter
+# github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v1.0.2
+github.com/modern-go/reflect2
+# github.com/onsi/ginkgo v4.7.0-origin.0+incompatible => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
+## explicit
+# github.com/onsi/gomega v1.10.1
+## explicit
+# github.com/spf13/pflag v1.0.5
+## explicit
+github.com/spf13/pflag
+# github.com/stretchr/testify v1.7.0
+## explicit
+# golang.org/x/mod v0.4.2
+golang.org/x/mod/module
+golang.org/x/mod/semver
+# golang.org/x/net v0.0.0-20210825183410-e898025ed96a
+## explicit
+golang.org/x/net/idna
+# golang.org/x/sys v0.0.0-20210831042530-f4d43177bf5e
+## explicit
+golang.org/x/sys/execabs
+# golang.org/x/text v0.3.7
+## explicit
+golang.org/x/text/secure/bidirule
+golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+golang.org/x/text/width
+# golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff
+## explicit
+golang.org/x/tools/go/ast/astutil
+golang.org/x/tools/go/gcexportdata
+golang.org/x/tools/go/internal/gcimporter
+golang.org/x/tools/go/internal/packagesdriver
+golang.org/x/tools/go/packages
+golang.org/x/tools/imports
+golang.org/x/tools/internal/event
+golang.org/x/tools/internal/event/core
+golang.org/x/tools/internal/event/keys
+golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/fastwalk
+golang.org/x/tools/internal/gocommand
+golang.org/x/tools/internal/gopathwalk
+golang.org/x/tools/internal/imports
+golang.org/x/tools/internal/packagesinternal
+golang.org/x/tools/internal/typeparams
+golang.org/x/tools/internal/typesinternal
+# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+golang.org/x/xerrors
+golang.org/x/xerrors/internal
+# google.golang.org/protobuf v1.27.1
+google.golang.org/protobuf/encoding/prototext
+google.golang.org/protobuf/encoding/protowire
+google.golang.org/protobuf/internal/descfmt
+google.golang.org/protobuf/internal/descopts
+google.golang.org/protobuf/internal/detrand
+google.golang.org/protobuf/internal/encoding/defval
+google.golang.org/protobuf/internal/encoding/messageset
+google.golang.org/protobuf/internal/encoding/tag
+google.golang.org/protobuf/internal/encoding/text
+google.golang.org/protobuf/internal/errors
+google.golang.org/protobuf/internal/filedesc
+google.golang.org/protobuf/internal/filetype
+google.golang.org/protobuf/internal/flags
+google.golang.org/protobuf/internal/genid
+google.golang.org/protobuf/internal/impl
+google.golang.org/protobuf/internal/order
+google.golang.org/protobuf/internal/pragma
+google.golang.org/protobuf/internal/set
+google.golang.org/protobuf/internal/strs
+google.golang.org/protobuf/internal/version
+google.golang.org/protobuf/proto
+google.golang.org/protobuf/reflect/protodesc
+google.golang.org/protobuf/reflect/protoreflect
+google.golang.org/protobuf/reflect/protoregistry
+google.golang.org/protobuf/runtime/protoiface
+google.golang.org/protobuf/runtime/protoimpl
+google.golang.org/protobuf/types/descriptorpb
+google.golang.org/protobuf/types/known/anypb
+google.golang.org/protobuf/types/known/durationpb
+google.golang.org/protobuf/types/known/timestamppb
+# gopkg.in/fsnotify.v1 v1.4.7
+## explicit
+# gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
+## explicit
+# gopkg.in/yaml.v2 v2.4.0
+## explicit
+gopkg.in/yaml.v2
+# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+gopkg.in/yaml.v3
+# k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
+## explicit
+k8s.io/gengo/args
+k8s.io/gengo/examples/deepcopy-gen/generators
+k8s.io/gengo/examples/defaulter-gen/generators
+k8s.io/gengo/examples/import-boss/generators
+k8s.io/gengo/examples/set-gen/generators
+k8s.io/gengo/examples/set-gen/sets
+k8s.io/gengo/generator
+k8s.io/gengo/namer
+k8s.io/gengo/parser
+k8s.io/gengo/types
+# k8s.io/klog/v2 v2.30.0
+## explicit
+k8s.io/klog/v2
+# k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
+## explicit
+k8s.io/kube-openapi/cmd/openapi-gen/args
+k8s.io/kube-openapi/pkg/common
+k8s.io/kube-openapi/pkg/generators
+k8s.io/kube-openapi/pkg/generators/rules
+k8s.io/kube-openapi/pkg/schemaconv
+k8s.io/kube-openapi/pkg/util/proto
+k8s.io/kube-openapi/pkg/util/sets
+k8s.io/kube-openapi/pkg/validation/spec
+# sigs.k8s.io/structured-merge-diff/v4 v4.2.0 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
+## explicit
+sigs.k8s.io/structured-merge-diff/v4/schema
+# sigs.k8s.io/yaml v1.2.0
+sigs.k8s.io/yaml
+# github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
+# k8s.io/code-generator => ../code-generator
+# sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2

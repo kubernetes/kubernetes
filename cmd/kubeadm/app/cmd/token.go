@@ -25,21 +25,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
-	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -51,9 +39,20 @@ import (
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
+	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // newCmdToken returns cobra.Command for token management
@@ -300,7 +299,7 @@ func RunGenerateToken(out io.Writer) error {
 	return nil
 }
 
-func formatBootstrapToken(obj *outputapiv1alpha1.BootstrapToken) string {
+func formatBootstrapToken(obj *outputapiv1alpha2.BootstrapToken) string {
 	ttl := "<forever>"
 	expires := "<never>"
 	if obj.Expires != nil {
@@ -347,7 +346,7 @@ func (ttp *tokenTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) erro
 	}
 
 	// Print token
-	fmt.Fprint(tabw, formatBootstrapToken(obj.(*outputapiv1alpha1.BootstrapToken)))
+	fmt.Fprint(tabw, formatBootstrapToken(obj.(*outputapiv1alpha2.BootstrapToken)))
 
 	return tabw.Flush()
 }
@@ -391,9 +390,9 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 		}
 
 		// Convert token into versioned output structure
-		outputToken := outputapiv1alpha1.BootstrapToken{
-			BootstrapToken: kubeadmapiv1beta2.BootstrapToken{
-				Token:       &kubeadmapiv1beta2.BootstrapTokenString{ID: token.Token.ID, Secret: token.Token.Secret},
+		outputToken := outputapiv1alpha2.BootstrapToken{
+			BootstrapToken: bootstraptokenv1.BootstrapToken{
+				Token:       &bootstraptokenv1.BootstrapTokenString{ID: token.Token.ID, Secret: token.Token.Secret},
 				Description: token.Description,
 				TTL:         token.TTL,
 				Expires:     token.Expires,

@@ -50,3 +50,20 @@ E0605 22:04:02.019698 3229645 logger.go:61] Log using Errorf, err: fail
 E0605 22:04:02.019709 3229645 logger.go:62] "Log using ErrorS" err="fail"
 I0605 22:04:02.019714 3229645 logger.go:64] Log message has been redacted. Log argument #0 contains: [secret-key]
 ```
+
+## Verbosity
+
+```console
+go run ./staging/src/k8s.io/component-base/logs/example/cmd/logger.go -v1
+```
+
+```
+I0914 10:31:12.342958   54086 logger.go:61] Log using Infof, key: value
+I0914 10:31:12.343021   54086 logger.go:62] "Log using InfoS" key="value"
+E0914 10:31:12.343053   54086 logger.go:64] Log using Errorf, err: fail
+E0914 10:31:12.343064   54086 logger.go:65] "Log using ErrorS" err="fail"
+I0914 10:31:12.343073   54086 logger.go:67] Log with sensitive key, data: {"secret"}
+I0914 10:31:12.343090   54086 logger.go:68] Log less important message
+```
+
+The last line is not printed at the default log level.

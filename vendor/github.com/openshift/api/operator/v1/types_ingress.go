@@ -235,7 +235,56 @@ type IngressControllerSpec struct {
 	// +nullable
 	// +kubebuilder:pruning:PreserveUnknownFields
 	UnsupportedConfigOverrides runtime.RawExtension `json:"unsupportedConfigOverrides"`
+
+	// httpCompression defines a policy for HTTP traffic compression.
+	// By default, there is no HTTP compression.
+	//
+	// +optional
+	HTTPCompression HTTPCompressionPolicy `json:"httpCompression,omitempty"`
 }
+
+// httpCompressionPolicy turns on compression for the specified MIME types.
+//
+// This field is optional, and its absence implies that compression should not be enabled
+// globally in HAProxy.
+//
+// If httpCompressionPolicy exists, compression should be enabled only for the specified
+// MIME types.
+type HTTPCompressionPolicy struct {
+	// mimeTypes is a list of MIME types that should have compression applied.
+	// This list can be empty, in which case the ingress controller does not apply compression.
+	//
+	// Note: Not all MIME types benefit from compression, but HAProxy will still use resources
+	// to try to compress if instructed to.  Generally speaking, text (html, css, js, etc.)
+	// formats benefit from compression, but formats that are already compressed (image,
+	// audio, video, etc.) benefit little in exchange for the time and cpu spent on compressing
+	// again. See https://joehonton.medium.com/the-gzip-penalty-d31bd697f1a2
+	//
+	// +listType=set
+	MimeTypes []CompressionMIMEType `json:"mimeTypes,omitempty"`
+}
+
+// CompressionMIMEType defines the format of a single MIME type.
+// E.g. "text/css; charset=utf-8", "text/html", "text/*", "image/svg+xml",
+// "application/octet-stream", "X-custom/customsub", etc.
+//
+// The format should follow the Content-Type definition in RFC 1341:
+// Content-Type := type "/" subtype *[";" parameter]
+// - The type in Content-Type can be one of:
+//   application, audio, image, message, multipart, text, video, or a custom
+//   type preceded by "X-" and followed by a token as defined below.
+// - The token is a string of at least one character, and not containing white
+//   space, control characters, or any of the characters in the tspecials set.
+// - The tspecials set contains the characters ()<>@,;:\"/[]?.=
+// - The subtype in Content-Type is also a token.
+// - The optional parameter/s following the subtype are defined as:
+//   token "=" (token / quoted-string)
+// - The quoted-string, as defined in RFC 822, is surrounded by double quotes
+//   and can contain white space plus any character EXCEPT \, ", and CR.
+//   It can also contain any single ASCII character as long as it is escaped by \.
+//
+// +kubebuilder:validation:Pattern=`^(?i)(x-[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+|application|audio|image|message|multipart|text|video)/[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+(; *[^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+=([^][ ()\\<>@,;:"/?.=\x00-\x1F\x7F]+|"(\\[\x00-\x7F]|[^\x0D"\\])*"))*$`
+type CompressionMIMEType string
 
 // NodePlacement describes node scheduling configuration for an ingress
 // controller.
@@ -773,6 +822,17 @@ type SyslogLoggingDestinationParameters struct {
 	// +kubebuilder:validation:Enum=kern;user;mail;daemon;auth;syslog;lpr;news;uucp;cron;auth2;ftp;ntp;audit;alert;cron2;local0;local1;local2;local3;local4;local5;local6;local7
 	// +optional
 	Facility string `json:"facility,omitempty"`
+
+	// maxLength is the maximum length of the syslog message
+	//
+	// If this field is empty, the maxLength is set to "1024".
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Maximum=4096
+	// +kubebuilder:validation:Minimum=480
+	// +kubebuilder:default=1024
+	// +optional
+	MaxLength uint32 `json:"maxLength,omitempty"`
 }
 
 // ContainerLoggingDestinationParameters describes parameters for the Container

@@ -51,7 +51,8 @@ import (
 func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testing.EtcdTestServer) {
 	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	etcdStorage.Codec = unstructured.UnstructuredJSONScheme
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
+	groupResource := schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage.ForResource(groupResource), Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
 
 	parameterScheme := runtime.NewScheme()
 	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: "mygroup.example.com", Version: "v1beta1"},
@@ -91,7 +92,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 	table, _ := tableconvertor.New(headers, schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"})
 
 	storage := customresource.NewStorage(
-		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
+		groupResource,
 		kind,
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
 		customresource.NewStrategy(

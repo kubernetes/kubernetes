@@ -21,9 +21,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/pkg/errors"
+
+	"sigs.k8s.io/yaml"
 )
 
 func TestNewCmdVersion(t *testing.T) {

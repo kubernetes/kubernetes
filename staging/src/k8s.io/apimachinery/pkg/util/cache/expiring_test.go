@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestExpiringCache(t *testing.T) {
@@ -58,7 +58,7 @@ func TestExpiringCache(t *testing.T) {
 }
 
 func TestExpiration(t *testing.T) {
-	fc := &utilclock.FakeClock{}
+	fc := &testingclock.FakeClock{}
 	c := NewExpiringWithClock(fc)
 
 	c.Set("a", "a", time.Second)
@@ -104,7 +104,7 @@ func TestExpiration(t *testing.T) {
 }
 
 func TestGarbageCollection(t *testing.T) {
-	fc := &utilclock.FakeClock{}
+	fc := &testingclock.FakeClock{}
 
 	type entry struct {
 		key, val string

@@ -35,115 +35,100 @@ import (
 func TestResourceTypeAndNameCompletionFuncOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
 	addPodsToFactory(tf)
+
 	compFunc := ResourceTypeAndNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod"}, "b")
 	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
-func TestResourceTypeAndNameCompletionFuncTooManyArgs(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
+func TestResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := ResourceTypeAndNameCompletionFunc(tf)
-	comps, directive := compFunc(cmd, []string{"pod", "pod-name"}, "")
-	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+	comps, directive := compFunc(cmd, []string{"pod", "bar"}, "")
+	// The other pods should be completed, but not the already specified ones
+	checkCompletion(t, comps, []string{"foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func TestSpecifiedResourceTypeAndNameCompletionFuncNoArgs(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod", "service", "statefulset"})
 	comps, directive := compFunc(cmd, []string{}, "s")
 	checkCompletion(t, comps, []string{"service", "statefulset"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func TestSpecifiedResourceTypeAndNameCompletionFuncOneArg(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	pods, _, _ := cmdtesting.TestData()
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
-	}
-
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod"}, "b")
 	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
-func TestSpecifiedResourceTypeAndNameCompletionFuncTooManyArgs(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
+func TestSpecifiedResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
-	comps, directive := compFunc(cmd, []string{"pod", "pod-name"}, "")
+	comps, directive := compFunc(cmd, []string{"pod", "bar"}, "")
+	// The other pods should be completed, but not the already specified ones
+	checkCompletion(t, comps, []string{"foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncOneArg(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
+	comps, directive := compFunc(cmd, []string{"pod"}, "b")
+	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncMultiArg(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
+	comps, directive := compFunc(cmd, []string{"pod", "bar"}, "")
+	// There should not be any more pods shown as this function should not repeat the completion
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func TestResourceNameCompletionFuncNoArgs(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	pods, _, _ := cmdtesting.TestData()
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
-	}
-
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := ResourceNameCompletionFunc(tf, "pod")
 	comps, directive := compFunc(cmd, []string{}, "b")
 	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func TestResourceNameCompletionFuncTooManyArgs(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := ResourceNameCompletionFunc(tf, "pod")
 	comps, directive := compFunc(cmd, []string{"pod-name"}, "")
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func TestPodResourceNameAndContainerCompletionFuncNoArgs(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	pods, _, _ := cmdtesting.TestData()
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
-	}
-
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "b")
 	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func TestPodResourceNameAndContainerCompletionFuncTooManyArgs(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
 
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := get.NewCmdGet("kubectl", tf, streams)
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod-name", "container-name"}, "")
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)

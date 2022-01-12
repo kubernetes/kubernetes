@@ -248,7 +248,7 @@ func (o TaintOptions) Validate() error {
 				continue
 			}
 			if len(taintRemove.Effect) == 0 || taintAdd.Effect == taintRemove.Effect {
-				conflictTaint := fmt.Sprintf("{\"%s\":\"%s\"}", taintRemove.Key, taintRemove.Effect)
+				conflictTaint := fmt.Sprintf("%s=%s", taintRemove.Key, taintRemove.Effect)
 				conflictTaints = append(conflictTaints, conflictTaint)
 			}
 		}

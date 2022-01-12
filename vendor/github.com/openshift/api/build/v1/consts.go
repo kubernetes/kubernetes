@@ -52,7 +52,7 @@ const (
 	// truncated to maximum label length.
 	BuildLabel = "openshift.io/build.name"
 
-	// BuildRunPolicyLabel represents the start policy used to to start the build.
+	// BuildRunPolicyLabel represents the start policy used to start the build.
 	BuildRunPolicyLabel = "openshift.io/build.start-policy"
 
 	// BuildConfigLabelDeprecated was used as BuildConfigLabel before adding namespaces.

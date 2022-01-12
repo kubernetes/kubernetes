@@ -25,7 +25,7 @@ import (
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 )
 

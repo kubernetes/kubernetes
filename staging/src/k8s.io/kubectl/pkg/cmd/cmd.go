@@ -17,9 +17,7 @@ limitations under the License.
 package cmd
 
 import (
-	"flag"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -83,28 +81,57 @@ import (
 
 const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
+type KubectlOptions struct {
+	PluginHandler PluginHandler
+	Arguments     []string
+	ConfigFlags   *genericclioptions.ConfigFlags
+
+	genericclioptions.IOStreams
+}
+
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
-	return NewDefaultKubectlCommandWithArgs(NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes), os.Args, os.Stdin, os.Stdout, os.Stderr)
+	return NewDefaultKubectlCommandWithArgs(KubectlOptions{
+		PluginHandler: NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes),
+		Arguments:     os.Args,
+		ConfigFlags:   genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag(),
+		IOStreams:     genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+	})
 }
 
 // NewDefaultKubectlCommandWithArgs creates the `kubectl` command with arguments
-func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string, in io.Reader, out, errout io.Writer) *cobra.Command {
-	cmd := NewKubectlCommand(in, out, errout)
+func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
+	cmd := NewKubectlCommand(o)
 
-	if pluginHandler == nil {
+	if o.PluginHandler == nil {
 		return cmd
 	}
 
-	if len(args) > 1 {
-		cmdPathPieces := args[1:]
+	if len(o.Arguments) > 1 {
+		cmdPathPieces := o.Arguments[1:]
 
 		// only look for suitable extension executables if
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
-			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
-				fmt.Fprintf(errout, "Error: %v\n", err)
-				os.Exit(1)
+			// Also check the commands that will be added by Cobra.
+			// These commands are only added once rootCmd.Execute() is called, so we
+			// need to check them explicitly here.
+			var cmdName string // first "non-flag" arguments
+			for _, arg := range cmdPathPieces {
+				if !strings.HasPrefix(arg, "-") {
+					cmdName = arg
+					break
+				}
+			}
+
+			switch cmdName {
+			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+				// Don't search for a plugin
+			default:
+				if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces); err != nil {
+					fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+					os.Exit(1)
+				}
 			}
 		}
 	}
@@ -218,8 +245,8 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
-	warningHandler := rest.NewWarningWriter(err, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(err)})
+func NewKubectlCommand(o KubectlOptions) *cobra.Command {
+	warningHandler := rest.NewWarningWriter(o.IOStreams.ErrOut, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(o.IOStreams.ErrOut)})
 	warningsAsErrors := false
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
@@ -255,26 +282,25 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+	// From this point and forward we get warnings on flags that contain "_" separators
+	// when adding them with hyphen instead of the original name.
+	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
 	flags := cmds.PersistentFlags()
-	flags.SetNormalizeFunc(cliflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
-
-	// Normalize all flags that are coming from other packages or pre-configurations
-	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
-	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
+	kubeConfigFlags := o.ConfigFlags
+	if kubeConfigFlags == nil {
+		kubeConfigFlags = genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag().WithDiscoveryBurst(300).WithDiscoveryQPS(50.0)
+	}
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
-	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	matchVersionKubeConfigFlags.AddFlags(flags)
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
 	addCmdHeaderHooks(cmds, kubeConfigFlags)
-
-	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
@@ -285,14 +311,9 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// the language, instead of just loading from the LANG env. variable.
 	i18n.LoadTranslations("kubectl", nil)
 
-	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
-
-	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
-
 	// Proxy command is incompatible with CommandHeaderRoundTripper, so
 	// clear the WrapConfigFn before running proxy command.
-	proxyCmd := proxy.NewCmdProxy(f, ioStreams)
+	proxyCmd := proxy.NewCmdProxy(f, o.IOStreams)
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		kubeConfigFlags.WrapConfigFn = nil
 	}
@@ -300,72 +321,72 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		{
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
-				create.NewCmdCreate(f, ioStreams),
-				expose.NewCmdExposeService(f, ioStreams),
-				run.NewCmdRun(f, ioStreams),
-				set.NewCmdSet(f, ioStreams),
+				create.NewCmdCreate(f, o.IOStreams),
+				expose.NewCmdExposeService(f, o.IOStreams),
+				run.NewCmdRun(f, o.IOStreams),
+				set.NewCmdSet(f, o.IOStreams),
 			},
 		},
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				explain.NewCmdExplain("kubectl", f, ioStreams),
-				get.NewCmdGet("kubectl", f, ioStreams),
-				edit.NewCmdEdit(f, ioStreams),
-				delete.NewCmdDelete(f, ioStreams),
+				explain.NewCmdExplain("kubectl", f, o.IOStreams),
+				get.NewCmdGet("kubectl", f, o.IOStreams),
+				edit.NewCmdEdit(f, o.IOStreams),
+				delete.NewCmdDelete(f, o.IOStreams),
 			},
 		},
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, ioStreams),
-				scale.NewCmdScale(f, ioStreams),
-				autoscale.NewCmdAutoscale(f, ioStreams),
+				rollout.NewCmdRollout(f, o.IOStreams),
+				scale.NewCmdScale(f, o.IOStreams),
+				autoscale.NewCmdAutoscale(f, o.IOStreams),
 			},
 		},
 		{
 			Message: "Cluster Management Commands:",
 			Commands: []*cobra.Command{
-				certificates.NewCmdCertificate(f, ioStreams),
-				clusterinfo.NewCmdClusterInfo(f, ioStreams),
-				top.NewCmdTop(f, ioStreams),
-				drain.NewCmdCordon(f, ioStreams),
-				drain.NewCmdUncordon(f, ioStreams),
-				drain.NewCmdDrain(f, ioStreams),
-				taint.NewCmdTaint(f, ioStreams),
+				certificates.NewCmdCertificate(f, o.IOStreams),
+				clusterinfo.NewCmdClusterInfo(f, o.IOStreams),
+				top.NewCmdTop(f, o.IOStreams),
+				drain.NewCmdCordon(f, o.IOStreams),
+				drain.NewCmdUncordon(f, o.IOStreams),
+				drain.NewCmdDrain(f, o.IOStreams),
+				taint.NewCmdTaint(f, o.IOStreams),
 			},
 		},
 		{
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
-				describe.NewCmdDescribe("kubectl", f, ioStreams),
-				logs.NewCmdLogs(f, ioStreams),
-				attach.NewCmdAttach(f, ioStreams),
-				cmdexec.NewCmdExec(f, ioStreams),
-				portforward.NewCmdPortForward(f, ioStreams),
+				describe.NewCmdDescribe("kubectl", f, o.IOStreams),
+				logs.NewCmdLogs(f, o.IOStreams),
+				attach.NewCmdAttach(f, o.IOStreams),
+				cmdexec.NewCmdExec(f, o.IOStreams),
+				portforward.NewCmdPortForward(f, o.IOStreams),
 				proxyCmd,
-				cp.NewCmdCp(f, ioStreams),
-				auth.NewCmdAuth(f, ioStreams),
-				debug.NewCmdDebug(f, ioStreams),
+				cp.NewCmdCp(f, o.IOStreams),
+				auth.NewCmdAuth(f, o.IOStreams),
+				debug.NewCmdDebug(f, o.IOStreams),
 			},
 		},
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
-				diff.NewCmdDiff(f, ioStreams),
-				apply.NewCmdApply("kubectl", f, ioStreams),
-				patch.NewCmdPatch(f, ioStreams),
-				replace.NewCmdReplace(f, ioStreams),
-				wait.NewCmdWait(f, ioStreams),
-				kustomize.NewCmdKustomize(ioStreams),
+				diff.NewCmdDiff(f, o.IOStreams),
+				apply.NewCmdApply("kubectl", f, o.IOStreams),
+				patch.NewCmdPatch(f, o.IOStreams),
+				replace.NewCmdReplace(f, o.IOStreams),
+				wait.NewCmdWait(f, o.IOStreams),
+				kustomize.NewCmdKustomize(o.IOStreams),
 			},
 		},
 		{
 			Message: "Settings Commands:",
 			Commands: []*cobra.Command{
-				label.NewCmdLabel(f, ioStreams),
-				annotate.NewCmdAnnotate("kubectl", f, ioStreams),
-				completion.NewCmdCompletion(ioStreams.Out, ""),
+				label.NewCmdLabel(f, o.IOStreams),
+				annotate.NewCmdAnnotate("kubectl", f, o.IOStreams),
+				completion.NewCmdCompletion(o.IOStreams.Out, ""),
 			},
 		},
 	}
@@ -374,7 +395,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := NewCmdAlpha(ioStreams)
+	alpha := NewCmdAlpha(f, o.IOStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
@@ -385,13 +406,16 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	registerCompletionFuncForGlobalFlags(cmds, f)
 
 	cmds.AddCommand(alpha)
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), ioStreams))
-	cmds.AddCommand(plugin.NewCmdPlugin(ioStreams))
-	cmds.AddCommand(version.NewCmdVersion(f, ioStreams))
-	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, ioStreams))
-	cmds.AddCommand(apiresources.NewCmdAPIResources(f, ioStreams))
-	cmds.AddCommand(options.NewCmdOptions(ioStreams.Out))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), o.IOStreams))
+	cmds.AddCommand(plugin.NewCmdPlugin(o.IOStreams))
+	cmds.AddCommand(version.NewCmdVersion(f, o.IOStreams))
+	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, o.IOStreams))
+	cmds.AddCommand(apiresources.NewCmdAPIResources(f, o.IOStreams))
+	cmds.AddCommand(options.NewCmdOptions(o.IOStreams.Out))
 
+	// Stop warning about normalization of flags. That makes it possible to
+	// add the klog flags later.
+	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 	return cmds
 }
 
@@ -422,11 +446,19 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 		crt.ParseCommandHeaders(cmd, args)
 		return existingPreRunE(cmd, args)
 	}
+	wrapConfigFn := kubeConfigFlags.WrapConfigFn
 	// Wraps CommandHeaderRoundTripper around standard RoundTripper.
 	kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+		if wrapConfigFn != nil {
+			c = wrapConfigFn(c)
+		}
 		c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			crt.Delegate = rt
-			return crt
+			// Must be separate RoundTripper; not "crt" closure.
+			// Fixes: https://github.com/kubernetes/kubectl/issues/1098
+			return &genericclioptions.CommandHeaderRoundTripper{
+				Delegate: rt,
+				Headers:  crt.Headers,
+			}
 		})
 		return c
 	}

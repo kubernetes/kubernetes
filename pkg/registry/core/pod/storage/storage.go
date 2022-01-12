@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -180,20 +181,32 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 		}
 	}
 
-	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
+	err = r.assignPod(ctx, binding.UID, binding.ResourceVersion, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
 	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return
 }
 
-// setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if it was
-// previously 'oldMachine' and merges the provided annotations with those of the pod.
+// setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if
+// the pod is unassigned and merges the provided annotations with those of the pod.
 // Returns the current state of the pod, or an error.
-func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMachine, machine string, annotations map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
+func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podUID types.UID, podResourceVersion, podID, machine string, annotations map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
 	podKey, err := r.store.KeyFunc(ctx, podID)
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Storage.GuaranteedUpdate(ctx, podKey, &api.Pod{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+
+	var preconditions *storage.Preconditions
+	if podUID != "" || podResourceVersion != "" {
+		preconditions = &storage.Preconditions{}
+		if podUID != "" {
+			preconditions.UID = &podUID
+		}
+		if podResourceVersion != "" {
+			preconditions.ResourceVersion = &podResourceVersion
+		}
+	}
+
+	err = r.store.Storage.GuaranteedUpdate(ctx, podKey, &api.Pod{}, false, preconditions, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
@@ -201,7 +214,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 		if pod.DeletionTimestamp != nil {
 			return nil, fmt.Errorf("pod %s is being deleted, cannot be assigned to a host", pod.Name)
 		}
-		if pod.Spec.NodeName != oldMachine {
+		if pod.Spec.NodeName != "" {
 			return nil, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
 		}
 		pod.Spec.NodeName = machine
@@ -222,8 +235,8 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 }
 
 // assignPod assigns the given pod to the given machine.
-func (r *BindingREST) assignPod(ctx context.Context, podID string, machine string, annotations map[string]string, dryRun bool) (err error) {
-	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations, dryRun); err != nil {
+func (r *BindingREST) assignPod(ctx context.Context, podUID types.UID, podResourceVersion, podID string, machine string, annotations map[string]string, dryRun bool) (err error) {
+	if _, err = r.setPodHostAndAnnotations(ctx, podUID, podResourceVersion, podID, machine, annotations, dryRun); err != nil {
 		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
 		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {

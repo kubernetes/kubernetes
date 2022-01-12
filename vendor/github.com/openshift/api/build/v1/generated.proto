@@ -939,7 +939,7 @@ message GitSourceRevision {
 // ImageChangeCause contains information about the image that triggered a
 // build
 message ImageChangeCause {
-  // imageID is the ID of the image that triggered a a new build.
+  // imageID is the ID of the image that triggered a new build.
   optional string imageID = 1;
 
   // fromRef contains detailed information about an image that triggered a

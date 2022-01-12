@@ -19,14 +19,14 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/onsi/ginkgo"
-	"github.com/pkg/errors"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"sigs.k8s.io/yaml"
-	"time"
 )
 
 const (
@@ -68,7 +68,7 @@ func UpdatePolicy(k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespac
 // waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
 func waitForHTTPServers(k *kubeManager, model *Model) error {
 	const maxTries = 10
-	framework.Logf("waiting for HTTP servers (ports 80 and 81) to become ready")
+	framework.Logf("waiting for HTTP servers (ports 80 and/or 81) to become ready")
 
 	testCases := map[string]*TestCase{}
 	for _, port := range model.Ports {
@@ -104,7 +104,7 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 		}
 		time.Sleep(waitInterval)
 	}
-	return errors.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
+	return fmt.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
 }
 
 // ValidateOrFail validates connectivity

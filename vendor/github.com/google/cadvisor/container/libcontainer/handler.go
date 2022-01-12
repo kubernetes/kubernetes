@@ -396,7 +396,7 @@ func getReferencedKBytes(pids []int) (uint64, error) {
 		if err != nil {
 			klog.V(5).Infof("Cannot read %s file, err: %s", smapsFilePath, err)
 			if os.IsNotExist(err) {
-				continue //smaps file does not exists for all PIDs
+				continue // smaps file does not exists for all PIDs
 			}
 			return 0, err
 		}
@@ -439,7 +439,7 @@ func clearReferencedBytes(pids []int, cycles uint64, resetInterval uint64) error
 	if cycles%resetInterval == 0 {
 		for _, pid := range pids {
 			clearRefsFilePath := fmt.Sprintf(clearRefsFilePathPattern, pid)
-			clerRefsFile, err := os.OpenFile(clearRefsFilePath, os.O_WRONLY, 0644)
+			clerRefsFile, err := os.OpenFile(clearRefsFilePath, os.O_WRONLY, 0o644)
 			if err != nil {
 				// clear_refs file may not exist for all PIDs
 				continue
@@ -468,9 +468,7 @@ func networkStatsFromProc(rootFs string, pid int) ([]info.InterfaceStats, error)
 	return ifaceStats, nil
 }
 
-var (
-	ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
-)
+var ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
 
 func isIgnoredDevice(ifName string) bool {
 	for _, prefix := range ignoredDevicePrefixes {
@@ -628,11 +626,9 @@ func scanAdvancedTCPStats(advancedStats *info.TcpAdvancedStat, advancedTCPStatsF
 	}
 
 	return scanner.Err()
-
 }
 
 func scanTCPStats(tcpStatsFile string) (info.TcpStat, error) {
-
 	var stats info.TcpStat
 
 	data, err := ioutil.ReadFile(tcpStatsFile)
@@ -641,17 +637,17 @@ func scanTCPStats(tcpStatsFile string) (info.TcpStat, error) {
 	}
 
 	tcpStateMap := map[string]uint64{
-		"01": 0, //ESTABLISHED
-		"02": 0, //SYN_SENT
-		"03": 0, //SYN_RECV
-		"04": 0, //FIN_WAIT1
-		"05": 0, //FIN_WAIT2
-		"06": 0, //TIME_WAIT
-		"07": 0, //CLOSE
-		"08": 0, //CLOSE_WAIT
-		"09": 0, //LAST_ACK
-		"0A": 0, //LISTEN
-		"0B": 0, //CLOSING
+		"01": 0, // ESTABLISHED
+		"02": 0, // SYN_SENT
+		"03": 0, // SYN_RECV
+		"04": 0, // FIN_WAIT1
+		"05": 0, // FIN_WAIT2
+		"06": 0, // TIME_WAIT
+		"07": 0, // CLOSE
+		"08": 0, // CLOSE_WAIT
+		"09": 0, // LAST_ACK
+		"0A": 0, // LISTEN
+		"0B": 0, // CLOSING
 	}
 
 	reader := strings.NewReader(string(data))
@@ -792,14 +788,14 @@ func setCPUStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 }
 
 func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
-	ret.DiskIo.IoServiceBytes = DiskStatsCopy(s.BlkioStats.IoServiceBytesRecursive)
-	ret.DiskIo.IoServiced = DiskStatsCopy(s.BlkioStats.IoServicedRecursive)
-	ret.DiskIo.IoQueued = DiskStatsCopy(s.BlkioStats.IoQueuedRecursive)
-	ret.DiskIo.Sectors = DiskStatsCopy(s.BlkioStats.SectorsRecursive)
-	ret.DiskIo.IoServiceTime = DiskStatsCopy(s.BlkioStats.IoServiceTimeRecursive)
-	ret.DiskIo.IoWaitTime = DiskStatsCopy(s.BlkioStats.IoWaitTimeRecursive)
-	ret.DiskIo.IoMerged = DiskStatsCopy(s.BlkioStats.IoMergedRecursive)
-	ret.DiskIo.IoTime = DiskStatsCopy(s.BlkioStats.IoTimeRecursive)
+	ret.DiskIo.IoServiceBytes = diskStatsCopy(s.BlkioStats.IoServiceBytesRecursive)
+	ret.DiskIo.IoServiced = diskStatsCopy(s.BlkioStats.IoServicedRecursive)
+	ret.DiskIo.IoQueued = diskStatsCopy(s.BlkioStats.IoQueuedRecursive)
+	ret.DiskIo.Sectors = diskStatsCopy(s.BlkioStats.SectorsRecursive)
+	ret.DiskIo.IoServiceTime = diskStatsCopy(s.BlkioStats.IoServiceTimeRecursive)
+	ret.DiskIo.IoWaitTime = diskStatsCopy(s.BlkioStats.IoWaitTimeRecursive)
+	ret.DiskIo.IoMerged = diskStatsCopy(s.BlkioStats.IoMergedRecursive)
+	ret.DiskIo.IoTime = diskStatsCopy(s.BlkioStats.IoTimeRecursive)
 }
 
 func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
@@ -810,7 +806,7 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	if cgroups.IsCgroup2UnifiedMode() {
 		ret.Memory.Cache = s.MemoryStats.Stats["file"]
 		ret.Memory.RSS = s.MemoryStats.Stats["anon"]
-		ret.Memory.Swap = s.MemoryStats.SwapUsage.Usage
+		ret.Memory.Swap = s.MemoryStats.SwapUsage.Usage - s.MemoryStats.Usage.Usage
 		ret.Memory.MappedFile = s.MemoryStats.Stats["file_mapped"]
 	} else if s.MemoryStats.UseHierarchy {
 		ret.Memory.Cache = s.MemoryStats.Stats["total_cache"]
@@ -909,7 +905,6 @@ func setThreadsStats(s *cgroups.Stats, ret *info.ContainerStats) {
 		ret.Processes.ThreadsCurrent = s.PidsStats.Current
 		ret.Processes.ThreadsMax = s.PidsStats.Limit
 	}
-
 }
 
 func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics container.MetricSet) *info.ContainerStats {

@@ -12,6 +12,9 @@ var (
 			`\[Feature:StorageVersionAPI\]`,
 			`\[Feature:StatefulSetMinReadySeconds\]`,
 			`\[Feature:PodSecurityPolicy\]`,
+			`\[Feature:StatefulSetAutoDeletePVC\]`,
+			`\[Feature:CustomResourceValidationExpressions\]`,
+			`\[Feature:GRPCContainerProbe\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -88,10 +91,8 @@ var (
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
 			`should drop INVALID conntrack entries`,
 
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1993845
-			`Services should respect internalTrafficPolicy=Local Pod to Pod \(hostNetwork: true\)`,
-			`Services should respect internalTrafficPolicy=Local Pod \(hostNetwork: true\) to Pod \(hostNetwork: true\)`,
-			`Services should respect internalTrafficPolicy=Local Pod \(hostNetwork: true\) to Pod`,
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1986306
+			`\[sig-cli\] Kubectl client kubectl wait should ignore not found error with --for=delete`,
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1980141
 			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
@@ -107,8 +108,11 @@ var (
 			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should support a 'default-deny-ingress' policy`,
 			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy based on Ports`,
 			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
-			// Bug https://bugzilla.redhat.com/show_bug.cgi?id=1989180
-			`\[sig-storage\] Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs`,
+
+			`Topology Hints should distribute endpoints evenly`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=2034958
+			`\[sig-network\] Conntrack should be able to preserve UDP traffic when initial unready endpoints get ready`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
@@ -52,12 +51,14 @@ import (
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	openapibuilder "k8s.io/kube-openapi/pkg/builder"
+	openapibuilder2 "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
+	"k8s.io/kube-openapi/pkg/handler3"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/utils/clock"
 )
 
 // Info about an API group.
@@ -146,6 +147,10 @@ type GenericAPIServer struct {
 	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
 	OpenAPIVersionedService *handler.OpenAPIService
 
+	// OpenAPIV3VersionedService controls the /openapi/v3 endpoint and can be used to update the served spec.
+	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
+	OpenAPIV3VersionedService *handler3.OpenAPIService
+
 	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
 	// It is set during PrepareRun.
 	StaticOpenAPISpec *spec.Swagger
@@ -216,6 +221,12 @@ type GenericAPIServer struct {
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals
 
+	// muxAndDiscoveryCompleteSignals holds signals that indicate all known HTTP paths have been registered.
+	// it exists primarily to avoid returning a 404 response when a resource actually exists but we haven't installed the path to a handler.
+	// it is exposed for easier composition of the individual servers.
+	// the primary users of this field are the WithMuxCompleteProtection filter and the NotFoundHandler
+	muxAndDiscoveryCompleteSignals map[string]<-chan struct{}
+
 	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
 	// Server during the graceful termination of the apiserver. If true, we wait
 	// for non longrunning requests in flight to be drained and then initiate a
@@ -253,6 +264,9 @@ type DelegationTarget interface {
 
 	// PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
 	PrepareRun() preparedGenericAPIServer
+
+	// MuxAndDiscoveryCompleteSignals exposes registered signals that indicate if all known HTTP paths have been installed.
+	MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{}
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -276,15 +290,37 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 	return s.delegationTarget
 }
 
+// RegisterMuxAndDiscoveryCompleteSignal registers the given signal that will be used to determine if all known
+// HTTP paths have been registered. It is okay to call this method after instantiating the generic server but before running.
+func (s *GenericAPIServer) RegisterMuxAndDiscoveryCompleteSignal(signalName string, signal <-chan struct{}) error {
+	if _, exists := s.muxAndDiscoveryCompleteSignals[signalName]; exists {
+		return fmt.Errorf("%s already registered", signalName)
+	}
+	s.muxAndDiscoveryCompleteSignals[signalName] = signal
+	return nil
+}
+
+func (s *GenericAPIServer) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
+	return s.muxAndDiscoveryCompleteSignals
+}
+
 type emptyDelegate struct {
+	// handler is called at the end of the delegation chain
+	// when a request has been made against an unregistered HTTP path the individual servers will simply pass it through until it reaches the handler.
+	handler http.Handler
 }
 
 func NewEmptyDelegate() DelegationTarget {
 	return emptyDelegate{}
 }
 
+// NewEmptyDelegateWithCustomHandler allows for registering a custom handler usually for special handling of 404 requests
+func NewEmptyDelegateWithCustomHandler(handler http.Handler) DelegationTarget {
+	return emptyDelegate{handler}
+}
+
 func (s emptyDelegate) UnprotectedHandler() http.Handler {
-	return nil
+	return s.handler
 }
 func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 	return map[string]postStartHookEntry{}
@@ -304,6 +340,9 @@ func (s emptyDelegate) NextDelegate() DelegationTarget {
 func (s emptyDelegate) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{nil}
 }
+func (s emptyDelegate) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
+	return map[string]<-chan struct{}{}
+}
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
 type preparedGenericAPIServer struct {
@@ -317,7 +356,12 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
-		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+			s.OpenAPIV3VersionedService = routes.OpenAPI{
+				Config: s.openAPIConfig,
+			}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		}
 	}
 
 	s.installHealthz()
@@ -350,6 +394,23 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
+
+	// spawn a new goroutine for closing the MuxAndDiscoveryComplete signal
+	// registration happens during construction of the generic api server
+	// the last server in the chain aggregates signals from the previous instances
+	go func() {
+		for _, muxAndDiscoveryCompletedSignal := range s.GenericAPIServer.MuxAndDiscoveryCompleteSignals() {
+			select {
+			case <-muxAndDiscoveryCompletedSignal:
+				continue
+			case <-stopCh:
+				klog.V(1).Infof("haven't completed %s, stop requested", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+				return
+			}
+		}
+		s.lifecycleSignals.MuxAndDiscoveryComplete.Signal()
+		klog.V(1).Infof("%s has all endpoints registered and discovery information is complete", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+	}()
 
 	go func() {
 		defer delayedStopCh.Signal()
@@ -690,7 +751,7 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	}
 
 	// Build the openapi definitions for those resources and convert it to proto models
-	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
+	openAPISpec, err := openapibuilder2.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
 	if err != nil {
 		return nil, err
 	}

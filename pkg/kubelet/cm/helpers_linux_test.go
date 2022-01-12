@@ -249,6 +249,31 @@ func TestResourceConfigForPod(t *testing.T) {
 			quotaPeriod:      tunedQuotaPeriod,
 			expected:         &ResourceConfig{CpuShares: &guaranteedShares, CpuQuota: &cpuNoLimit, CpuPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory},
 		},
+		"burstable-partial-limits-with-init-containers": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100m"), getResourceList("100m", "100Mi")),
+						},
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100m"), getResourceList("", "")),
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100m"), getResourceList("100m", "100Mi")),
+						},
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100m"), getResourceList("", "")),
+						},
+					},
+				},
+			},
+			enforceCPULimits: true,
+			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CpuShares: &burstablePartialShares},
+		},
 	}
 
 	for testName, testCase := range testCases {
@@ -256,16 +281,16 @@ func TestResourceConfigForPod(t *testing.T) {
 		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false)
 
 		if !reflect.DeepEqual(actual.CpuPeriod, testCase.expected.CpuPeriod) {
-			t.Errorf("unexpected result, test: %v, cpu period not as expected", testName)
+			t.Errorf("unexpected result, test: %v, cpu period not as expected. Expected: %v, Actual:%v", testName, *testCase.expected.CpuPeriod, *actual.CpuPeriod)
 		}
 		if !reflect.DeepEqual(actual.CpuQuota, testCase.expected.CpuQuota) {
-			t.Errorf("unexpected result, test: %v, cpu quota not as expected", testName)
+			t.Errorf("unexpected result, test: %v, cpu quota not as expected. Expected: %v, Actual:%v", testName, *testCase.expected.CpuQuota, *actual.CpuQuota)
 		}
 		if !reflect.DeepEqual(actual.CpuShares, testCase.expected.CpuShares) {
-			t.Errorf("unexpected result, test: %v, cpu shares not as expected", testName)
+			t.Errorf("unexpected result, test: %v, cpu shares not as expected. Expected: %v, Actual:%v", testName, *testCase.expected.CpuShares, &actual.CpuShares)
 		}
 		if !reflect.DeepEqual(actual.Memory, testCase.expected.Memory) {
-			t.Errorf("unexpected result, test: %v, memory not as expected", testName)
+			t.Errorf("unexpected result, test: %v, memory not as expected. Expected: %v, Actual:%v", testName, *testCase.expected.Memory, *actual.Memory)
 		}
 	}
 }

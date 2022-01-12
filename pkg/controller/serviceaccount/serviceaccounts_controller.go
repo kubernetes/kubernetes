@@ -98,7 +98,7 @@ type ServiceAccountsController struct {
 	serviceAccountsToEnsure []v1.ServiceAccount
 
 	// To allow injection for testing.
-	syncHandler func(key string) error
+	syncHandler func(ctx context.Context, key string) error
 
 	saLister       corelisters.ServiceAccountLister
 	saListerSynced cache.InformerSynced
@@ -110,22 +110,22 @@ type ServiceAccountsController struct {
 }
 
 // Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
-func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
+func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting service account controller")
 	defer klog.Infof("Shutting down service account controller")
 
-	if !cache.WaitForNamedCacheSync("service account", stopCh, c.saListerSynced, c.nsListerSynced) {
+	if !cache.WaitForNamedCacheSync("service account", ctx.Done(), c.saListerSynced, c.nsListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // serviceAccountDeleted reacts to a ServiceAccount deletion by recreating a default ServiceAccount in the namespace if needed
@@ -158,20 +158,20 @@ func (c *ServiceAccountsController) namespaceUpdated(oldObj interface{}, newObj 
 	c.queue.Add(newNamespace.Name)
 }
 
-func (c *ServiceAccountsController) runWorker() {
-	for c.processNextWorkItem() {
+func (c *ServiceAccountsController) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *ServiceAccountsController) processNextWorkItem() bool {
+func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncHandler(key.(string))
+	err := c.syncHandler(ctx, key.(string))
 	if err == nil {
 		c.queue.Forget(key)
 		return true
@@ -182,7 +182,7 @@ func (c *ServiceAccountsController) processNextWorkItem() bool {
 
 	return true
 }
-func (c *ServiceAccountsController) syncNamespace(key string) error {
+func (c *ServiceAccountsController) syncNamespace(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
@@ -213,7 +213,7 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		// TODO eliminate this once the fake client can handle creation without NS
 		sa.Namespace = ns.Name
 
-		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(context.TODO(), &sa, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(ctx, &sa, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 			// we can safely ignore terminating namespace errors
 			if !apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 				createFailures = append(createFailures, err)

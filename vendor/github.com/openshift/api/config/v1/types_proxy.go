@@ -35,7 +35,7 @@ type ProxySpec struct {
 	// +optional
 	HTTPSProxy string `json:"httpsProxy,omitempty"`
 
-	// noProxy is a comma-separated list of hostnames and/or CIDRs for which the proxy should not be used.
+	// noProxy is a comma-separated list of hostnames and/or CIDRs and/or IPs for which the proxy should not be used.
 	// Empty means unset and will not result in an env var.
 	// +optional
 	NoProxy string `json:"noProxy,omitempty"`

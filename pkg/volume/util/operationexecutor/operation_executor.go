@@ -141,6 +141,9 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName
 	// and one of podName or nodeName is pending, otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName) bool
+	// IsOperationSafeToRetry returns false if an operation for the given volumeName
+	// and one of podName or nodeName is pending or in exponential backoff, otherwise it returns true
+	IsOperationSafeToRetry(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName, operationName string) bool
 	// ExpandInUseVolume will resize volume's file system to expected size without unmounting the volume.
 	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
@@ -662,6 +665,14 @@ func (oe *operationExecutor) IsOperationPending(
 	podName volumetypes.UniquePodName,
 	nodeName types.NodeName) bool {
 	return oe.pendingOperations.IsOperationPending(volumeName, podName, nodeName)
+}
+
+func (oe *operationExecutor) IsOperationSafeToRetry(
+	volumeName v1.UniqueVolumeName,
+	podName volumetypes.UniquePodName,
+	nodeName types.NodeName,
+	operationName string) bool {
+	return oe.pendingOperations.IsOperationSafeToRetry(volumeName, podName, nodeName, operationName)
 }
 
 func (oe *operationExecutor) AttachVolume(

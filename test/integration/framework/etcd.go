@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -168,6 +169,9 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 
 // EtcdMain starts an etcd instance before running tests.
 func EtcdMain(tests func() int) {
+	// Bail out early when -help was given as parameter.
+	flag.Parse()
+
 	stop, err := startEtcd()
 	if err != nil {
 		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)

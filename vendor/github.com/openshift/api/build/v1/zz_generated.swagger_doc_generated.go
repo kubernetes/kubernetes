@@ -481,7 +481,7 @@ func (GitSourceRevision) SwaggerDoc() map[string]string {
 
 var map_ImageChangeCause = map[string]string{
 	"":        "ImageChangeCause contains information about the image that triggered a build",
-	"imageID": "imageID is the ID of the image that triggered a a new build.",
+	"imageID": "imageID is the ID of the image that triggered a new build.",
 	"fromRef": "fromRef contains detailed information about an image that triggered a build.",
 }
 

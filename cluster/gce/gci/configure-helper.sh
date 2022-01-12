@@ -657,6 +657,16 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
+
+  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    mkdir -p "${pki_dir}/konnectivity-agent"
+    KONNECTIVITY_AGENT_CA_CERT_PATH="${pki_dir}/konnectivity-agent/ca.crt"
+    KONNECTIVITY_AGENT_CLIENT_KEY_PATH="${pki_dir}/konnectivity-agent/client.key"
+    KONNECTIVITY_AGENT_CLIENT_CERT_PATH="${pki_dir}/konnectivity-agent/client.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_CERT}" "${KONNECTIVITY_AGENT_CA_CERT_PATH}"
+    write-pki-data "${KONNECTIVITY_AGENT_CLIENT_KEY}" "${KONNECTIVITY_AGENT_CLIENT_KEY_PATH}"
+    write-pki-data "${KONNECTIVITY_AGENT_CLIENT_CERT}" "${KONNECTIVITY_AGENT_CLIENT_CERT_PATH}"
+  fi
 }
 
 function create-master-pki {
@@ -723,6 +733,39 @@ function create-master-pki {
 
     PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
     write-pki-data "${PROXY_CLIENT_CERT}" "${PROXY_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ -n "${KONNECTIVITY_SERVER_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/konnectivity-server
+    KONNECTIVITY_SERVER_CA_CERT_PATH="${pki_dir}/konnectivity-server/ca.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CA_CERT}" "${KONNECTIVITY_SERVER_CA_CERT_PATH}"
+
+    KONNECTIVITY_SERVER_KEY_PATH="${pki_dir}/konnectivity-server/server.key"
+    write-pki-data "${KONNECTIVITY_SERVER_KEY}" "${KONNECTIVITY_SERVER_KEY_PATH}"
+
+    KONNECTIVITY_SERVER_CERT_PATH="${pki_dir}/konnectivity-server/server.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CERT}" "${KONNECTIVITY_SERVER_CERT_PATH}"
+
+    KONNECTIVITY_SERVER_CLIENT_KEY_PATH="${pki_dir}/konnectivity-server/client.key"
+    write-pki-data "${KONNECTIVITY_SERVER_CLIENT_KEY}" "${KONNECTIVITY_SERVER_CLIENT_KEY_PATH}"
+
+    KONNECTIVITY_SERVER_CLIENT_CERT_PATH="${pki_dir}/konnectivity-server/client.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CLIENT_CERT}" "${KONNECTIVITY_SERVER_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ -n "${KONNECTIVITY_AGENT_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/konnectivity-agent
+    KONNECTIVITY_AGENT_CA_KEY_PATH="${pki_dir}/konnectivity-agent/ca.key"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_KEY}" "${KONNECTIVITY_AGENT_CA_KEY_PATH}"
+
+    KONNECTIVITY_AGENT_CA_CERT_PATH="${pki_dir}/konnectivity-agent/ca.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_CERT}" "${KONNECTIVITY_AGENT_CA_CERT_PATH}"
+
+    KONNECTIVITY_AGENT_KEY_PATH="${pki_dir}/konnectivity-agent/server.key"
+    write-pki-data "${KONNECTIVITY_AGENT_KEY}" "${KONNECTIVITY_AGENT_KEY_PATH}"
+
+    KONNECTIVITY_AGENT_CERT_PATH="${pki_dir}/konnectivity-agent/server.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CERT}" "${KONNECTIVITY_AGENT_CERT_PATH}"
   fi
 }
 
@@ -937,7 +980,7 @@ egressSelections:
     transport:
       uds:
         udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
-- name: master
+- name: controlplane
   connection:
     proxyProtocol: Direct
 - name: etcd
@@ -953,9 +996,13 @@ egressSelections:
   connection:
     proxyProtocol: HTTPConnect
     transport:
-      uds:
-        udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
-- name: master
+      tcp:
+        url: https://127.0.0.1:8131
+        tlsConfig:
+          caBundle: /etc/srv/kubernetes/pki/konnectivity-server/ca.crt
+          clientKey: /etc/srv/kubernetes/pki/konnectivity-server/client.key
+          clientCert: /etc/srv/kubernetes/pki/konnectivity-server/client.crt
+- name: controlplane
   connection:
     proxyProtocol: Direct
 - name: etcd
@@ -1461,7 +1508,6 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
-
 function docker-installed {
     if systemctl cat docker.service &> /dev/null ; then
         return 0
@@ -1759,7 +1805,7 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" "${src_file}"
-  sed -i -e "s@{{ cpurequest }}@100m@g" "${src_file}"
+  sed -i -e "s@{{ cpurequest }}@${KUBE_PROXY_CPU_REQUEST:-100m}@g" "${src_file}"
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" "${src_file}"
   sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" "${src_file}"
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -1786,7 +1832,27 @@ function start-kube-proxy {
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
-  local -r host_ip=$(python3 -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
+
+  local resolve_host_script_py='
+import socket
+import time
+import sys
+
+timeout_sec=300
+
+def resolve(host):
+  for attempt in range(timeout_sec):
+    try:
+      print(socket.gethostbyname(host))
+      break
+    except Exception as e:
+      sys.stderr.write("error: resolving host %s to IP failed: %s\n" % (host, e))
+      time.sleep(1)
+      continue
+
+'
+
+  local -r host_ip=$(python3 -c "${resolve_host_script_py}"$'\n'"resolve(\"${host_name}\")")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -1924,28 +1990,48 @@ function prepare-konnectivity-server-manifest {
   params+=("--log-file=/var/log/konnectivity-server.log")
   params+=("--logtostderr=false")
   params+=("--log-file-max-size=0")
-  params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
+  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
+    params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
+  elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    # HTTP-CONNECT can work with either UDS or mTLS. 
+    # Linking them here to make sure we get good coverage with two test configurations. 
+    params+=("--server-ca-cert=${KONNECTIVITY_SERVER_CA_CERT_PATH}")
+    params+=("--server-cert=${KONNECTIVITY_SERVER_CERT_PATH}")
+    params+=("--server-key=${KONNECTIVITY_SERVER_KEY_PATH}")
+    params+=("--cluster-ca-cert=${KONNECTIVITY_AGENT_CA_CERT_PATH}")
+  fi
   params+=("--cluster-cert=/etc/srv/kubernetes/pki/apiserver.crt")
   params+=("--cluster-key=/etc/srv/kubernetes/pki/apiserver.key")
   if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
     params+=("--mode=grpc")
+    params+=("--server-port=0")
+    params+=("--agent-namespace=kube-system")
+    params+=("--agent-service-account=konnectivity-agent")
+    params+=("--authentication-audience=system:konnectivity-server")
+    params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
+    params+=("--proxy-strategies=default")
   elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    # GRPC can work with either UDS or mTLS. 
     params+=("--mode=http-connect")
+    params+=("--server-port=8131")
+    params+=("--agent-namespace=")
+    params+=("--agent-service-account=")
+    params+=("--authentication-audience=")
+    # Need to fix ANP code to allow kubeconfig to be set with mtls.
+    params+=("--kubeconfig=")
+    params+=("--proxy-strategies=destHost,default")
   else
     echo "KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE must be set to either grpc or http-connect"
     exit 1
   fi
 
-  params+=("--server-port=0")
   params+=("--agent-port=$1")
   params+=("--health-port=$2")
   params+=("--admin-port=$3")
-  params+=("--agent-namespace=kube-system")
-  params+=("--agent-service-account=konnectivity-agent")
-  params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
-  params+=("--authentication-audience=system:konnectivity-server")
   params+=("--kubeconfig-qps=75")
   params+=("--kubeconfig-burst=150")
+  params+=("--keepalive-time=60s")
+  params+=("--frontend-keepalive-time=60s")
   konnectivity_args=""
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
@@ -2812,6 +2898,15 @@ EOF
 function setup-konnectivity-agent-manifest {
     local -r manifest="/etc/kubernetes/addons/konnectivity-agent/konnectivity-agent-ds.yaml"
     sed -i "s|__APISERVER_IP__|${KUBERNETES_MASTER_NAME}|g" "${manifest}"
+    if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+      sed -i "s|__EXTRA_PARAMS__|\t\t\"--agent-cert=/etc/srv/kubernetes/pki/konnectivity-agent/client.crt\",\n\t\t\"--agent-key=/etc/srv/kubernetes/pki/konnectivity-agent/client.key\",|g" "${manifest}"
+      sed -i "s|__EXTRA_VOL_MNTS__|            - name: pki\n              mountPath: /etc/srv/kubernetes/pki/konnectivity-agent|g" "${manifest}"
+      sed -i "s|__EXTRA_VOLS__|        - name: pki\n          hostPath:\n            path: /etc/srv/kubernetes/pki/konnectivity-agent|g" "${manifest}"
+    else
+      sed -i "s|__EXTRA_PARAMS__||g" "${manifest}"
+      sed -i "s|__EXTRA_VOL_MNTS__||g" "${manifest}"
+      sed -i "s|__EXTRA_VOLS__||g" "${manifest}"
+    fi
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
@@ -2939,7 +3034,7 @@ function override-pv-recycler {
   PV_RECYCLER_VOLUME="{\"name\": \"pv-recycler-mount\",\"hostPath\": {\"path\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"type\": \"FileOrCreate\"}},"
   PV_RECYCLER_MOUNT="{\"name\": \"pv-recycler-mount\",\"mountPath\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"readOnly\": true},"
 
-  cat > "${PV_RECYCLER_OVERRIDE_TEMPLATE}" <<EOF
+  cat > "${PV_RECYCLER_OVERRIDE_TEMPLATE}" <<\EOF
 version: v1
 kind: Pod
 metadata:

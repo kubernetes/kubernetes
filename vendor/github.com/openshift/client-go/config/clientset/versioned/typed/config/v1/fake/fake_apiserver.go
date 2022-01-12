@@ -94,7 +94,7 @@ func (c *FakeAPIServers) UpdateStatus(ctx context.Context, aPIServer *configv1.A
 // Delete takes name of the aPIServer and deletes it. Returns an error if one occurs.
 func (c *FakeAPIServers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(apiserversResource, name), &configv1.APIServer{})
+		Invokes(testing.NewRootDeleteActionWithOptions(apiserversResource, name, opts), &configv1.APIServer{})
 	return err
 }
 

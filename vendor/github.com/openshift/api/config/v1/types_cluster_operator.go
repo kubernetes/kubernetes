@@ -143,43 +143,50 @@ type ClusterOperatorStatusCondition struct {
 type ClusterStatusConditionType string
 
 const (
-	// Available indicates that the operand (eg: openshift-apiserver for the
-	// openshift-apiserver-operator), is functional and available in the cluster.
-	// Available=False means at least part of the component is non-functional,
-	// and that the condition requires immediate administrator intervention.
+	// Available indicates that the component (operator and all configured operands)
+	// is functional and available in the cluster. Available=False means at least
+	// part of the component is non-functional, and that the condition requires
+	// immediate administrator intervention.
 	OperatorAvailable ClusterStatusConditionType = "Available"
 
-	// Progressing indicates that the operator is actively rolling out new code,
-	// propagating config changes, or otherwise moving from one steady state to
-	// another.  Operators should not report progressing when they are reconciling
-	// (without action) a previously known state.  If the observed cluster state
-	// has changed and the operator/operand is reacting to it (scaling up for instance),
-	// Progressing should become true since it is moving from one steady state to
-	// another.
+	// Progressing indicates that the component (operator and all configured operands)
+	// is actively rolling out new code, propagating config changes, or otherwise
+	// moving from one steady state to another. Operators should not report
+	// progressing when they are reconciling (without action) a previously known
+	// state. If the observed cluster state has changed and the component is
+	// reacting to it (scaling up for instance), Progressing should become true
+	// since it is moving from one steady state to another.
 	OperatorProgressing ClusterStatusConditionType = "Progressing"
 
-	// Degraded indicates that the operator's current state does not match its
-	// desired state over a period of time resulting in a lower quality of service.
-	// The period of time may vary by component, but a Degraded state represents
-	// persistent observation of a condition.  As a result, a component should not
-	// oscillate in and out of Degraded state.  A service may be Available even
-	// if its degraded.  For example, your service may desire 3 running pods, but 1
-	// pod is crash-looping.  The service is Available but Degraded because it
-	// may have a lower quality of service.  A component may be Progressing but
-	// not Degraded because the transition from one state to another does not
-	// persist over a long enough period to report Degraded.  A service should not
-	// report Degraded during the course of a normal upgrade.  A service may report
-	// Degraded in response to a persistent infrastructure failure that requires
-	// eventual administrator intervention.  For example, if a control plane host
-	// is unhealthy and must be replaced.  An operator should report Degraded if
-	// unexpected errors occur over a period, but the expectation is that all
-	// unexpected errors are handled as operators mature.
+	// Degraded indicates that the component (operator and all configured operands)
+	// does not match its desired state over a period of time resulting in a lower
+	// quality of service. The period of time may vary by component, but a Degraded
+	// state represents persistent observation of a condition. As a result, a
+	// component should not oscillate in and out of Degraded state. A component may
+	// be Available even if its degraded. For example, a component may desire 3
+	// running pods, but 1 pod is crash-looping. The component is Available but
+	// Degraded because it may have a lower quality of service. A component may be
+	// Progressing but not Degraded because the transition from one state to
+	// another does not persist over a long enough period to report Degraded. A
+	// component should not report Degraded during the course of a normal upgrade.
+	// A component may report Degraded in response to a persistent infrastructure
+	// failure that requires eventual administrator intervention.  For example, if
+	// a control plane host is unhealthy and must be replaced. A component should
+	// report Degraded if unexpected errors occur over a period, but the
+	// expectation is that all unexpected errors are handled as operators mature.
 	OperatorDegraded ClusterStatusConditionType = "Degraded"
 
-	// Upgradeable indicates whether the operator safe to upgrade based on the current cluster state. When status is `False`
-	// administrators should not upgrade their cluster and the message field should contain a human readable description
-	// of what the administrator should do to allow the operator to successfully update.  A missing condition, True,
-	// and Unknown are all treated by the CVO as allowing an upgrade.
+	// Upgradeable indicates whether the component (operator and all configured
+	// operands) is safe to upgrade based on the current cluster state. When
+	// Upgradeable is False, the cluster-version operator will prevent the
+	// cluster from performing impacted updates unless forced.  When set on
+	// ClusterVersion, the message will explain which updates (minor or patch)
+	// are impacted. When set on ClusterOperator, False will block minor
+	// OpenShift updates. The message field should contain a human readable
+	// description of what the administrator should do to allow the cluster or
+	// component to successfully update. The cluster-version operator will
+	// allow updates when this condition is not False, including when it is
+	// missing, True, or Unknown.
 	OperatorUpgradeable ClusterStatusConditionType = "Upgradeable"
 )
 

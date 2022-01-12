@@ -419,7 +419,7 @@ EVICTION_HARD="${EVICTION_HARD:-memory.available<250Mi,nodefs.available<10%,node
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 
 # Optional: install a default StorageClass
-ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
+ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-false}"
 
 # Optional: install volume snapshot CRDs
 ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
@@ -559,6 +559,10 @@ export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
 # NPD analyzes the host for problems that can disrupt workloads.
 export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
 export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+
+# Enable Windows Hyper-V
+# sig-storage uses it to create Virtual Hard Disks in tests
+export WINDOWS_ENABLE_HYPERV="${WINDOWS_ENABLE_HYPERV:-false}"
 
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.

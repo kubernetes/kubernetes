@@ -281,7 +281,7 @@ message ImageStreamImport {
   // Spec is a description of the images that the user wishes to import
   optional ImageStreamImportSpec spec = 2;
 
-  // Status is the the result of importing the image
+  // Status is the result of importing the image
   optional ImageStreamImportStatus status = 3;
 }
 

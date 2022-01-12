@@ -1,11 +1,72 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.22.0](#v1220)
-  - [Downloads for v1.22.0](#downloads-for-v1220)
+- [v1.22.4](#v1224)
+  - [Downloads for v1.22.4](#downloads-for-v1224)
     - [Source Code](#source-code)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
+  - [Changelog since v1.22.3](#changelog-since-v1223)
+  - [Changes by Kind](#changes-by-kind)
+    - [Feature](#feature)
+    - [Failing Test](#failing-test)
+    - [Bug or Regression](#bug-or-regression)
+  - [Dependencies](#dependencies)
+    - [Added](#added)
+    - [Changed](#changed)
+    - [Removed](#removed)
+- [v1.22.3](#v1223)
+  - [Downloads for v1.22.3](#downloads-for-v1223)
+    - [Source Code](#source-code-1)
+    - [Client Binaries](#client-binaries-1)
+    - [Server Binaries](#server-binaries-1)
+    - [Node Binaries](#node-binaries-1)
+  - [Changelog since v1.22.2](#changelog-since-v1222)
+  - [Changes by Kind](#changes-by-kind-1)
+    - [API Change](#api-change)
+    - [Feature](#feature-1)
+    - [Bug or Regression](#bug-or-regression-1)
+  - [Dependencies](#dependencies-1)
+    - [Added](#added-1)
+    - [Changed](#changed-1)
+    - [Removed](#removed-1)
+- [v1.22.2](#v1222)
+  - [Downloads for v1.22.2](#downloads-for-v1222)
+    - [Source Code](#source-code-2)
+    - [Client Binaries](#client-binaries-2)
+    - [Server Binaries](#server-binaries-2)
+    - [Node Binaries](#node-binaries-2)
+  - [Changelog since v1.22.1](#changelog-since-v1221)
+  - [Important Security Information](#important-security-information)
+    - [CVE-2021-25741: Symlink Exchange Can Allow Host Filesystem Access](#cve-2021-25741-symlink-exchange-can-allow-host-filesystem-access)
+  - [Changes by Kind](#changes-by-kind-2)
+    - [Feature](#feature-2)
+    - [Bug or Regression](#bug-or-regression-2)
+  - [Dependencies](#dependencies-2)
+    - [Added](#added-2)
+    - [Changed](#changed-2)
+    - [Removed](#removed-2)
+- [v1.22.1](#v1221)
+  - [Downloads for v1.22.1](#downloads-for-v1221)
+    - [Source Code](#source-code-3)
+    - [Client Binaries](#client-binaries-3)
+    - [Server Binaries](#server-binaries-3)
+    - [Node Binaries](#node-binaries-3)
+  - [Changelog since v1.22.0](#changelog-since-v1220)
+  - [Changes by Kind](#changes-by-kind-3)
+    - [Feature](#feature-3)
+    - [Bug or Regression](#bug-or-regression-3)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
+  - [Dependencies](#dependencies-3)
+    - [Added](#added-3)
+    - [Changed](#changed-3)
+    - [Removed](#removed-3)
+- [v1.22.0](#v1220)
+  - [Downloads for v1.22.0](#downloads-for-v1220)
+    - [Source Code](#source-code-4)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
+    - [Node Binaries](#node-binaries-4)
   - [Changelog since v1.21.0](#changelog-since-v1210)
   - [What's New (Major Themes)](#whats-new-major-themes)
     - [Removal of several beta Kubernetes APIs](#removal-of-several-beta-kubernetes-apis)
@@ -22,150 +83,523 @@
     - [API changes and improvements for ephemeral containers](#api-changes-and-improvements-for-ephemeral-containers)
   - [Known Issues](#known-issues)
     - [CPU and Memory manager are not working correctly for Guaranteed Pods with multiple containers](#cpu-and-memory-manager-are-not-working-correctly-for-guaranteed-pods-with-multiple-containers)
-    - [<code>CSIMigrationvSphere</code> feature gate has not migrated to new CRD APIs](#-feature-gate-has-not-migrated-to-new-crd-apis)
+    - [<code>CSIMigrationvSphere</code> feature gate has not migrated to new CRD APIs](#csimigrationvsphere-feature-gate-has-not-migrated-to-new-crd-apis)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
-  - [Changes by Kind](#changes-by-kind)
+  - [Changes by Kind](#changes-by-kind-4)
     - [Deprecation](#deprecation)
-    - [API Change](#api-change)
-    - [Feature](#feature)
-    - [Documentation](#documentation)
-    - [Failing Test](#failing-test)
-    - [Bug or Regression](#bug-or-regression)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
-  - [Dependencies](#dependencies)
-    - [Added](#added)
-    - [Changed](#changed)
-    - [Removed](#removed)
-- [v1.22.0-rc.0](#v1220-rc0)
-  - [Downloads for v1.22.0-rc.0](#downloads-for-v1220-rc0)
-    - [Source Code](#source-code-1)
-    - [Client Binaries](#client-binaries-1)
-    - [Server Binaries](#server-binaries-1)
-    - [Node Binaries](#node-binaries-1)
-  - [Changelog since v1.22.0-beta.2](#changelog-since-v1220-beta2)
-  - [Changes by Kind](#changes-by-kind-1)
     - [API Change](#api-change-1)
-    - [Bug or Regression](#bug-or-regression-1)
-  - [Dependencies](#dependencies-1)
-    - [Added](#added-2)
-    - [Changed](#changed-2)
-    - [Removed](#removed-2)
-- [v1.22.0-beta.2](#v1220-beta2)
-  - [Downloads for v1.22.0-beta.2](#downloads-for-v1220-beta2)
-    - [Source Code](#source-code-2)
-    - [Client Binaries](#client-binaries-2)
-    - [Server Binaries](#server-binaries-2)
-    - [Node Binaries](#node-binaries-2)
-  - [Changelog since v1.22.0-beta.1](#changelog-since-v1220-beta1)
-  - [Changes by Kind](#changes-by-kind-2)
-    - [API Change](#api-change-2)
-    - [Feature](#feature-1)
-    - [Bug or Regression](#bug-or-regression-2)
-  - [Dependencies](#dependencies-2)
-    - [Added](#added-3)
-    - [Changed](#changed-3)
-    - [Removed](#removed-3)
-- [v1.22.0-beta.1](#v1220-beta1)
-  - [Downloads for v1.22.0-beta.1](#downloads-for-v1220-beta1)
-    - [Source Code](#source-code-3)
-    - [Client Binaries](#client-binaries-3)
-    - [Server Binaries](#server-binaries-3)
-    - [Node Binaries](#node-binaries-3)
-  - [Changelog since v1.22.0-beta.0](#changelog-since-v1220-beta0)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
-  - [Changes by Kind](#changes-by-kind-3)
-    - [Deprecation](#deprecation-1)
-    - [API Change](#api-change-3)
-    - [Feature](#feature-2)
-    - [Documentation](#documentation-1)
-    - [Bug or Regression](#bug-or-regression-3)
+    - [Feature](#feature-4)
+    - [Documentation](#documentation)
+    - [Failing Test](#failing-test-1)
+    - [Bug or Regression](#bug-or-regression-4)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
-  - [Dependencies](#dependencies-3)
+  - [Dependencies](#dependencies-4)
     - [Added](#added-4)
     - [Changed](#changed-4)
     - [Removed](#removed-4)
-- [v1.22.0-beta.0](#v1220-beta0)
-  - [Downloads for v1.22.0-beta.0](#downloads-for-v1220-beta0)
-    - [Source Code](#source-code-4)
-    - [Client Binaries](#client-binaries-4)
-    - [Server Binaries](#server-binaries-4)
-    - [Node Binaries](#node-binaries-4)
-  - [Changelog since v1.22.0-alpha.3](#changelog-since-v1220-alpha3)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
-  - [Changes by Kind](#changes-by-kind-4)
-    - [Deprecation](#deprecation-2)
-    - [API Change](#api-change-4)
-    - [Feature](#feature-3)
-    - [Bug or Regression](#bug-or-regression-4)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
-  - [Dependencies](#dependencies-4)
-    - [Added](#added-5)
-    - [Changed](#changed-5)
-    - [Removed](#removed-5)
-- [v1.22.0-alpha.3](#v1220-alpha3)
-  - [Downloads for v1.22.0-alpha.3](#downloads-for-v1220-alpha3)
+- [v1.22.0-rc.0](#v1220-rc0)
+  - [Downloads for v1.22.0-rc.0](#downloads-for-v1220-rc0)
     - [Source Code](#source-code-5)
     - [Client Binaries](#client-binaries-5)
     - [Server Binaries](#server-binaries-5)
     - [Node Binaries](#node-binaries-5)
-  - [Changelog since v1.22.0-alpha.2](#changelog-since-v1220-alpha2)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
+  - [Changelog since v1.22.0-beta.2](#changelog-since-v1220-beta2)
   - [Changes by Kind](#changes-by-kind-5)
-    - [Deprecation](#deprecation-3)
-    - [API Change](#api-change-5)
-    - [Feature](#feature-4)
+    - [API Change](#api-change-2)
     - [Bug or Regression](#bug-or-regression-5)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
   - [Dependencies](#dependencies-5)
-    - [Added](#added-6)
-    - [Changed](#changed-6)
-    - [Removed](#removed-6)
-- [v1.22.0-alpha.2](#v1220-alpha2)
-  - [Downloads for v1.22.0-alpha.2](#downloads-for-v1220-alpha2)
+    - [Added](#added-5)
+    - [Changed](#changed-5)
+    - [Removed](#removed-5)
+- [v1.22.0-beta.2](#v1220-beta2)
+  - [Downloads for v1.22.0-beta.2](#downloads-for-v1220-beta2)
     - [Source Code](#source-code-6)
     - [Client Binaries](#client-binaries-6)
     - [Server Binaries](#server-binaries-6)
     - [Node Binaries](#node-binaries-6)
-  - [Changelog since v1.22.0-alpha.1](#changelog-since-v1220-alpha1)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-4)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-4)
+  - [Changelog since v1.22.0-beta.1](#changelog-since-v1220-beta1)
   - [Changes by Kind](#changes-by-kind-6)
-    - [Deprecation](#deprecation-4)
-    - [API Change](#api-change-6)
+    - [API Change](#api-change-3)
     - [Feature](#feature-5)
-    - [Failing Test](#failing-test-1)
     - [Bug or Regression](#bug-or-regression-6)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
   - [Dependencies](#dependencies-6)
+    - [Added](#added-6)
+    - [Changed](#changed-6)
+    - [Removed](#removed-6)
+- [v1.22.0-beta.1](#v1220-beta1)
+  - [Downloads for v1.22.0-beta.1](#downloads-for-v1220-beta1)
+    - [Source Code](#source-code-7)
+    - [Client Binaries](#client-binaries-7)
+    - [Server Binaries](#server-binaries-7)
+    - [Node Binaries](#node-binaries-7)
+  - [Changelog since v1.22.0-beta.0](#changelog-since-v1220-beta0)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
+  - [Changes by Kind](#changes-by-kind-7)
+    - [Deprecation](#deprecation-1)
+    - [API Change](#api-change-4)
+    - [Feature](#feature-6)
+    - [Documentation](#documentation-1)
+    - [Bug or Regression](#bug-or-regression-7)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
+  - [Dependencies](#dependencies-7)
     - [Added](#added-7)
     - [Changed](#changed-7)
     - [Removed](#removed-7)
-- [v1.22.0-alpha.1](#v1220-alpha1)
-  - [Downloads for v1.22.0-alpha.1](#downloads-for-v1220-alpha1)
-    - [Source Code](#source-code-7)
-    - [Client binaries](#client-binaries-7)
-    - [Server binaries](#server-binaries-7)
-    - [Node binaries](#node-binaries-7)
-  - [Changelog since v1.21.0](#changelog-since-v1210-1)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-5)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-5)
-  - [Changes by Kind](#changes-by-kind-7)
-    - [Deprecation](#deprecation-5)
-    - [API Change](#api-change-7)
-    - [Feature](#feature-6)
-    - [Failing Test](#failing-test-2)
-    - [Bug or Regression](#bug-or-regression-7)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-5)
-  - [Dependencies](#dependencies-7)
+- [v1.22.0-beta.0](#v1220-beta0)
+  - [Downloads for v1.22.0-beta.0](#downloads-for-v1220-beta0)
+    - [Source Code](#source-code-8)
+    - [Client Binaries](#client-binaries-8)
+    - [Server Binaries](#server-binaries-8)
+    - [Node Binaries](#node-binaries-8)
+  - [Changelog since v1.22.0-alpha.3](#changelog-since-v1220-alpha3)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
+  - [Changes by Kind](#changes-by-kind-8)
+    - [Deprecation](#deprecation-2)
+    - [API Change](#api-change-5)
+    - [Feature](#feature-7)
+    - [Bug or Regression](#bug-or-regression-8)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
+  - [Dependencies](#dependencies-8)
     - [Added](#added-8)
     - [Changed](#changed-8)
     - [Removed](#removed-8)
+- [v1.22.0-alpha.3](#v1220-alpha3)
+  - [Downloads for v1.22.0-alpha.3](#downloads-for-v1220-alpha3)
+    - [Source Code](#source-code-9)
+    - [Client Binaries](#client-binaries-9)
+    - [Server Binaries](#server-binaries-9)
+    - [Node Binaries](#node-binaries-9)
+  - [Changelog since v1.22.0-alpha.2](#changelog-since-v1220-alpha2)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
+  - [Changes by Kind](#changes-by-kind-9)
+    - [Deprecation](#deprecation-3)
+    - [API Change](#api-change-6)
+    - [Feature](#feature-8)
+    - [Bug or Regression](#bug-or-regression-9)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
+  - [Dependencies](#dependencies-9)
+    - [Added](#added-9)
+    - [Changed](#changed-9)
+    - [Removed](#removed-9)
+- [v1.22.0-alpha.2](#v1220-alpha2)
+  - [Downloads for v1.22.0-alpha.2](#downloads-for-v1220-alpha2)
+    - [Source Code](#source-code-10)
+    - [Client Binaries](#client-binaries-10)
+    - [Server Binaries](#server-binaries-10)
+    - [Node Binaries](#node-binaries-10)
+  - [Changelog since v1.22.0-alpha.1](#changelog-since-v1220-alpha1)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-4)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-4)
+  - [Changes by Kind](#changes-by-kind-10)
+    - [Deprecation](#deprecation-4)
+    - [API Change](#api-change-7)
+    - [Feature](#feature-9)
+    - [Failing Test](#failing-test-2)
+    - [Bug or Regression](#bug-or-regression-10)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-5)
+  - [Dependencies](#dependencies-10)
+    - [Added](#added-10)
+    - [Changed](#changed-10)
+    - [Removed](#removed-10)
+- [v1.22.0-alpha.1](#v1220-alpha1)
+  - [Downloads for v1.22.0-alpha.1](#downloads-for-v1220-alpha1)
+    - [Source Code](#source-code-11)
+    - [Client binaries](#client-binaries-11)
+    - [Server binaries](#server-binaries-11)
+    - [Node binaries](#node-binaries-11)
+  - [Changelog since v1.21.0](#changelog-since-v1210-1)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-5)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-5)
+  - [Changes by Kind](#changes-by-kind-11)
+    - [Deprecation](#deprecation-5)
+    - [API Change](#api-change-8)
+    - [Feature](#feature-10)
+    - [Failing Test](#failing-test-3)
+    - [Bug or Regression](#bug-or-regression-11)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-6)
+  - [Dependencies](#dependencies-11)
+    - [Added](#added-11)
+    - [Changed](#changed-11)
+    - [Removed](#removed-11)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+# v1.22.4
+
+
+## Downloads for v1.22.4
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes.tar.gz) | 5d8f53b29f14313b029d7f313b8f11b6f51577d5679a85e114579f4308488ab2a553c2eb0c8e202f1af81548311006cc6b2d2d11af5640b69bb99fe797b8db09
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-src.tar.gz) | 53f63c58cba8d1e9b538cae9a360fd848f750d4fcd8574fc4439572440b42da2dc8e4b00a7fddff6a0895efdee0b5e0b1c4f262edc6ec0f4316ecce74150cff0
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-darwin-amd64.tar.gz) | 3213b109eb8ce2394ca9817ef364ea7a334f4c6c84dc409b06b0f66008327eac08bbbddffaff3e546144f0bf27bb66bcdbb3c74d4cc64021927448b035b72697
+[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-darwin-arm64.tar.gz) | e533036f247d528198d223ff65097184952c35052db27620eec6dba8008a7a14993f31c44c941bdc1a977d08f09ed5c1bb9521cf1413613e5a3682f5c9e41dbf
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-linux-386.tar.gz) | 2d6436be76ecd070348b76293f1a1ff9c8747df9c78b930578ed1151e981875c74d0c3b7ab059cdb6ea18dd50a9c89d4831d405357ac1ec1421a46a416f39a08
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-linux-amd64.tar.gz) | a3da93d56c64a80adc5b58044ecb52204507c733350972e7448e759c040fe3f72584f20d88a46b23bed9f021fc745cdb0530619416006170392d4fb7f69b28f5
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-linux-arm.tar.gz) | d9814036686de7ae72f94f5f7e12542112bbbd4a7d989599c6d946e71d6f83c89e56f64b4cd3db862a5ed2d23c578816cf5badb9305bfa1b62b7294257361112
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-linux-arm64.tar.gz) | a3f1be1bd89504d8cfcf81c86d7245919af6ddd29785041b6f2e64a55952a806fa4660b51573bbde66848b47fd2150b3b7540e631dcfe9057d26ed688e1f6cbb
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-linux-ppc64le.tar.gz) | c4844c1e359f6176104a3c77c5197234787ac5053c23c0fbaeceaa165f56ed71b0ea564dcb440aa80615c3370c7ce94b89cea19ca414752579f1c71b375ba2f5
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-linux-s390x.tar.gz) | 9a52bd1e9c81d11b17b21bcad3f2311d91e33392eb43a63acfcdd0c278c9c4bdbe754a911a6f9b080d438a805e982683919a9bc46ca45bdf4f185c36b8622ef8
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-windows-386.tar.gz) | f5214dce1529801a7ec042d7fa2636fe1b0340518e1bfd367b6f411e035d5ab440cdd6c9e6471024873aae41f64078c9083ffe4c13bd617cfe76b51f65303635
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-client-windows-amd64.tar.gz) | 0c7b36a2bc721e783a6a1936b8729a1e2944c97e50377a29660485d68b0ba349e596a7366da23d23d14485e7e37eac07677d56931391764c291b21abeed30b52
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-server-linux-amd64.tar.gz) | 7a2f9a358d74bdf30203ddb9315a5e733ecf8e9047a02b4a523ed347288e5e84013b30f918dff7e706413d817e3838cb79f1e3dbafe4af3a532bcfc4cdf11dac
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-server-linux-arm.tar.gz) | 4ed7ac4dcd15011996ed8f1634a4169dbc553155b6a63130916c87d59fcaab90fac8d8922da9a32dce0cb55c2a954b63ac3c747334adff116e53c6fbac5da1b1
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-server-linux-arm64.tar.gz) | 5a21cf29ec7e58087d4814f507fa4dd2e09183e4b57cb800b928b0f23437bf852a756325a8ffc6eb79269644832c000cad048a2048942cc06f1e817f750dc9c1
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-server-linux-ppc64le.tar.gz) | c88ddb75f185c6cf5da6abf4d389defad8249b863ab9c31174de040dc0d1388938daed90fe622dfef2235a2b6d5ae898d33d73482d40c9cb3a8b4c7f50c53b23
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-server-linux-s390x.tar.gz) | 72fc1f7f17792c827543fbaef965bdcba47b0abd764f1c1cb95ab08fa56ef9ed8359196f00be871c54da54c3e270d2158e68043e112a23a7621e9eb7b29b6073
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-node-linux-amd64.tar.gz) | 6a12aebaf4550eb7fb42bb66d4bc67c5dcb9e628dc7db444d8e10cc279b7913e202eb98c0b7aa3f546d7055648d2ea37f50a900b1d8daf48cb65118be0e4466c
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-node-linux-arm.tar.gz) | d4bf028ce4bdc513498272c17eb9dd0dc8db82ce00274b07b061c1ee0b1c8f6bcee599e08414bd8049dffe5c5b942724df72dfce02f4aeaed5f704daa59a3739
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-node-linux-arm64.tar.gz) | 4c23fc3b3e274577f70a8c11213acc585e9c0162285e110fada3a826e9ea0fdd2b46c24a7c234fcefdbf30ce5341c7f3b0348bc0e3bc510fe1cd1935783db295
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-node-linux-ppc64le.tar.gz) | 0bba195a3552e3d173459299669ff1bf933b82be6b93647fdcda9681c0662273f5b1cef0d197348a23e537e3cb4e0db66e0b84edacfe07fcf028577f4dabc268
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-node-linux-s390x.tar.gz) | 7e30fb801a8d695615de5633aa8e9877c377cbbe7b38190052e1e2ecf85046bc2c1fa79828284cdcf229c60e12ceffabdd55c0703a1ea4d37c3b21ccdf6afa6b
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.4/kubernetes-node-windows-amd64.tar.gz) | eb8dd4ffed0b8a92c11583eeae7bd446e1e3211a444b7398b8c9a847da3a3b28784efb410c1cd7f3f33f46c521078528462c71f39d53e1425685bc8d5962b563
+
+## Changelog since v1.22.3
+
+## Changes by Kind
+
+### Feature
+
+- Kubernetes is now built with Golang 1.16.10 (#106223, @cpanato) [SIG Cloud Provider, Instrumentation, Release and Testing]
+- Update debian-base, debian-iptables, setcap images to pick up CVE fixes
+  - Debian-base to v1.9.0
+  - Debian-iptables to v1.6.7
+  - setcap to v2.0.4 (#106143, @cpanato) [SIG Release and Testing]
+
+### Failing Test
+
+- Fixes hostpath storage e2e tests within SELinux enabled env (#105786, @Elbehery) [SIG Testing]
+
+### Bug or Regression
+
+- EndpointSlice Mirroring controller now cleans up managed EndpointSlices when a Service selector is added (#106132, @robscott) [SIG Apps, Network and Testing]
+- Fix a bug that `--disabled-metrics` doesn't function well. (#105793, @Huang-Wei) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
+- Fix a panic in kubectl when creating secrets with an improper output type (#106356, @lauchokyip) [SIG CLI]
+- Fix concurrent map access causing panics when logging timed-out API calls. (#106112, @marseel) [SIG API Machinery]
+- Fix kube-proxy regression on UDP services because the logic to detect stale connections was not considering if the endpoint was ready. (#106239, @aojea) [SIG Network and Testing]
+- Fix scoring for NodeResourcesBalancedAllocation plugins when nodes have containers with no requests. (#106081, @ahmad-diaa) [SIG Scheduling]
+- Support more than 100 disk mounts on Windows (#105673, @andyzhangx) [SIG Storage and Windows]
+- The --leader-elect* CLI args are now honored correctly in scheduler. (#106130, @Huang-Wei) [SIG Scheduling]
+- The kube-proxy sync_proxy_rules_iptables_total metric now gives
+  the correct number of rules, rather than being off by one.
+  
+  Fixed multiple iptables proxy regressions introduced in 1.22:
+  
+    - When using Services with SessionAffinity, client affinity for an
+      endpoint now gets broken when that endpoint becomes non-ready
+      (rather than continuing until the endpoint is fully deleted).
+  
+    - Traffic to a service IP now starts getting rejected (as opposed to
+      merely dropped) as soon as there are no longer any *usable*
+      endpoints, rather than waiting until all of the terminating
+      endpoints have terminated even when those terminating endpoints
+      were not being used.
+  
+    - Chains for endpoints that won't be used are no longer output to
+      iptables, saving a bit of memory/time/cpu. (#106373, @aojea) [SIG Network]
+- Watch requests that are delegated to aggregated apiservers no longer reserve concurrency units (seats) in the API Priority and Fairness dispatcher for their entire duration. (#105827, @benluddy) [SIG API Machinery]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+- k8s.io/kube-openapi: 9528897 → 2043435
+
+### Removed
+_Nothing has changed._
+
+
+
+# v1.22.3
+
+
+## Downloads for v1.22.3
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes.tar.gz) | 515be8024601706fa45090f98434f10e1742ce1f92964e4d4d405ea7baef62ec96b12f00c0560fde367fee514a42c1781b74235666a691f45ac2a2bd69695cc6
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-src.tar.gz) | 7bf0317295bb815925a6d3f6d6385e2a3f4100b4c6c62735dd0d0b8693e0687c394dccdef5f16a4210337f60343bf65f9c971558f62c890edaf6fef3309642c4
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-darwin-amd64.tar.gz) | df3a78f4c1a5e7680271de709295e1150e9c1c817cd06cee4b11909e81bb94aabd674b575adb5c75b4ee53c9d580c47acead3176bf34b9b1e96de65e954056f5
+[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-darwin-arm64.tar.gz) | 78d60fd871da818d489ccd11512f3222484814a0eda17300ed4d17cda46e94c3c4ed61604e8dfe4ca1090115c1fb74322977495b0c781d6869cdad24c90baf21
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-linux-386.tar.gz) | 93e1d46781884df23223f1e918e3218bfe1d79eca62b6597c4eedd59422cbbfa21e852a97cecc0c5cb3da1938ec33a3e1a8b94fb2018d04327c14f71f9a48f05
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-linux-amd64.tar.gz) | 3f3d706163e142cf5ee8e6031b68e9a14236ce085bdfbaa5e8c1a599c15e5ee002248b7ed985a577307ceecb5cb531b9a399f1a4264e77d71597d569172a2ee6
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-linux-arm.tar.gz) | 22229218e7043c715ed5bfcb18238f93e654f4e030d458992ea7e1bf6e196a4c91d1326a72811a9853ad00ca63d5df91bc4ff2166e6357debecc6d0e8a93e294
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-linux-arm64.tar.gz) | e821caba3e8f45267b9f5eabb5ce62566e8165823b2711d2dc2b8ac5b4b44d7f4a422e9a15703619cea2c13ed75e12e30c8c8f0ea9405aa7b821cd6bff98cf66
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-linux-ppc64le.tar.gz) | 8166cc544183c0257a3e571fca0554ee50f7ea04a11a4ff9d342672ec61b626e4cdd2eef80c2f0738c75a86f50da84f45f103a9888778b2e1e9c2efba0d5deed
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-linux-s390x.tar.gz) | 11416f8164d57843104914cd02577828a99334df8bb37463a8a7ef44fa2945f6f4cda8dda88e0a9f84903e5decb781c03873fb813b98f36e1e79b9751ccea831
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-windows-386.tar.gz) | 60d74e28451f212f23efd8a9292722105377449877050417eb901f2812b5e57c8e60373a3550804a0c1e183d177b2b255290a0cd0828e02904d8dbfc1a5590cc
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-client-windows-amd64.tar.gz) | 232fa5f80a5841c03fa13782988f6a9ffcf065888713a2d8f95b1ca64665ae0086faed7109d20e487fb6445ef03b84ee46f8ffdd65570eeb562337e95862bcf5
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-server-linux-amd64.tar.gz) | 3eea6a889b23d361356dcc2282591e23aac7e299f6c54b70c475dc92c3b51f9a91da12847b1265f2ef9fc110cb4776d6214ab7ab9bf1e49b4d10b5bf8284842d
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-server-linux-arm.tar.gz) | 0036b97628601ca6c65f91fe6dff2d8949b9379c6076602487acc74eaf8c75f534c53bb76ffe64b1528629b669697f15c63aa730bccd2a259f9577f284be1593
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-server-linux-arm64.tar.gz) | 49b3b0e0a7e36771bb104bb42cbe879b6a08a7b6d2993398a7590fd511a7cab1c8e267abb30fea0b04898a3102286ab141b2b63d6a609fb2b02b19012b6e26a1
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-server-linux-ppc64le.tar.gz) | 64fd35ae9b340b9bc78f84aaa66cc9bf5ed548d86af310c19fbe184e16a2077864bcec93a97f23df2e195cdfeec06e79332915f25c05ce7ce6262cdffc826451
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-server-linux-s390x.tar.gz) | b5f369b3b47c65f179b2c7e5463ae006199d2b8638a0be51e2820257531e59c6e39f79f0826c8f0b11408884e338acb2137d68a31f6060cf6fbe85246da0412b
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-node-linux-amd64.tar.gz) | 7655e45ac74a2ab4f40ea91d6199e60c871e2e0f3a0942b3823c3e372df337de7246ad6d5368bcce4e9807b6413c7f5d928b5b9d8abb35888b54c9f2c288ca63
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-node-linux-arm.tar.gz) | 111ee23614e2f307a62c2554ce441df832932c16fb6cde6b240378f516f350e8e28209d169784b3fe2f6ab421a2f5dc57e5e557e7b664987c97528b81d311bb7
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-node-linux-arm64.tar.gz) | 6d5b25938512c32bf9e324257af306b4e6091f17af91387b5674dfd2422a877d7afbc647bfcd1d9e6eac49d6707016704ce68e82eacde83029a1745c588eb505
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-node-linux-ppc64le.tar.gz) | 8dae0a057658bebcaf5e586230e58cb9ddc4e2099daa5851a7d7b26131200c22c433870469471f31ef34e61ab0c85cf75bba8d0df6aba94e6a9228b4b730a426
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-node-linux-s390x.tar.gz) | ceec8049c3592cc280bf88ed921fe8e845b632aaa72bc206aa23ec574e1e7518b25727cfdd9a031a774247e085cd362bd0a931fb17f65894640d4d53c4b85d8a
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.3/kubernetes-node-windows-amd64.tar.gz) | 92902909a903f0fc354fd5c7b8e2e7915ed49a0f3ae2c19b3d119efcc8da7cd675b2930ceb483d1980e033037c4d174a28d88ef03d9f90b7a186dc365a3de100
+
+## Changelog since v1.22.2
+
+## Changes by Kind
+
+### API Change
+
+- Kube-apiserver: Fixes handling of CRD schemas containing literal null values in enums (#104988, @liggitt) [SIG API Machinery, Apps and Network]
+
+### Feature
+
+- Kubernetes is now built with Golang 1.16.9 (#105671, @cpanato) [SIG Cloud Provider, Instrumentation, Release and Testing]
+
+### Bug or Regression
+
+- Fix: consolidate logs for instance not found error (#105366, @nilo19) [SIG Cloud Provider]
+- Fix: ignore not a VMSS error for VMAS nodes in EnsureBackendPoolDeleted. (#105400, @ialidzhikov) [SIG Cloud Provider]
+- Fixes a regression on Kubelet restart and pod statuses. (#105560, @rphillips) [SIG Node and Testing]
+- Fixes kubelet memory regression in 1.22 (#105452, @liggitt) [SIG Node]
+- Fixes the kubelet's ability to restart static pods (#105075, @rphillips) [SIG Node and Testing]
+- Kube-proxy(ipvs mode) : delete stale conntrack UDP entries for loadbalancer ingress IP. (#105650, @VivekThrivikraman-est) [SIG Network]
+- Release-note Removed error message label from kubelet_started_pods_errors_total metric (#105213, @yxxhero) [SIG Instrumentation and Node]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+_Nothing has changed._
+
+### Removed
+_Nothing has changed._
+
+
+
+# v1.22.2
+
+
+## Downloads for v1.22.2
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes.tar.gz) | 5a567e5133a04da82a656b072151fa2b8a6b680db85a4faf69f6e727d2ec9889fd2bae9c5be8562074352c67eace863c894b734650e07e7fce91dcf5986f9357
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-src.tar.gz) | eebf175f20ebee1ac03a067b66a680e67bc2f9a209c699ff9954d53a6f37e35ae832397ead051c993b14aa12d627b16e5d89518cf2974a1a26a8ed28277458e0
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-darwin-amd64.tar.gz) | 264ccda40e275da89d66284002ab7818880bb37056053d0d2e8d535cd835f2f56fc43e995c76ea9041e25a59f8f6b4cff8710130c285fcf383c5417926e371d1
+[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-darwin-arm64.tar.gz) | 04aa25b204d289e5abd704055a05adee331dac9d075791737b64033142d1c43238773ab2357b308fdde5ff1cc390a686ed5efa3be424b4324dae361418d898d9
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-linux-386.tar.gz) | c3b8f0b54fc9fcf64f87af93ca74d3e2eb87fbfdc346e09ed36406827fab29ac63e0feefe6f47612d26caacb9ed2d56189ae29c996d98c35b4984a87a51c1507
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-linux-amd64.tar.gz) | 09694e377b5104c47d291626cdb9c199519119b0ae27c1d9ed61b6dd544f462032026188a298f533494ad04ec6e0366ed3e3eac89122f658c2efee433b25090f
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-linux-arm.tar.gz) | 39b9a64d6f58ec42455985c9feb785ea6f9354612f16bc9e4c2e1ae6a74bf5e252d609907ad6c9b7ba4ba84763cc2382531115ed1c5265eb91d457ec6cb8a31d
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-linux-arm64.tar.gz) | 832a8b023f3b4f54ba21ac2e9e74aa686522441619c53f73b3cf34efe9ee4df447447526215b68f759564f3be9929436247b23250d29202eef87c7c1f58bb26b
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-linux-ppc64le.tar.gz) | b078e73d0dabb6cb4409aa2a01f4139cda82228573f6702a2890b84417750bfcf01c868d2914f7231361a0782e40082bdef9460cd59e4d04a210b7278495d495
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-linux-s390x.tar.gz) | c7f4776df0613e0c76e9e7e42d3020d2391daba0f50530df246cd65767dc394346d3acc0be91b1fc3eabcb930e73afcf4ad1068110d859b4fdd2f6a0cca4b69b
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-windows-386.tar.gz) | 27f770302a66b922b04fe810687fd1b36cfe9a96e12d67ed8e3873d2b27dc3bb2df55ba5e305c64184d38f20c8ea55627419f37cd8c1822b7716637fe09aff0b
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-client-windows-amd64.tar.gz) | dc504970bb4d7555e3d41a0b4762d1d94fbae4118e4399bd49bea8766b41fbcf6e25276efb7dada941d14447e51fc00372535fbf2f6045ea4eca17a8dcd2978d
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-server-linux-amd64.tar.gz) | 4187b6d62c57412820394c051c14fe00be3c02ecae0f3a9d2dfd62a5e74cc89f2c94e094d3c23e9e5ec130cc2d0f68d7d2f7d6f484cbfbae4939493f44332d76
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-server-linux-arm.tar.gz) | 17103d3e88c7542a742fcd758ee75cbab2d54e9c1f5eb9b998b2a278a1401c819fae2234959971a4f9fe8e6f4a491b0bf7cccc3e98efc31a14704282ff74e835
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-server-linux-arm64.tar.gz) | c97be69e10f19862f61e898baff43475a1ef59336d9ced5f6688feebece476b6cf78a2f51ee6a3940405ce0d6162e85465515e533fff1716af5bc8266fd94f50
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-server-linux-ppc64le.tar.gz) | 1b8e65e010c9885ba5dd2b7b9cbcd4caaca2c9edc5af77b92276d47f3e7b5c2af49eeb1436300682596d0fca15793ada21160a8c58bdc74ef81dead8d391c246
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-server-linux-s390x.tar.gz) | a571c3ce7d295628dd7a979765594ba2e6dfe96f494002edd0df4e704dc002eef497655cb31a98991c2bbdd09bd432797e0c778e9bbd8168ded2867b012285d5
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-node-linux-amd64.tar.gz) | 40e97ee26566af810a2881441572b798c8feb010ac5727507ec379e897dc3cfefc9e6c06f09de8ef0b52d941dbb929003590006cc8cf76403f6c64e231e6759e
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-node-linux-arm.tar.gz) | d852803b6cc264f83328e6ecb7d509d083cc4ed9a84dafc2d08c5fc1ef38fc2bf395d9bf5e4c87b11699c047be07a957177157396f61d7e957c7cc08881d3fb8
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-node-linux-arm64.tar.gz) | 9b35d16a1d2760a017564f6d09ec17b0aa2ed2b4cd62065d9aa0fe760d080fa8d64feb4ab7fb54eda1b8a1a760b4ee58ac36ad1c134b4adefe3e45872209816e
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-node-linux-ppc64le.tar.gz) | dfc779984b3c2859b103ffa446131befe455531b1eedc8dd796871d027d17abf2d33c1ea46f0cdb0c1a349418980e8986dcd10a8fae779966922fe543b070bd0
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-node-linux-s390x.tar.gz) | 508b47667233f467418d24a4b55af0d6360ab82744568b207465d035035ff8106dae0ef992cb4af60884be8c27b7370f90c1db161444a9adc90a61814133b361
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.2/kubernetes-node-windows-amd64.tar.gz) | 1d9472eef1be3c640d86e3299c96f55de975311ef3589473024fbcc9b9ff4d1111af993cbafe526ff45ecf7ff01146a5c65224b23f4f2ed289137bcfb6374ab9
+
+## Changelog since v1.22.1
+
+## Important Security Information
+
+This release contains changes that address the following vulnerabilities:
+
+### CVE-2021-25741: Symlink Exchange Can Allow Host Filesystem Access
+
+A security issue was discovered in Kubernetes where a user may be able to
+create a container with subpath volume mounts to access files &
+directories outside of the volume, including on the host filesystem.
+
+**Affected Versions**:
+  - kubelet v1.22.0 - v1.22.1
+  - kubelet v1.21.0 - v1.21.4
+  - kubelet v1.20.0 - v1.20.10
+  - kubelet <= v1.19.14
+
+**Fixed Versions**:
+  - kubelet v1.22.2
+  - kubelet v1.21.5
+  - kubelet v1.20.11
+  - kubelet v1.19.15
+
+This vulnerability was reported by Fabricio Voznika and Mark Wolters of Google.
+
+**CVSS Rating:** High (8.8) [CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H](https://www.first.org/cvss/calculator/3.0#CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H)
+
+## Changes by Kind
+
+### Feature
+
+- Kubernetes is now built with Golang 1.16.8 ([#104905](https://github.com/kubernetes/kubernetes/pull/104905), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
+
+### Bug or Regression
+
+- Fix Job tracking with finalizers for more than 500 pods, ensuring all finalizers are removed before counting the Pod. ([#104876](https://github.com/kubernetes/kubernetes/pull/104876), [@alculquicondor](https://github.com/alculquicondor)) [SIG Apps]
+- Fix: skip case sensitivity when checking Azure NSG rules
+  fix: ensure InstanceShutdownByProviderID return false for creating Azure VMs ([#104446](https://github.com/kubernetes/kubernetes/pull/104446), [@feiskyer](https://github.com/feiskyer)) [SIG Cloud Provider]
+- Fixed occasional pod cgroup freeze when using cgroup v1 and systemd driver. ([#104529](https://github.com/kubernetes/kubernetes/pull/104529), [@kolyshkin](https://github.com/kolyshkin)) [SIG Node]
+- Fixes a regression that could cause panics in LRU caches in controller-manager, kubelet, kube-apiserver, or client-go EventSourceObjectSpamFilter ([#104469](https://github.com/kubernetes/kubernetes/pull/104469), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Storage]
+- When using `kubectl replace` (or the equivalent API call) on a Service, the caller no longer needs to do a read-modify-write cycle to fetch the allocated values for `.spec.clusterIP` and `.spec.ports[].nodePort`.  Instead the API server will automatically carry these forward from the original object when the new object does not specify them. ([#104672](https://github.com/kubernetes/kubernetes/pull/104672), [@thockin](https://github.com/thockin)) [SIG Network]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+- github.com/opencontainers/runc: [v1.0.1 → v1.0.2](https://github.com/opencontainers/runc/compare/v1.0.1...v1.0.2)
+- k8s.io/utils: 4b05e18 → bdf08cb
+
+### Removed
+_Nothing has changed._
+
+
+
+# v1.22.1
+
+
+## Downloads for v1.22.1
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes.tar.gz) | 4ba0d63665c5959cec560264a260bb1341d09a28f6651e9814982af1ec47aff144e9ad7e6c4273867c864cdf3d12f1e7cbb4bfa44301cf5b9e81f98a345acdfb
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-src.tar.gz) | eac27ada62bf719f8d31655fadbb74c2c13793c57fe866e768c86dfbbe90c8ca1c2c07d093f1874c198e49a125968de5951ec8f07d90f8b236a1a1bcb1640b03
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-darwin-amd64.tar.gz) | 41dcfff40498335c92d872eb6aa6215d9d84908f79bdf61777d52243a446fffb114313fb586ec6a58908684eaf86fae6b2fbaa70a2a3f06f78470a20ca4d9727
+[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-darwin-arm64.tar.gz) | 810b6db31fa9c277044b1b0e39a72430f3ff728722f1fd9cc85143835147314b3fd7a6374d963eeff96cf572d2a0b034e3cab4bc0294a219832d58c40f0c1302
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-386.tar.gz) | d215c81c9a5274ced217fe09d2111f4073ed225c24c3daa71f91a4f75e38817dea504ff9b9558dcee7bd1a0c26d936c2e2bbe66e30736879fd0fba4aa0438f03
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-amd64.tar.gz) | 064bd1eaf468c9b4a00e31bec3f9c80850c52cd1e06edfd86f307236acbdba7c89dbe663cbfefdc5ead72f1cb93ba9d21d828558508f0b29f8c814d9085846ca
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-arm.tar.gz) | 07754877a5f486efb97ddb4a5d0edc8389a59bc7dba2927c73829f1aa77e36593dec6d0ba5386582221c9cf33497ebc68181d8cef4144185cf2817a5d85064c8
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-arm64.tar.gz) | 0b2265f27baad42425f6d815182261542efba2e5defccdb92668a50ff0f49c831f3af4ea6c38f351004ab1eafc270871e443e673188f37463ee3012da20cfc27
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-ppc64le.tar.gz) | a689eaef1c0788eb734fd5e70899f4cd0bc4ad6dd9f56827e7d55cab4acb2b1b0035226e69e1230fe74ac45accbbafbcc616c00fabe8dc55b9d8f94519cde253
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-s390x.tar.gz) | a76300dbd915b232826d022e1fd5b8a336e7de2089d897aed594381ad571396619609498687eba75f2dcb7fe2fb2bfe50fe6a199eda53af8513d9b3b2967b7ec
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-windows-386.tar.gz) | 46c62a9dd3d5753bf8111a32b19f41babf7c06a10f8931fede339da1605d45f020850bc568cdc9b78300d0d7a5deb4c8602092f8b6667b73bea18eadf758a14c
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-windows-amd64.tar.gz) | 88e30aee1103ab6b4f3c2bd5570b4f739cbc01b4755bfaee915dcb717ae4d8b0b99457e2bb44cc60f47b77822ce6119fbe77bdfbaaf4afa4220b78b40b1c9b2c
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-amd64.tar.gz) | 66c596577d19c1a609b554e1e61b0bc2c8ba691b2101f481dfc616799e37347edc62956b7684370dec5b16388d48a665ba78c942de4aaf5df1f78cf0667df545
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-arm.tar.gz) | b2f6d2ef240a2cf829823ef599aad5590f531c6873ace7a682d9f74954f90b9c48d3f5f33460bd050bee87736e37c331a99ed599146cebd5ade36459d41a0842
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-arm64.tar.gz) | bf7d8978b72409f02c1b7ad5f44a908f31287ee715966e47726c3f9f85c349a14f457cd84160cfe78d4e39233a119afd152528ed79db5eef6558a25098825438
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-ppc64le.tar.gz) | 9546df4488665af35a7289e77f8b194f12e5939199411fb8f4b2f15db5e669eef9dfba950315205d39f4d89c135fbccd37e8ad9c554a482bb09977234d7d7185
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-s390x.tar.gz) | e1eb0868e613e27ea7f71df5875c5d0b107a7fc38525151dffd22826c7a47111ece7d3948badb28b1a1c9d8cabca70af54cdc1501e5aadf5c842bf09bd26f1c2
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-amd64.tar.gz) | 53b44fbf58308c18b478ced5629a82d01c67dd6ae5be9559a2d65edae339983bff4d143b1bde062f5d8202ec8241e45da3b087af1fb0aea35afb1812a26450d1
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-arm.tar.gz) | c3855f27d4001dde9f89f41dc15ddab66a9bd5fa2cc058b65fc47e6c487ac12ef3e2d94ed72e9560a88696a86ef893a548eef3ef78d4528b2903f0f3d487e9df
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-arm64.tar.gz) | eb6a5cb5270a662a79302472a347a5486b3e0689c0c8ea0ceb62e83f72c043dc3b15ee3d5ec40790a1754748950208d8b5818b3f1d64e44a881720a78f50cc7e
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-ppc64le.tar.gz) | 45038ed6ee110d04ea7fb18e8f3c5f33aff2cc291a169d7a2f5f37ae1780b534ff5cd2895b7c2a9fb675a8490c9da7518e09f4ca9e2af4d57238557e1021d255
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-s390x.tar.gz) | 14a286eb32ae450e1afb9bfcf4fd84be259613b1be4d81a4433000c507427f137ff79a6da9f457ade4b668a01c1de76488b134a895d36673531cde372f3ee884
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-windows-amd64.tar.gz) | a38016acc743eb87d4803d2d06c24fc3315a4db6eacbd3f2060f28355ca96f1b3294b30483b74ecea18fe220a9d1319509f26fe02615fbaa7f1ecd11f76b1f6b
+
+## Changelog since v1.22.0
+
+## Changes by Kind
+
+### Feature
+
+- Kubernetes is now built with Golang 1.16.7 ([#104200](https://github.com/kubernetes/kubernetes/pull/104200), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
+
+### Bug or Regression
+
+- Fix kube-apiserver metric reporting for the deprecated watch path of /api/<version>/watch/... ([#104188](https://github.com/kubernetes/kubernetes/pull/104188), [@wojtek-t](https://github.com/wojtek-t)) [SIG API Machinery and Instrumentation]
+- Kube-proxy: delete stale conntrack UDP entries for loadbalancer ingress IP. ([#104009](https://github.com/kubernetes/kubernetes/pull/104009), [@aojea](https://github.com/aojea)) [SIG Network]
+- Pass additional flags to subpath mount to avoid flakes in certain conditions ([#104346](https://github.com/kubernetes/kubernetes/pull/104346), [@mauriciopoppe](https://github.com/mauriciopoppe)) [SIG Storage]
+
+### Other (Cleanup or Flake)
+
+- Kube-apiserver: sets an upper-bound on the lifetime of idle keep-alive connections and time to read the headers of incoming requests ([#103958](https://github.com/kubernetes/kubernetes/pull/103958), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Node]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+_Nothing has changed._
+
+### Removed
+_Nothing has changed._
+
+
 
 # v1.22.0
 
@@ -329,7 +763,7 @@ If CSIMigrationvSphere feature gate is enabled, user should not upgrade to Kuber
 - Deprecate `--record` flag in `kubectl`. The `--record` flag is being replaced with the [mechanism](https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers) which annotates HTTP requests with kubectl command details. ([#102873](https://github.com/kubernetes/kubernetes/pull/102873), [@soltysh](https://github.com/soltysh))
 - E2e.test: removed the  `--viper-config` flag. If you were previously using this to pass flags to `e2e.test` via a file, you will need to pass them directly on the command line, e.g. `e2e.test --e2e-output-dir`. ([#102598](https://github.com/kubernetes/kubernetes/pull/102598), [@dims](https://github.com/dims))
 - For `kubeadm`: remove the ClusterStatus API from v1beta3 and its management in the kube-system/kubeadm-config ConfigMap. This method of keeping track of what API endpoints exists in the cluster was replaced (in a prior release) by a method to annotate the etcd Pods that `kubeadm` creates in "stacked etcd" clusters. The following CLI sub-phases are deprecated and are now a NO-OP: for `kubeadm join`: "control-plane-join/update-status", for `kubeadm reset`: "update-cluster-status". Unless you are using these phases explicitly, you should not be affected. ([#101915](https://github.com/kubernetes/kubernetes/pull/101915), [@neolit123](https://github.com/neolit123))
-- Kubead: remove the deprecated `--csr-only` and `--csr-dir` flags from `kubeadm init phase certs`. Deprecate the same flags under `kubeadm certs renew`. In both the cases the command `kubeadm certs generate-csr` should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123))
+- Kubeadm: remove the deprecated `--csr-only` and `--csr-dir` flags from `kubeadm init phase certs`. Deprecate the same flags under `kubeadm certs renew`. In both the cases the command `kubeadm certs generate-csr` should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123))
 - Kubeadm: Remove the deprecated command `kubeadm alpha kubeconfig`. Please use `kubeadm kubeconfig` instead. ([#101938](https://github.com/kubernetes/kubernetes/pull/101938), [@knight42](https://github.com/knight42))
 - Kubeadm: Remove the deprecated hyperkube image support in `v1beta3`. This implies removal of `ClusterConfiguration.UseHyperKubeImage.` ([#101537](https://github.com/kubernetes/kubernetes/pull/101537), [@neolit123](https://github.com/neolit123))
 - Kubeadm: Remove the field `ClusterConfiguration.DNS.Type` in v1beta3 since CoreDNS is the only supported DNS type. ([#101547](https://github.com/kubernetes/kubernetes/pull/101547), [@neolit123](https://github.com/neolit123))
@@ -722,7 +1156,7 @@ If CSIMigrationvSphere feature gate is enabled, user should not upgrade to Kuber
 - Replace `go-bindata` with `//go:embed`. ([#99829](https://github.com/kubernetes/kubernetes/pull/99829), [@palnabarun](https://github.com/palnabarun))
 - The `DynamicFakeClient` now exposes its tracker via a `Tracker()` function. ([#100085](https://github.com/kubernetes/kubernetes/pull/100085), [@markusthoemmes](https://github.com/markusthoemmes))
 - The `VolumeSnapshotDataSource` feature gate that is GA since v1.20 is unconditionally enabled, and can no longer be specified via the `--feature-gates` argument. ([#101531](https://github.com/kubernetes/kubernetes/pull/101531), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG Storage]
-- The deprecated `CRIContainerLogRotation` feature-gate has been removed, since the `CRIContainerLogRotatio`n feature graduated to GA in 1.21 and was unconditionally enabled. ([#101578](https://github.com/kubernetes/kubernetes/pull/101578), [@carlory](https://github.com/carlory))
+- The deprecated `CRIContainerLogRotation` feature-gate has been removed, since the `CRIContainerLogRotation` feature graduated to GA in 1.21 and was unconditionally enabled. ([#101578](https://github.com/kubernetes/kubernetes/pull/101578), [@carlory](https://github.com/carlory))
 - The deprecated `RootCAConfigMap` feature-gate has been removed, since the `RootCAConfigMap` feature graduated to GA in 1.21 and is unconditionally enabled. ([#101579](https://github.com/kubernetes/kubernetes/pull/101579), [@carlory](https://github.com/carlory))
 - The deprecated `runAsGroup` feature-gate has been removed, since the `runAsGroup` feature graduated to GA in 1.21. ([#101581](https://github.com/kubernetes/kubernetes/pull/101581), [@carlory](https://github.com/carlory))
 - The etcd client has been updated to 3.5.0; `github.com/golang/protobuf`, `google.golang.org/protobuf`, and `google.golang.org/grpc` have been updated to current versions. ([#100488](https://github.com/kubernetes/kubernetes/pull/100488), [@liggitt](https://github.com/liggitt))
@@ -1860,7 +2294,7 @@ filename | sha512 hash
   - liveness/readiness probes to controller-manager MUST use HTTPS now, and the default port has been changed to 10257.
   - Applications that fetch metrics from controller-manager should use a dedicated service account which is allowed to access nonResourceURLs `/metrics`. ([#96216](https://github.com/kubernetes/kubernetes/pull/96216), [@knight42](https://github.com/knight42)) [SIG API Machinery, Cloud Provider, Instrumentation and Testing]
 - Ingress v1beta1 has been deprecated ([#102030](https://github.com/kubernetes/kubernetes/pull/102030), [@aojea](https://github.com/aojea)) [SIG CLI, Network and Testing]
-- Kubead: remove the deprecated `--csr-only` and `--csr-dir` flags from "kubeadm init phase certs". Deprecate the same flags under "kubeadm certs renew". In both cases the command "kubeadm certs generate-csr" should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
+- Kubeadm: remove the deprecated `--csr-only` and `--csr-dir` flags from "kubeadm init phase certs". Deprecate the same flags under "kubeadm certs renew". In both cases the command "kubeadm certs generate-csr" should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
 - Kubeadm: remove the ClusterStatus API from v1beta3 and its management in the kube-system/kubeadm-config ConfigMap. This method of keeping track of what API endpoints exists in the cluster was replaced (in a prior release) by a method to annotate the etcd Pods that kubeadm creates in "stacked etcd" clusters. The following CLI sub-phases are deprecated and are now a NO-OP: for " kubeadm join": "control-plane-join/update-status", for "kubeadm reset": "update-cluster-status". Unless you are using these phases explicitly, you should not be affected. ([#101915](https://github.com/kubernetes/kubernetes/pull/101915), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
 - Kubeadm: remove the deprecated command "kubeadm alpha kubeconfig". Please use "kubeadm kubeconfig" instead. ([#101938](https://github.com/kubernetes/kubernetes/pull/101938), [@knight42](https://github.com/knight42)) [SIG Cluster Lifecycle]
 - Kubeadm: remove the deprecated command 'kubeadm config view'. A replacement for this command is 'kubectl get cm -n kube-system kubeadm-config -o=jsonpath="{.data.ClusterConfiguration}"' ([#102071](https://github.com/kubernetes/kubernetes/pull/102071), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]

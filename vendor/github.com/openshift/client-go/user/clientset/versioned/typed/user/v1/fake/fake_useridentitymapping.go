@@ -53,6 +53,6 @@ func (c *FakeUserIdentityMappings) Update(ctx context.Context, userIdentityMappi
 // Delete takes name of the userIdentityMapping and deletes it. Returns an error if one occurs.
 func (c *FakeUserIdentityMappings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(useridentitymappingsResource, name), &userv1.UserIdentityMapping{})
+		Invokes(testing.NewRootDeleteActionWithOptions(useridentitymappingsResource, name, opts), &userv1.UserIdentityMapping{})
 	return err
 }

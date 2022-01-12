@@ -25,6 +25,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+func (ds *dockerService) getContainerStats(c *runtimeapi.Container) (*runtimeapi.ContainerStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }

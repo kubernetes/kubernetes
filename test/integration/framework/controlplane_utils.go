@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -119,7 +120,7 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 			Description: "Default Response.",
 		},
 	}
-	openAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
 
 	return openAPIConfig
 }
@@ -199,7 +200,7 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
 		controlPlaneConfig.GenericConfig.FlowControl = utilflowcontrol.New(
 			controlPlaneConfig.ExtraConfig.VersionedInformers,
-			clientset.FlowcontrolV1beta1(),
+			clientset.FlowcontrolV1beta2(),
 			controlPlaneConfig.GenericConfig.MaxRequestsInFlight+controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight,
 			controlPlaneConfig.GenericConfig.RequestTimeout/4,
 		)

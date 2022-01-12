@@ -89,7 +89,7 @@ func (c *FakeRoleBindingRestrictions) Update(ctx context.Context, roleBindingRes
 // Delete takes name of the roleBindingRestriction and deletes it. Returns an error if one occurs.
 func (c *FakeRoleBindingRestrictions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(rolebindingrestrictionsResource, c.ns, name), &authorizationv1.RoleBindingRestriction{})
+		Invokes(testing.NewDeleteActionWithOptions(rolebindingrestrictionsResource, c.ns, name, opts), &authorizationv1.RoleBindingRestriction{})
 
 	return err
 }

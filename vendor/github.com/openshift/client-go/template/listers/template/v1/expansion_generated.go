@@ -6,6 +6,14 @@ package v1
 // BrokerTemplateInstanceLister.
 type BrokerTemplateInstanceListerExpansion interface{}
 
+// TemplateListerExpansion allows custom methods to be added to
+// TemplateLister.
+type TemplateListerExpansion interface{}
+
+// TemplateNamespaceListerExpansion allows custom methods to be added to
+// TemplateNamespaceLister.
+type TemplateNamespaceListerExpansion interface{}
+
 // TemplateInstanceListerExpansion allows custom methods to be added to
 // TemplateInstanceLister.
 type TemplateInstanceListerExpansion interface{}

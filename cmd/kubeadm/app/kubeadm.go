@@ -20,12 +20,12 @@ import (
 	"flag"
 	"os"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
+	"github.com/spf13/pflag"
 
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
-	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
 
 // Run creates and executes new kubeadm command

@@ -27,7 +27,7 @@ be used to document the test which make it more human readable. The "Description
 documentation for that test.
 
 ### **Output:**
-## [Kubelet, log output, default](https://github.com/kubernetes/kubernetes/tree/master/test/e2e/common/kubelet.go#L48)
+## [Kubelet, log output, default](https://github.com/kubernetes/kubernetes/tree/master/test/e2e/common/node/kubelet.go#L49)
 
 - Added to conformance in release v1.13
 - Defined in code as: [k8s.io] Kubelet when scheduling a busybox command in a pod should print the output to logs [NodeConformance] [Conformance]

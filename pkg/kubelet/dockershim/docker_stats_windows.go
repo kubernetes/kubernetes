@@ -20,7 +20,6 @@ limitations under the License.
 package dockershim
 
 import (
-	"context"
 	"strings"
 	"time"
 
@@ -29,26 +28,21 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
-	info, err := ds.client.Info()
-	if err != nil {
-		return nil, err
-	}
-
-	hcsshimContainer, err := hcsshim.OpenContainer(containerID)
+func (ds *dockerService) getContainerStats(c *runtimeapi.Container) (*runtimeapi.ContainerStats, error) {
+	hcsshimContainer, err := hcsshim.OpenContainer(c.Id)
 	if err != nil {
 		// As we moved from using Docker stats to hcsshim directly, we may query HCS with already exited container IDs.
 		// That will typically happen with init-containers in Exited state. Docker still knows about them but the HCS does not.
 		// As we don't want to block stats retrieval for other containers, we only log errors.
 		if !hcsshim.IsNotExist(err) && !hcsshim.IsAlreadyStopped(err) {
-			klog.V(4).InfoS("Error opening container (stats will be missing)", "containerID", containerID, "err", err)
+			klog.V(4).InfoS("Error opening container (stats will be missing)", "containerID", c.Id, "err", err)
 		}
 		return nil, nil
 	}
 	defer func() {
 		closeErr := hcsshimContainer.Close()
 		if closeErr != nil {
-			klog.ErrorS(closeErr, "Error closing container", "containerID", containerID)
+			klog.ErrorS(closeErr, "Error closing container", "containerID", c.Id)
 		}
 	}()
 
@@ -61,30 +55,19 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 			// These hcs errors do not have helpers exposed in public package so need to query for the known codes
 			// https://github.com/microsoft/hcsshim/blob/master/internal/hcs/errors.go
 			// PR to expose helpers in hcsshim: https://github.com/microsoft/hcsshim/pull/933
-			klog.V(4).InfoS("Container is not in a state that stats can be accessed. This occurs when the container is created but not started.", "containerID", containerID, "err", err)
+			klog.V(4).InfoS("Container is not in a state that stats can be accessed. This occurs when the container is created but not started.", "containerID", c.Id, "err", err)
 			return nil, nil
 		}
 		return nil, err
 	}
 
-	containerJSON, err := ds.client.InspectContainerWithSize(containerID)
-	if err != nil {
-		return nil, err
-	}
-
-	statusResp, err := ds.ContainerStatus(context.Background(), &runtimeapi.ContainerStatusRequest{ContainerId: containerID})
-	if err != nil {
-		return nil, err
-	}
-	status := statusResp.GetStatus()
-
 	timestamp := time.Now().UnixNano()
 	containerStats := &runtimeapi.ContainerStats{
 		Attributes: &runtimeapi.ContainerAttributes{
-			Id:          containerID,
-			Metadata:    status.Metadata,
-			Labels:      status.Labels,
-			Annotations: status.Annotations,
+			Id:          c.Id,
+			Metadata:    c.Metadata,
+			Labels:      c.Labels,
+			Annotations: c.Annotations,
 		},
 		Cpu: &runtimeapi.CpuUsage{
 			Timestamp: timestamp,
@@ -97,8 +80,11 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		},
 		WritableLayer: &runtimeapi.FilesystemUsage{
 			Timestamp: timestamp,
-			FsId:      &runtimeapi.FilesystemIdentifier{Mountpoint: info.DockerRootDir},
-			UsedBytes: &runtimeapi.UInt64Value{Value: uint64(*containerJSON.SizeRw)},
+			FsId:      &runtimeapi.FilesystemIdentifier{Mountpoint: ds.dockerRootDir},
+			// used bytes from image are not implemented on Windows
+			// don't query for it since it is expensive to call docker over named pipe
+			// https://github.com/moby/moby/blob/1ba54a5fd0ba293db3bea46cd67604b593f2048b/daemon/images/image_windows.go#L11-L14
+			UsedBytes: &runtimeapi.UInt64Value{Value: 0},
 		},
 	}
 	return containerStats, nil

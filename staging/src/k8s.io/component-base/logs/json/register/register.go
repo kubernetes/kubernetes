@@ -19,9 +19,10 @@ package register
 import (
 	"k8s.io/component-base/logs"
 	json "k8s.io/component-base/logs/json"
+	"k8s.io/component-base/logs/registry"
 )
 
 func init() {
 	// JSON format is optional klog format
-	logs.LogRegistry.Register(logs.JSONLogFormat, json.JSONLogger)
+	registry.LogRegistry.Register(logs.JSONLogFormat, json.Factory{})
 }

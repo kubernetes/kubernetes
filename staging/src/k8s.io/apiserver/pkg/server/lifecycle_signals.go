@@ -16,6 +16,10 @@ limitations under the License.
 
 package server
 
+import (
+	"sync"
+)
+
 /*
 We make an attempt here to identify the events that take place during
 lifecycle of the apiserver.
@@ -126,6 +130,11 @@ type lifecycleSignals struct {
 
 	// HasBeenReady is signaled when the readyz endpoint succeeds for the first time.
 	HasBeenReady lifecycleSignal
+
+	// MuxAndDiscoveryComplete is signaled when all known HTTP paths have been installed.
+	// It exists primarily to avoid returning a 404 response when a resource actually exists but we haven't installed the path to a handler.
+	// The actual logic is implemented by an APIServer using the generic server library.
+	MuxAndDiscoveryComplete lifecycleSignal
 }
 
 // newLifecycleSignals returns an instance of lifecycleSignals interface to be used
@@ -137,28 +146,28 @@ func newLifecycleSignals() lifecycleSignals {
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
 		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 		HasBeenReady:               newNamedChannelWrapper("HasBeenReady"),
+		MuxAndDiscoveryComplete:    newNamedChannelWrapper("MuxAndDiscoveryComplete"),
 	}
 }
 
 func newNamedChannelWrapper(name string) lifecycleSignal {
 	return &namedChannelWrapper{
 		name: name,
+		once: sync.Once{},
 		ch:   make(chan struct{}),
 	}
 }
 
 type namedChannelWrapper struct {
 	name string
+	once sync.Once
 	ch   chan struct{}
 }
 
 func (e *namedChannelWrapper) Signal() {
-	select {
-	case <-e.ch:
-		// already closed, don't close again.
-	default:
+	e.once.Do(func() {
 		close(e.ch)
-	}
+	})
 }
 
 func (e *namedChannelWrapper) Signaled() <-chan struct{} {
