@@ -107,7 +107,7 @@ func TestUnsetUnexistConfig(t *testing.T) {
 
 func TestUnsetAuthProviderInfo(t *testing.T) {
 	authProviderConfig := clientcmdapi.AuthProviderConfig{
-		Name: "foo",
+		Name:   "foo",
 		Config: map[string]string{"refresh-token": "testestestest"},
 	}
 	conf := clientcmdapi.Config{
