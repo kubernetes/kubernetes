@@ -1,0 +1,8 @@
+    startupProbe:
+      failureThreshold: 4
+      periodSeconds: 1
+      successThreshold: 1
+      tcpSocket:
+        port: 8080
+      timeoutSeconds: 1
+
