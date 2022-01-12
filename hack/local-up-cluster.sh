@@ -138,10 +138,6 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-if [ "$(id -u)" != "0" ]; then
-    echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
-fi
-
 # Stop right away if the build fails
 set -e
 
@@ -362,8 +358,6 @@ cleanup()
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
 
-  # Drop the rule we added
-  iptables -t nat -D OUTPUT -m addrtype --dst-type LOCAL -j DOCKER || true
   exit 0
 }
 
