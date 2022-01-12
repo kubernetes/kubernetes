@@ -29,7 +29,7 @@ MODULES=(
     staging/src/k8s.io/kms/internal/plugins/_mock
 )
 
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
+# Explicitly opt into go modules
 export GO111MODULE=on
 
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
