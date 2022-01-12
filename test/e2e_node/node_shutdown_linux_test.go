@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -65,6 +67,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func() {
+			if err := lookEmitSignalCommand(); err != nil {
+				e2eskipper.Skipf("skipping test because: %v", err)
+				return
+			}
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady()
 		})
@@ -437,6 +443,11 @@ while true; do sleep 5; done
 func emitSignalPrepareForShutdown(b bool) error {
 	cmd := "dbus-send --system /org/freedesktop/login1 org.freedesktop.login1.Manager.PrepareForShutdown boolean:" + strconv.FormatBool(b)
 	_, err := runCommand("sh", "-c", cmd)
+	return err
+}
+
+func lookEmitSignalCommand() error {
+	_, err := exec.LookPath("dbus-send")
 	return err
 }
 
