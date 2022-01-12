@@ -29,7 +29,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -44,8 +43,8 @@ type Validator interface {
 }
 
 // NewValidator is in order to find AppArmor FS
-func NewValidator(runtime string) Validator {
-	if err := validateHost(runtime); err != nil {
+func NewValidator() Validator {
+	if err := validateHost(); err != nil {
 		return &validator{validateHostErr: err}
 	}
 	appArmorFS, err := getAppArmorFS()
@@ -90,7 +89,7 @@ func (v *validator) ValidateHost() error {
 }
 
 // Verify that the host and runtime is capable of enforcing AppArmor profiles.
-func validateHost(runtime string) error {
+func validateHost() error {
 	// Check feature-gates
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
 		return errors.New("AppArmor disabled by feature-gate")
@@ -104,11 +103,6 @@ func validateHost(runtime string) error {
 	// Check kernel support.
 	if !apparmor.IsEnabled() {
 		return errors.New("AppArmor is not enabled on the host")
-	}
-
-	// Check runtime support. Currently only Docker is supported.
-	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q", runtime)
 	}
 
 	return nil
