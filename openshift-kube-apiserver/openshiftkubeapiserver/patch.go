@@ -93,8 +93,8 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 		return nil
 	})
 	genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(
-		enablement.OpenshiftConfig().ConsolePublicURL,
 		enablement.OpenshiftConfig().AuthConfig.OAuthMetadataFile,
+		kubeInformers.Core().V1().ConfigMaps(),
 		apiRequestCountController,
 	)
 	if err != nil {
