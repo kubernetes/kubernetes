@@ -155,6 +155,7 @@ const (
 	// owner: @wojtek-t
 	// alpha: v1.20
 	// beta: v1.21
+	// GA: v1.24
 	//
 	// Allows for updating watchcache resource version with progress notify events.
 	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
@@ -224,7 +225,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemoveSelfLink:                      {Default: true, PreRelease: featuregate.Beta},
 	SelectorIndex:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	WarningHeaders:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	EfficientWatchResumption:            {Default: true, PreRelease: featuregate.Beta},
+	EfficientWatchResumption:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	APIServerIdentity:                   {Default: false, PreRelease: featuregate.Alpha},
 	APIServerTracing:                    {Default: false, PreRelease: featuregate.Alpha},
 	OpenAPIEnums:                        {Default: false, PreRelease: featuregate.Alpha},

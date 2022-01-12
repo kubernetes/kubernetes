@@ -1103,9 +1103,7 @@ func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interfac
 		ResourceVersion: options.ResourceVersion,
 		Predicate:       storage.Everything,
 		Recursive:       true,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EfficientWatchResumption) {
-		opts.ProgressNotify = true
+		ProgressNotify:  true,
 	}
 	return lw.storage.Watch(context.TODO(), lw.resourcePrefix, opts)
 }
