@@ -34,7 +34,7 @@ kube::golang::verify_go_version
 export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
+# Explicitly opt into go modules
 export GO111MODULE=on
 
 # Install golangci-lint
