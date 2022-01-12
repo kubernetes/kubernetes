@@ -117,6 +117,8 @@ type AuthenticationInfoResolver interface {
 	ClientConfigForService(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error)
 }
 
+var _ AuthenticationInfoResolver = &AuthenticationInfoResolverDelegator{}
+
 // AuthenticationInfoResolverDelegator implements AuthenticationInfoResolver.
 type AuthenticationInfoResolverDelegator struct {
 	ClientConfigForFunc        func(hostPort string) (*rest.Config, error)
@@ -132,6 +134,8 @@ func (a *AuthenticationInfoResolverDelegator) ClientConfigFor(hostPort string) (
 func (a *AuthenticationInfoResolverDelegator) ClientConfigForService(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error) {
 	return a.ClientConfigForServiceFunc(serviceName, serviceNamespace, servicePort)
 }
+
+var _ AuthenticationInfoResolver = &defaultAuthenticationInfoResolver{}
 
 type defaultAuthenticationInfoResolver struct {
 	kubeconfig clientcmdapi.Config

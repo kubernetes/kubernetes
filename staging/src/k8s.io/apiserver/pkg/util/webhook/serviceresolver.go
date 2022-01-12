@@ -27,6 +27,8 @@ type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
 }
 
+var _ ServiceResolver = &defaultServiceResolver{}
+
 type defaultServiceResolver struct{}
 
 // NewDefaultServiceResolver creates a new default server resolver.
