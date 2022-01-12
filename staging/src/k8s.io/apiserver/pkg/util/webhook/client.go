@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 
@@ -179,6 +180,11 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 		if len(cfg.TLSClientConfig.ServerName) == 0 {
 			cfg.TLSClientConfig.ServerName = serverName
 		}
+		// request to Services should not be proxied #107446
+		// https://github.com/golang/net/blob/c6ed85c7a12db1bd15e993fd3ae4700b2e9f2c84/http/httpproxy/proxy.go#L112-L114
+		// A nil URL and nil error are returned if no proxy is defined in the environment,
+		// or a proxy should not be used for the given request, as defined by NO_PROXY
+		cfg.Proxy = func(req *http.Request) (*url.URL, error) { return nil, nil }
 
 		delegateDialer := cfg.Dial
 		if delegateDialer == nil {
