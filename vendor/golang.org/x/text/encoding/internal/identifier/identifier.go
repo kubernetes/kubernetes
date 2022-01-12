@@ -31,8 +31,8 @@ package identifier
 
 // References:
 // - http://source.icu-project.org/repos/icu/icu/trunk/source/data/mappings/convrtrs.txt
-// - http://www.iana.org/assignments/character-sets/character-sets.xhtml
-// - http://www.iana.org/assignments/ianacharset-mib/ianacharset-mib
+// - https://www.iana.org/assignments/character-sets/character-sets.xhtml
+// - https://www.iana.org/assignments/ianacharset-mib/ianacharset-mib
 // - http://www.ietf.org/rfc/rfc2978.txt
 // - https://www.unicode.org/reports/tr22/
 // - http://www.w3.org/TR/encoding/
@@ -61,7 +61,7 @@ type Interface interface {
 // some identifiers for some encodings that are not covered by the IANA
 // standard.
 //
-// See http://www.iana.org/assignments/ianacharset-mib.
+// See https://www.iana.org/assignments/ianacharset-mib.
 type MIB uint16
 
 // These additional MIB types are not defined in IANA. They are added because

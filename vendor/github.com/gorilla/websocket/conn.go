@@ -201,7 +201,7 @@ func isData(frameType int) bool {
 }
 
 var validReceivedCloseCodes = map[int]bool{
-	// see http://www.iana.org/assignments/websocket/websocket.xhtml#close-code-number
+	// see https://www.iana.org/assignments/websocket/websocket.xhtml#close-code-number
 
 	CloseNormalClosure:           true,
 	CloseGoingAway:               true,

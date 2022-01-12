@@ -98,7 +98,7 @@ func CachableObject(obj *Object, rv *ObjectResults) {
 	case "TRACE":
 		rv.OutReasons = append(rv.OutReasons, ReasonRequestMethodTRACE)
 
-	// HTTP Extension Methods: http://www.iana.org/assignments/http-methods/http-methods.xhtml
+	// HTTP Extension Methods: https://www.iana.org/assignments/http-methods/http-methods.xhtml
 	//
 	// To my knowledge, none of them are cachable. Please open a ticket if this is not the case!
 	//

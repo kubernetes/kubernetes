@@ -26,7 +26,7 @@ import (
 	"strings"
 )
 
-// TODO(pquerna): add extensions from here: http://www.iana.org/assignments/http-cache-directives/http-cache-directives.xhtml
+// TODO(pquerna): add extensions from here: https://www.iana.org/assignments/http-cache-directives/http-cache-directives.xhtml
 
 var (
 	ErrQuoteMismatch         = errors.New("Missing closing quote")

@@ -257,7 +257,7 @@ func timeoutUnitToDuration(u uint8) (d time.Duration, ok bool) {
 
 // isPermanentHTTPHeader checks whether hdr belongs to the list of
 // permanent request headers maintained by IANA.
-// http://www.iana.org/assignments/message-headers/message-headers.xml
+// https://www.iana.org/assignments/message-headers/message-headers.xml
 func isPermanentHTTPHeader(hdr string) bool {
 	switch hdr {
 	case
