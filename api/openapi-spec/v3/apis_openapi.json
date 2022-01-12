@@ -1,7 +1,7 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup": {
+      "core.v1.APIGroup": {
         "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
         "properties": {
           "apiVersion": {
@@ -52,7 +52,7 @@
           }
         ]
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList": {
+      "core.v1.APIGroupList": {
         "description": "APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
         "properties": {
           "apiVersion": {
@@ -62,7 +62,7 @@
           "groups": {
             "description": "groups is a list of APIGroup.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup",
+              "$ref": "#/components/schemas/core.v1.APIGroup",
               "default": {}
             },
             "type": "array"
@@ -141,17 +141,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList"
+                  "$ref": "#/components/schemas/core.v1.APIGroupList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList"
+                  "$ref": "#/components/schemas/core.v1.APIGroupList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList"
+                  "$ref": "#/components/schemas/core.v1.APIGroupList"
                 }
               }
             },

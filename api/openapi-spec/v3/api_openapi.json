@@ -1,7 +1,7 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions": {
+      "core.v1.APIVersions": {
         "description": "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
         "properties": {
           "apiVersion": {
@@ -79,17 +79,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions"
+                  "$ref": "#/components/schemas/core.v1.APIVersions"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions"
+                  "$ref": "#/components/schemas/core.v1.APIVersions"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions"
+                  "$ref": "#/components/schemas/core.v1.APIVersions"
                 }
               }
             },

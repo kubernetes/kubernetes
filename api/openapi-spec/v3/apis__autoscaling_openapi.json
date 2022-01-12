@@ -1,7 +1,7 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup": {
+      "core.v1.APIGroup": {
         "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
         "properties": {
           "apiVersion": {
@@ -109,17 +109,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                  "$ref": "#/components/schemas/core.v1.APIGroup"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                  "$ref": "#/components/schemas/core.v1.APIGroup"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                  "$ref": "#/components/schemas/core.v1.APIGroup"
                 }
               }
             },

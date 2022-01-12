@@ -1,6 +1,746 @@
 {
   "components": {
     "schemas": {
+      "autoscaling.v2beta1.HorizontalPodAutoscaler": {
+        "description": "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "default": {},
+            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerSpec",
+            "default": {},
+            "description": "spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status."
+          },
+          "status": {
+            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerStatus",
+            "default": {},
+            "description": "status is the current information about the autoscaler."
+          }
+        },
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "autoscaling",
+            "kind": "HorizontalPodAutoscaler",
+            "version": "v2beta1"
+          }
+        ]
+      },
+      "autoscaling.v2beta1.HorizontalPodAutoscalerList": {
+        "description": "HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "description": "items is the list of horizontal pod autoscaler objects.",
+            "items": {
+              "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler",
+              "default": {}
+            },
+            "type": "array"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+            "default": {},
+            "description": "metadata is the standard list metadata."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "autoscaling",
+            "kind": "HorizontalPodAutoscalerList",
+            "version": "v2beta1"
+          }
+        ]
+      },
+      "core.v1.APIResourceList": {
+        "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "groupVersion": {
+            "default": "",
+            "description": "groupVersion is the group and version this APIResourceList is for.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "resources": {
+            "description": "resources contains the name of the resources and if they are namespaced.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource",
+              "default": {}
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "groupVersion",
+          "resources"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "",
+            "kind": "APIResourceList",
+            "version": "v1"
+          }
+        ]
+      },
+      "core.v1.DeleteOptions": {
+        "description": "DeleteOptions may be provided when deleting an API object.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "dryRun": {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "gracePeriodSeconds": {
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "orphanDependents": {
+            "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+            "type": "boolean"
+          },
+          "preconditions": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions",
+            "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned."
+          },
+          "propagationPolicy": {
+            "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "admission.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "admission.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "apps",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "DeleteOptions",
+            "version": "v1beta2"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v2"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v2beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v2beta2"
+          },
+          {
+            "group": "batch",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "batch",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "extensions",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta2"
+          },
+          {
+            "group": "imagepolicy.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "internal.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "policy",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "policy",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          }
+        ]
+      },
+      "core.v1.Status": {
+        "description": "Status is a return value for calls that don't return other objects.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "code": {
+            "description": "Suggested HTTP return code for this status, 0 if not set.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "details": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails",
+            "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "message": {
+            "description": "A human-readable description of the status of this operation.",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+            "default": {},
+            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+          },
+          "reason": {
+            "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it.",
+            "type": "string"
+          },
+          "status": {
+            "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "",
+            "kind": "Status",
+            "version": "v1"
+          }
+        ]
+      },
+      "core.v1.WatchEvent": {
+        "description": "Event represents a single event to a watched resource.",
+        "properties": {
+          "object": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension",
+            "default": {},
+            "description": "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context."
+          },
+          "type": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "object"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "admission.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "admission.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "apps",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "WatchEvent",
+            "version": "v1beta2"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v2"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v2beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v2beta2"
+          },
+          {
+            "group": "batch",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "batch",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "extensions",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta2"
+          },
+          {
+            "group": "imagepolicy.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "internal.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "policy",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "policy",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          }
+        ]
+      },
       "io.k8s.api.autoscaling.v2beta1.ContainerResourceMetricSource": {
         "description": "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
         "properties": {
@@ -139,42 +879,6 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler": {
-        "description": "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-            "default": {},
-            "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
-          },
-          "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerSpec",
-            "default": {},
-            "description": "spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status."
-          },
-          "status": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerStatus",
-            "default": {},
-            "description": "status is the current information about the autoscaler."
-          }
-        },
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "autoscaling",
-            "kind": "HorizontalPodAutoscaler",
-            "version": "v2beta1"
-          }
-        ]
-      },
       "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerCondition": {
         "description": "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
         "properties": {
@@ -207,43 +911,6 @@
           "status"
         ],
         "type": "object"
-      },
-      "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList": {
-        "description": "HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "items": {
-            "description": "items is the list of horizontal pod autoscaler objects.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler",
-              "default": {}
-            },
-            "type": "array"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
-            "default": {},
-            "description": "metadata is the standard list metadata."
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "autoscaling",
-            "kind": "HorizontalPodAutoscalerList",
-            "version": "v2beta1"
-          }
-        ]
       },
       "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerSpec": {
         "description": "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
@@ -631,345 +1298,6 @@
         ],
         "type": "object"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList": {
-        "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "groupVersion": {
-            "default": "",
-            "description": "groupVersion is the group and version this APIResourceList is for.",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "resources": {
-            "description": "resources contains the name of the resources and if they are namespaced.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource",
-              "default": {}
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "groupVersion",
-          "resources"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "",
-            "kind": "APIResourceList",
-            "version": "v1"
-          }
-        ]
-      },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions": {
-        "description": "DeleteOptions may be provided when deleting an API object.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "dryRun": {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "items": {
-              "default": "",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "gracePeriodSeconds": {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
-            "format": "int64",
-            "type": "integer"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "orphanDependents": {
-            "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
-            "type": "boolean"
-          },
-          "preconditions": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions",
-            "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned."
-          },
-          "propagationPolicy": {
-            "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "admission.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "admission.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "apps",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "DeleteOptions",
-            "version": "v1beta2"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "DeleteOptions",
-            "version": "v2beta2"
-          },
-          {
-            "group": "batch",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "batch",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "extensions",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta2"
-          },
-          {
-            "group": "imagepolicy.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "internal.apiserver.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "policy",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "policy",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1beta1"
-          }
-        ]
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1": {
         "description": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
         "type": "object"
@@ -1239,53 +1567,6 @@
         },
         "type": "object"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.Status": {
-        "description": "Status is a return value for calls that don't return other objects.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "code": {
-            "description": "Suggested HTTP return code for this status, 0 if not set.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "details": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails",
-            "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "message": {
-            "description": "A human-readable description of the status of this operation.",
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
-            "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
-          },
-          "reason": {
-            "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it.",
-            "type": "string"
-          },
-          "status": {
-            "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "",
-            "kind": "Status",
-            "version": "v1"
-          }
-        ]
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause": {
         "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
         "properties": {
@@ -1344,287 +1625,6 @@
         "format": "date-time",
         "type": "string"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent": {
-        "description": "Event represents a single event to a watched resource.",
-        "properties": {
-          "object": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension",
-            "default": {},
-            "description": "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context."
-          },
-          "type": {
-            "default": "",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "object"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "admission.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "admission.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "apiextensions.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "apiregistration.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "apps",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "apps",
-            "kind": "WatchEvent",
-            "version": "v1beta2"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "authentication.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta1"
-          },
-          {
-            "group": "autoscaling",
-            "kind": "WatchEvent",
-            "version": "v2beta2"
-          },
-          {
-            "group": "batch",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "batch",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "certificates.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "coordination.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "discovery.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "events.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "extensions",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "flowcontrol.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta2"
-          },
-          {
-            "group": "imagepolicy.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "internal.apiserver.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "node.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "policy",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "policy",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "rbac.authorization.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "scheduling.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "storage.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1beta1"
-          }
-        ]
-      },
       "io.k8s.apimachinery.pkg.runtime.RawExtension": {
         "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.Object `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// External package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// On the wire, the JSON will look something like this: {\n\t\"kind\":\"MyAPIObject\",\n\t\"apiVersion\":\"v1\",\n\t\"myPlugin\": {\n\t\t\"kind\":\"PluginA\",\n\t\t\"aOption\":\"foo\",\n\t},\n}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
         "type": "object"
@@ -1646,17 +1646,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                  "$ref": "#/components/schemas/core.v1.APIResourceList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                  "$ref": "#/components/schemas/core.v1.APIResourceList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                  "$ref": "#/components/schemas/core.v1.APIResourceList"
                 }
               }
             },
@@ -1677,27 +1677,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               }
             },
@@ -1910,7 +1910,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+                "$ref": "#/components/schemas/core.v1.DeleteOptions"
               }
             }
           }
@@ -1920,17 +1920,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               }
             },
@@ -2032,27 +2032,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscalerList"
                 }
               }
             },
@@ -2120,7 +2120,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
               }
             }
           }
@@ -2130,17 +2130,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2150,17 +2150,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2170,17 +2170,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2238,7 +2238,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+                "$ref": "#/components/schemas/core.v1.DeleteOptions"
               }
             }
           }
@@ -2248,17 +2248,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               }
             },
@@ -2268,17 +2268,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                  "$ref": "#/components/schemas/core.v1.Status"
                 }
               }
             },
@@ -2297,17 +2297,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2404,17 +2404,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2424,17 +2424,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2481,7 +2481,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
               }
             }
           }
@@ -2491,17 +2491,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2511,17 +2511,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2542,17 +2542,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2649,17 +2649,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2669,17 +2669,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2726,7 +2726,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
               }
             }
           }
@@ -2736,17 +2736,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2756,17 +2756,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+                  "$ref": "#/components/schemas/autoscaling.v2beta1.HorizontalPodAutoscaler"
                 }
               }
             },
@@ -2787,27 +2787,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               }
             },
@@ -2920,27 +2920,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               }
             },
@@ -3063,27 +3063,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                  "$ref": "#/components/schemas/core.v1.WatchEvent"
                 }
               }
             },

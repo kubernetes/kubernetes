@@ -1,41 +1,40 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.api.authorization.v1.LocalSubjectAccessReview": {
-        "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+      "core.v1.APIResourceList": {
+        "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "groupVersion": {
+            "default": "",
+            "description": "groupVersion is the group and version this APIResourceList is for.",
             "type": "string"
           },
           "kind": {
             "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
             "type": "string"
           },
-          "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-            "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
-          },
-          "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
-            "default": {},
-            "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
-          },
-          "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
-            "default": {},
-            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+          "resources": {
+            "description": "resources contains the name of the resources and if they are namespaced.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource",
+              "default": {}
+            },
+            "type": "array"
           }
         },
         "required": [
-          "spec"
+          "groupVersion",
+          "resources"
         ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
-            "group": "authorization.k8s.io",
-            "kind": "LocalSubjectAccessReview",
+            "group": "",
+            "kind": "APIResourceList",
             "version": "v1"
           }
         ]
@@ -154,45 +153,6 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.authorization.v1.SelfSubjectAccessReview": {
-        "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-            "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
-          },
-          "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec",
-            "default": {},
-            "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
-          },
-          "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
-            "default": {},
-            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
-          }
-        },
-        "required": [
-          "spec"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "authorization.k8s.io",
-            "kind": "SelfSubjectAccessReview",
-            "version": "v1"
-          }
-        ]
-      },
       "io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec": {
         "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
         "properties": {
@@ -207,45 +167,6 @@
         },
         "type": "object"
       },
-      "io.k8s.api.authorization.v1.SelfSubjectRulesReview": {
-        "description": "SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server's authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-            "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
-          },
-          "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReviewSpec",
-            "default": {},
-            "description": "Spec holds information about the request being evaluated."
-          },
-          "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectRulesReviewStatus",
-            "default": {},
-            "description": "Status is filled in by the server and indicates the set of actions a user can perform."
-          }
-        },
-        "required": [
-          "spec"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "authorization.k8s.io",
-            "kind": "SelfSubjectRulesReview",
-            "version": "v1"
-          }
-        ]
-      },
       "io.k8s.api.authorization.v1.SelfSubjectRulesReviewSpec": {
         "description": "SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.",
         "properties": {
@@ -255,45 +176,6 @@
           }
         },
         "type": "object"
-      },
-      "io.k8s.api.authorization.v1.SubjectAccessReview": {
-        "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-            "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
-          },
-          "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
-            "default": {},
-            "description": "Spec holds information about the request being evaluated"
-          },
-          "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
-            "default": {},
-            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
-          }
-        },
-        "required": [
-          "spec"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "authorization.k8s.io",
-            "kind": "SubjectAccessReview",
-            "version": "v1"
-          }
-        ]
       },
       "io.k8s.api.authorization.v1.SubjectAccessReviewSpec": {
         "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
@@ -466,44 +348,6 @@
           "verbs"
         ],
         "type": "object"
-      },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList": {
-        "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "groupVersion": {
-            "default": "",
-            "description": "groupVersion is the group and version this APIResourceList is for.",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "resources": {
-            "description": "resources contains the name of the resources and if they are namespaced.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource",
-              "default": {}
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "groupVersion",
-          "resources"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "",
-            "kind": "APIResourceList",
-            "version": "v1"
-          }
-        ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1": {
         "description": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
@@ -684,6 +528,162 @@
         "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
         "format": "date-time",
         "type": "string"
+      },
+      "io.k8s.authorization.v1.LocalSubjectAccessReview": {
+        "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "default": {},
+            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
+            "default": {},
+            "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
+          },
+          "status": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
+            "default": {},
+            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "authorization.k8s.io",
+            "kind": "LocalSubjectAccessReview",
+            "version": "v1"
+          }
+        ]
+      },
+      "io.k8s.authorization.v1.SelfSubjectAccessReview": {
+        "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "default": {},
+            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec",
+            "default": {},
+            "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
+          },
+          "status": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
+            "default": {},
+            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "authorization.k8s.io",
+            "kind": "SelfSubjectAccessReview",
+            "version": "v1"
+          }
+        ]
+      },
+      "io.k8s.authorization.v1.SelfSubjectRulesReview": {
+        "description": "SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server's authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "default": {},
+            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReviewSpec",
+            "default": {},
+            "description": "Spec holds information about the request being evaluated."
+          },
+          "status": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectRulesReviewStatus",
+            "default": {},
+            "description": "Status is filled in by the server and indicates the set of actions a user can perform."
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "authorization.k8s.io",
+            "kind": "SelfSubjectRulesReview",
+            "version": "v1"
+          }
+        ]
+      },
+      "io.k8s.authorization.v1.SubjectAccessReview": {
+        "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "default": {},
+            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
+            "default": {},
+            "description": "Spec holds information about the request being evaluated"
+          },
+          "status": {
+            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
+            "default": {},
+            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "authorization.k8s.io",
+            "kind": "SubjectAccessReview",
+            "version": "v1"
+          }
+        ]
       }
     }
   },
@@ -702,17 +702,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                  "$ref": "#/components/schemas/core.v1.APIResourceList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                  "$ref": "#/components/schemas/core.v1.APIResourceList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                  "$ref": "#/components/schemas/core.v1.APIResourceList"
                 }
               }
             },
@@ -780,7 +780,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
               }
             }
           }
@@ -790,17 +790,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               }
             },
@@ -810,17 +810,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               }
             },
@@ -830,17 +830,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.LocalSubjectAccessReview"
                 }
               }
             },
@@ -898,7 +898,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
               }
             }
           }
@@ -908,17 +908,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               }
             },
@@ -928,17 +928,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               }
             },
@@ -948,17 +948,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectAccessReview"
                 }
               }
             },
@@ -1016,7 +1016,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
               }
             }
           }
@@ -1026,17 +1026,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               }
             },
@@ -1046,17 +1046,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               }
             },
@@ -1066,17 +1066,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SelfSubjectRulesReview"
                 }
               }
             },
@@ -1134,7 +1134,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
               }
             }
           }
@@ -1144,17 +1144,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               }
             },
@@ -1164,17 +1164,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               }
             },
@@ -1184,17 +1184,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                  "$ref": "#/components/schemas/io.k8s.authorization.v1.SubjectAccessReview"
                 }
               }
             },
