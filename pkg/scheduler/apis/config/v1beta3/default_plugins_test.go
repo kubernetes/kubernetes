@@ -97,6 +97,38 @@ func TestApplyFeatureGates(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "VolumeCapacityPriority enabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			wantConfig: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: names.PrioritySort},
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration, Weight: pointer.Int32(3)},
+						{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+						{Name: names.VolumeRestrictions},
+						{Name: names.EBSLimits},
+						{Name: names.GCEPDLimits},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.AzureDiskLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+						{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
+						{Name: names.DefaultPreemption},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+						{Name: names.DefaultBinder},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

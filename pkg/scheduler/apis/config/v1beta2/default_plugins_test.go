@@ -198,6 +198,89 @@ func TestApplyFeatureGates(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "VolumeCapacityPriority enabled",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			wantConfig: &v1beta2.Plugins{
+				QueueSort: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.PrioritySort},
+					},
+				},
+				PreFilter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.NodeResourcesFit},
+						{Name: names.NodePorts},
+						{Name: names.VolumeRestrictions},
+						{Name: names.PodTopologySpread},
+						{Name: names.InterPodAffinity},
+						{Name: names.VolumeBinding},
+						{Name: names.NodeAffinity},
+					},
+				},
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration},
+						{Name: names.NodeAffinity},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit},
+						{Name: names.VolumeRestrictions},
+						{Name: names.EBSLimits},
+						{Name: names.GCEPDLimits},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.AzureDiskLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread},
+						{Name: names.InterPodAffinity},
+					},
+				},
+				PostFilter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.DefaultPreemption},
+					},
+				},
+				PreScore: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.InterPodAffinity},
+						{Name: names.PodTopologySpread},
+						{Name: names.TaintToleration},
+						{Name: names.NodeAffinity},
+					},
+				},
+				Score: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
+						{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
+						{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
+						{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
+						{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
+						{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
+						{Name: names.VolumeBinding, Weight: pointer.Int32Ptr(1)},
+					},
+				},
+				Reserve: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.VolumeBinding},
+					},
+				},
+				PreBind: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.VolumeBinding},
+					},
+				},
+				Bind: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.DefaultBinder},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
