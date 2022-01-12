@@ -161,6 +161,7 @@ communication, please see the [the spreadsheet used for the 1.19
 rebase](https://docs.google.com/spreadsheets/d/10KYptJkDB1z8_RYCQVBYDjdTlRfyoXILMa0Fg8tnNlY/edit).
 
 ## Picking commits from the previous rebase branch to the new branch
+
 Go through the spreadsheet and for every commit set one of the appropriate actions:
  - `p`, to pick the commit
  - `s`, to squash it (add a comment with the sha of the target)
@@ -218,7 +219,7 @@ Explicit commit rules:
 
 ## Update the hyperkube image version to the release tag
 
-The [hyperkube dockerfile](openshift-hack/images/hyperkube/Dockerfile.rhel)
+The [hyperkube image](openshift-hack/images/hyperkube/Dockerfile.rhel)
 hard-codes the Kubernetes version in an image label. It's necessary to manually
 set this label to the new release tag. Prefix the commit summary with
 `UPSTREAM: <carry>: (squash)` and squash it before merging the rebase PR.
@@ -226,6 +227,16 @@ set this label to the new release tag. Prefix the commit summary with
 This value, among other things, is used by ART to inject appropriate version of
 kubernetes during build process, so it always has to reflect correct level of
 kubernetes.
+
+## Update base-os and test images
+
+To be able to use the latest kubelet from a pull request, in this repository
+we build [machine-os-content image](openshift-hack/images/os/Dockerfile).
+Make sure that both `FROM` and `curl` operation in `RUN` command use appropriate
+OCP version which corresponds with what we have in the [hyperkube image](openshift-hack/images/hyperkube/Dockerfile.rhel).
+
+Similarly, update `FROM` in [test image](openshift-hack/images/tests/Dockerfile.rhel)
+to match the one from [hyperkube image](openshift-hack/images/hyperkube/Dockerfile.rhel).
 
 ## Updating dependencies
 
@@ -329,6 +340,15 @@ most. Re-picking carries should not result in conflicts since the base of the
 rebase branch will be the same as before. The only potential sources of conflict
 will be the newly added commits.
 
+## Ensuring the stability of the release
+
+To ensure we don't regress the product by introducing a new level of kubernetes
+it is required to create a new sheet in the following spreadsheet and pass all
+the variants: https://docs.google.com/spreadsheets/d/1PBk3eqYaPbvY982k_a0W7EGx7CBCHTmKrN6FyNSTDeA/edit#gid=0
+
+NOTE: Double check with TRT team if the current variants in that spreadsheet
+are up-to-date.
+
 ## Send email announcing upcoming merge
 
 Second email should be send close O(~3 days) to merging the bump:
@@ -416,12 +436,12 @@ git log v1.21.1..v1.21.2 --ancestry-path --reverse --no-merges
 
 ## Updating with `rebase.sh` (experimental)
 
-The above steps are available as a script that will merge and rebase along the happy path without automatic conflict 
+The above steps are available as a script that will merge and rebase along the happy path without automatic conflict
 resolution and at the end will create a PR for you.
 
 Here are the steps:
-1. Create a new BugZilla with the respective OpenShift version to rebase (Target Release stays ---), 
-   Prio&Severity to High with a proper description of the change logs. 
+1. Create a new BugZilla with the respective OpenShift version to rebase (Target Release stays ---),
+   Prio&Severity to High with a proper description of the change logs.
    See [BZ2021468](https://bugzilla.redhat.com/show_bug.cgi?id=2021468) as an example.
 2. It's best to start off with a fresh fork of [openshift/kubernetes](https://github.com/openshift/kubernetes/). Stay on the master branch.
 3. This script requires `jq`, `git`, `podman` and `bash`, `gh` is optional.
@@ -430,10 +450,10 @@ Here are the steps:
 openshift-hack/rebase.sh --k8s-tag=v1.21.2 --openshift-release=release-4.8 --bugzilla-id=2003027
 ```
 
-where `k8s-tag` is the [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes/) release tag, the `openshift-release`  
-is the OpenShift release branch in [openshift/kubernetes](https://github.com/openshift/kubernetes/) and the `bugzilla-id` is the 
+where `k8s-tag` is the [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes/) release tag, the `openshift-release`
+is the OpenShift release branch in [openshift/kubernetes](https://github.com/openshift/kubernetes/) and the `bugzilla-id` is the
 BugZilla ID created in step (1).
 
 5. In case of conflicts, it will ask you to step into another shell to resolve those. The script will continue by committing the resolution with `UPSTREAM: <drop>`.
 6. At the end, there will be a "rebase-$VERSION" branch pushed to your fork.
-7. If you have `gh` installed and are logged in, it will attempt to create a PR for you by opening a web browser. 
+7. If you have `gh` installed and are logged in, it will attempt to create a PR for you by opening a web browser.
