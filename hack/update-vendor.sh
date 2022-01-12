@@ -30,7 +30,7 @@ kube::golang::verify_go_version
 
 # Turn off workspaces until we are ready for them later
 export GOWORK=off
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
+# Explicitly opt into go modules
 export GO111MODULE=on
 # Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=-mod=mod
