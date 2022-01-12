@@ -78,7 +78,7 @@ func TestParseWithNoMatchingValue(t *testing.T) {
 		expectedNavigationSteps: navigationSteps{
 			steps: []navigationStep{},
 		},
-		expectedError: "unable to parse one or more field values of users.jheiss.exec",
+		expectedError: "found exec, kubectl config set does not currently support manipulating exec settings",
 	}
 
 	test.run(t)

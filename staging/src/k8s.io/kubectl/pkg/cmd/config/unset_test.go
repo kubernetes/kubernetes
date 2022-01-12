@@ -129,8 +129,8 @@ func TestUnsetAuthProviderInfo(t *testing.T) {
 	test := unsetConfigTest{
 		description: "Testing for kubectl config unset auth-provider configurations",
 		config:      conf,
-		args:        []string{"users.foo.auth-provider.foo.refresh-token"},
-		expected:    `Property "users.foo.auth-provider.foo.refresh-token" unset.` + "\n",
+		args:        []string{"users.foo.auth-provider.config.refresh-token"},
+		expected:    `Property "users.foo.auth-provider.config.refresh-token" unset.` + "\n",
 	}
 	test.run(t)
 }

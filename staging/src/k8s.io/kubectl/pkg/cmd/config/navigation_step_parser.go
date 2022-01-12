@@ -94,7 +94,7 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 				}
 
 			case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
-				return nil, fmt.Errorf("found exec, kubectl does not currently support manipulating exec settings")
+				return nil, fmt.Errorf("found exec, kubectl config set does not currently support manipulating exec settings")
 
 			default:
 				return nil, fmt.Errorf("unable to parse one or more field values of %v", path)

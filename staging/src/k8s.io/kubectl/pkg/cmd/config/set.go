@@ -323,7 +323,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			}
 
 		case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
-			return fmt.Errorf("found exec, kubectl does not currently support manipulating exec settings")
+			return fmt.Errorf("found exec, kubectl config set does not currently support manipulating exec settings")
 
 		default:
 			return fmt.Errorf("unable to parse one or more field types of %v", actualCurrValue.Type())
