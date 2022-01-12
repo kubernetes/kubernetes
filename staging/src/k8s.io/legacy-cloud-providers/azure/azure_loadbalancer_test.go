@@ -1725,6 +1725,15 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			expectedProbes:  getDefaultTestProbes("Tcp", ""),
 			expectedRules:   getHATestRules(true),
 		},
+		{
+			desc:            "reconcileLoadBalancerRule shall leave probe path empty when using TCP probe",
+			service:         getTestService("test1", v1.ProtocolTCP, nil, false, 80),
+			loadBalancerSku: "standard",
+			wantLb:          true,
+			probeProtocol:   "Tcp",
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
+			expectedRules:   getDefaultTestRules(true),
+		},
 	}
 	for i, test := range testCases {
 		az := GetTestCloud(ctrl)

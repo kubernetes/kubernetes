@@ -1661,7 +1661,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				if probeProtocol == "" {
 					probeProtocol = string(network.ProbeProtocolHTTP)
 				}
-				if requestPath == "" {
+				needRequestPath := strings.EqualFold(probeProtocol, string(network.ProbeProtocolHTTP)) || strings.EqualFold(probeProtocol, string(network.ProbeProtocolHTTPS))
+				if requestPath == "" && needRequestPath {
 					requestPath = podPresencePath
 				}
 
