@@ -713,7 +713,7 @@
             "description": "storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://examples.k8s.io/volumes/storageos/README.md"
           },
           "volumeMode": {
-            "description": "Describes the volume mode. Can be one of the following: * Filesystem - the volume will be mounted into the Pod onto a directory.\n  If the volume is backed by a block device and the device is empty, the\n  storage driver creates a filesystem on the device before mounting it\n  for the first time.\n* Block - the volume is presented to the Pod as a block device, without\n  any filesystem on it. The Pod needs to understand how to use a raw\n  block device.\nDefaults to Filesystem when unset. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode",
+            "description": "volumeMode describes the volume mode. Can be one of the following: * Filesystem - the volume will be mounted into the Pod onto a directory.\n  If the volume is backed by a block device and the device is empty, the\n  storage driver creates a filesystem on the device before mounting it\n  for the first time.\n* Block - the volume is presented to the Pod as a block device, without\n  any filesystem on it. The Pod needs to understand how to use a raw\n  block device.\nDefaults to Filesystem when unset. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode",
             "type": "string"
           },
           "vsphereVolume": {

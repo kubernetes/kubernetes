@@ -302,13 +302,13 @@ type PersistentVolume struct {
 
 // PersistentVolumeSpec has most of the details required to define a PersistentVolume.
 type PersistentVolumeSpec struct {
-	// Capacity represents the available capacity of a PersistentVolume.
+	// capacity represents the available capacity of a PersistentVolume.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
 	// +optional
 	Capacity ResourceList
-	// The actual volume backing the PersistentVolume.
+	// persistentVolumeSource is the actual volume backing the PersistentVolume.
 	PersistentVolumeSource
-	// Describes all the ways a PersistentVolume can be accessed.
+	// accessModes describe all the ways a PersistentVolume can be accessed.
 	// Possible values are:
 	// * ReadWriteOnce - can be mounted read/write mode to exactly 1 node.
 	// * ReadOnlyMany - can be mounted in read-only mode to many nodes.
@@ -316,7 +316,8 @@ type PersistentVolumeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
 	// +optional
 	AccessModes []PersistentVolumeAccessMode
-	// Part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
+	// claimRef is part of a bi-directional binding between PersistentVolume and
+	// PersistentVolumeClaim.
 	// Expected to be non-nil when bound.
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	// When set to non-nil value, PVC.Spec.Selector of the referenced PVC is
@@ -324,7 +325,8 @@ type PersistentVolumeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding
 	// +optional
 	ClaimRef *ObjectReference
-	// What happens to a PersistentVolume when released from its claim.
+	// persistentVolumeReclaimPolicy defines what happens to a PersistentVolume
+	// when released from its claim.
 	// Valid options are
 	// * Retain (default for manually created PersistentVolumes)
 	// * Delete (default for dynamically provisioned PersistentVolumes)
@@ -333,16 +335,17 @@ type PersistentVolumeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy
-	// Name of StorageClass to which this PersistentVolume belongs. Empty value
-	// means that this volume does not belong to any StorageClass.
+	// storageClassName is the name of StorageClass to which this
+	// PersistentVolume belongs. Empty value means that this volume does not
+	// belong to any StorageClass.
 	// +optional
 	StorageClassName string
-	// A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
-	// simply fail if one is invalid.
+	// mountOptions is the list of mount options, e.g. ["ro", "soft"]. Not
+	// validated - mount will simply fail if one is invalid.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
 	// +optional
 	MountOptions []string
-	// Describes the volume mode. Can be one of the following:
+	// volumeMode describes the volume mode. Can be one of the following:
 	// * Filesystem - the volume will be mounted into the Pod onto a directory.
 	//   If the volume is backed by a block device and the device is empty, the
 	//   storage driver creates a filesystem on the device before mounting it
@@ -354,7 +357,8 @@ type PersistentVolumeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode
 	// +optional
 	VolumeMode *PersistentVolumeMode
-	// Defines constraints that limit what nodes this volume can be accessed from.
+	// nodeAffinity defines constraints that limit what nodes this volume can be
+	// accessed from.
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity
@@ -445,8 +449,8 @@ type PersistentVolumeClaimList struct {
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
-	// Contains the types of access modes the volume should have. Valid access
-	// modes include:
+	// accessModes contain the types of access modes the volume should have.
+	// Valid access modes include:
 	// * ReadWriteOnce - can be mounted read/write mode to exactly 1 node.
 	// * ReadOnlyMany - can be mounted in read-only mode to many nodes.
 	// * ReadWriteMany - can be mounted in read/write mode to many nodes.
@@ -455,24 +459,24 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
 	// +optional
 	AccessModes []PersistentVolumeAccessMode
-	// A label query over volumes to consider for binding. This selector is
-	// ignored when volumeName is set.
+	// selector is a label query over volumes to consider for binding. This
+	// selector is ignored when volumeName is set.
 	// A claim with a non-empty selector can't have a PersistentVolume
 	// dynamically provisioned for it.
 	// +optional
 	Selector *metav1.LabelSelector
-	// Represents the minimum resources the volume should have.
+	// resources represent the minimum resources the volume should have.
 	// If RecoverVolumeExpansionFailure feature is enabled, users are allowed to
 	// specify resource requirements that are lower than previous value but must
 	// still be higher than capacity recorded in the status field of the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
 	// +optional
 	Resources ResourceRequirements
-	// The binding reference to the PersistentVolume backing this claim. When
-	// set to non-empty value, selector is not evaluated.
+	// volumeName is the binding reference to the PersistentVolume backing this
+	// claim. When set to non-empty value, selector is not evaluated.
 	// +optional
 	VolumeName string
-	// Name of the StorageClass required by the claim.
+	// storageClassName is the name of the StorageClass required by the claim.
 	// If the value is "" (an empty string), the claim can only be bound to a
 	// PersistentVolume with no StorageClass (the storageClassName field is
 	// either unset or set to "").
@@ -495,8 +499,8 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
 	// +optional
 	StorageClassName *string
-	// Defines what volume mode is required by the claim. Can be one of the
-	// following:
+	// volumeMode defines what volume mode is required by the claim. Can be one
+	// of the following:
 	// * Filesystem - the volume contains a filesystem. If it doesn't,
 	//   the storage plugin creates a filesystem before mounting it for the
 	//   first time.
@@ -506,7 +510,7 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-modes
 	// +optional
 	VolumeMode *PersistentVolumeMode
-	// This field can be used to specify either:
+	// dataSource field can be used to specify either:
 	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
 	// * An existing PVC (PersistentVolumeClaim)
 	// If the provisioner or an external controller can support the specified data source,
@@ -515,9 +519,10 @@ type PersistentVolumeClaimSpec struct {
 	// the same contents as the DataSourceRef field.
 	// +optional
 	DataSource *TypedLocalObjectReference
-	// Specifies the object from which to populate the volume with data, if a non-empty
-	// volume is desired. This may be any local object from a non-empty API group (non
-	// core object) or a PersistentVolumeClaim object.
+	// dataSourceRef specifies the object from which to populate the volume with
+	// data, if a non-empty volume is desired. This may be any local object from
+	// a non-empty API group (non core object) or a PersistentVolumeClaim
+	// object.
 	// When this field is specified, volume binding will only succeed if the type of
 	// the specified object matches some installed volume populator or dynamic
 	// provisioner.
