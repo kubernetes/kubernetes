@@ -216,15 +216,10 @@ type defaultAPIServer struct {
 
 // uses the default settings
 func handle(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker, nil)
+	return handleInternal(storage, admissionControl, nil)
 }
 
-// tests using a custom self linker
-func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker, nil)
-}
-
-func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker, auditSink audit.Sink) http.Handler {
+func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, auditSink audit.Sink) http.Handler {
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
@@ -237,6 +232,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
+		// TODO(wojtek-t): Switch to Namer.
 		Linker:          selfLinker,
 		RootScopedKinds: sets.NewString("SimpleRoot"),
 
@@ -376,7 +372,6 @@ func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainterna
 	result := &genericapitesting.SimpleList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "10",
-			SelfLink:        "/test/link",
 		},
 		Items: storage.list,
 	}
@@ -942,7 +937,6 @@ func TestList(t *testing.T) {
 	testCases := []struct {
 		url       string
 		namespace string
-		selfLink  string
 		legacy    bool
 		label     string
 		field     string
@@ -953,19 +947,16 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple?namespace=",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple?namespace=other",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
@@ -974,19 +965,16 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
@@ -995,24 +983,20 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		// list items in a namespace in the path
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 			namespace: "default",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 		},
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 		},
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/other/simple",
 			label:     "a=b",
 			field:     "c=d",
 		},
@@ -1020,7 +1004,6 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simple",
 		},
 
 		// Group API
@@ -1029,19 +1012,16 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=",
 			namespace: "",
-			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other",
 			namespace: "",
-			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple?namespace=other&labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "",
-			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
@@ -1050,19 +1030,16 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
 		},
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
 			legacy:    true,
 			label:     "a=b",
 			field:     "c=d",
@@ -1071,24 +1048,20 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple",
 			legacy:    true,
 		},
 		// list items in a namespace in the path
 		{
 			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/default/simple",
 			namespace: "default",
-			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/default/simple",
 		},
 		{
 			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple",
 			namespace: "other",
-			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple",
 		},
 		{
 			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple?labelSelector=a%3Db&fieldSelector=c%3Dd",
 			namespace: "other",
-			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/other/simple",
 			label:     "a=b",
 			field:     "c=d",
 		},
@@ -1096,19 +1069,13 @@ func TestList(t *testing.T) {
 		{
 			url:       "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple",
 			namespace: "",
-			selfLink:  "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple",
 		},
 	}
 	for i, testCase := range testCases {
 		storage := map[string]rest.Storage{}
 		simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
 		storage["simple"] = &simpleStorage
-		selfLinker := &setTestSelfLinker{
-			t:           t,
-			namespace:   testCase.namespace,
-			expectedSet: testCase.selfLink,
-		}
-		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+		var handler = handleInternal(storage, admissionControl, nil)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -1127,9 +1094,6 @@ func TestList(t *testing.T) {
 			}
 			t.Logf("%d: body: %s", i, string(body))
 			continue
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-			t.Errorf("%d: unexpected selfLinker.called: %v", i, selfLinker.called)
 		}
 		if !simpleStorage.namespacePresent {
 			t.Errorf("%d: namespace not set", i)
@@ -1151,7 +1115,7 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 	storage["simple"] = &SimpleRESTStorage{expectedResourceNamespace: "default"}
 	storage["withoptions"] = GetWithOptionsRESTStorage{}
 
-	var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+	var handler = handleInternal(storage, admissionControl, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1195,7 +1159,6 @@ func TestListCompression(t *testing.T) {
 	testCases := []struct {
 		url            string
 		namespace      string
-		selfLink       string
 		legacy         bool
 		label          string
 		field          string
@@ -1205,13 +1168,11 @@ func TestListCompression(t *testing.T) {
 		{
 			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 			namespace:      "default",
-			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 			acceptEncoding: "",
 		},
 		{
 			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 			namespace:      "default",
-			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
 			acceptEncoding: "gzip",
 		},
 	}
@@ -1224,12 +1185,7 @@ func TestListCompression(t *testing.T) {
 			},
 		}
 		storage["simple"] = &simpleStorage
-		selfLinker := &setTestSelfLinker{
-			t:           t,
-			namespace:   testCase.namespace,
-			expectedSet: testCase.selfLink,
-		}
-		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+		var handler = handleInternal(storage, admissionControl, nil)
 
 		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 
@@ -1261,9 +1217,6 @@ func TestListCompression(t *testing.T) {
 			}
 			t.Logf("%d: body: %s", i, string(body))
 			continue
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-			t.Errorf("%d: unexpected selfLinker.called: %v", i, selfLinker.called)
 		}
 		if !simpleStorage.namespacePresent {
 			t.Errorf("%d: namespace not set", i)
@@ -1381,67 +1334,6 @@ func TestNonEmptyList(t *testing.T) {
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
-		if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
-			t.Errorf("unexpected list self link: %#v", listOut)
-		}
-		expectedSelfLink := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple/something"
-		if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
-			t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
-		}
-	}
-}
-
-func TestSelfLinkSkipsEmptyName(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		list: []genericapitesting.Simple{
-			{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "other"},
-				Other:      "foo",
-			},
-		},
-	}
-	storage["simple"] = &simpleStorage
-	handler := handle(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		t.Logf("Data: %s", string(body))
-	}
-	var listOut genericapitesting.SimpleList
-	body, err := extractBody(resp, &listOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(listOut.Items) != 1 {
-		t.Errorf("Unexpected response: %#v", listOut)
-		return
-	}
-	if listOut.Items[0].Other != simpleStorage.list[0].Other {
-		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
-		if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
-			t.Errorf("unexpected list self link: %#v", listOut)
-		}
-		expectedSelfLink := ""
-		if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
-			t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
-		}
-	}
 }
 
 func TestMetadata(t *testing.T) {
@@ -1488,14 +1380,8 @@ func TestGet(t *testing.T) {
 			Other: "foo",
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
 	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1515,9 +1401,6 @@ func TestGet(t *testing.T) {
 	if itemOut.Name != simpleStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
-	}
 }
 
 func BenchmarkGet(b *testing.B) {
@@ -1527,13 +1410,8 @@ func BenchmarkGet(b *testing.B) {
 			Other: "foo",
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
 	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1562,13 +1440,8 @@ func BenchmarkGetNoCompression(b *testing.B) {
 			Other: "foo",
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
 	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1603,15 +1476,9 @@ func TestGetCompression(t *testing.T) {
 			Other: strings.Repeat("0123456789abcdef", (128*1024/16)+1),
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
 
 	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -1662,9 +1529,6 @@ func TestGetCompression(t *testing.T) {
 		if itemOut.Name != simpleStorage.item.Name {
 			t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-			t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
-		}
 	}
 }
 
@@ -1675,14 +1539,8 @@ func TestGetPretty(t *testing.T) {
 			Other: "foo",
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
 	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -1754,7 +1612,7 @@ func TestGetPretty(t *testing.T) {
 func TestGetTable(t *testing.T) {
 	now := metav1.Now()
 	obj := genericapitesting.Simple{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", ResourceVersion: "10", SelfLink: "/blah", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", ResourceVersion: "10", CreationTimestamp: now, UID: types.UID("abcdef0123")},
 		Other:      "foo",
 	}
 
@@ -1813,7 +1671,7 @@ func TestGetTable(t *testing.T) {
 			accept: "application/json;as=Table;v=v1;g=meta.k8s.io",
 			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
-				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -1828,7 +1686,7 @@ func TestGetTable(t *testing.T) {
 			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
-				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -1846,7 +1704,7 @@ func TestGetTable(t *testing.T) {
 			}, ","),
 			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
-				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -1862,7 +1720,7 @@ func TestGetTable(t *testing.T) {
 			params: url.Values{"includeObject": []string{"Metadata"}},
 			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
-				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -1877,7 +1735,7 @@ func TestGetTable(t *testing.T) {
 			params: url.Values{"includeObject": []string{"Metadata"}},
 			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
-				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/test/link"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -1895,17 +1753,8 @@ func TestGetTable(t *testing.T) {
 				item: obj,
 				list: []genericapitesting.Simple{obj},
 			}
-			selfLinker := &setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple",
-				namespace:   "default",
-			}
-			if test.item {
-				selfLinker.expectedSet += "/id"
-				selfLinker.name = "id"
-			}
 			storage["simple"] = &simpleStorage
-			handler := handleLinker(storage, selfLinker)
+			handler := handle(storage)
 			server := httptest.NewServer(handler)
 			defer server.Close()
 
@@ -1957,7 +1806,7 @@ func TestGetTable(t *testing.T) {
 
 func TestWatchTable(t *testing.T) {
 	obj := genericapitesting.Simple{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", ResourceVersion: "10", SelfLink: "/blah", CreationTimestamp: metav1.NewTime(time.Unix(1, 0)), UID: types.UID("abcdef0123")},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", ResourceVersion: "10", CreationTimestamp: metav1.NewTime(time.Unix(1, 0)), UID: types.UID("abcdef0123")},
 		Other:      "foo",
 	}
 
@@ -2010,7 +1859,7 @@ func TestWatchTable(t *testing.T) {
 					Object: runtime.RawExtension{
 						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
-							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -2035,7 +1884,7 @@ func TestWatchTable(t *testing.T) {
 					Object: runtime.RawExtension{
 						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
-							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -2051,7 +1900,7 @@ func TestWatchTable(t *testing.T) {
 					Object: runtime.RawExtension{
 						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
-							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
@@ -2072,7 +1921,7 @@ func TestWatchTable(t *testing.T) {
 					Object: runtime.RawExtension{
 						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
-							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
@@ -2088,7 +1937,7 @@ func TestWatchTable(t *testing.T) {
 					Object: runtime.RawExtension{
 						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
-							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10"},
 							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBodyV1}},
 							},
@@ -2106,17 +1955,8 @@ func TestWatchTable(t *testing.T) {
 				list: []genericapitesting.Simple{obj},
 			}
 
-			selfLinker := &setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple",
-				namespace:   "default",
-			}
-			if test.item {
-				selfLinker.expectedSet += "/id"
-				selfLinker.name = "id"
-			}
 			storage["simple"] = &simpleStorage
-			handler := handleLinker(storage, selfLinker)
+			handler := handle(storage)
 			server := httptest.NewServer(handler)
 			defer server.Close()
 
@@ -2229,15 +2069,8 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			},
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		t:              t,
-		expectedSet:    "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		alternativeSet: sets.NewString("/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"),
-		name:           "id",
-		namespace:      "default",
-	}
 	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -2320,7 +2153,6 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			expected: &metav1beta1.PartialObjectMetadataList{
 				ListMeta: metav1.ListMeta{
 					ResourceVersion: "10",
-					SelfLink:        "/test/link",
 				},
 				Items: []metav1beta1.PartialObjectMetadata{
 					{
@@ -2607,82 +2439,6 @@ func TestGetWithOptions(t *testing.T) {
 			t.Errorf("%s: Unexpected path value. Expected: %s. Actual: %s.", test.name, test.expectedPath, opts.Path)
 			continue
 		}
-	}
-}
-
-func TestGetAlternateSelfLink(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		item: genericapitesting.Simple{
-			Other: "foo",
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/test/simple/id",
-		name:        "id",
-		namespace:   "test",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/test/simple/id")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	var itemOut genericapitesting.Simple
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
-	}
-}
-
-func TestGetNamespaceSelfLink(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		item: genericapitesting.Simple{
-			Other: "foo",
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simple/id",
-		name:        "id",
-		namespace:   "foo",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleInternal(storage, admissionControl, selfLinker, nil)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simple/id")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	var itemOut genericapitesting.Simple
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -3135,7 +2891,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 		simpleStorage := SimpleRESTStorage{}
 		ID := "id"
 		storage["simple"] = &simpleStorage
-		handler := handleInternal(storage, admit, selfLinker, nil)
+		handler := handleInternal(storage, admit, nil)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -3185,13 +2941,7 @@ func TestUpdate(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
-		name:        ID,
-		namespace:   metav1.NamespaceDefault,
-	}
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -3223,9 +2973,6 @@ func TestUpdate(t *testing.T) {
 	if simpleStorage.updated == nil || simpleStorage.updated.Name != item.Name {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
-	}
 }
 
 func TestUpdateInvokesAdmissionControl(t *testing.T) {
@@ -3236,7 +2983,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 		simpleStorage := SimpleRESTStorage{}
 		ID := "id"
 		storage["simple"] = &simpleStorage
-		handler := handleInternal(storage, admit, selfLinker, nil)
+		handler := handleInternal(storage, admit, nil)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -3349,11 +3096,7 @@ func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	selfLinker := &setTestSelfLinker{
-		t:   t,
-		err: fmt.Errorf("test error"),
-	}
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -3384,9 +3127,6 @@ func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
 
 	if simpleStorage.updated != nil {
 		t.Errorf("Unexpected update value %#v.", simpleStorage.updated)
-	}
-	if selfLinker.called {
-		t.Errorf("self link ignored")
 	}
 }
 
@@ -3652,13 +3392,7 @@ func TestNamedCreaterWithoutName(t *testing.T) {
 		},
 	}
 
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		name:        "bar",
-		namespace:   "default",
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo",
-	}
-	handler := handleLinker(map[string]rest.Storage{"foo": storage}, selfLinker)
+	handler := handle(map[string]rest.Storage{"foo": storage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -3727,18 +3461,12 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		},
 	}
 
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		namespace:   "default",
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo",
-	}
-
 	ac := &namePopulatorAdmissionControl{
 		t:            t,
 		populateName: populateName,
 	}
 
-	handler := handleInternal(map[string]rest.Storage{"foo": storage}, ac, selfLinker, nil)
+	handler := handleInternal(map[string]rest.Storage{"foo": storage}, ac, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -3813,20 +3541,6 @@ func TestUpdateChecksDecode(t *testing.T) {
 	}
 }
 
-type setTestSelfLinker struct {
-	t              *testing.T
-	expectedSet    string
-	alternativeSet sets.String
-	name           string
-	namespace      string
-	called         bool
-	err            error
-}
-
-func (s *setTestSelfLinker) Namespace(runtime.Object) (string, error) { return s.namespace, s.err }
-func (s *setTestSelfLinker) Name(runtime.Object) (string, error)      { return s.name, s.err }
-func (s *setTestSelfLinker) SelfLink(runtime.Object) (string, error)  { return "", s.err }
-
 func TestCreate(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
@@ -3834,13 +3548,7 @@ func TestCreate(t *testing.T) {
 			return obj, nil
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		name:        "bar",
-		namespace:   "default",
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar",
-	}
-	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
+	handler := handle(map[string]rest.Storage{"foo": &storage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -3882,9 +3590,6 @@ func TestCreate(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
-	}
 }
 
 func TestCreateYAML(t *testing.T) {
@@ -3894,13 +3599,7 @@ func TestCreateYAML(t *testing.T) {
 			return obj, nil
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		name:        "bar",
-		namespace:   "default",
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar",
-	}
-	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
+	handler := handle(map[string]rest.Storage{"foo": &storage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -3952,9 +3651,6 @@ func TestCreateYAML(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
-	}
 }
 
 func TestCreateInNamespace(t *testing.T) {
@@ -3964,13 +3660,7 @@ func TestCreateInNamespace(t *testing.T) {
 			return obj, nil
 		},
 	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		name:        "bar",
-		namespace:   "other",
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
-	}
-	handler := handleLinker(map[string]rest.Storage{"foo": &storage}, selfLinker)
+	handler := handle(map[string]rest.Storage{"foo": &storage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -4012,9 +3702,6 @@ func TestCreateInNamespace(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
-		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
-	}
 }
 
 func TestCreateInvokeAdmissionControl(t *testing.T) {
@@ -4027,13 +3714,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 				return obj, nil
 			},
 		}
-		selfLinker := &setTestSelfLinker{
-			t:           t,
-			name:        "bar",
-			namespace:   "other",
-			expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
-		}
-		handler := handleInternal(map[string]rest.Storage{"foo": &storage}, admit, selfLinker, nil)
+		handler := handleInternal(map[string]rest.Storage{"foo": &storage}, admit, nil)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 		client := http.Client{}
