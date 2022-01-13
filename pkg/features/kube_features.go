@@ -869,7 +869,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginAzureFileUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationvSphere:                            {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires vSphere CSI driver)
 	InTreePluginvSphereUnregister:                  {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationOpenStack:                          {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationOpenStack:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	InTreePluginOpenStackUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationRBD:                                {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
 	InTreePluginRBDUnregister:                      {Default: false, PreRelease: featuregate.Alpha},
