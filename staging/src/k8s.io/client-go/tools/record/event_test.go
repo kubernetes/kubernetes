@@ -129,7 +129,6 @@ func TestNonRacyShutdown(t *testing.T) {
 func TestEventf(t *testing.T) {
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
@@ -137,7 +136,6 @@ func TestEventf(t *testing.T) {
 	}
 	testPod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "differentUid",
@@ -554,9 +552,8 @@ func TestLotsOfEvents(t *testing.T) {
 func TestEventfNoNamespace(t *testing.T) {
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink: "/api/v1/namespaces/default/pods/foo",
-			Name:     "foo",
-			UID:      "bar",
+			Name: "foo",
+			UID:  "bar",
 		},
 	}
 	testRef, err := ref.GetPartialReference(scheme.Scheme, testPod, "spec.containers[2]")
@@ -651,7 +648,6 @@ func TestEventfNoNamespace(t *testing.T) {
 func TestMultiSinkCache(t *testing.T) {
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
@@ -659,7 +655,6 @@ func TestMultiSinkCache(t *testing.T) {
 	}
 	testPod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "differentUid",

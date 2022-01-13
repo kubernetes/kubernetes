@@ -622,7 +622,6 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 			Namespace:       "testns",
 			UID:             types.UID("pvc-uid"),
 			ResourceVersion: resourceVersion,
-			SelfLink:        "/api/v1/namespaces/testns/persistentvolumeclaims/" + name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			Resources: v1.ResourceRequirements{

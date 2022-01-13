@@ -404,8 +404,6 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 			Phase: phase,
 		},
 	}
-	// Make sure ref.GetReference(claim) works
-	claim.ObjectMeta.SelfLink = "/api/v1/namespaces/" + testNamespace + "/persistentvolumeclaims/" + name
 
 	if len(annotations) > 0 {
 		claim.Annotations = make(map[string]string)
