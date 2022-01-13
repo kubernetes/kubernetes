@@ -179,7 +179,7 @@ function config-ip-firewall {
   # node because we don't expect the daemonset to run on this node.
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
-    ip addr add dev lo 169.254.169.252/32
+    ip addr add dev lo 169.254.169.252/32 scope host
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 169.254.169.252:988
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 8080 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 169.254.169.252:987
   fi
@@ -1537,7 +1537,7 @@ EOF
 
 function disable_aufs() {
   # disable aufs module if aufs is loaded
-  if lsmod | grep "aufs" &> /dev/null ; then 
+  if lsmod | grep "aufs" &> /dev/null ; then
     sudo modprobe -r aufs
   fi
 }
@@ -1601,7 +1601,7 @@ addockeropt "\"pidfile\": \"/var/run/docker.pid\",
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
       docker_opts+="--registry-mirror=${DOCKER_REGISTRY_MIRROR_URL} "
   fi
-  
+
   disable_aufs
   set_docker_options_non_ubuntu
 
@@ -1993,8 +1993,8 @@ function prepare-konnectivity-server-manifest {
   if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
     params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
   elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
-    # HTTP-CONNECT can work with either UDS or mTLS. 
-    # Linking them here to make sure we get good coverage with two test configurations. 
+    # HTTP-CONNECT can work with either UDS or mTLS.
+    # Linking them here to make sure we get good coverage with two test configurations.
     params+=("--server-ca-cert=${KONNECTIVITY_SERVER_CA_CERT_PATH}")
     params+=("--server-cert=${KONNECTIVITY_SERVER_CERT_PATH}")
     params+=("--server-key=${KONNECTIVITY_SERVER_KEY_PATH}")
@@ -2011,7 +2011,7 @@ function prepare-konnectivity-server-manifest {
     params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
     params+=("--proxy-strategies=default")
   elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
-    # GRPC can work with either UDS or mTLS. 
+    # GRPC can work with either UDS or mTLS.
     params+=("--mode=http-connect")
     params+=("--server-port=8131")
     params+=("--agent-namespace=")
