@@ -37,11 +37,11 @@ option go_package = "v1";
 // can only be mounted as read/write once. AWS EBS volumes support
 // ownership management and SELinux relabeling.
 message AWSElasticBlockStoreVolumeSource {
-  // Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
+  // volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume).
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
   optional string volumeID = 1;
 
-  // Filesystem type of the volume that you want to mount.
+  // fsType is the filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
@@ -49,15 +49,14 @@ message AWSElasticBlockStoreVolumeSource {
   // +optional
   optional string fsType = 2;
 
-  // The partition in the volume that you want to mount.
+  // partition is the partition in the volume that you want to mount.
   // If omitted, the default is to mount by volume name.
   // Examples: For volume /dev/sda1, you specify the partition as "1".
   // Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
   // +optional
   optional int32 partition = 3;
 
-  // Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
-  // If omitted, the default is "false".
+  // readOnly value true will force the readOnly setting in VolumeMounts.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
   // +optional
   optional bool readOnly = 4;
@@ -99,45 +98,45 @@ message AvoidPods {
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 message AzureDiskVolumeSource {
-  // The Name of the data disk in the blob storage
+  // diskName is the Name of the data disk in the blob storage
   optional string diskName = 1;
 
-  // The URI the data disk in the blob storage
+  // diskURI is the URI of data disk in the blob storage
   optional string diskURI = 2;
 
-  // Host Caching mode: None, Read Only, Read Write.
+  // cachingMode is the Host Caching mode: None, Read Only, Read Write.
   // +optional
   optional string cachingMode = 3;
 
-  // Filesystem type to mount.
+  // fsType is Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
   optional string fsType = 4;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 5;
 
-  // Expected values Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+  // kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
   optional string kind = 6;
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFilePersistentVolumeSource {
-  // the name of secret that contains Azure Storage Account Name and Key
+  // secretName is the name of secret that contains Azure Storage Account Name and Key
   optional string secretName = 1;
 
-  // Share Name
+  // shareName is the azure Share Name
   optional string shareName = 2;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 3;
 
-  // the namespace of the secret that contains Azure Storage Account Name and Key
+  // secretNamespace is the namespace of the secret that contains Azure Storage Account Name and Key
   // default is the same as the Pod
   // +optional
   optional string secretNamespace = 4;
@@ -145,13 +144,13 @@ message AzureFilePersistentVolumeSource {
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
-  // the name of secret that contains Azure Storage Account Name and Key
+  // secretName is the  name of secret that contains Azure Storage Account Name and Key
   optional string secretName = 1;
 
-  // Share Name
+  // shareName is the azure share Name
   optional string shareName = 2;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 3;
@@ -273,30 +272,30 @@ message Capabilities {
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 message CephFSPersistentVolumeSource {
-  // Required: Monitors is a collection of Ceph monitors
+  // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   repeated string monitors = 1;
 
-  // Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+  // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
   // +optional
   optional string path = 2;
 
-  // Optional: User is the rados user name, default is admin
+  // user is Optional: User is the rados user name, default is admin
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string user = 3;
 
-  // Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+  // secretFile is Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string secretFile = 4;
 
-  // Optional: SecretRef is reference to the authentication secret for User, default is empty.
+  // secretRef is Optional: SecretRef is reference to the authentication secret for User, default is empty.
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional SecretReference secretRef = 5;
 
-  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // readOnly is Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
@@ -306,30 +305,30 @@ message CephFSPersistentVolumeSource {
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 message CephFSVolumeSource {
-  // Required: Monitors is a collection of Ceph monitors
+  // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   repeated string monitors = 1;
 
-  // Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+  // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
   // +optional
   optional string path = 2;
 
-  // Optional: User is the rados user name, default is admin
+  // user is optional: User is the rados user name, default is admin
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string user = 3;
 
-  // Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+  // secretFile is Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string secretFile = 4;
 
-  // Optional: SecretRef is reference to the authentication secret for User, default is empty.
+  // secretRef is Optional: SecretRef is reference to the authentication secret for User, default is empty.
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional LocalObjectReference secretRef = 5;
 
-  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // readOnly is Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
@@ -341,24 +340,24 @@ message CephFSVolumeSource {
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
 message CinderPersistentVolumeSource {
-  // volume id used to identify the volume in cinder.
+  // volumeID used to identify the volume in cinder.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   optional string volumeID = 1;
 
-  // Filesystem type to mount.
+  // fsType Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional string fsType = 2;
 
-  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // readOnly is Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
 
-  // Optional: points to a secret object containing parameters used to connect
+  // secretRef is Optional: points to a secret object containing parameters used to connect
   // to OpenStack.
   // +optional
   optional SecretReference secretRef = 4;
@@ -369,24 +368,24 @@ message CinderPersistentVolumeSource {
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
 message CinderVolumeSource {
-  // volume id used to identify the volume in cinder.
+  // volumeID used to identify the volume in cinder.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   optional string volumeID = 1;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional string fsType = 2;
 
-  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // readOnly defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
 
-  // Optional: points to a secret object containing parameters used to connect
+  // secretRef is optional: points to a secret object containing parameters used to connect
   // to OpenStack.
   // +optional
   optional LocalObjectReference secretRef = 4;
@@ -556,7 +555,7 @@ message ConfigMapNodeConfigSource {
 message ConfigMapProjection {
   optional LocalObjectReference localObjectReference = 1;
 
-  // If unspecified, each key-value pair in the Data field of the referenced
+  // items if unspecified, each key-value pair in the Data field of the referenced
   // ConfigMap will be projected into the volume as a file whose name is the
   // key and content is the value. If specified, the listed keys will be
   // projected into the specified paths, and unlisted keys will not be
@@ -566,7 +565,7 @@ message ConfigMapProjection {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Specify whether the ConfigMap or its keys must be defined
+  // optional specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -580,7 +579,7 @@ message ConfigMapProjection {
 message ConfigMapVolumeSource {
   optional LocalObjectReference localObjectReference = 1;
 
-  // If unspecified, each key-value pair in the Data field of the referenced
+  // items if unspecified, each key-value pair in the Data field of the referenced
   // ConfigMap will be projected into the volume as a file whose name is the
   // key and content is the value. If specified, the listed keys will be
   // projected into the specified paths, and unlisted keys will not be
@@ -590,7 +589,7 @@ message ConfigMapVolumeSource {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Optional: mode bits used to set permissions on created files by default.
+  // defaultMode is optional: mode bits used to set permissions on created files by default.
   // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
   // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
   // Defaults to 0644.
@@ -600,7 +599,7 @@ message ConfigMapVolumeSource {
   // +optional
   optional int32 defaultMode = 3;
 
-  // Specify whether the ConfigMap or its keys must be defined
+  // optional specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -990,14 +989,14 @@ message DownwardAPIVolumeSource {
 // Represents an empty directory for a pod.
 // Empty directory volumes support ownership management and SELinux relabeling.
 message EmptyDirVolumeSource {
-  // What type of storage medium should back this directory.
+  // medium represents what type of storage medium should back this directory.
   // The default is "" which means to use the node's default medium.
   // Must be an empty string (default) or Memory.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
   // +optional
   optional string medium = 1;
 
-  // Total amount of local storage required for this EmptyDir volume.
+  // sizeLimit is the total amount of local storage required for this EmptyDir volume.
   // The size limit is also applicable for memory medium.
   // The maximum usage on memory medium EmptyDir would be the minimum value between
   // the SizeLimit specified here and the sum of memory limits of all containers in a pod.
@@ -1511,27 +1510,27 @@ message ExecAction {
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 message FCVolumeSource {
-  // Optional: FC target worldwide names (WWNs)
+  // targetWWNs is Optional: FC target worldwide names (WWNs)
   // +optional
   repeated string targetWWNs = 1;
 
-  // Optional: FC target lun number
+  // lun is Optional: FC target lun number
   // +optional
   optional int32 lun = 2;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // TODO: how do we prevent errors in the filesystem from compromising the machine
   // +optional
   optional string fsType = 3;
 
-  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // readOnly is Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 4;
 
-  // Optional: FC volume world wide identifiers (wwids)
+  // wwids Optional: FC volume world wide identifiers (wwids)
   // Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
   // +optional
   repeated string wwids = 5;
@@ -1540,16 +1539,16 @@ message FCVolumeSource {
 // FlexPersistentVolumeSource represents a generic persistent volume resource that is
 // provisioned/attached using an exec based plugin.
 message FlexPersistentVolumeSource {
-  // Driver is the name of the driver to use for this volume.
+  // driver is the name of the driver to use for this volume.
   optional string driver = 1;
 
-  // Filesystem type to mount.
+  // fsType is the Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
   // +optional
   optional string fsType = 2;
 
-  // Optional: SecretRef is reference to the secret object containing
+  // secretRef is Optional: SecretRef is reference to the secret object containing
   // sensitive information to pass to the plugin scripts. This may be
   // empty if no secret object is specified. If the secret object
   // contains more than one secret, all secrets are passed to the plugin
@@ -1557,12 +1556,12 @@ message FlexPersistentVolumeSource {
   // +optional
   optional SecretReference secretRef = 3;
 
-  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // readOnly is Optional: defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 4;
 
-  // Optional: Extra command options if any.
+  // options is Optional: this field holds extra command options if any.
   // +optional
   map<string, string> options = 5;
 }
@@ -1570,16 +1569,16 @@ message FlexPersistentVolumeSource {
 // FlexVolume represents a generic volume resource that is
 // provisioned/attached using an exec based plugin.
 message FlexVolumeSource {
-  // Driver is the name of the driver to use for this volume.
+  // driver is the name of the driver to use for this volume.
   optional string driver = 1;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". The default filesystem depends on FlexVolume script.
   // +optional
   optional string fsType = 2;
 
-  // Optional: SecretRef is reference to the secret object containing
+  // secretRef is Optional: secretRef is reference to the secret object containing
   // sensitive information to pass to the plugin scripts. This may be
   // empty if no secret object is specified. If the secret object
   // contains more than one secret, all secrets are passed to the plugin
@@ -1587,12 +1586,12 @@ message FlexVolumeSource {
   // +optional
   optional LocalObjectReference secretRef = 3;
 
-  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // readOnly is Optional: defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 4;
 
-  // Optional: Extra command options if any.
+  // options is Optional: this field holds extra command options if any.
   // +optional
   map<string, string> options = 5;
 }
@@ -1601,12 +1600,12 @@ message FlexVolumeSource {
 // One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
 message FlockerVolumeSource {
-  // Name of the dataset stored as metadata -> name on the dataset for Flocker
+  // datasetName is Name of the dataset stored as metadata -> name on the dataset for Flocker
   // should be considered as deprecated
   // +optional
   optional string datasetName = 1;
 
-  // UUID of the dataset. This is unique identifier of a Flocker dataset
+  // datasetUUID is the UUID of the dataset. This is unique identifier of a Flocker dataset
   // +optional
   optional string datasetUUID = 2;
 }
@@ -1618,11 +1617,11 @@ message FlockerVolumeSource {
 // can only be mounted as read/write once or read-only many times. GCE
 // PDs support ownership management and SELinux relabeling.
 message GCEPersistentDiskVolumeSource {
-  // Unique name of the PD resource in GCE. Used to identify the disk in GCE.
+  // pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
   optional string pdName = 1;
 
-  // Filesystem type of the volume that you want to mount.
+  // fsType is filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
@@ -1630,7 +1629,7 @@ message GCEPersistentDiskVolumeSource {
   // +optional
   optional string fsType = 2;
 
-  // The partition in the volume that you want to mount.
+  // partition is the partition in the volume that you want to mount.
   // If omitted, the default is to mount by volume name.
   // Examples: For volume /dev/sda1, you specify the partition as "1".
   // Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
@@ -1638,7 +1637,7 @@ message GCEPersistentDiskVolumeSource {
   // +optional
   optional int32 partition = 3;
 
-  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // readOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
   // +optional
@@ -1666,14 +1665,14 @@ message GRPCAction {
 // EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
 // into the Pod's container.
 message GitRepoVolumeSource {
-  // Repository URL
+  // repository is the URL
   optional string repository = 1;
 
-  // Commit hash for the specified revision.
+  // revision is the commit hash for the specified revision.
   // +optional
   optional string revision = 2;
 
-  // Target directory name.
+  // directory is the target directory name.
   // Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the
   // git repository.  Otherwise, if specified, the volume will contain the git repository in
   // the subdirectory with the given name.
@@ -1684,21 +1683,21 @@ message GitRepoVolumeSource {
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 message GlusterfsPersistentVolumeSource {
-  // EndpointsName is the endpoint name that details Glusterfs topology.
+  // endpoints is the endpoint name that details Glusterfs topology.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
-  // Path is the Glusterfs volume path.
+  // path is the Glusterfs volume path.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string path = 2;
 
-  // ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
+  // readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
   // Defaults to false.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   // +optional
   optional bool readOnly = 3;
 
-  // EndpointsNamespace is the namespace that contains Glusterfs endpoint.
+  // endpointsNamespace is the namespace that contains Glusterfs endpoint.
   // If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   // +optional
@@ -1708,15 +1707,15 @@ message GlusterfsPersistentVolumeSource {
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 message GlusterfsVolumeSource {
-  // EndpointsName is the endpoint name that details Glusterfs topology.
+  // endpoints is the endpoint name that details Glusterfs topology.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
-  // Path is the Glusterfs volume path.
+  // path is the Glusterfs volume path.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string path = 2;
 
-  // ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
+  // readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
   // Defaults to false.
   // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   // +optional
@@ -1771,12 +1770,12 @@ message HostAlias {
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 message HostPathVolumeSource {
-  // Path of the directory on the host.
+  // path of the directory on the host.
   // If the path is a symlink, it will follow the link to the real path.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
   optional string path = 1;
 
-  // Type for HostPath Volume
+  // type for HostPath Volume
   // Defaults to ""
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
   // +optional
@@ -1787,22 +1786,22 @@ message HostPathVolumeSource {
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
 message ISCSIPersistentVolumeSource {
-  // iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
+  // targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   optional string targetPortal = 1;
 
-  // Target iSCSI Qualified Name.
+  // iqn is Target iSCSI Qualified Name.
   optional string iqn = 2;
 
-  // iSCSI Target Lun number.
+  // lun is iSCSI Target Lun number.
   optional int32 lun = 3;
 
-  // iSCSI Interface Name that uses an iSCSI transport.
+  // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
   optional string iscsiInterface = 4;
 
-  // Filesystem type of the volume that you want to mount.
+  // fsType is the filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
@@ -1810,29 +1809,29 @@ message ISCSIPersistentVolumeSource {
   // +optional
   optional string fsType = 5;
 
-  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // readOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
   // +optional
   optional bool readOnly = 6;
 
-  // iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
+  // portals is the iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
   repeated string portals = 7;
 
-  // whether support iSCSI Discovery CHAP authentication
+  // chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
   // +optional
   optional bool chapAuthDiscovery = 8;
 
-  // whether support iSCSI Session CHAP authentication
+  // chapAuthSession defines whether support iSCSI Session CHAP authentication
   // +optional
   optional bool chapAuthSession = 11;
 
-  // CHAP Secret for iSCSI target and initiator authentication
+  // secretRef is the CHAP Secret for iSCSI target and initiator authentication
   // +optional
   optional SecretReference secretRef = 10;
 
-  // Custom iSCSI Initiator Name.
+  // initiatorName is the custom iSCSI Initiator Name.
   // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
   // <target portal>:<volume name> will be created for the connection.
   // +optional
@@ -1843,22 +1842,22 @@ message ISCSIPersistentVolumeSource {
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
 message ISCSIVolumeSource {
-  // iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
+  // targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   optional string targetPortal = 1;
 
-  // Target iSCSI Qualified Name.
+  // iqn is the target iSCSI Qualified Name.
   optional string iqn = 2;
 
-  // iSCSI Target Lun number.
+  // lun represents iSCSI Target Lun number.
   optional int32 lun = 3;
 
-  // iSCSI Interface Name that uses an iSCSI transport.
+  // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
   optional string iscsiInterface = 4;
 
-  // Filesystem type of the volume that you want to mount.
+  // fsType is the filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
@@ -1866,29 +1865,29 @@ message ISCSIVolumeSource {
   // +optional
   optional string fsType = 5;
 
-  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // readOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
   // +optional
   optional bool readOnly = 6;
 
-  // iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
+  // portals is the iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
   repeated string portals = 7;
 
-  // whether support iSCSI Discovery CHAP authentication
+  // chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
   // +optional
   optional bool chapAuthDiscovery = 8;
 
-  // whether support iSCSI Session CHAP authentication
+  // chapAuthSession defines whether support iSCSI Session CHAP authentication
   // +optional
   optional bool chapAuthSession = 11;
 
-  // CHAP Secret for iSCSI target and initiator authentication
+  // secretRef is the CHAP Secret for iSCSI target and initiator authentication
   // +optional
   optional LocalObjectReference secretRef = 10;
 
-  // Custom iSCSI Initiator Name.
+  // initiatorName is the custom iSCSI Initiator Name.
   // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
   // <target portal>:<volume name> will be created for the connection.
   // +optional
@@ -1897,16 +1896,16 @@ message ISCSIVolumeSource {
 
 // Maps a string key to a path within a volume.
 message KeyToPath {
-  // The key to project.
+  // key is the key to project.
   optional string key = 1;
 
-  // The relative path of the file to map the key to.
+  // path is the relative path of the file to map the key to.
   // May not be an absolute path.
   // May not contain the path element '..'.
   // May not start with the string '..'.
   optional string path = 2;
 
-  // Optional: mode bits used to set permissions on this file.
+  // mode is Optional: mode bits used to set permissions on this file.
   // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
   // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
   // If not specified, the volume defaultMode will be used.
@@ -2067,11 +2066,11 @@ message LocalObjectReference {
 
 // Local represents directly-attached storage with node affinity (Beta feature)
 message LocalVolumeSource {
-  // The full path to the volume on the node.
+  // path of the full path to the volume on the node.
   // It can be either a directory or block device (disk, partition, ...).
   optional string path = 1;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // It applies only when the Path is a block device.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a filesystem if unspecified.
@@ -2082,16 +2081,15 @@ message LocalVolumeSource {
 // Represents an NFS mount that lasts the lifetime of a pod.
 // NFS volumes do not support ownership management or SELinux relabeling.
 message NFSVolumeSource {
-  // Server is the hostname or IP address of the NFS server.
+  // server is the hostname or IP address of the NFS server.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
   optional string server = 1;
 
-  // Path that is exported by the NFS server.
+  // path that is exported by the NFS server.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
   optional string path = 2;
 
-  // ReadOnly here will force
-  // the NFS export to be mounted with read-only permissions.
+  // readOnly here will force the NFS export to be mounted with read-only permissions.
   // Defaults to false.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
   // +optional
@@ -2994,10 +2992,10 @@ message PersistentVolumeStatus {
 
 // Represents a Photon Controller persistent disk resource.
 message PhotonPersistentDiskVolumeSource {
-  // ID that identifies Photon Controller persistent disk
+  // pdID is the ID that identifies Photon Controller persistent disk
   optional string pdID = 1;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   optional string fsType = 2;
@@ -3907,15 +3905,15 @@ message PortStatus {
 
 // PortworxVolumeSource represents a Portworx volume resource.
 message PortworxVolumeSource {
-  // VolumeID uniquely identifies a Portworx volume
+  // volumeID uniquely identifies a Portworx volume
   optional string volumeID = 1;
 
-  // FSType represents the filesystem type to mount
+  // fSType represents the filesystem type to mount
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
   optional string fsType = 2;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 3;
@@ -4027,11 +4025,11 @@ message ProbeHandler {
 
 // Represents a projected volume source
 message ProjectedVolumeSource {
-  // list of volume projections
+  // sources is the list of volume projections
   // +optional
   repeated VolumeProjection sources = 1;
 
-  // Mode bits used to set permissions on created files by default.
+  // defaultMode are the mode bits used to set permissions on created files by default.
   // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
   // YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
   // Directories within the path are not affected by this setting.
@@ -4044,30 +4042,30 @@ message ProjectedVolumeSource {
 // Represents a Quobyte mount that lasts the lifetime of a pod.
 // Quobyte volumes do not support ownership management or SELinux relabeling.
 message QuobyteVolumeSource {
-  // Registry represents a single or multiple Quobyte Registry services
+  // registry represents a single or multiple Quobyte Registry services
   // specified as a string as host:port pair (multiple entries are separated with commas)
   // which acts as the central registry for volumes
   optional string registry = 1;
 
-  // Volume is a string that references an already created Quobyte volume by name.
+  // volume is a string that references an already created Quobyte volume by name.
   optional string volume = 2;
 
-  // ReadOnly here will force the Quobyte volume to be mounted with read-only permissions.
+  // readOnly here will force the Quobyte volume to be mounted with read-only permissions.
   // Defaults to false.
   // +optional
   optional bool readOnly = 3;
 
-  // User to map volume access to
+  // user to map volume access to
   // Defaults to serivceaccount user
   // +optional
   optional string user = 4;
 
-  // Group to map volume access to
+  // group to map volume access to
   // Default is no group
   // +optional
   optional string group = 5;
 
-  // Tenant owning the given Quobyte volume in the Backend
+  // tenant owning the given Quobyte volume in the Backend
   // Used with dynamically provisioned Quobyte volumes, value is set by the plugin
   // +optional
   optional string tenant = 6;
@@ -4076,15 +4074,15 @@ message QuobyteVolumeSource {
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 message RBDPersistentVolumeSource {
-  // A collection of Ceph monitors.
+  // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   repeated string monitors = 1;
 
-  // The rados image name.
+  // image is the rados image name.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   optional string image = 2;
 
-  // Filesystem type of the volume that you want to mount.
+  // fsType is the filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
@@ -4092,32 +4090,32 @@ message RBDPersistentVolumeSource {
   // +optional
   optional string fsType = 3;
 
-  // The rados pool name.
+  // pool is the rados pool name.
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string pool = 4;
 
-  // The rados user name.
+  // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string user = 5;
 
-  // Keyring is the path to key ring for RBDUser.
+  // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string keyring = 6;
 
-  // SecretRef is name of the authentication secret for RBDUser. If provided
+  // secretRef is name of the authentication secret for RBDUser. If provided
   // overrides keyring.
   // Default is nil.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional SecretReference secretRef = 7;
 
-  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // readOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
@@ -4127,15 +4125,15 @@ message RBDPersistentVolumeSource {
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 message RBDVolumeSource {
-  // A collection of Ceph monitors.
+  // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   repeated string monitors = 1;
 
-  // The rados image name.
+  // image is the rados image name.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   optional string image = 2;
 
-  // Filesystem type of the volume that you want to mount.
+  // fsType is the filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
@@ -4143,32 +4141,32 @@ message RBDVolumeSource {
   // +optional
   optional string fsType = 3;
 
-  // The rados pool name.
+  // pool is the rados pool name.
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string pool = 4;
 
-  // The rados user name.
+  // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string user = 5;
 
-  // Keyring is the path to key ring for RBDUser.
+  // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string keyring = 6;
 
-  // SecretRef is name of the authentication secret for RBDUser. If provided
+  // secretRef is name of the authentication secret for RBDUser. If provided
   // overrides keyring.
   // Default is nil.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional LocalObjectReference secretRef = 7;
 
-  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // readOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
@@ -4417,45 +4415,45 @@ message SELinuxOptions {
 
 // ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume
 message ScaleIOPersistentVolumeSource {
-  // The host address of the ScaleIO API Gateway.
+  // gateway is the host address of the ScaleIO API Gateway.
   optional string gateway = 1;
 
-  // The name of the storage system as configured in ScaleIO.
+  // system is the name of the storage system as configured in ScaleIO.
   optional string system = 2;
 
-  // SecretRef references to the secret for ScaleIO user and other
+  // secretRef references to the secret for ScaleIO user and other
   // sensitive information. If this is not provided, Login operation will fail.
   optional SecretReference secretRef = 3;
 
-  // Flag to enable/disable SSL communication with Gateway, default false
+  // sslEnabled is the flag to enable/disable SSL communication with Gateway, default false
   // +optional
   optional bool sslEnabled = 4;
 
-  // The name of the ScaleIO Protection Domain for the configured storage.
+  // protectionDomain is the name of the ScaleIO Protection Domain for the configured storage.
   // +optional
   optional string protectionDomain = 5;
 
-  // The ScaleIO Storage Pool associated with the protection domain.
+  // storagePool is the ScaleIO Storage Pool associated with the protection domain.
   // +optional
   optional string storagePool = 6;
 
-  // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+  // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
   optional string storageMode = 7;
 
-  // The name of a volume already created in the ScaleIO system
+  // volumeName is the name of a volume already created in the ScaleIO system
   // that is associated with this volume source.
   optional string volumeName = 8;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs"
   // +optional
   optional string fsType = 9;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 10;
@@ -4463,45 +4461,45 @@ message ScaleIOPersistentVolumeSource {
 
 // ScaleIOVolumeSource represents a persistent ScaleIO volume
 message ScaleIOVolumeSource {
-  // The host address of the ScaleIO API Gateway.
+  // gateway is the host address of the ScaleIO API Gateway.
   optional string gateway = 1;
 
-  // The name of the storage system as configured in ScaleIO.
+  // system is the name of the storage system as configured in ScaleIO.
   optional string system = 2;
 
-  // SecretRef references to the secret for ScaleIO user and other
+  // secretRef references to the secret for ScaleIO user and other
   // sensitive information. If this is not provided, Login operation will fail.
   optional LocalObjectReference secretRef = 3;
 
-  // Flag to enable/disable SSL communication with Gateway, default false
+  // sslEnabled Flag enable/disable SSL communication with Gateway, default false
   // +optional
   optional bool sslEnabled = 4;
 
-  // The name of the ScaleIO Protection Domain for the configured storage.
+  // protectionDomain is the name of the ScaleIO Protection Domain for the configured storage.
   // +optional
   optional string protectionDomain = 5;
 
-  // The ScaleIO Storage Pool associated with the protection domain.
+  // storagePool is the ScaleIO Storage Pool associated with the protection domain.
   // +optional
   optional string storagePool = 6;
 
-  // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+  // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
   optional string storageMode = 7;
 
-  // The name of a volume already created in the ScaleIO system
+  // volumeName is the name of a volume already created in the ScaleIO system
   // that is associated with this volume source.
   optional string volumeName = 8;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs".
   // +optional
   optional string fsType = 9;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 10;
@@ -4640,7 +4638,7 @@ message SecretList {
 message SecretProjection {
   optional LocalObjectReference localObjectReference = 1;
 
-  // If unspecified, each key-value pair in the Data field of the referenced
+  // items if unspecified, each key-value pair in the Data field of the referenced
   // Secret will be projected into the volume as a file whose name is the
   // key and content is the value. If specified, the listed keys will be
   // projected into the specified paths, and unlisted keys will not be
@@ -4650,7 +4648,7 @@ message SecretProjection {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Specify whether the Secret or its key must be defined
+  // optional field specify whether the Secret or its key must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -4659,11 +4657,11 @@ message SecretProjection {
 // in any namespace
 // +structType=atomic
 message SecretReference {
-  // Name is unique within a namespace to reference a secret resource.
+  // name is unique within a namespace to reference a secret resource.
   // +optional
   optional string name = 1;
 
-  // Namespace defines the space within which the secret name must be unique.
+  // namespace defines the space within which the secret name must be unique.
   // +optional
   optional string namespace = 2;
 }
@@ -4674,12 +4672,12 @@ message SecretReference {
 // as files using the keys in the Data field as the file names.
 // Secret volumes support ownership management and SELinux relabeling.
 message SecretVolumeSource {
-  // Name of the secret in the pod's namespace to use.
+  // secretName is the name of the secret in the pod's namespace to use.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#secret
   // +optional
   optional string secretName = 1;
 
-  // If unspecified, each key-value pair in the Data field of the referenced
+  // items If unspecified, each key-value pair in the Data field of the referenced
   // Secret will be projected into the volume as a file whose name is the
   // key and content is the value. If specified, the listed keys will be
   // projected into the specified paths, and unlisted keys will not be
@@ -4689,7 +4687,7 @@ message SecretVolumeSource {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Optional: mode bits used to set permissions on created files by default.
+  // defaultMode is Optional: mode bits used to set permissions on created files by default.
   // Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
   // YAML accepts both octal and decimal values, JSON requires decimal values
   // for mode bits. Defaults to 0644.
@@ -4699,7 +4697,7 @@ message SecretVolumeSource {
   // +optional
   optional int32 defaultMode = 3;
 
-  // Specify whether the Secret or its keys must be defined
+  // optional field specify whether the Secret or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -4869,14 +4867,14 @@ message ServiceAccountList {
 // the pods runtime filesystem for use against APIs (Kubernetes API Server or
 // otherwise).
 message ServiceAccountTokenProjection {
-  // Audience is the intended audience of the token. A recipient of a token
+  // audience is the intended audience of the token. A recipient of a token
   // must identify itself with an identifier specified in the audience of the
   // token, and otherwise should reject the token. The audience defaults to the
   // identifier of the apiserver.
   // +optional
   optional string audience = 1;
 
-  // ExpirationSeconds is the requested duration of validity of the service
+  // expirationSeconds is the requested duration of validity of the service
   // account token. As the token approaches expiration, the kubelet volume
   // plugin will proactively rotate the service account token. The kubelet will
   // start trying to rotate the token if the token is older than 80 percent of
@@ -4885,7 +4883,7 @@ message ServiceAccountTokenProjection {
   // +optional
   optional int64 expirationSeconds = 2;
 
-  // Path is the path relative to the mount point of the file to project the
+  // path is the path relative to the mount point of the file to project the
   // token into.
   optional string path = 3;
 }
@@ -5217,11 +5215,11 @@ message SessionAffinityConfig {
 
 // Represents a StorageOS persistent volume resource.
 message StorageOSPersistentVolumeSource {
-  // VolumeName is the human-readable name of the StorageOS volume.  Volume
+  // volumeName is the human-readable name of the StorageOS volume.  Volume
   // names are only unique within a namespace.
   optional string volumeName = 1;
 
-  // VolumeNamespace specifies the scope of the volume within StorageOS.  If no
+  // volumeNamespace specifies the scope of the volume within StorageOS.  If no
   // namespace is specified then the Pod's namespace will be used.  This allows the
   // Kubernetes name scoping to be mirrored within StorageOS for tighter integration.
   // Set VolumeName to any name to override the default behaviour.
@@ -5230,18 +5228,18 @@ message StorageOSPersistentVolumeSource {
   // +optional
   optional string volumeNamespace = 2;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
   optional string fsType = 3;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 4;
 
-  // SecretRef specifies the secret to use for obtaining the StorageOS API
+  // secretRef specifies the secret to use for obtaining the StorageOS API
   // credentials.  If not specified, default values will be attempted.
   // +optional
   optional ObjectReference secretRef = 5;
@@ -5249,11 +5247,11 @@ message StorageOSPersistentVolumeSource {
 
 // Represents a StorageOS persistent volume resource.
 message StorageOSVolumeSource {
-  // VolumeName is the human-readable name of the StorageOS volume.  Volume
+  // volumeName is the human-readable name of the StorageOS volume.  Volume
   // names are only unique within a namespace.
   optional string volumeName = 1;
 
-  // VolumeNamespace specifies the scope of the volume within StorageOS.  If no
+  // volumeNamespace specifies the scope of the volume within StorageOS.  If no
   // namespace is specified then the Pod's namespace will be used.  This allows the
   // Kubernetes name scoping to be mirrored within StorageOS for tighter integration.
   // Set VolumeName to any name to override the default behaviour.
@@ -5262,18 +5260,18 @@ message StorageOSVolumeSource {
   // +optional
   optional string volumeNamespace = 2;
 
-  // Filesystem type to mount.
+  // fsType is the filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
   optional string fsType = 3;
 
-  // Defaults to false (read/write). ReadOnly here will force
+  // readOnly defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 4;
 
-  // SecretRef specifies the secret to use for obtaining the StorageOS API
+  // secretRef specifies the secret to use for obtaining the StorageOS API
   // credentials.  If not specified, default values will be attempted.
   // +optional
   optional LocalObjectReference secretRef = 5;
@@ -5516,19 +5514,19 @@ message VolumeNodeAffinity {
 
 // Projection that may be projected along with other supported volume types
 message VolumeProjection {
-  // information about the secret data to project
+  // secret information about the secret data to project
   // +optional
   optional SecretProjection secret = 1;
 
-  // information about the downwardAPI data to project
+  // downwardAPI information about the downwardAPI data to project
   // +optional
   optional DownwardAPIProjection downwardAPI = 2;
 
-  // information about the configMap data to project
+  // configMap information about the configMap data to project
   // +optional
   optional ConfigMapProjection configMap = 3;
 
-  // information about the serviceAccountToken data to project
+  // serviceAccountToken is information about the serviceAccountToken data to project
   // +optional
   optional ServiceAccountTokenProjection serviceAccountToken = 4;
 }
@@ -5702,20 +5700,20 @@ message VolumeSource {
 
 // Represents a vSphere volume resource.
 message VsphereVirtualDiskVolumeSource {
-  // Path that identifies vSphere volume vmdk
+  // volumePath is the path that identifies vSphere volume vmdk
   optional string volumePath = 1;
 
-  // Filesystem type to mount.
+  // fsType is filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
   optional string fsType = 2;
 
-  // Storage Policy Based Management (SPBM) profile name.
+  // storagePolicyName is the storage Policy Based Management (SPBM) profile name.
   // +optional
   optional string storagePolicyName = 3;
 
-  // Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.
+  // storagePolicyID is the storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.
   // +optional
   optional string storagePolicyID = 4;
 }
