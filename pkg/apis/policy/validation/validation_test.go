@@ -41,7 +41,7 @@ func TestValidatePodDisruptionBudgetSpec(t *testing.T) {
 		MinAvailable:   &minAvailable,
 		MaxUnavailable: &maxUnavailable,
 	}
-	errs := ValidatePodDisruptionBudgetSpec(spec, field.NewPath("foo"))
+	errs := ValidatePodDisruptionBudgetSpec(spec, PodDisruptionBudgetValidationOptions{true}, field.NewPath("foo"))
 	if len(errs) == 0 {
 		t.Errorf("unexpected success for %v", spec)
 	}
@@ -60,7 +60,7 @@ func TestValidateMinAvailablePodDisruptionBudgetSpec(t *testing.T) {
 		spec := policy.PodDisruptionBudgetSpec{
 			MinAvailable: &c,
 		}
-		errs := ValidatePodDisruptionBudgetSpec(spec, field.NewPath("foo"))
+		errs := ValidatePodDisruptionBudgetSpec(spec, PodDisruptionBudgetValidationOptions{true}, field.NewPath("foo"))
 		if len(errs) != 0 {
 			t.Errorf("unexpected failure %v for %v", errs, spec)
 		}
@@ -77,7 +77,7 @@ func TestValidateMinAvailablePodDisruptionBudgetSpec(t *testing.T) {
 		spec := policy.PodDisruptionBudgetSpec{
 			MinAvailable: &c,
 		}
-		errs := ValidatePodDisruptionBudgetSpec(spec, field.NewPath("foo"))
+		errs := ValidatePodDisruptionBudgetSpec(spec, PodDisruptionBudgetValidationOptions{true}, field.NewPath("foo"))
 		if len(errs) == 0 {
 			t.Errorf("unexpected success for %v", spec)
 		}
@@ -92,7 +92,7 @@ func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing
 		MinAvailable:   &c1,
 		MaxUnavailable: &c2,
 	}
-	errs := ValidatePodDisruptionBudgetSpec(spec, field.NewPath("foo"))
+	errs := ValidatePodDisruptionBudgetSpec(spec, PodDisruptionBudgetValidationOptions{true}, field.NewPath("foo"))
 	if len(errs) == 0 {
 		t.Errorf("unexpected success for %v", spec)
 	}
