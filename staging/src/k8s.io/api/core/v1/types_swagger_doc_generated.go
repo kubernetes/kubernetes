@@ -29,10 +29,10 @@ package v1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AWSElasticBlockStoreVolumeSource = map[string]string{
 	"":          "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
-	"volumeID":  "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
-	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
-	"partition": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
-	"readOnly":  "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+	"volumeID":  "volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+	"fsType":    "fsType is the filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+	"partition": "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
+	"readOnly":  "readOnly value true will force the readOnly setting in VolumeMounts. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
 }
 
 func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
@@ -71,12 +71,12 @@ func (AvoidPods) SwaggerDoc() map[string]string {
 
 var map_AzureDiskVolumeSource = map[string]string{
 	"":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
-	"diskName":    "The Name of the data disk in the blob storage",
-	"diskURI":     "The URI the data disk in the blob storage",
-	"cachingMode": "Host Caching mode: None, Read Only, Read Write.",
-	"fsType":      "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-	"readOnly":    "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"kind":        "Expected values Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
+	"diskName":    "diskName is the Name of the data disk in the blob storage",
+	"diskURI":     "diskURI is the URI of data disk in the blob storage",
+	"cachingMode": "cachingMode is the Host Caching mode: None, Read Only, Read Write.",
+	"fsType":      "fsType is Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":    "readOnly Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"kind":        "kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
 }
 
 func (AzureDiskVolumeSource) SwaggerDoc() map[string]string {
@@ -85,10 +85,10 @@ func (AzureDiskVolumeSource) SwaggerDoc() map[string]string {
 
 var map_AzureFilePersistentVolumeSource = map[string]string{
 	"":                "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-	"secretName":      "the name of secret that contains Azure Storage Account Name and Key",
-	"shareName":       "Share Name",
-	"readOnly":        "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"secretNamespace": "the namespace of the secret that contains Azure Storage Account Name and Key default is the same as the Pod",
+	"secretName":      "secretName is the name of secret that contains Azure Storage Account Name and Key",
+	"shareName":       "shareName is the azure Share Name",
+	"readOnly":        "readOnly defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"secretNamespace": "secretNamespace is the namespace of the secret that contains Azure Storage Account Name and Key default is the same as the Pod",
 }
 
 func (AzureFilePersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -97,9 +97,9 @@ func (AzureFilePersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_AzureFileVolumeSource = map[string]string{
 	"":           "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
-	"shareName":  "Share Name",
-	"readOnly":   "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"secretName": "secretName is the  name of secret that contains Azure Storage Account Name and Key",
+	"shareName":  "shareName is the azure share Name",
+	"readOnly":   "readOnly defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
 }
 
 func (AzureFileVolumeSource) SwaggerDoc() map[string]string {
@@ -158,12 +158,12 @@ func (Capabilities) SwaggerDoc() map[string]string {
 
 var map_CephFSPersistentVolumeSource = map[string]string{
 	"":           "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
-	"monitors":   "Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"path":       "Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
-	"user":       "Optional: User is the rados user name, default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"secretFile": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"secretRef":  "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"monitors":   "monitors is Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"path":       "path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
+	"user":       "user is Optional: User is the rados user name, default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"secretFile": "secretFile is Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"secretRef":  "secretRef is Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"readOnly":   "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
 }
 
 func (CephFSPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -172,12 +172,12 @@ func (CephFSPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_CephFSVolumeSource = map[string]string{
 	"":           "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
-	"monitors":   "Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"path":       "Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
-	"user":       "Optional: User is the rados user name, default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"secretFile": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"secretRef":  "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
-	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"monitors":   "monitors is Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"path":       "path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
+	"user":       "user is optional: User is the rados user name, default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"secretFile": "secretFile is Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"secretRef":  "secretRef is Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+	"readOnly":   "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
 }
 
 func (CephFSVolumeSource) SwaggerDoc() map[string]string {
@@ -186,10 +186,10 @@ func (CephFSVolumeSource) SwaggerDoc() map[string]string {
 
 var map_CinderPersistentVolumeSource = map[string]string{
 	"":          "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
-	"volumeID":  "volume id used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
-	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
-	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
-	"secretRef": "Optional: points to a secret object containing parameters used to connect to OpenStack.",
+	"volumeID":  "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+	"fsType":    "fsType Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+	"readOnly":  "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+	"secretRef": "secretRef is Optional: points to a secret object containing parameters used to connect to OpenStack.",
 }
 
 func (CinderPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -198,10 +198,10 @@ func (CinderPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_CinderVolumeSource = map[string]string{
 	"":          "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
-	"volumeID":  "volume id used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
-	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
-	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
-	"secretRef": "Optional: points to a secret object containing parameters used to connect to OpenStack.",
+	"volumeID":  "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+	"fsType":    "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+	"readOnly":  "readOnly defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+	"secretRef": "secretRef is optional: points to a secret object containing parameters used to connect to OpenStack.",
 }
 
 func (CinderVolumeSource) SwaggerDoc() map[string]string {
@@ -305,8 +305,8 @@ func (ConfigMapNodeConfigSource) SwaggerDoc() map[string]string {
 
 var map_ConfigMapProjection = map[string]string{
 	"":         "Adapts a ConfigMap into a projected volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a projected volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. Note that this is identical to a configmap volume source without the default mode.",
-	"items":    "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
-	"optional": "Specify whether the ConfigMap or its keys must be defined",
+	"items":    "items if unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"optional": "optional specify whether the ConfigMap or its keys must be defined",
 }
 
 func (ConfigMapProjection) SwaggerDoc() map[string]string {
@@ -315,9 +315,9 @@ func (ConfigMapProjection) SwaggerDoc() map[string]string {
 
 var map_ConfigMapVolumeSource = map[string]string{
 	"":            "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
-	"items":       "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
-	"defaultMode": "Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
-	"optional":    "Specify whether the ConfigMap or its keys must be defined",
+	"items":       "items if unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"defaultMode": "defaultMode is optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"optional":    "optional specify whether the ConfigMap or its keys must be defined",
 }
 
 func (ConfigMapVolumeSource) SwaggerDoc() map[string]string {
@@ -481,8 +481,8 @@ func (DownwardAPIVolumeSource) SwaggerDoc() map[string]string {
 
 var map_EmptyDirVolumeSource = map[string]string{
 	"":          "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
-	"medium":    "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
-	"sizeLimit": "Total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
+	"medium":    "medium represents what type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+	"sizeLimit": "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
 }
 
 func (EmptyDirVolumeSource) SwaggerDoc() map[string]string {
@@ -690,11 +690,11 @@ func (ExecAction) SwaggerDoc() map[string]string {
 
 var map_FCVolumeSource = map[string]string{
 	"":           "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-	"targetWWNs": "Optional: FC target worldwide names (WWNs)",
-	"lun":        "Optional: FC target lun number",
-	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"wwids":      "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.",
+	"targetWWNs": "targetWWNs is Optional: FC target worldwide names (WWNs)",
+	"lun":        "lun is Optional: FC target lun number",
+	"fsType":     "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":   "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"wwids":      "wwids Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.",
 }
 
 func (FCVolumeSource) SwaggerDoc() map[string]string {
@@ -703,11 +703,11 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 
 var map_FlexPersistentVolumeSource = map[string]string{
 	"":          "FlexPersistentVolumeSource represents a generic persistent volume resource that is provisioned/attached using an exec based plugin.",
-	"driver":    "Driver is the name of the driver to use for this volume.",
-	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
-	"secretRef": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
-	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"options":   "Optional: Extra command options if any.",
+	"driver":    "driver is the name of the driver to use for this volume.",
+	"fsType":    "fsType is the Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
+	"secretRef": "secretRef is Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
+	"readOnly":  "readOnly is Optional: defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"options":   "options is Optional: this field holds extra command options if any.",
 }
 
 func (FlexPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -716,11 +716,11 @@ func (FlexPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_FlexVolumeSource = map[string]string{
 	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
-	"driver":    "Driver is the name of the driver to use for this volume.",
-	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
-	"secretRef": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
-	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"options":   "Optional: Extra command options if any.",
+	"driver":    "driver is the name of the driver to use for this volume.",
+	"fsType":    "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
+	"secretRef": "secretRef is Optional: secretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
+	"readOnly":  "readOnly is Optional: defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"options":   "options is Optional: this field holds extra command options if any.",
 }
 
 func (FlexVolumeSource) SwaggerDoc() map[string]string {
@@ -729,8 +729,8 @@ func (FlexVolumeSource) SwaggerDoc() map[string]string {
 
 var map_FlockerVolumeSource = map[string]string{
 	"":            "Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.",
-	"datasetName": "Name of the dataset stored as metadata -> name on the dataset for Flocker should be considered as deprecated",
-	"datasetUUID": "UUID of the dataset. This is unique identifier of a Flocker dataset",
+	"datasetName": "datasetName is Name of the dataset stored as metadata -> name on the dataset for Flocker should be considered as deprecated",
+	"datasetUUID": "datasetUUID is the UUID of the dataset. This is unique identifier of a Flocker dataset",
 }
 
 func (FlockerVolumeSource) SwaggerDoc() map[string]string {
@@ -739,10 +739,10 @@ func (FlockerVolumeSource) SwaggerDoc() map[string]string {
 
 var map_GCEPersistentDiskVolumeSource = map[string]string{
 	"":          "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
-	"pdName":    "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
-	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
-	"partition": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
-	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+	"pdName":    "pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+	"fsType":    "fsType is filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+	"partition": "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+	"readOnly":  "readOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
 }
 
 func (GCEPersistentDiskVolumeSource) SwaggerDoc() map[string]string {
@@ -760,9 +760,9 @@ func (GRPCAction) SwaggerDoc() map[string]string {
 
 var map_GitRepoVolumeSource = map[string]string{
 	"":           "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.\n\nDEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
-	"repository": "Repository URL",
-	"revision":   "Commit hash for the specified revision.",
-	"directory":  "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.",
+	"repository": "repository is the URL",
+	"revision":   "revision is the commit hash for the specified revision.",
+	"directory":  "directory is the target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.",
 }
 
 func (GitRepoVolumeSource) SwaggerDoc() map[string]string {
@@ -771,10 +771,10 @@ func (GitRepoVolumeSource) SwaggerDoc() map[string]string {
 
 var map_GlusterfsPersistentVolumeSource = map[string]string{
 	"":                   "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
-	"endpoints":          "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
-	"path":               "Path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
-	"readOnly":           "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
-	"endpointsNamespace": "EndpointsNamespace is the namespace that contains Glusterfs endpoint. If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+	"endpoints":          "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+	"path":               "path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+	"readOnly":           "readOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+	"endpointsNamespace": "endpointsNamespace is the namespace that contains Glusterfs endpoint. If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
 }
 
 func (GlusterfsPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -783,9 +783,9 @@ func (GlusterfsPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_GlusterfsVolumeSource = map[string]string{
 	"":          "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
-	"endpoints": "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
-	"path":      "Path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
-	"readOnly":  "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+	"endpoints": "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+	"path":      "path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+	"readOnly":  "readOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
 }
 
 func (GlusterfsVolumeSource) SwaggerDoc() map[string]string {
@@ -827,8 +827,8 @@ func (HostAlias) SwaggerDoc() map[string]string {
 
 var map_HostPathVolumeSource = map[string]string{
 	"":     "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
-	"path": "Path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
-	"type": "Type for HostPath Volume Defaults to \"\" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
+	"path": "path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
+	"type": "type for HostPath Volume Defaults to \"\" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
 }
 
 func (HostPathVolumeSource) SwaggerDoc() map[string]string {
@@ -837,17 +837,17 @@ func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 
 var map_ISCSIPersistentVolumeSource = map[string]string{
 	"":                  "ISCSIPersistentVolumeSource represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
-	"targetPortal":      "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
-	"iqn":               "Target iSCSI Qualified Name.",
-	"lun":               "iSCSI Target Lun number.",
-	"iscsiInterface":    "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
-	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
-	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
-	"portals":           "iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
-	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
-	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
-	"secretRef":         "CHAP Secret for iSCSI target and initiator authentication",
-	"initiatorName":     "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
+	"targetPortal":      "targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"iqn":               "iqn is Target iSCSI Qualified Name.",
+	"lun":               "lun is iSCSI Target Lun number.",
+	"iscsiInterface":    "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
+	"fsType":            "fsType is the filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
+	"readOnly":          "readOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"portals":           "portals is the iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"chapAuthDiscovery": "chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication",
+	"chapAuthSession":   "chapAuthSession defines whether support iSCSI Session CHAP authentication",
+	"secretRef":         "secretRef is the CHAP Secret for iSCSI target and initiator authentication",
+	"initiatorName":     "initiatorName is the custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
 }
 
 func (ISCSIPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -856,17 +856,17 @@ func (ISCSIPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_ISCSIVolumeSource = map[string]string{
 	"":                  "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
-	"targetPortal":      "iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
-	"iqn":               "Target iSCSI Qualified Name.",
-	"lun":               "iSCSI Target Lun number.",
-	"iscsiInterface":    "iSCSI Interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
-	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
-	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
-	"portals":           "iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
-	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
-	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
-	"secretRef":         "CHAP Secret for iSCSI target and initiator authentication",
-	"initiatorName":     "Custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
+	"targetPortal":      "targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"iqn":               "iqn is the target iSCSI Qualified Name.",
+	"lun":               "lun represents iSCSI Target Lun number.",
+	"iscsiInterface":    "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
+	"fsType":            "fsType is the filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
+	"readOnly":          "readOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"portals":           "portals is the iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"chapAuthDiscovery": "chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication",
+	"chapAuthSession":   "chapAuthSession defines whether support iSCSI Session CHAP authentication",
+	"secretRef":         "secretRef is the CHAP Secret for iSCSI target and initiator authentication",
+	"initiatorName":     "initiatorName is the custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
@@ -875,9 +875,9 @@ func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
 
 var map_KeyToPath = map[string]string{
 	"":     "Maps a string key to a path within a volume.",
-	"key":  "The key to project.",
-	"path": "The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
-	"mode": "Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"key":  "key is the key to project.",
+	"path": "path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
+	"mode": "mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 }
 
 func (KeyToPath) SwaggerDoc() map[string]string {
@@ -979,8 +979,8 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 
 var map_LocalVolumeSource = map[string]string{
 	"":       "Local represents directly-attached storage with node affinity (Beta feature)",
-	"path":   "The full path to the volume on the node. It can be either a directory or block device (disk, partition, ...).",
-	"fsType": "Filesystem type to mount. It applies only when the Path is a block device. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default value is to auto-select a filesystem if unspecified.",
+	"path":   "path of the full path to the volume on the node. It can be either a directory or block device (disk, partition, ...).",
+	"fsType": "fsType is the filesystem type to mount. It applies only when the Path is a block device. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default value is to auto-select a filesystem if unspecified.",
 }
 
 func (LocalVolumeSource) SwaggerDoc() map[string]string {
@@ -989,9 +989,9 @@ func (LocalVolumeSource) SwaggerDoc() map[string]string {
 
 var map_NFSVolumeSource = map[string]string{
 	"":         "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
-	"server":   "Server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
-	"path":     "Path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
-	"readOnly": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+	"server":   "server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+	"path":     "path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+	"readOnly": "readOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
 }
 
 func (NFSVolumeSource) SwaggerDoc() map[string]string {
@@ -1421,8 +1421,8 @@ func (PersistentVolumeStatus) SwaggerDoc() map[string]string {
 
 var map_PhotonPersistentDiskVolumeSource = map[string]string{
 	"":       "Represents a Photon Controller persistent disk resource.",
-	"pdID":   "ID that identifies Photon Controller persistent disk",
-	"fsType": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"pdID":   "pdID is the ID that identifies Photon Controller persistent disk",
+	"fsType": "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 }
 
 func (PhotonPersistentDiskVolumeSource) SwaggerDoc() map[string]string {
@@ -1749,9 +1749,9 @@ func (PortStatus) SwaggerDoc() map[string]string {
 
 var map_PortworxVolumeSource = map[string]string{
 	"":         "PortworxVolumeSource represents a Portworx volume resource.",
-	"volumeID": "VolumeID uniquely identifies a Portworx volume",
-	"fsType":   "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-	"readOnly": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"volumeID": "volumeID uniquely identifies a Portworx volume",
+	"fsType":   "fSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly": "readOnly defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
 }
 
 func (PortworxVolumeSource) SwaggerDoc() map[string]string {
@@ -1817,8 +1817,8 @@ func (ProbeHandler) SwaggerDoc() map[string]string {
 
 var map_ProjectedVolumeSource = map[string]string{
 	"":            "Represents a projected volume source",
-	"sources":     "list of volume projections",
-	"defaultMode": "Mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"sources":     "sources is the list of volume projections",
+	"defaultMode": "defaultMode are the mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 }
 
 func (ProjectedVolumeSource) SwaggerDoc() map[string]string {
@@ -1827,12 +1827,12 @@ func (ProjectedVolumeSource) SwaggerDoc() map[string]string {
 
 var map_QuobyteVolumeSource = map[string]string{
 	"":         "Represents a Quobyte mount that lasts the lifetime of a pod. Quobyte volumes do not support ownership management or SELinux relabeling.",
-	"registry": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
-	"volume":   "Volume is a string that references an already created Quobyte volume by name.",
-	"readOnly": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
-	"user":     "User to map volume access to Defaults to serivceaccount user",
-	"group":    "Group to map volume access to Default is no group",
-	"tenant":   "Tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin",
+	"registry": "registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
+	"volume":   "volume is a string that references an already created Quobyte volume by name.",
+	"readOnly": "readOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
+	"user":     "user to map volume access to Defaults to serivceaccount user",
+	"group":    "group to map volume access to Default is no group",
+	"tenant":   "tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin",
 }
 
 func (QuobyteVolumeSource) SwaggerDoc() map[string]string {
@@ -1841,14 +1841,14 @@ func (QuobyteVolumeSource) SwaggerDoc() map[string]string {
 
 var map_RBDPersistentVolumeSource = map[string]string{
 	"":          "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
-	"monitors":  "A collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"image":     "The rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd",
-	"pool":      "The rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"user":      "The rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"keyring":   "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"secretRef": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"monitors":  "monitors is a collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"image":     "image is the rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"fsType":    "fsType is the filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd",
+	"pool":      "pool is the rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"user":      "user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"keyring":   "keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"secretRef": "secretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"readOnly":  "readOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
 }
 
 func (RBDPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1857,14 +1857,14 @@ func (RBDPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_RBDVolumeSource = map[string]string{
 	"":          "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
-	"monitors":  "A collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"image":     "The rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd",
-	"pool":      "The rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"user":      "The rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"keyring":   "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"secretRef": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
-	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"monitors":  "monitors is a collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"image":     "image is the rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"fsType":    "fsType is the filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd",
+	"pool":      "pool is the rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"user":      "user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"keyring":   "keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"secretRef": "secretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+	"readOnly":  "readOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
 }
 
 func (RBDVolumeSource) SwaggerDoc() map[string]string {
@@ -2019,16 +2019,16 @@ func (SELinuxOptions) SwaggerDoc() map[string]string {
 
 var map_ScaleIOPersistentVolumeSource = map[string]string{
 	"":                 "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
-	"gateway":          "The host address of the ScaleIO API Gateway.",
-	"system":           "The name of the storage system as configured in ScaleIO.",
-	"secretRef":        "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
-	"sslEnabled":       "Flag to enable/disable SSL communication with Gateway, default false",
-	"protectionDomain": "The name of the ScaleIO Protection Domain for the configured storage.",
-	"storagePool":      "The ScaleIO Storage Pool associated with the protection domain.",
-	"storageMode":      "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
-	"volumeName":       "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
-	"fsType":           "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\"",
-	"readOnly":         "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"gateway":          "gateway is the host address of the ScaleIO API Gateway.",
+	"system":           "system is the name of the storage system as configured in ScaleIO.",
+	"secretRef":        "secretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
+	"sslEnabled":       "sslEnabled is the flag to enable/disable SSL communication with Gateway, default false",
+	"protectionDomain": "protectionDomain is the name of the ScaleIO Protection Domain for the configured storage.",
+	"storagePool":      "storagePool is the ScaleIO Storage Pool associated with the protection domain.",
+	"storageMode":      "storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
+	"volumeName":       "volumeName is the name of a volume already created in the ScaleIO system that is associated with this volume source.",
+	"fsType":           "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\"",
+	"readOnly":         "readOnly defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
 }
 
 func (ScaleIOPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -2037,16 +2037,16 @@ func (ScaleIOPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_ScaleIOVolumeSource = map[string]string{
 	"":                 "ScaleIOVolumeSource represents a persistent ScaleIO volume",
-	"gateway":          "The host address of the ScaleIO API Gateway.",
-	"system":           "The name of the storage system as configured in ScaleIO.",
-	"secretRef":        "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
-	"sslEnabled":       "Flag to enable/disable SSL communication with Gateway, default false",
-	"protectionDomain": "The name of the ScaleIO Protection Domain for the configured storage.",
-	"storagePool":      "The ScaleIO Storage Pool associated with the protection domain.",
-	"storageMode":      "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
-	"volumeName":       "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
-	"fsType":           "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\".",
-	"readOnly":         "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"gateway":          "gateway is the host address of the ScaleIO API Gateway.",
+	"system":           "system is the name of the storage system as configured in ScaleIO.",
+	"secretRef":        "secretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
+	"sslEnabled":       "sslEnabled Flag enable/disable SSL communication with Gateway, default false",
+	"protectionDomain": "protectionDomain is the name of the ScaleIO Protection Domain for the configured storage.",
+	"storagePool":      "storagePool is the ScaleIO Storage Pool associated with the protection domain.",
+	"storageMode":      "storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
+	"volumeName":       "volumeName is the name of a volume already created in the ScaleIO system that is associated with this volume source.",
+	"fsType":           "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\".",
+	"readOnly":         "readOnly Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
 }
 
 func (ScaleIOVolumeSource) SwaggerDoc() map[string]string {
@@ -2127,8 +2127,8 @@ func (SecretList) SwaggerDoc() map[string]string {
 
 var map_SecretProjection = map[string]string{
 	"":         "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
-	"items":    "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
-	"optional": "Specify whether the Secret or its key must be defined",
+	"items":    "items if unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"optional": "optional field specify whether the Secret or its key must be defined",
 }
 
 func (SecretProjection) SwaggerDoc() map[string]string {
@@ -2137,8 +2137,8 @@ func (SecretProjection) SwaggerDoc() map[string]string {
 
 var map_SecretReference = map[string]string{
 	"":          "SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace",
-	"name":      "Name is unique within a namespace to reference a secret resource.",
-	"namespace": "Namespace defines the space within which the secret name must be unique.",
+	"name":      "name is unique within a namespace to reference a secret resource.",
+	"namespace": "namespace defines the space within which the secret name must be unique.",
 }
 
 func (SecretReference) SwaggerDoc() map[string]string {
@@ -2147,10 +2147,10 @@ func (SecretReference) SwaggerDoc() map[string]string {
 
 var map_SecretVolumeSource = map[string]string{
 	"":            "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
-	"secretName":  "Name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
-	"items":       "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
-	"defaultMode": "Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
-	"optional":    "Specify whether the Secret or its keys must be defined",
+	"secretName":  "secretName is the name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
+	"items":       "items If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
+	"defaultMode": "defaultMode is Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"optional":    "optional field specify whether the Secret or its keys must be defined",
 }
 
 func (SecretVolumeSource) SwaggerDoc() map[string]string {
@@ -2220,9 +2220,9 @@ func (ServiceAccountList) SwaggerDoc() map[string]string {
 
 var map_ServiceAccountTokenProjection = map[string]string{
 	"":                  "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
-	"audience":          "Audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver.",
-	"expirationSeconds": "ExpirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
-	"path":              "Path is the path relative to the mount point of the file to project the token into.",
+	"audience":          "audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver.",
+	"expirationSeconds": "expirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
+	"path":              "path is the path relative to the mount point of the file to project the token into.",
 }
 
 func (ServiceAccountTokenProjection) SwaggerDoc() map[string]string {
@@ -2310,11 +2310,11 @@ func (SessionAffinityConfig) SwaggerDoc() map[string]string {
 
 var map_StorageOSPersistentVolumeSource = map[string]string{
 	"":                "Represents a StorageOS persistent volume resource.",
-	"volumeName":      "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
-	"volumeNamespace": "VolumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
-	"fsType":          "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-	"readOnly":        "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"secretRef":       "SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
+	"volumeName":      "volumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+	"volumeNamespace": "volumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
+	"fsType":          "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":        "readOnly defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"secretRef":       "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
 }
 
 func (StorageOSPersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -2323,11 +2323,11 @@ func (StorageOSPersistentVolumeSource) SwaggerDoc() map[string]string {
 
 var map_StorageOSVolumeSource = map[string]string{
 	"":                "Represents a StorageOS persistent volume resource.",
-	"volumeName":      "VolumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
-	"volumeNamespace": "VolumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
-	"fsType":          "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-	"readOnly":        "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"secretRef":       "SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
+	"volumeName":      "volumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+	"volumeNamespace": "volumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
+	"fsType":          "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":        "readOnly defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"secretRef":       "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
 }
 
 func (StorageOSVolumeSource) SwaggerDoc() map[string]string {
@@ -2465,10 +2465,10 @@ func (VolumeNodeAffinity) SwaggerDoc() map[string]string {
 
 var map_VolumeProjection = map[string]string{
 	"":                    "Projection that may be projected along with other supported volume types",
-	"secret":              "information about the secret data to project",
-	"downwardAPI":         "information about the downwardAPI data to project",
-	"configMap":           "information about the configMap data to project",
-	"serviceAccountToken": "information about the serviceAccountToken data to project",
+	"secret":              "secret information about the secret data to project",
+	"downwardAPI":         "downwardAPI information about the downwardAPI data to project",
+	"configMap":           "configMap information about the configMap data to project",
+	"serviceAccountToken": "serviceAccountToken is information about the serviceAccountToken data to project",
 }
 
 func (VolumeProjection) SwaggerDoc() map[string]string {
@@ -2514,10 +2514,10 @@ func (VolumeSource) SwaggerDoc() map[string]string {
 
 var map_VsphereVirtualDiskVolumeSource = map[string]string{
 	"":                  "Represents a vSphere volume resource.",
-	"volumePath":        "Path that identifies vSphere volume vmdk",
-	"fsType":            "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-	"storagePolicyName": "Storage Policy Based Management (SPBM) profile name.",
-	"storagePolicyID":   "Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.",
+	"volumePath":        "volumePath is the path that identifies vSphere volume vmdk",
+	"fsType":            "fsType is filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"storagePolicyName": "storagePolicyName is the storage Policy Based Management (SPBM) profile name.",
+	"storagePolicyID":   "storagePolicyID is the storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.",
 }
 
 func (VsphereVirtualDiskVolumeSource) SwaggerDoc() map[string]string {
