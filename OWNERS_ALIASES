@@ -361,6 +361,12 @@ aliases:
     - lavalamp
     - smarterclayton
     - thockin
+  sig-security-approvers:
+    - IanColdwater
+    - tabbysable
+  sig-security-reviewers:
+    - IanColdwater
+    - tabbysable
   sig-storage-api-approvers:
     - liggitt
     - thockin
