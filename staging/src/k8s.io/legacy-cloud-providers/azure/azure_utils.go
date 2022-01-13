@@ -138,3 +138,28 @@ func parseTags(tags string) map[string]*string {
 	}
 	return formatted
 }
+
+func findKeyInMapCaseInsensitive(targetMap map[string]*string, key string) (bool, string) {
+	for k := range targetMap {
+		if strings.EqualFold(k, key) {
+			return true, k
+		}
+	}
+
+	return false, ""
+}
+
+func reconcileTags(currentTagsOnResource, newTags map[string]*string) (reconciledTags map[string]*string, changed bool) {
+	for k, v := range newTags {
+		found, key := findKeyInMapCaseInsensitive(currentTagsOnResource, k)
+		if !found {
+			currentTagsOnResource[k] = v
+			changed = true
+		} else if !strings.EqualFold(to.String(v), to.String(currentTagsOnResource[key])) {
+			currentTagsOnResource[key] = v
+			changed = true
+		}
+	}
+
+	return currentTagsOnResource, changed
+}
