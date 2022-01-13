@@ -781,23 +781,6 @@ function construct-linux-kubelet-flags {
       flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
     fi
   fi
-  # Network plugin
-  if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
-    flags+=" --cni-bin-dir=/home/kubernetes/bin"
-    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
-      # Calico uses CNI always.
-      # Note that network policy won't work for master node.
-      if [[ "${node_type}" == "master" ]]; then
-        flags+=" --network-plugin=${NETWORK_PROVIDER}"
-      else
-        flags+=" --network-plugin=cni"
-      fi
-    else
-      # Otherwise use the configured value.
-      flags+=" --network-plugin=${NETWORK_PROVIDER}"
-
-    fi
-  fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
@@ -862,9 +845,6 @@ function construct-windows-kubelet-flags {
   # The directory where the TLS certs are located.
   flags+=" --cert-dir=${WINDOWS_PKI_DIR}"
 
-  flags+=" --network-plugin=cni"
-  flags+=" --cni-bin-dir=${WINDOWS_CNI_DIR}"
-  flags+=" --cni-conf-dir=${WINDOWS_CNI_CONFIG_DIR}"
   flags+=" --pod-manifest-path=${WINDOWS_MANIFESTS_DIR}"
 
   # Windows images are large and we don't have gcr mirrors yet. Allow longer

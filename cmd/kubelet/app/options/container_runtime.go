@@ -50,9 +50,5 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		DockershimRootDirectory:   "/var/lib/dockershim",
 		PodSandboxImage:           defaultPodSandboxImage,
 		ImagePullProgressDeadline: metav1.Duration{Duration: 1 * time.Minute},
-
-		CNIBinDir:   "/opt/cni/bin",
-		CNIConfDir:  "/etc/cni/net.d",
-		CNICacheDir: "/var/lib/cni/cache",
 	}
 }
