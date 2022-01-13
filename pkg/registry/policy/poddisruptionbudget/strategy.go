@@ -20,6 +20,7 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -87,7 +88,10 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 // Validate validates a new PodDisruptionBudget.
 func (podDisruptionBudgetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
-	return validation.ValidatePodDisruptionBudget(podDisruptionBudget)
+	opts := validation.PodDisruptionBudgetValidationOptions{
+		AllowInvalidLabelValueInSelector: false,
+	}
+	return validation.ValidatePodDisruptionBudget(podDisruptionBudget, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -106,7 +110,10 @@ func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podDisruptionBudgetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodDisruptionBudget(obj.(*policy.PodDisruptionBudget))
+	opts := validation.PodDisruptionBudgetValidationOptions{
+		AllowInvalidLabelValueInSelector: allowValidateLabelValueInLabelSelector(old.(*policy.PodDisruptionBudget)),
+	}
+	return validation.ValidatePodDisruptionBudget(obj.(*policy.PodDisruptionBudget), opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -166,4 +173,12 @@ func (podDisruptionBudgetStatusStrategy) ValidateUpdate(ctx context.Context, obj
 // WarningsOnUpdate returns warnings for the given update.
 func (podDisruptionBudgetStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+func allowValidateLabelValueInLabelSelector(pdb *policy.PodDisruptionBudget) bool {
+	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}
+	if pdb.Spec.Selector != nil {
+		return len(metav1validation.ValidateLabelSelector(pdb.Spec.Selector, labelSelectorValidationOptions, nil)) > 0
+	}
+	return false
 }

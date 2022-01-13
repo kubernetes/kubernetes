@@ -2179,7 +2179,7 @@ func TestValidateCSIStorageCapacity(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateCSIStorageCapacity(scenario.capacity)
+			errs := ValidateCSIStorageCapacity(scenario.capacity, CSIStorageCapacityValidateOptions{false})
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success")
 			}
