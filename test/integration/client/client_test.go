@@ -42,13 +42,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -967,67 +964,6 @@ func TestMultiWatch(t *testing.T) {
 	}
 	log.Printf("all watches ended")
 	t.Errorf("durations: %v", dur)
-}
-
-func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace string) {
-	podBody := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "selflinktest",
-			Namespace: namespace,
-			Labels: map[string]string{
-				"name": "selflinktest",
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{Name: "name", Image: "image"},
-			},
-		},
-	}
-	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &podBody, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Failed creating selflinktest pod: %v", err)
-	}
-	if err = c.CoreV1().RESTClient().Get().RequestURI(pod.SelfLink).Do(context.TODO()).Into(pod); err != nil {
-		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
-	}
-
-	podList, err := c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		t.Errorf("Failed listing pods: %v", err)
-	}
-
-	if err = c.CoreV1().RESTClient().Get().RequestURI(podList.SelfLink).Do(context.TODO()).Into(podList); err != nil {
-		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
-	}
-
-	found := false
-	for i := range podList.Items {
-		item := &podList.Items[i]
-		if item.Name != "selflinktest" {
-			continue
-		}
-		found = true
-		err = c.CoreV1().RESTClient().Get().RequestURI(item.SelfLink).Do(context.TODO()).Into(pod)
-		if err != nil {
-			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
-		}
-		break
-	}
-	if !found {
-		t.Errorf("never found selflinktest pod in namespace %s", namespace)
-	}
-}
-
-func TestSelfLinkOnNamespace(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoveSelfLink, false)()
-
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
-	defer result.TearDownFn()
-
-	c := clientset.NewForConfigOrDie(result.ClientConfig)
-
-	runSelfLinkTestOnNamespace(t, c, "default")
 }
 
 func TestApplyWithApplyConfiguration(t *testing.T) {
