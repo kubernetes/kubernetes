@@ -107,6 +107,11 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	// delete the APIService first to avoid causing discovery errors
 	_ = aggrclient.ApiregistrationV1().APIServices().Delete(context.TODO(), "v1alpha1.wardle.example.com", metav1.DeleteOptions{})
 
+	// this simple sleep makes sure that the sample api server was unregistered from all Kube APIs before tearing down the deployment (otherwise it could make the test to fail)
+	// a more expensive way of doing it would be checking if the sample server was unregistered from all deployed Kube API servers before tearing down the deployment.
+	framework.Logf("sleeping 45 seconds before deleting the sample-apiserver deployment, see %q for more", "https://bugzilla.redhat.com/show_bug.cgi?id=1933144")
+	time.Sleep(time.Second * 45)
+
 	_ = client.AppsV1().Deployments(namespace).Delete(context.TODO(), "sample-apiserver-deployment", metav1.DeleteOptions{})
 	_ = client.CoreV1().Secrets(namespace).Delete(context.TODO(), "sample-apiserver-secret", metav1.DeleteOptions{})
 	_ = client.CoreV1().Services(namespace).Delete(context.TODO(), "sample-api", metav1.DeleteOptions{})
