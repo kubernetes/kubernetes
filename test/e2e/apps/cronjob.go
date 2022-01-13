@@ -191,7 +191,7 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1.ForbidConcurrent,
 			sleepCommand, nil, nil)
 		creationTime := time.Now().Add(-99 * 24 * time.Hour)
-		lastScheduleTime := creationTime.Add(-1 * 24 * time.Hour)
+		lastScheduleTime := creationTime.Add(1 * 24 * time.Hour)
 		cronJob.CreationTimestamp = metav1.Time{Time: creationTime}
 		cronJob.Status.LastScheduleTime = &metav1.Time{Time: lastScheduleTime}
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
