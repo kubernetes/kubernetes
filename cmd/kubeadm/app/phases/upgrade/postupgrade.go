@@ -239,6 +239,42 @@ func RemoveOldControlPlaneLabel(client clientset.Interface) error {
 	return nil
 }
 
+// AddNewControlPlaneTaint finds all nodes with the new "control-plane" node-role label
+// and adds the new "control-plane" taint to them.
+// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+func AddNewControlPlaneTaint(client clientset.Interface) error {
+	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+		kubeadmconstants.LabelNodeRoleControlPlane: "",
+	}))
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selectorControlPlane.String(),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
+	}
+
+	for _, n := range nodes.Items {
+		// Check if the node has the taint already and skip it if so
+		hasTaint := false
+		for _, t := range n.Spec.Taints {
+			if t.String() == kubeadmconstants.ControlPlaneTaint.String() {
+				hasTaint = true
+				break
+			}
+		}
+		// If the node does not have the taint, patch it
+		if !hasTaint {
+			err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
+				n.Spec.Taints = append(n.Spec.Taints, kubeadmconstants.ControlPlaneTaint)
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // UpdateKubeletDynamicEnvFileWithURLScheme reads the kubelet dynamic environment file
 // from disk, ensure that the CRI endpoint flag has a scheme prefix and writes it
 // back to disk.

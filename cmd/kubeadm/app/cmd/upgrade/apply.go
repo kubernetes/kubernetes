@@ -164,6 +164,15 @@ func runApply(flags *applyFlags, args []string) error {
 		return err
 	}
 
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+	fmt.Printf("[upgrade/postupgrade] Adding the new taint %s to all control plane Nodes. "+
+		"After this step both taints %s and %s should be present on control plane Nodes.\n",
+		kubeadmconstants.ControlPlaneTaint.String(), kubeadmconstants.ControlPlaneTaint.String(),
+		kubeadmconstants.OldControlPlaneTaint.String())
+	if err := upgrade.AddNewControlPlaneTaint(client); err != nil {
+		return err
+	}
+
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.dryRun); err != nil {
