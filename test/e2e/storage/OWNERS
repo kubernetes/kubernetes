@@ -9,5 +9,3 @@ reviewers:
   - pohly
 labels:
   - sig/storage
-emeritus_reviewers:
-  - saad-ali
