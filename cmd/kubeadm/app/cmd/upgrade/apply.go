@@ -157,9 +157,10 @@ func runApply(flags *applyFlags, args []string) error {
 	}
 
 	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
-		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
-	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
+	fmt.Printf("[upgrade/postupgrade] Removing the deprecated label %s='' from all control plane Nodes. "+
+		"After this step only the label %s='' will be present on control plane Nodes.\n",
+		kubeadmconstants.LabelNodeRoleOldControlPlane, kubeadmconstants.LabelNodeRoleControlPlane)
+	if err := upgrade.RemoveOldControlPlaneLabel(client); err != nil {
 		return err
 	}
 
