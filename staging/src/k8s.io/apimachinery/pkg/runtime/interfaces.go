@@ -286,7 +286,6 @@ type ResourceVersioner interface {
 
 // SelfLinker provides methods for setting and retrieving the SelfLink field of an API object.
 type SelfLinker interface {
-	SetSelfLink(obj Object, selfLink string) error
 	SelfLink(obj Object) (string, error)
 
 	// Knowing Name is sometimes necessary to use a SelfLinker.

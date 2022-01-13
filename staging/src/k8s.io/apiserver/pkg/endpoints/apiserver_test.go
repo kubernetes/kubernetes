@@ -1444,65 +1444,6 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	}
 }
 
-func TestRootSelfLink(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoveSelfLink, false)()
-
-	storage := map[string]rest.Storage{}
-	simpleStorage := GetWithOptionsRootRESTStorage{
-		SimpleTypedStorage: &SimpleTypedStorage{
-			baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
-			item: &genericapitesting.SimpleRoot{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Other:      "foo",
-			},
-		},
-		takesPath: "atAPath",
-	}
-	storage["simple"] = &simpleStorage
-	storage["simple/sub"] = &simpleStorage
-	handler := handle(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	testCases := []struct {
-		url      string
-		selfLink string
-	}{
-		{
-			url:      server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo",
-			selfLink: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo",
-		},
-		{
-			url:      server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo/sub",
-			selfLink: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple/foo/sub",
-		},
-	}
-
-	for _, test := range testCases {
-		resp, err := http.Get(test.url)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			t.Logf("Data: %s", string(body))
-		}
-		var out genericapitesting.SimpleRoot
-		if _, err := extractBody(resp, &out); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if out.SelfLink != test.selfLink {
-			t.Errorf("unexpected self link: %#v", out.SelfLink)
-		}
-	}
-}
-
 func TestMetadata(t *testing.T) {
 	simpleStorage := &MetadataRESTStorage{&SimpleRESTStorage{}, []string{"text/plain"}}
 	h := handle(map[string]rest.Storage{"simple": simpleStorage})
@@ -3885,15 +3826,6 @@ type setTestSelfLinker struct {
 func (s *setTestSelfLinker) Namespace(runtime.Object) (string, error) { return s.namespace, s.err }
 func (s *setTestSelfLinker) Name(runtime.Object) (string, error)      { return s.name, s.err }
 func (s *setTestSelfLinker) SelfLink(runtime.Object) (string, error)  { return "", s.err }
-func (s *setTestSelfLinker) SetSelfLink(obj runtime.Object, selfLink string) error {
-	if e, a := s.expectedSet, selfLink; e != a {
-		if !s.alternativeSet.Has(a) {
-			s.t.Errorf("expected '%v', got '%v'", e, a)
-		}
-	}
-	s.called = true
-	return s.err
-}
 
 func TestCreate(t *testing.T) {
 	storage := SimpleRESTStorage{
