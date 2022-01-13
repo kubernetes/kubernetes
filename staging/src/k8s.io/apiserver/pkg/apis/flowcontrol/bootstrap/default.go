@@ -264,44 +264,20 @@ var (
 		})
 )
 
-// Suggested FlowSchema objects
+// Suggested FlowSchema objects.
+// Ordered by matching precedence, so that their interactions are easier
+// to follow while reading this source.
 var (
-	SuggestedFlowSchemaSystemNodes = newFlowSchema(
-		"system-nodes", "system", 500,
-		flowcontrol.FlowDistinguisherMethodByUserType,
+	// the following flow schema exempts probes
+	SuggestedFlowSchemaProbes = newFlowSchema(
+		"probes", "exempt", 2,
+		"", // distinguisherMethodType
 		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.NodesGroup), // the nodes group
-			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
-				[]string{flowcontrol.VerbAll},
-				[]string{flowcontrol.APIGroupAll},
-				[]string{flowcontrol.ResourceAll},
-				[]string{flowcontrol.NamespaceEvery},
-				true)},
+			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
-	)
-	SuggestedFlowSchemaSystemNodeHigh = newFlowSchema(
-		"system-node-high", "node-high", 400,
-		flowcontrol.FlowDistinguisherMethodByUserType,
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.NodesGroup), // the nodes group
-			ResourceRules: []flowcontrol.ResourcePolicyRule{
-				resourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{corev1.GroupName},
-					[]string{"nodes", "nodes/status"},
-					[]string{flowcontrol.NamespaceEvery},
-					true),
-				resourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{coordinationv1.GroupName},
-					[]string{"leases"},
-					[]string{flowcontrol.NamespaceEvery},
-					false),
+					[]string{"get"},
+					[]string{"/healthz", "/readyz", "/livez"}),
 			},
 		},
 	)
@@ -365,6 +341,45 @@ var (
 					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
 					false),
+			},
+		},
+	)
+	SuggestedFlowSchemaSystemNodeHigh = newFlowSchema(
+		"system-node-high", "node-high", 400,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(user.NodesGroup), // the nodes group
+			ResourceRules: []flowcontrol.ResourcePolicyRule{
+				resourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{corev1.GroupName},
+					[]string{"nodes", "nodes/status"},
+					[]string{flowcontrol.NamespaceEvery},
+					true),
+				resourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{coordinationv1.GroupName},
+					[]string{"leases"},
+					[]string{flowcontrol.NamespaceEvery},
+					false),
+			},
+		},
+	)
+	SuggestedFlowSchemaSystemNodes = newFlowSchema(
+		"system-nodes", "system", 500,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(user.NodesGroup), // the nodes group
+			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
+				[]string{flowcontrol.VerbAll},
+				[]string{flowcontrol.APIGroupAll},
+				[]string{flowcontrol.ResourceAll},
+				[]string{flowcontrol.NamespaceEvery},
+				true)},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+				nonResourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{flowcontrol.NonResourceAll}),
 			},
 		},
 	)
@@ -455,19 +470,6 @@ var (
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
 					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
-	)
-	// the following flow schema exempts probes
-	SuggestedFlowSchemaProbes = newFlowSchema(
-		"probes", "exempt", 2,
-		"", // distinguisherMethodType
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{"get"},
-					[]string{"/healthz", "/readyz", "/livez"}),
 			},
 		},
 	)
