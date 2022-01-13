@@ -201,9 +201,9 @@ type NodeRegistrationOptions struct {
 	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
 	CRISocket string `json:"criSocket,omitempty"`
 
-	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
-	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your control-plane node, set this field to an
-	// empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
+	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil,
+	// it will be defaulted with a control-plane taint for control-plane nodes. If you don't want to taint your control-plane
+	// node, set this field to an empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
 	Taints []v1.Taint `json:"taints"`
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
