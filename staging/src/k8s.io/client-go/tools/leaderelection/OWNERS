@@ -2,11 +2,10 @@
 
 approvers:
   - mikedanese
-  - timothysc
 reviewers:
   - wojtek-t
   - deads2k
   - mikedanese
-  - timothysc
   - ingvagabund
-  - resouer
+emeritus_approvers:
+  - timothysc

@@ -6,12 +6,10 @@ reviewers:
   - smarterclayton
   - wojtek-t
   - deads2k
-  - brendandburns
   - derekwaynecarr
   - caesarxuchao
   - mikedanese
   - liggitt
-  - pmorie
   - sttts
   - saad-ali
   - janetkuo
@@ -21,5 +19,3 @@ reviewers:
   - mwielgus
   - soltysh
   - dims
-  - errordeveloper
-  - resouer

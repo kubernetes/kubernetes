@@ -2,23 +2,16 @@
 
 approvers:
   - luxas
-  - timothysc
   - fabriziopandini
   - neolit123
-  - ereslibre
 reviewers:
   - luxas
-  - timothysc
   - fabriziopandini
   - neolit123
-  - kad
-  - detiber
-  - dixudx
-  - yagonobre
-  - ereslibre
   - SataQiu
-  - yastij
 labels:
   - sig/cluster-lifecycle
 emeritus_approvers:
   - rosti
+  - ereslibre
+  - timothysc

@@ -50,14 +50,12 @@ aliases:
     - deads2k
     - dims
     - enj
-    - errordeveloper
     - lavalamp
     - liggitt
     - mikedanese
     - smarterclayton
     - sttts
     - thockin
-    - timothysc
     - wojtek-t
   sig-auth-encryption-at-rest-approvers:
     - smarterclayton
@@ -196,11 +194,9 @@ aliases:
   # - smarterclayton
   sig-cli:
     - brianpursley
-    - dixudx
     - seans3
     - soltysh
     - pwittrock
-    - zhouya0
     - eddiezane
     - dougsland
     - rikatz
@@ -238,8 +234,6 @@ aliases:
     - ehashman
     - feiskyer
     - mtaufen
-    - pmorie
-    - resouer
     - sjenning
     - wzshiming
     - yujuhong
@@ -259,7 +253,6 @@ aliases:
     - aojea
     - bowei
     - caseydavenport
-    - cmluciano
     - danwinship
     - dcbw
     - freehan
@@ -272,23 +265,19 @@ aliases:
     - aojea
     - bowei
     - caseydavenport
-    - cmluciano
     - danwinship
     - dcbw
     - freehan
     - johnbelamaric
     - khenidak
-    - m1093782566
     - mrhohn
     - thockin
   sig-apps-approvers:
     - kow3ns
     - janetkuo
     - soltysh
-    - erictune
     - smarterclayton
   sig-apps-reviewers:
-    - erictune
     - janetkuo
     - kow3ns
     - mortent
@@ -327,7 +316,6 @@ aliases:
   # - DirectXMan12
 
   api-approvers:
-    - erictune
     - lavalamp
     - smarterclayton
     - thockin
@@ -338,7 +326,6 @@ aliases:
     - liggitt
     - smarterclayton
   sig-apps-api-approvers:
-    - erictune
     - lavalamp
     - liggitt
     - smarterclayton
@@ -365,7 +352,6 @@ aliases:
   sig-network-api-reviewers:
     - andrewsykim
     - caseydavenport
-    - cmluciano
     - danwinship
     - thockin
   sig-node-api-approvers:
@@ -384,7 +370,6 @@ aliases:
     - liggitt
   api-reviewers:
     - andrewsykim
-    - erictune
     - lavalamp
     - smarterclayton
     - thockin
@@ -392,11 +377,9 @@ aliases:
     - wojtek-t
     - deads2k
     - yujuhong
-    - brendandburns
     - derekwaynecarr
     - caesarxuchao
     - mikedanese
-    - pmorie
     - sttts
     - dchen1107
     - saad-ali
@@ -407,7 +390,6 @@ aliases:
     - ncdc
     - tallclair
     - mwielgus
-    - timothysc
     - soltysh
     - jsafrane
     - dims
@@ -437,7 +419,6 @@ aliases:
   #   -
   #   -
   sig-contribex-approvers:
-    - alisondy
     - mrbobbytables
     - cblecker
     - nikhita
@@ -468,14 +449,7 @@ aliases:
     - msau42
     - jsafrane
     - xing-yang
-  sig-security-approvers:
-    - IanColdwater
-    - tabbysable
-  sig-security-reviewers:
-    - IanColdwater
-    - tabbysable
   sig-windows-api-reviewers:
-    - ddebroy
     - jayunit100
     - jsturtevant
     - marosset
@@ -508,10 +482,8 @@ aliases:
     - liggitt # Auth
     - luxas # Cluster Lifecycle
     - marosset # Windows
-    - mattfarina # Apps
     - msau42 # Storage
     - mwielgus # Autoscaling
-    - prydonius # Apps
     - pwittrock # CLI
     - justinsb # Cluster Lifecycle
     - saad-ali # Storage
@@ -519,7 +491,6 @@ aliases:
     - soltysh # Apps, CLI
     - tallclair # Auth
     - thockin # Network
-    - timothysc # Cluster Lifecycle, Scheduling
     - xing-yang # Storage
     - wojtek-t # Scalability
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md

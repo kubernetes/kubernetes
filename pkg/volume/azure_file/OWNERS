@@ -2,12 +2,10 @@
 
 approvers:
   - andyzhangx
-  - brendandburns
   - feiskyer
   - khenidak
 reviewers:
   - andyzhangx
-  - brendandburns
   - feiskyer
   - jsafrane
   - jingxu97
@@ -17,3 +15,4 @@ reviewers:
 emeritus_approvers:
   - karataliu
   - rootfs
+  - brendandburns

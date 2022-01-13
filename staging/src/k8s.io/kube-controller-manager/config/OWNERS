@@ -11,6 +11,5 @@ reviewers:
   - luxas
   - mtaufen
   - sttts
-  - stewart-yu
 labels:
   - kind/api-change

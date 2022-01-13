@@ -2,7 +2,7 @@
 
 approvers:
   - pwittrock
-  - mengqiy
 reviewers:
-  - mengqiy
   - apelisse
+emeritus_approvers:
+  - mengqiy

@@ -1,7 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - pmorie
   - saad-ali
   - humblec
 reviewers:
@@ -12,3 +11,4 @@ reviewers:
   - msau42
 emeritus_approvers:
   - rootfs
+  - pmorie

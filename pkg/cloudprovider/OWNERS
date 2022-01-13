@@ -3,7 +3,6 @@
 approvers:
   - mikedanese
   - dims
-  - wlan0
   - andrewsykim
   - cheftako
 reviewers:
@@ -12,12 +11,10 @@ reviewers:
   - smarterclayton
   - wojtek-t
   - deads2k
-  - brendandburns
   - derekwaynecarr
   - caesarxuchao
   - mikedanese
   - liggitt
-  - pmorie
   - sttts
   - dchen1107
   - saad-ali

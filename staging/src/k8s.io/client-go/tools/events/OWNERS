@@ -2,9 +2,9 @@
 
 approvers:
   - sig-instrumentation-approvers
-  - yastij
   - wojtek-t
 reviewers:
   - sig-instrumentation-reviewers
-  - yastij
   - wojtek-t
+emeritus_approvers:
+  - yastij

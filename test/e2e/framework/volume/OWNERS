@@ -5,6 +5,5 @@ approvers:
   - jingxu97
 reviewers:
   - sig-storage-reviewers
-  - jeffvance
 emeritus_approvers:
   - rootfs

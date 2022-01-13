@@ -2,14 +2,13 @@
 
 reviewers:
   - josephburnett
-  - MaciekPytel
   - mwielgus
 approvers:
   - josephburnett
-  - MaciekPytel
   - mwielgus
 emeritus_approvers:
   - jszczepkowski
   - piosz
+  - MaciekPytel
 labels:
   - sig/autoscaling
