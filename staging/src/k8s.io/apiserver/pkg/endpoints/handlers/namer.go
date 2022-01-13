@@ -39,7 +39,7 @@ type ScopeNamer interface {
 }
 
 type ContextBasedNaming struct {
-	SelfLinker    runtime.SelfLinker
+	Namer         runtime.Namer
 	ClusterScoped bool
 
 	SelfLinkPathPrefix string
@@ -70,14 +70,14 @@ func (n ContextBasedNaming) Name(req *http.Request) (namespace, name string, err
 }
 
 func (n ContextBasedNaming) ObjectName(obj runtime.Object) (namespace, name string, err error) {
-	name, err = n.SelfLinker.Name(obj)
+	name, err = n.Namer.Name(obj)
 	if err != nil {
 		return "", "", err
 	}
 	if len(name) == 0 {
 		return "", "", errEmptyName
 	}
-	namespace, err = n.SelfLinker.Namespace(obj)
+	namespace, err = n.Namer.Namespace(obj)
 	if err != nil {
 		return "", "", err
 	}

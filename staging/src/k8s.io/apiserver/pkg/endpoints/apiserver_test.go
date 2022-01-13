@@ -126,7 +126,7 @@ var newCodec = codecs.LegacyCodec(newGroupVersion)
 var parameterCodec = runtime.NewParameterCodec(scheme)
 
 var accessor = meta.NewAccessor()
-var selfLinker runtime.SelfLinker = accessor
+var namer runtime.Namer = accessor
 var admissionControl admission.Interface
 
 func init() {
@@ -232,8 +232,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
-		// TODO(wojtek-t): Switch to Namer.
-		Linker:          selfLinker,
+		Namer:           namer,
 		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
@@ -3280,7 +3279,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
-		Linker:          selfLinker,
+		Namer:           namer,
 		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
@@ -3313,7 +3312,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
-		Linker:          selfLinker,
+		Namer:           namer,
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
@@ -4100,7 +4099,7 @@ func TestXGSubresource(t *testing.T) {
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
-		Linker:          selfLinker,
+		Namer:           namer,
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 

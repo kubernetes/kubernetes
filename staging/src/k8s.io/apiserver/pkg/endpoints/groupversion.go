@@ -79,7 +79,7 @@ type APIGroupVersion struct {
 	Convertor             runtime.ObjectConvertor
 	ConvertabilityChecker ConvertabilityChecker
 	Defaulter             runtime.ObjectDefaulter
-	Linker                runtime.SelfLinker
+	Namer                 runtime.Namer
 	UnsafeConvertor       runtime.ObjectConvertor
 	TypeConverter         fieldmanager.TypeConverter
 

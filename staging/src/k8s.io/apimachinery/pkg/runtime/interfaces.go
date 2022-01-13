@@ -292,14 +292,6 @@ type Namer interface {
 	Namespace(obj Object) (string, error)
 }
 
-// SelfLinker provides methods for setting and retrieving the SelfLink field of an API object.
-type SelfLinker interface {
-	SelfLink(obj Object) (string, error)
-
-	// Knowing Name or Namespace is sometimes necessary to use a SelfLinker.
-	Namer
-}
-
 // Object interface must be supported by all API types registered with Scheme. Since objects in a scheme are
 // expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
 // serializers to set the kind, version, and group the object is represented as. An Object may choose

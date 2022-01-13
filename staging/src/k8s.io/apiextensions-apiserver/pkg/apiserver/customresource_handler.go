@@ -843,7 +843,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		requestScopes[v.Name] = &handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{
-				SelfLinker:         meta.NewAccessor(),
+				Namer:              meta.NewAccessor(),
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
@@ -896,7 +896,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme())
 		scaleScope.Kind = autoscalingv1.SchemeGroupVersion.WithKind("Scale")
 		scaleScope.Namer = handlers.ContextBasedNaming{
-			SelfLinker:         meta.NewAccessor(),
+			Namer:              meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/scale",
@@ -921,7 +921,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
 		statusScope.Namer = handlers.ContextBasedNaming{
-			SelfLinker:         meta.NewAccessor(),
+			Namer:              meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/status",

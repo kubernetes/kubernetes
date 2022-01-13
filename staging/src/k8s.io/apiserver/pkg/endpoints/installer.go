@@ -428,7 +428,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = false
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			SelfLinker:         a.group.Linker,
+			Namer:              a.group.Namer,
 			ClusterScoped:      true,
 			SelfLinkPathPrefix: gpath.Join(a.prefix, resource) + "/",
 			SelfLinkPathSuffix: suffix,
@@ -477,7 +477,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = true
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			SelfLinker:         a.group.Linker,
+			Namer:              a.group.Namer,
 			ClusterScoped:      false,
 			SelfLinkPathPrefix: gpath.Join(a.prefix, namespaceParamName) + "/",
 			SelfLinkPathSuffix: itemPathSuffix,
