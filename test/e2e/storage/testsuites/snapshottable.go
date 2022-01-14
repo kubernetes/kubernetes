@@ -142,7 +142,9 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 
 			ginkgo.By("[init] starting a pod to use the claim")
 			originalMntTestData = fmt.Sprintf("hello from %s namespace", f.Namespace.Name)
-			command := fmt.Sprintf("echo '%s' > %s", originalMntTestData, datapath)
+			// After writing data to a file `sync` flushes the data from memory to disk.
+			// sync is available in the Linux and Windows versions of agnhost.
+			command := fmt.Sprintf("echo '%s' > %s; sync", originalMntTestData, datapath)
 
 			pod = StartInPodWithVolumeSource(cs, *volumeResource.VolSource, f.Namespace.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
 
@@ -422,7 +424,9 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 
 				ginkgo.By("modifying the data in the source PVC")
 
-				command := fmt.Sprintf("echo '%s' > %s", modifiedMntTestData, datapath)
+				// After writing data to a file `sync` flushes the data from memory to disk.
+				// sync is available in the Linux and Windows versions of agnhost.
+				command := fmt.Sprintf("echo '%s' > %s; sync", modifiedMntTestData, datapath)
 				RunInPodWithVolume(cs, f.Timeouts, pvc.Namespace, pvc.Name, "pvc-snapshottable-data-tester", command, config.ClientNodeSelection)
 
 				ginkgo.By("creating a pvc from the snapshot")
