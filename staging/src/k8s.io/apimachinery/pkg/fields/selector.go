@@ -82,7 +82,7 @@ type hasTerm struct {
 }
 
 func (t *hasTerm) Matches(ls Fields) bool {
-	return ls.Get(t.field) == t.value
+	return strings.EqualFold(ls.Get(t.field), t.value)
 }
 
 func (t *hasTerm) Empty() bool {
@@ -133,7 +133,7 @@ type notHasTerm struct {
 }
 
 func (t *notHasTerm) Matches(ls Fields) bool {
-	return ls.Get(t.field) != t.value
+	return !strings.EqualFold(ls.Get(t.field), t.value)
 }
 
 func (t *notHasTerm) Empty() bool {

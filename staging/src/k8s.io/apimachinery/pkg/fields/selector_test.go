@@ -209,6 +209,7 @@ func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "", Set{"x": "y"})
 	expectMatch(t, "x=y", Set{"x": "y"})
 	expectMatch(t, "x=y,z=w", Set{"x": "y", "z": "w"})
+	expectMatch(t, "x=y,z=w", Set{"x": "Y", "z": "W"}) // matching is case insensitive
 	expectMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "a"})
 	expectMatch(t, "notin=in", Set{"notin": "in"}) // in and notin in exactMatch
 	expectNoMatch(t, "x=y", Set{"x": "z"})
