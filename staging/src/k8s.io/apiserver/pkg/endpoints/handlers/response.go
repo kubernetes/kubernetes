@@ -59,7 +59,7 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
-	if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
+	if err := ensureNonNilItems(obj); err != nil {
 		return nil, err
 	}
 

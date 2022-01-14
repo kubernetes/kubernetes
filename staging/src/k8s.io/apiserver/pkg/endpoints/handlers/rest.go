@@ -356,49 +356,14 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 	}
 }
 
-// setObjectSelfLink sets the self link of an object as needed.
-// TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
-//   interfaces
-func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
-		// Ensure that for empty lists we don't return <nil> items.
-		if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-			if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// We only generate list links on objects that implement ListInterface - historically we duck typed this
-	// check via reflection, but as we move away from reflection we require that you not only carry Items but
-	// ListMeta into order to be identified as a list.
-	if !meta.IsListType(obj) {
-		_, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			return fmt.Errorf("missing requestInfo")
-		}
-		return nil
-	}
-
-	_, ok := request.RequestInfoFrom(ctx)
-	if !ok {
-		return fmt.Errorf("missing requestInfo")
-	}
-
-	count := 0
-	err := meta.EachListItem(obj, func(obj runtime.Object) error {
-		count++
-		return nil
-	})
-
-	if count == 0 {
+// ensureNonNilItems ensures that for empty lists we don't return <nil> items.
+func ensureNonNilItems(obj runtime.Object) error {
+	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
 		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
 			return err
 		}
 	}
-
-	return err
+	return nil
 }
 
 func summarizeData(data []byte, maxLength int) string {
