@@ -38,6 +38,9 @@ func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffini
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
 // matches the namespace and selector defined by <affinityPod>`s <term>.
 func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, selector labels.Selector) bool {
+	if selector == nil {
+		return false
+	}
 	if !namespaces.Has(pod.Namespace) {
 		return false
 	}
