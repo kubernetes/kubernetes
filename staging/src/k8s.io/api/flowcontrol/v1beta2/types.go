@@ -352,8 +352,10 @@ type FlowSchemaStatus struct {
 	// `conditions` is a list of the current states of FlowSchema.
 	// +listType=map
 	// +listMapKey=type
+	// +patchStrategy=merge,retainKeys
+	// +patchMergeKey=type
 	// +optional
-	Conditions []FlowSchemaCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
+	Conditions []FlowSchemaCondition `json:"conditions,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // FlowSchemaCondition describes conditions for a FlowSchema.
@@ -544,8 +546,10 @@ type PriorityLevelConfigurationStatus struct {
 	// `conditions` is the current state of "request-priority".
 	// +listType=map
 	// +listMapKey=type
+	// +patchStrategy=merge,retainKeys
+	// +patchMergeKey=type
 	// +optional
-	Conditions []PriorityLevelConfigurationCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
+	Conditions []PriorityLevelConfigurationCondition `json:"conditions,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // PriorityLevelConfigurationCondition defines the condition of priority level.

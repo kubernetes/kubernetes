@@ -161,7 +161,9 @@
             "x-kubernetes-list-map-keys": [
               "type"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "type",
+            "x-kubernetes-patch-strategy": "merge,retainKeys"
           }
         },
         "type": "object"
@@ -440,7 +442,9 @@
             "x-kubernetes-list-map-keys": [
               "type"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "type",
+            "x-kubernetes-patch-strategy": "merge,retainKeys"
           }
         },
         "type": "object"

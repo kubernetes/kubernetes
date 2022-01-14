@@ -119,6 +119,8 @@ message FlowSchemaStatus {
   // `conditions` is a list of the current states of FlowSchema.
   // +listType=map
   // +listMapKey=type
+  // +patchStrategy=merge,retainKeys
+  // +patchMergeKey=type
   // +optional
   repeated FlowSchemaCondition conditions = 1;
 }
@@ -310,6 +312,8 @@ message PriorityLevelConfigurationStatus {
   // `conditions` is the current state of "request-priority".
   // +listType=map
   // +listMapKey=type
+  // +patchStrategy=merge,retainKeys
+  // +patchMergeKey=type
   // +optional
   repeated PriorityLevelConfigurationCondition conditions = 1;
 }
