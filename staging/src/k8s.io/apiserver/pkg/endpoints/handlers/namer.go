@@ -41,9 +41,6 @@ type ScopeNamer interface {
 type ContextBasedNaming struct {
 	Namer         runtime.Namer
 	ClusterScoped bool
-
-	SelfLinkPathPrefix string
-	SelfLinkPathSuffix string
 }
 
 // ContextBasedNaming implements ScopeNamer
