@@ -76,7 +76,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
@@ -220,27 +219,26 @@ type Dependencies struct {
 	Options []Option
 
 	// Injected Dependencies
-	Auth                    server.AuthInterface
-	CAdvisorInterface       cadvisor.Interface
-	Cloud                   cloudprovider.Interface
-	ContainerManager        cm.ContainerManager
-	EventClient             v1core.EventsGetter
-	HeartbeatClient         clientset.Interface
-	OnHeartbeatFailure      func()
-	KubeClient              clientset.Interface
-	Mounter                 mount.Interface
-	HostUtil                hostutil.HostUtils
-	OOMAdjuster             *oom.OOMAdjuster
-	OSInterface             kubecontainer.OSInterface
-	PodConfig               *config.PodConfig
-	Recorder                record.EventRecorder
-	Subpather               subpath.Interface
-	VolumePlugins           []volume.VolumePlugin
-	DynamicPluginProber     volume.DynamicPluginProber
-	TLSOptions              *server.TLSOptions
-	KubeletConfigController *kubeletconfig.Controller
-	RemoteRuntimeService    internalapi.RuntimeService
-	RemoteImageService      internalapi.ImageManagerService
+	Auth                 server.AuthInterface
+	CAdvisorInterface    cadvisor.Interface
+	Cloud                cloudprovider.Interface
+	ContainerManager     cm.ContainerManager
+	EventClient          v1core.EventsGetter
+	HeartbeatClient      clientset.Interface
+	OnHeartbeatFailure   func()
+	KubeClient           clientset.Interface
+	Mounter              mount.Interface
+	HostUtil             hostutil.HostUtils
+	OOMAdjuster          *oom.OOMAdjuster
+	OSInterface          kubecontainer.OSInterface
+	PodConfig            *config.PodConfig
+	Recorder             record.EventRecorder
+	Subpather            subpath.Interface
+	VolumePlugins        []volume.VolumePlugin
+	DynamicPluginProber  volume.DynamicPluginProber
+	TLSOptions           *server.TLSOptions
+	RemoteRuntimeService internalapi.RuntimeService
+	RemoteImageService   internalapi.ImageManagerService
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
 }

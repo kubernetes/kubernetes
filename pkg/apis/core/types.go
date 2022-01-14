@@ -4127,8 +4127,7 @@ type NodeSpec struct {
 	// +optional
 	Taints []Taint
 
-	// If specified, the source to get node configuration from
-	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed from Kubelets as of 1.24 and will be fully removed in 1.26.
 	// +optional
 	ConfigSource *NodeConfigSource
 
@@ -4138,12 +4137,12 @@ type NodeSpec struct {
 	DoNotUseExternalID string
 }
 
-// NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
+// Deprecated: NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
 type NodeConfigSource struct {
 	ConfigMap *ConfigMapNodeConfigSource
 }
 
-// ConfigMapNodeConfigSource represents the config map of a node
+// Deprecated: ConfigMapNodeConfigSource represents the config map of a node
 type ConfigMapNodeConfigSource struct {
 	// Namespace is the metadata.namespace of the referenced ConfigMap.
 	// This field is required in all cases.

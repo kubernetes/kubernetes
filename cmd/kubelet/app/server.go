@@ -88,7 +88,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	dynamickubeletconfig "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
@@ -217,30 +216,11 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				klog.InfoS("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
 			}
 
-			// use dynamic kubelet config, if enabled
-			var kubeletConfigController *dynamickubeletconfig.Controller
-			if dynamicConfigDir := kubeletFlags.DynamicConfigDir.Value(); len(dynamicConfigDir) > 0 {
-				var dynamicKubeletConfig *kubeletconfiginternal.KubeletConfiguration
-				dynamicKubeletConfig, kubeletConfigController, err = BootstrapKubeletConfigController(dynamicConfigDir,
-					func(kc *kubeletconfiginternal.KubeletConfiguration) error {
-						// Here, we enforce flag precedence inside the controller, prior to the controller's validation sequence,
-						// so that we get a complete validation at the same point where we can decide to reject dynamic config.
-						// This fixes the flag-precedence component of issue #63305.
-						// See issue #56171 for general details on flag precedence.
-						return kubeletConfigFlagPrecedence(kc, args)
-					})
-				if err != nil {
-					return fmt.Errorf("failed to bootstrap a configuration controller, error: %w, dynamicConfigDir: %s", err, dynamicConfigDir)
-				}
-				// If we should just use our existing, local config, the controller will return a nil config
-				if dynamicKubeletConfig != nil {
-					kubeletConfig = dynamicKubeletConfig
-					// Note: flag precedence was already enforced in the controller, prior to validation,
-					// by our above transform function. Now we simply update feature gates from the new config.
-					if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
-						return fmt.Errorf("failed to set feature gates from initial flags-based config: %w", err)
-					}
-				}
+			// The features.DynamicKubeletConfig is locked to false,
+			// feature gate is not locked using the LockedToDefault flag
+			// to make sure node authorizer can keep working with the older nodes
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+				return fmt.Errorf("cannot set feature gate %v to %v, feature is locked to %v", features.DynamicKubeletConfig, true, false)
 			}
 
 			// Config and flags parsed, now we can initialize logging.
@@ -263,9 +243,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			if err != nil {
 				return fmt.Errorf("failed to construct kubelet dependencies: %w", err)
 			}
-
-			// add the kubelet config controller to kubeletDeps
-			kubeletDeps.KubeletConfigController = kubeletConfigController
 
 			if err := checkPermissions(); err != nil {
 				klog.ErrorS(err, "kubelet running with insufficient permissions")
@@ -781,14 +758,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if err := RunKubelet(s, kubeDeps, s.RunOnce); err != nil {
 		return err
-	}
-
-	// If the kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && len(s.DynamicConfigDir.Value()) > 0 &&
-		kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
-		if err := kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName)); err != nil {
-			return err
-		}
 	}
 
 	if s.HealthzPort > 0 {
@@ -1318,27 +1287,4 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		}
 	}
 	return rl, nil
-}
-
-// BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamickubeletconfig.TransformFunc) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		return nil, nil, fmt.Errorf("failed to bootstrap Kubelet config controller, you must enable the DynamicKubeletConfig feature gate")
-	}
-	if len(dynamicConfigDir) == 0 {
-		return nil, nil, fmt.Errorf("cannot bootstrap Kubelet config controller, --dynamic-config-dir was not provided")
-	}
-
-	// compute absolute path and bootstrap controller
-	dir, err := filepath.Abs(dynamicConfigDir)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get absolute path for --dynamic-config-dir=%s", dynamicConfigDir)
-	}
-	// get the latest KubeletConfiguration checkpoint from disk, or return the default config if no valid checkpoints exist
-	c := dynamickubeletconfig.NewController(dir, transform)
-	kc, err := c.Bootstrap()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %w", err)
-	}
-	return kc, c, nil
 }

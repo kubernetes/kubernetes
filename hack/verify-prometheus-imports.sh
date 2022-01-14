@@ -64,7 +64,6 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/wrappers.go
   ./test/e2e/apimachinery/flowcontrol.go
   ./test/e2e/node/pods.go
-  ./test/e2e_node/dynamic_kubelet_config_test.go
   ./test/e2e_node/resource_metrics_test.go
   ./test/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
@@ -75,7 +74,7 @@ allowed_prometheus_importers=(
 # https://golang.org/ref/spec#Import_declarations
 #
 # If you *really* need a string literal that looks like "github.com/prometheus/.*"
-# somewhere else that actually isn't an import, you can use backticks / a raw 
+# somewhere else that actually isn't an import, you can use backticks / a raw
 # string literal instead (which cannot be used in imports, only double quotes).
 #
 # NOTE: we previously had an implementation that checked for an actual import

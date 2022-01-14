@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	nodeutil "k8s.io/component-helpers/node/util"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -173,24 +172,6 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 		// with the override
 		status = status.DeepCopy()
 		status.Error = s.errorOverride
-	}
-
-	// update metrics based on the status we will sync
-	metrics.SetConfigError(len(status.Error) > 0)
-	err = metrics.SetAssignedConfig(status.Assigned)
-	if err != nil {
-		err = fmt.Errorf("failed to update Assigned config metric, error: %v", err)
-		return
-	}
-	err = metrics.SetActiveConfig(status.Active)
-	if err != nil {
-		err = fmt.Errorf("failed to update Active config metric, error: %v", err)
-		return
-	}
-	err = metrics.SetLastKnownGoodConfig(status.LastKnownGood)
-	if err != nil {
-		err = fmt.Errorf("failed to update LastKnownGood config metric, error: %v", err)
-		return
 	}
 
 	// apply the status to a copy of the node so we don't modify the object in the informer's store
