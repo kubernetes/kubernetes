@@ -990,7 +990,6 @@ func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1beta1.CSI
 	// Only matching by label is supported.
 	selector, err := metav1.LabelSelectorAsSelector(capacity.NodeTopology)
 	if err != nil {
-		// This should never happen because NodeTopology must be valid.
 		klog.ErrorS(err, "Unexpected error converting to a label selector", "nodeTopology", capacity.NodeTopology)
 		return false
 	}

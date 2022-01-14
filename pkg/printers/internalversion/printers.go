@@ -1996,14 +1996,16 @@ func printDeployment(obj *apps.Deployment, options printers.GenerateOptions) ([]
 	age := translateTimestampSince(obj.CreationTimestamp)
 	containers := obj.Spec.Template.Spec.Containers
 	selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
+	selectorString := ""
 	if err != nil {
-		// this shouldn't happen if LabelSelector passed validation
-		return nil, err
+		selectorString = "<invalid>"
+	} else {
+		selectorString = selector.String()
 	}
 	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%d/%d", int64(readyReplicas), int64(desiredReplicas)), int64(updatedReplicas), int64(availableReplicas), age)
 	if options.Wide {
 		containers, images := layoutContainerCells(containers)
-		row.Cells = append(row.Cells, containers, images, selector.String())
+		row.Cells = append(row.Cells, containers, images, selectorString)
 	}
 	return []metav1.TableRow{row}, nil
 }

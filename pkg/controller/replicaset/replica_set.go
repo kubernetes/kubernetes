@@ -668,7 +668,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector: %v", err))
+		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector for rs %v/%v: %v", namespace, name, err))
 		return nil
 	}
 
@@ -774,7 +774,8 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 	for _, relatedRS := range rsc.getReplicaSetsWithSameController(rs) {
 		selector, err := metav1.LabelSelectorAsSelector(relatedRS.Spec.Selector)
 		if err != nil {
-			return nil, err
+			// This object has an invalid selector, it does not match any pods
+			continue
 		}
 		pods, err := rsc.podLister.Pods(relatedRS.Namespace).List(selector)
 		if err != nil {

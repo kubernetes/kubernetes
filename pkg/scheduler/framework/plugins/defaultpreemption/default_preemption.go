@@ -277,6 +277,7 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 				}
 				selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 				if err != nil {
+					// This object has an invalid selector, it does not match the pod
 					continue
 				}
 				// A PDB with a nil or empty selector matches nothing.
