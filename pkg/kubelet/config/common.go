@@ -80,8 +80,6 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	// Set the Host field to indicate this pod is scheduled on the current node.
 	pod.Spec.NodeName = string(nodeName)
 
-	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
-
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
@@ -100,15 +98,6 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	// Set the default status to pending.
 	pod.Status.Phase = api.PodPending
 	return nil
-}
-
-func getSelfLink(name, namespace string) string {
-	var selfLink string
-	if len(namespace) == 0 {
-		namespace = metav1.NamespaceDefault
-	}
-	selfLink = fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", namespace, name)
-	return selfLink
 }
 
 type defaultFunc func(pod *api.Pod) error
