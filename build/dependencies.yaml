@@ -90,8 +90,6 @@ dependencies:
     version: 1.17.5
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
-      match: 'FROM golang\:\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: test/images/Makefile
