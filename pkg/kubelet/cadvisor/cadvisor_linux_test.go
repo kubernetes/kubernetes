@@ -37,12 +37,6 @@ func TestImageFsInfoLabel(t *testing.T) {
 		expectedLabel   string
 		expectedError   error
 	}{{
-		description:     "LabelDockerImages should be returned",
-		runtime:         types.DockerContainerRuntime,
-		runtimeEndpoint: "",
-		expectedLabel:   cadvisorfs.LabelDockerImages,
-		expectedError:   nil,
-	}, {
 		description:     "LabelCrioImages should be returned",
 		runtime:         types.RemoteContainerRuntime,
 		runtimeEndpoint: CrioSocket,

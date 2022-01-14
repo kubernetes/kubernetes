@@ -484,7 +484,7 @@ function ensure-local-ssds-ephemeral-storage() {
   safe-format-and-mount "${device}" "${ephemeral_mountpoint}"
 
   # mount container runtime root dir on SSD
-  local container_runtime="${CONTAINER_RUNTIME:-docker}"
+  local container_runtime="${CONTAINER_RUNTIME:-containerd}"
   systemctl stop "$container_runtime"
   # Some images remount the container runtime root dir.
   umount "/var/lib/${container_runtime}" || true
@@ -2550,9 +2550,9 @@ function start-volumesnapshot-crd-and-controller {
 # endpoint.
 function update-container-runtime {
   local -r file="$1"
-  local -r container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}"
+  local -r container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/containerd/containerd.sock}"
   sed -i \
-    -e "s@{{ *fluentd_container_runtime_service *}}@${FLUENTD_CONTAINER_RUNTIME_SERVICE:-${CONTAINER_RUNTIME_NAME:-docker}}@g" \
+    -e "s@{{ *fluentd_container_runtime_service *}}@${FLUENTD_CONTAINER_RUNTIME_SERVICE:-${CONTAINER_RUNTIME_NAME:-containerd}}@g" \
     -e "s@{{ *container_runtime_endpoint *}}@${container_runtime_endpoint#unix://}@g" \
     "${file}"
 }
@@ -3446,7 +3446,7 @@ function main() {
   fi
 
   log-wrap 'OverrideKubectl' override-kubectl
-  container_runtime="${CONTAINER_RUNTIME:-docker}"
+  container_runtime="${CONTAINER_RUNTIME:-containerd}"
   # Run the containerized mounter once to pre-cache the container image.
   if [[ "${container_runtime}" == "docker" ]]; then
     log-wrap 'AssembleDockerFlags' assemble-docker-flags

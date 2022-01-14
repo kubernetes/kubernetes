@@ -781,23 +781,6 @@ function construct-linux-kubelet-flags {
       flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
     fi
   fi
-  # Network plugin
-  if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
-    flags+=" --cni-bin-dir=/home/kubernetes/bin"
-    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
-      # Calico uses CNI always.
-      # Note that network policy won't work for master node.
-      if [[ "${node_type}" == "master" ]]; then
-        flags+=" --network-plugin=${NETWORK_PROVIDER}"
-      else
-        flags+=" --network-plugin=cni"
-      fi
-    else
-      # Otherwise use the configured value.
-      flags+=" --network-plugin=${NETWORK_PROVIDER}"
-
-    fi
-  fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
@@ -810,12 +793,11 @@ function construct-linux-kubelet-flags {
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
   fi
-  if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
-    flags+=" --container-runtime=remote"
-    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
-      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
-      flags+=" --runtime-cgroups=/system.slice/containerd.service"
-    fi
+
+  flags+=" --container-runtime=remote"
+  if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+    CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+    flags+=" --runtime-cgroups=/system.slice/containerd.service"
   fi
 
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
@@ -861,16 +843,7 @@ function construct-windows-kubelet-flags {
 
   # The directory where the TLS certs are located.
   flags+=" --cert-dir=${WINDOWS_PKI_DIR}"
-
-  flags+=" --network-plugin=cni"
-  flags+=" --cni-bin-dir=${WINDOWS_CNI_DIR}"
-  flags+=" --cni-conf-dir=${WINDOWS_CNI_CONFIG_DIR}"
   flags+=" --pod-manifest-path=${WINDOWS_MANIFESTS_DIR}"
-
-  # Windows images are large and we don't have gcr mirrors yet. Allow longer
-  # pull progress deadline.
-  flags+=" --image-pull-progress-deadline=5m"
-  flags+=" --enable-debugging-handlers=true"
 
   # Configure kubelet to run as a windows service.
   flags+=" --windows-service=true"
@@ -888,13 +861,10 @@ function construct-windows-kubelet-flags {
   # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
   flags+=" --feature-gates=KubeletPodResources=false"
-
-  if [[ "${WINDOWS_CONTAINER_RUNTIME:-}" != "docker" ]]; then
-    flags+=" --container-runtime=remote"
-    if [[ "${WINDOWS_CONTAINER_RUNTIME}" == "containerd" ]]; then
-      WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
-      flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
-    fi
+  flags+=" --container-runtime=remote"
+  if [[ "${WINDOWS_CONTAINER_RUNTIME}" == "containerd" ]]; then
+    WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
+    flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
   fi
 
   KUBELET_ARGS="${flags}"

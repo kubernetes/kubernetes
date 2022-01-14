@@ -27,7 +27,6 @@ const (
 
 // Different container runtimes.
 const (
-	DockerContainerRuntime = "docker"
 	RemoteContainerRuntime = "remote"
 )
 

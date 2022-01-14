@@ -224,7 +224,6 @@ type Dependencies struct {
 	CAdvisorInterface       cadvisor.Interface
 	Cloud                   cloudprovider.Interface
 	ContainerManager        cm.ContainerManager
-	DockerOptions           *DockerOptions
 	EventClient             v1core.EventsGetter
 	HeartbeatClient         clientset.Interface
 	OnHeartbeatFailure      func()
@@ -244,15 +243,6 @@ type Dependencies struct {
 	RemoteImageService      internalapi.ImageManagerService
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
-}
-
-// DockerOptions contains docker specific configuration. Importantly, since it
-// lives outside of `dockershim`, it should not depend on the `docker/docker`
-// client library.
-type DockerOptions struct {
-	DockerEndpoint            string
-	RuntimeRequestTimeout     time.Duration
-	ImagePullProgressDeadline time.Duration
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -308,13 +298,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
-	switch containerRuntime {
-	case kubetypes.DockerContainerRuntime:
-		return fmt.Errorf("using dockershim is not supported, please consider using a full-fledged CRI implementation")
-	case kubetypes.RemoteContainerRuntime:
-		// No-op.
-		break
-	default:
+	if containerRuntime != kubetypes.RemoteContainerRuntime {
 		return fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
 	}
 
@@ -837,8 +821,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.appArmorValidator = apparmor.NewValidator()
 		klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	}
-	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
-	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewProcMountAdmitHandler(klet.containerRuntime))
 
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
 	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
