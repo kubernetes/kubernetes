@@ -346,7 +346,7 @@ const (
 	// alpha: v1.23
 	//
 	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
-	CSIMigrationRBD featuregate.Feature = "CSIMigrationRBD"
+	CSIMigrationRBD featuregate.Feature = "csiMigrationRBD"
 
 	// owner: @humblec
 	// alpha: v1.23
