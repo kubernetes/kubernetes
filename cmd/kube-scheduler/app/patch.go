@@ -17,12 +17,13 @@ func setUpPreferredHostForOpenShift(kubeSchedulerOptions *options.Options) error
 		return nil
 	}
 
-	master, kubeConfig := kubeSchedulerOptions.Master, kubeSchedulerOptions.ComponentConfig.ClientConnection.Kubeconfig
+	master := kubeSchedulerOptions.Master
+	var kubeConfig string
 
-	// this makes our patch small
+	// We cannot load component config anymore as the options are not being initialized.
 	// if there was no kubeconfig specified we won't be able to get cluster info.
 	// in that case try to load the configuration and read kubeconfig directly from it if it was provided.
-	if len(kubeConfig) == 0 && len(kubeSchedulerOptions.ConfigFile) > 0 {
+	if len(kubeSchedulerOptions.ConfigFile) > 0 {
 		cfg, err := options.LoadKubeSchedulerConfiguration(kubeSchedulerOptions.ConfigFile)
 		if err != nil {
 			return err
