@@ -141,6 +141,8 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+
+		winkernel.RegisterMetrics()
 	} else {
 		klog.V(0).InfoS("Using userspace Proxier.")
 		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'kernelspace' instead")
