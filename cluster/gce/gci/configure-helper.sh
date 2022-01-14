@@ -2816,9 +2816,9 @@ EOF
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "fluentd-elasticsearch"
-    local -r fluentd_es_configmap_yaml="${dst_dir}/fluentd-elasticsearch/fluentd-es-configmap.yaml"
-    update-container-runtime ${fluentd_es_configmap_yaml}
+    echo "fluentd-elasticsearch addon is no longer included here. Terminate cluster initialization."
+    echo "The addon can be installed from https://github.com/kubernetes-sigs/instrumentation-addons"
+    exit 1
   fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
