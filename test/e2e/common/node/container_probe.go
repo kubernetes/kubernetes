@@ -719,6 +719,62 @@ done
 			return false, nil
 		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrue(), "should not see liveness probes")
 	})
+	/*
+		Testname: Stop probing a pod during graceful shutdown
+		Description: A Pod is created with liveness probe. the container doesn't become unhealthy (indicating a livenessProbe failure) once the pod deletion has been requested (graceful shutdown indeed)
+	*/
+	ginkgo.It("should set liveness probe results success when a pod's deletionTimestamp is set (indicating graceful shutdown initiated)", func() {
+		// Pod liveness probe, using tcp socket, success
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        tcpSocketHandler(8080),
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       1,
+		}
+
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		longGracePeriod := int64(500)
+		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
+
+		podClient := f.PodClient()
+		ns := f.Namespace.Name
+		gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+		// At the end of the test, clean up by removing the pod.
+		defer func() {
+			ginkgo.By("deleting the pod")
+			podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
+		}()
+		ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
+		podClient.Create(pod)
+
+		// Wait until the pod is not pending. (Here we need to check for something other than
+		// 'Pending' other than checking for 'Running', since when failures occur, we go to
+		// 'Terminated' which can cause indefinite blocking.)
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
+			fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
+		framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
+
+		// Check the pod's current state
+		ginkgo.By("checking the pod's current state")
+		pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
+
+		// Sleep 10s for livenessprobe becoming running
+		time.Sleep(time.Second * 10)
+
+		ginkgo.By(fmt.Sprintf("Graceful shutting down pod %s in namespace %s", pod.Name, ns))
+		// graceful shutdown the pod
+		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
+
+		// Unexpected an event of type "Unhealthy".
+		expectedEvent := fields.Set{
+			"involvedObject.kind":      "Pod",
+			"involvedObject.name":      pod.Name,
+			"involvedObject.namespace": f.Namespace.Name,
+			"reason":                   events.ContainerUnhealthy,
+		}.AsSelector().String()
+		framework.ExpectError(e2eevents.WaitTimeoutForEvent(
+			f.ClientSet, f.Namespace.Name, expectedEvent, "probe failed", time.Second*30))
+	})
 })
 
 // GetContainerStartedTime returns the time when the given container started and error if any

@@ -136,6 +136,7 @@ func TestDoProbe(t *testing.T) {
 			if test.setDeletionTimestamp {
 				now := metav1.Now()
 				w.pod.ObjectMeta.DeletionTimestamp = &now
+				w.probeManager.podManager.UpdatePod(w.pod)
 			}
 			if c := w.doProbe(); c != test.expectContinue[probeType.String()] {
 				t.Errorf("[%s-%d] Expected continue to be %v but got %v", probeType, i, test.expectContinue[probeType.String()], c)

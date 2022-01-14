@@ -108,6 +108,7 @@ func newTestManager() *manager {
 	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
 	podManager.AddPod(getTestPod())
 	m := NewManager(
+		podManager,
 		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		results.NewManager(),
 		results.NewManager(),
@@ -122,6 +123,7 @@ func newTestManager() *manager {
 
 func newTestWorker(m *manager, probeType probeType, probeSpec v1.Probe) *worker {
 	pod := getTestPod()
+	m.podManager.AddPod(pod)
 	setTestProbe(pod, probeType, probeSpec)
 	return newWorker(m, probeType, pod, pod.Spec.Containers[0])
 }

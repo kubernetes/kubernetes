@@ -720,6 +720,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.probeManager = kubeDeps.ProbeManager
 	} else {
 		klet.probeManager = prober.NewManager(
+			klet.podManager,
 			klet.statusManager,
 			klet.livenessManager,
 			klet.readinessManager,

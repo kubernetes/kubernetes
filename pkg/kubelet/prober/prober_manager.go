@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"sync"
 	"time"
 
@@ -79,6 +80,10 @@ type manager struct {
 	// Lock for accessing & mutating workers
 	workerLock sync.RWMutex
 
+	// podManager is a facade that abstracts away the various sources of pods
+	// this Kubelet services.
+	podManager pod.Manager
+
 	// The statusManager cache provides pod IP and container IDs for probing.
 	statusManager status.Manager
 
@@ -99,6 +104,7 @@ type manager struct {
 
 // NewManager creates a Manager for pod probing.
 func NewManager(
+	podManager pod.Manager,
 	statusManager status.Manager,
 	livenessManager results.Manager,
 	readinessManager results.Manager,
@@ -108,6 +114,7 @@ func NewManager(
 
 	prober := newProber(runner, recorder)
 	return &manager{
+		podManager:       podManager,
 		statusManager:    statusManager,
 		prober:           prober,
 		readinessManager: readinessManager,

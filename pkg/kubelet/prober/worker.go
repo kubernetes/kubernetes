@@ -230,7 +230,14 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	// Graceful shutdown of the pod.
-	if w.pod.ObjectMeta.DeletionTimestamp != nil && (w.probeType == liveness || w.probeType == startup) {
+	p, ok := w.probeManager.podManager.GetPodByUID(w.pod.UID)
+	if !ok {
+		// The pod was already removed.
+		klog.V(3).InfoS("Pod was already removed from podManager", "pod", klog.KObj(w.pod))
+		// Stop probing at this point.
+		return false
+	}
+	if p.ObjectMeta.DeletionTimestamp != nil && (w.probeType == liveness || w.probeType == startup) {
 		klog.V(3).InfoS("Pod deletion requested, setting probe result to success",
 			"probeType", w.probeType, "pod", klog.KObj(w.pod), "containerName", w.container.Name)
 		if w.probeType == startup {
