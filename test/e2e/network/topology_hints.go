@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -82,8 +83,37 @@ var _ = common.SIGDescribe("Feature:Topology Hints", func() {
 		})
 		framework.ExpectNoError(err, "timed out waiting for DaemonSets to be ready")
 
-		nodeNames := e2edaemonset.SchedulableNodes(c, ds)
-		framework.Logf("Waiting for %d endpoints to be tracked in EndpointSlices", len(nodeNames))
+		// All Nodes should have same allocatable CPUs. If not, then skip the test.
+		schedulableNodes := map[string]*v1.Node{}
+		for _, nodeName := range e2edaemonset.SchedulableNodes(c, ds) {
+			schedulableNodes[nodeName] = nil
+		}
+
+		nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err, "Error when listing all Nodes")
+		var lastNodeCPU resource.Quantity
+		firstNode := true
+		for i := range nodeList.Items {
+			node := nodeList.Items[i]
+			if _, ok := schedulableNodes[node.Name]; !ok {
+				continue
+			}
+			schedulableNodes[node.Name] = &node
+
+			nodeCPU, found := node.Status.Allocatable[v1.ResourceCPU]
+			if !found {
+				framework.Failf("Error when getting allocatable CPU of Node '%s'", node.Name)
+			}
+			if firstNode {
+				lastNodeCPU = nodeCPU
+				firstNode = false
+			} else if !nodeCPU.Equal(lastNodeCPU) {
+				e2eskipper.Skipf("Expected Nodes to have equivalent allocatable CPUs, but Node '%s' is different from the previous one. %d not equals %d",
+					node.Name, nodeCPU.Value(), lastNodeCPU.Value())
+			}
+		}
+
+		framework.Logf("Waiting for %d endpoints to be tracked in EndpointSlices", len(schedulableNodes))
 
 		var finalSlices []discoveryv1.EndpointSlice
 		err = wait.Poll(5*time.Second, 3*time.Minute, func() (bool, error) {
@@ -96,8 +126,8 @@ var _ = common.SIGDescribe("Feature:Topology Hints", func() {
 			for _, slice := range slices.Items {
 				numEndpoints += len(slice.Endpoints)
 			}
-			if len(nodeNames) > numEndpoints {
-				framework.Logf("Expected %d endpoints, got %d", len(nodeNames), numEndpoints)
+			if len(schedulableNodes) > numEndpoints {
+				framework.Logf("Expected %d endpoints, got %d", len(schedulableNodes), numEndpoints)
 				return false, nil
 			}
 
@@ -124,12 +154,12 @@ var _ = common.SIGDescribe("Feature:Topology Hints", func() {
 			}
 		}
 
-		nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
 		nodesByZone := map[string]string{}
-		for _, node := range nodeList.Items {
+		zonesWithNode := map[string]string{}
+		for _, node := range schedulableNodes {
 			if zone, ok := node.Labels[v1.LabelTopologyZone]; ok {
 				nodesByZone[node.Name] = zone
+				zonesWithNode[zone] = node.Name
 			}
 		}
 
@@ -143,15 +173,7 @@ var _ = common.SIGDescribe("Feature:Topology Hints", func() {
 		}
 
 		ginkgo.By("keeping requests in the same zone")
-		for i, nodeName := range nodeNames {
-			// Iterate through max of 3 nodes
-			if i > 2 {
-				break
-			}
-			fromZone, ok := nodesByZone[nodeName]
-			if !ok {
-				framework.Failf("Expected zone to be specified for %s node", nodeName)
-			}
+		for fromZone, nodeName := range zonesWithNode {
 			ginkgo.By("creating a client pod for probing the service from " + fromZone)
 			podName := "curl-from-" + fromZone
 			clientPod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil, "serve-hostname")
