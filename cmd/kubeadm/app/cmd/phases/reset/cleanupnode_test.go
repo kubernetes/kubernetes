@@ -174,7 +174,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			if test.resetDir == "" {
 				test.resetDir = "pki"
 			}
-			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir))
+			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir), false)
 
 			// Verify the files we cleanup implicitly in every test:
 			assertExists(t, tmpDir)
