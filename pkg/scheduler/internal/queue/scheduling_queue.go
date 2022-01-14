@@ -545,6 +545,7 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 			if err != nil {
 				klog.Errorf("Error getting label selectors for pod: %v.", up.Name)
+				continue
 			}
 			if util.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
 				podsToMove = append(podsToMove, pInfo)
