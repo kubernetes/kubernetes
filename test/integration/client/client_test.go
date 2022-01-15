@@ -1367,11 +1367,11 @@ func TestExtractModifyApply_ForceOwnership(t *testing.T) {
 				WithSpec(corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().
-							WithName("nginx").
-							WithWorkingDir("/tmp/v2"),
-						corev1ac.Container().
 							WithName("sidecar").
 							WithImage("nginx:1.14.3"),
+						corev1ac.Container().
+							WithName("nginx").
+							WithWorkingDir("/tmp/v2"),
 					),
 				),
 			),
