@@ -1,4 +1,3 @@
-configs:
   - name: Agnhost
     image: agnhost
     registry: PromoterE2eRegistry

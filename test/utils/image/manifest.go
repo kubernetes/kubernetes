@@ -51,10 +51,6 @@ type Config struct {
 	Version  string `yaml:"version"`
 }
 
-type Configs struct {
-	Configs []Config `yaml:"configs"`
-}
-
 //go:embed registry.yaml
 var registryList embed.FS
 
@@ -195,9 +191,9 @@ const (
 	WindowsServer = "WindowsServer"
 )
 
-func initImageConfigs(list RegistryList) (Configs, Configs) {
+func initImageConfigs(list RegistryList) ([]Config, []Config) {
 	data, _ := images.ReadFile("images.yaml")
-	var configs Configs
+	var configs []Config
 	yaml.Unmarshal(data, &configs)
 
 	// if requested, map all the SHAs into a known format based on the input
@@ -211,9 +207,9 @@ func initImageConfigs(list RegistryList) (Configs, Configs) {
 
 // GetMappedImageConfigs returns the images if they were mapped to the provided
 // image repository.
-func GetMappedImageConfigs(list RegistryList, originalImageConfigs Configs, repo string) Configs {
+func GetMappedImageConfigs(list RegistryList, originalImageConfigs []Config, repo string) []Config {
 	configs := make([]Config, 0)
-	for _, config := range originalImageConfigs.Configs {
+	for _, config := range originalImageConfigs {
 		switch config.Registry {
 		case "InvalidRegistryImage", "AuthenticatedAlpine",
 			"AuthenticatedWindowsNanoServer", "AgnhostPrivate":
@@ -228,7 +224,7 @@ func GetMappedImageConfigs(list RegistryList, originalImageConfigs Configs, repo
 		// shorten and make the pull spec "safe" so it will fit in the tag
 		configs = append(configs, getRepositoryMappedConfig(0, config, repo))
 	}
-	return Configs{Configs: configs}
+	return configs
 }
 
 var (
@@ -273,17 +269,17 @@ func getRepositoryMappedConfig(index int, config Config, repo string) Config {
 
 // GetOriginalImageConfigs returns the configuration before any mapping rules.
 func GetOriginalImageConfigs() []Config {
-	return originalImageConfigs.Configs
+	return originalImageConfigs
 }
 
 // GetImageConfigs returns the map of imageConfigs
 func GetImageConfigs() []Config {
-	return imageConfigs.Configs
+	return imageConfigs
 }
 
 // GetConfig returns the Config object for an image
 func GetConfig(image string) Config {
-	for _, c := range imageConfigs.Configs {
+	for _, c := range imageConfigs {
 		if c.Name == image {
 			return c
 		}
@@ -293,7 +289,7 @@ func GetConfig(image string) Config {
 
 // GetE2EImage returns the fully qualified URI to an image (including version)
 func GetE2EImage(image string) string {
-	for _, c := range imageConfigs.Configs {
+	for _, c := range imageConfigs {
 		if c.Name == image {
 			return fmt.Sprintf("%s/%s:%s", c.Registry, c.Name, c.Version)
 		}
@@ -326,7 +322,7 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 
 	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
 		index := -1
-		for i, v := range originalImageConfigs.Configs {
+		for i, v := range originalImageConfigs {
 			if v.GetE2EImage() == imageURL {
 				index = i
 				break
