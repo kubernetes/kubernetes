@@ -181,8 +181,3 @@ func TestGetMappedImageConfigs(t *testing.T) {
 		t.Fatal(diff.ObjectReflectDiff(expected, actual))
 	}
 }
-
-func TestGetMappedImageConfigs1(t *testing.T) {
-	i := GetImageConfigs()
-	fmt.Println(i)
-}

@@ -44,6 +44,22 @@ type RegistryList struct {
 	CloudProviderGcpRegistry string `yaml:"cloudProviderGcpRegistry"`
 }
 
+func initializeRegistryMap(l RegistryList) map[string]string {
+	m := make(map[string]string)
+	m["gcAuthenticatedRegistry"] = l.GcAuthenticatedRegistry
+	m["promoterE2eRegistry"] = l.PromoterE2eRegistry
+	m["buildImageRegistry"] = l.BuildImageRegistry
+	m["invalidRegistry"] = l.InvalidRegistry
+	m["gcEtcdRegistry"] = l.GcEtcdRegistry
+	m["gcRegistry"] = l.GcRegistry
+	m["sigStorageRegistry"] = l.SigStorageRegistry
+	m["privateRegistry"] = l.PrivateRegistry
+	m["microsoftRegistry"] = l.MicrosoftRegistry
+	m["dockerLibraryRegistry"] = l.DockerLibraryRegistry
+	m["cloudProviderGcpRegistry"] = l.CloudProviderGcpRegistry
+	return m
+}
+
 // Config holds an images registry, name, and version
 type Config struct {
 	Registry string `yaml:"registry"`
@@ -192,9 +208,16 @@ const (
 )
 
 func initImageConfigs(list RegistryList) ([]Config, []Config) {
+	registryMap := initializeRegistryMap(list)
 	data, _ := images.ReadFile("images.yaml")
+	var unserializedconfigs []Config
+	yaml.Unmarshal(data, &unserializedconfigs)
+
 	var configs []Config
-	yaml.Unmarshal(data, &configs)
+	for _, c := range unserializedconfigs {
+		c.Registry = registryMap[c.Registry]
+		configs = append(configs, c)
+	}
 
 	// if requested, map all the SHAs into a known format based on the input
 	originalImageConfigs := configs
