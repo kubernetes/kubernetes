@@ -17,10 +17,13 @@ limitations under the License.
 package workqueue_test
 
 import (
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -158,4 +161,41 @@ func TestReinsert(t *testing.T) {
 	if a := q.Len(); a != 0 {
 		t.Errorf("Expected queue to be empty. Has %v items", a)
 	}
+}
+
+// TestGarbageCollection ensures that objects that are added then removed from the queue are
+// able to be garbage collected.
+func TestGarbageCollection(t *testing.T) {
+	type bigObject struct {
+		data []byte
+	}
+	leakQueue := workqueue.New()
+	t.Cleanup(func() {
+		// Make sure leakQueue doesn't go out of scope too early
+		runtime.KeepAlive(leakQueue)
+	})
+	c := &bigObject{data: []byte("hello")}
+	mustGarbageCollect(t, c)
+	leakQueue.Add(c)
+	o, _ := leakQueue.Get()
+	leakQueue.Done(o)
+}
+
+// mustGarbageCollect asserts than an object was garbage collected by the end of the test.
+// The input must be a pointer to an object.
+func mustGarbageCollect(t *testing.T, i interface{}) {
+	t.Helper()
+	var collected int32 = 0
+	runtime.SetFinalizer(i, func(x interface{}) {
+		atomic.StoreInt32(&collected, 1)
+	})
+	t.Cleanup(func() {
+		if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
+			// Trigger GC explicitly, otherwise we may need to wait a long time for it to run
+			runtime.GC()
+			return atomic.LoadInt32(&collected) == 1, nil
+		}); err != nil {
+			t.Errorf("object was not garbage collected")
+		}
+	})
 }
