@@ -26,7 +26,6 @@ import (
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs/registry"
-	"k8s.io/component-base/logs/sanitization"
 	"k8s.io/klog/v2"
 )
 
@@ -85,9 +84,6 @@ func (o *Options) apply() {
 		log, flush := factory.Create(o.Config.Options)
 		klog.SetLogger(log)
 		logrFlush = flush
-	}
-	if o.Config.Sanitization {
-		klog.SetLogFilter(&sanitization.SanitizingFilter{})
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(o.Config.Verbosity.String()); err != nil {
 		panic(fmt.Errorf("internal error while setting klog verbosity: %v", err))

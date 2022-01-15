@@ -101,9 +101,6 @@ type LoggingConfiguration struct {
 	// VModule overrides the verbosity threshold for individual files.
 	// Only supported for "text" log format.
 	VModule VModuleConfiguration `json:"vmodule,omitempty"`
-	// [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
-	Sanitization bool `json:"sanitization,omitempty"`
 	// [Experimental] Options holds additional parameters that are specific
 	// to the different logging formats. Only the options for the selected
 	// format get used, but all of them get validated.
