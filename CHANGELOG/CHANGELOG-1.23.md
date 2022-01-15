@@ -1200,15 +1200,15 @@ filename | sha512 hash
 - When using `RequestedToCapacityRatio` ScoringStrategy, empty shape will cause error. (#106169, @kerthcet) [SIG Scheduling]
 - This release enables in-tree RBD migration to CSI driver with a couple of feature gates.  These featuregates are alpha in this release.
 
-  - `CSIMigrationRBD`: when enabled, it will redirect traffic from in tree rbd plugin ( kubernetes.io/rbd )  to CSI driver ( rbd.csi.ceph.com) , default to `false` now.
+  - `csiMigrationRBD`: when enabled, it will redirect traffic from in tree rbd plugin ( kubernetes.io/rbd )  to CSI driver ( rbd.csi.ceph.com) , default to `false` now.
   - `IntreePluginRBDUnregister`: Disables the RBD in-tree driver
 
   The feature gates can be enabled by:
 
-  1. Adding the feature flag to the kube-controller-manager `--feature-gates=CSIMigrationRBD=true`
+  1. Adding the feature flag to the kube-controller-manager `--feature-gates=csiMigrationRBD=true`
   2. Adding the feature flag to the kubelet config:
      featureGates:
-     `CSIMigrationRBD`: true
+     `csiMigrationRBD`: true
 
   As a Kubernetes cluster operator that administers storage, here are the prerequisites that you must complete before you attempt migration to the RBD CSI driver:
 
