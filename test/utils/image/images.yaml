@@ -1,0 +1,169 @@
+configs:
+  - name: Agnhost
+    image: agnhost
+    registry: PromoterE2eRegistry
+    version: 2.33
+  - name: AgnhostPrivate
+    image: agnhost
+    registry: PrivateRegistry
+    version: 2.6
+  - name: AuthenticatedAlpine
+    image: alpine
+    registry: GcAuthenticatedRegistry
+    version: 3.7
+  - name: AuthenticatedWindowsNanoServer
+    image: windows-nanoserver
+    registry: GcAuthenticatedRegistry
+    version: v1
+  - name: APIServer
+    image: sample-apiserver
+    registry: PromoterE2eRegistry
+    version: 1.17.5
+  - name: AppArmorLoader
+    image: apparmor-loader
+    registry: PromoterE2eRegistry
+    version: 1.4
+  - name: BusyBox
+    image: busybox
+    registry: PromoterE2eRegistry
+    version: 1.29-2
+  - name: CheckMetadataConcealment
+    image: metadata-concealment
+    registry: PromoterE2eRegistry
+    version: 1.6
+  - name: CudaVectorAdd
+    image: cuda-vector-add
+    registry: PromoterE2eRegistry
+    version: 1.0
+  - name: CudaVectorAdd2
+    image: cuda-vector-add
+    registry: PromoterE2eRegistry
+    version: 2.2
+  - name: DebianIptables
+    image: debian-iptables
+    registry: BuildImageRegistry
+    version: bullseye-v1.1.0
+  - name: EchoServer
+    image: echoserver
+    registry: PromoterE2eRegistry
+    version: 2.4
+  - name: Etcd
+    image: etcd
+    registry: GcEtcdRegistry
+    version: 3.5.1-0
+  - name: GlusterDynamicProvisioner
+    image: glusterdynamic-provisioner
+    registry: PromoterE2eRegistry
+    version: v1.3
+  - name: Httpd
+    image: httpd
+    registry: PromoterE2eRegistry
+    version: 2.4.38-2
+  - name: HttpdNew
+    image: httpd
+    registry: PromoterE2eRegistry
+    version: 2.4.39-2
+  - name: InvalidRegistryImage
+    image: alpine
+    registry: InvalidRegistry
+    version: 3.1
+  - name: IpcUtils
+    image: ipc-utils
+    registry: PromoterE2eRegistry
+    version: 1.3
+  - name: JessieDnsutils
+    image: jessie-dnsutils
+    registry: PromoterE2eRegistry
+    version: 1.5
+  - name: Kitten
+    image: kitten
+    registry: PromoterE2eRegistry
+    version: 1.5
+  - name: Nautilus
+    image: nautilus
+    registry: PromoterE2eRegistry
+    version: 1.5
+  - name: NFSProvisioner
+    image: nfs-provisioner
+    registry: SigStorageRegistry
+    version: v2.2.2
+  - name: Nginx
+    image: nginx
+    registry: PromoterE2eRegistry
+    version: 1.14-2
+  - name: NginxNew
+    image: nginx
+    registry: PromoterE2eRegistry
+    version: 1.15-2
+  - name: NodePerfNpbEp
+    image: node-perf/npb-ep
+    registry: PromoterE2eRegistry
+    version: 1.2
+  - name: NodePerfNpbIs
+    image: node-perf/npb-is
+    registry: PromoterE2eRegistry
+    version: 1.2
+  - name: NodePerfTfWideDeep
+    image: node-perf/tf-wide-deep
+    registry: PromoterE2eRegistry
+    version: 1.1
+  - name: Nonewprivs
+    image: nonewprivs
+    registry: PromoterE2eRegistry
+    version: 1.3
+  - name: NonRoot
+    image: nonroot
+    registry: PromoterE2eRegistry
+    version: 1.2
+  - name: Pause
+    image: GcRegistry
+    registry: pause
+    version: 3.6
+  - name: Perl
+    image: perl
+    registry: PromoterE2eRegistry
+    version: 5.26
+  - name: PrometheusDummyExporter
+    image: prometheus-dummy-exporter
+    registry: GcRegistry
+    version: v0.1.0
+  - name: PrometheusToSd
+    image: prometheus-to-sd
+    registry: GcRegistry
+    version: v0.5.0
+  - name: Redis
+    image: redis
+    registry: PromoterE2eRegistry
+    version: 5.0.5-1
+  - name: RegressionIssue74839
+    image: regression-issue-74839
+    registry: PromoterE2eRegistry
+    version: 1.2
+  - name: ResourceConsumer
+    image: resource-consumer
+    registry: PromoterE2eRegistry
+    version: 1.10
+  - name: SdDummyExporter
+    image: sd-dummy-exporter
+    registry: GcRegistry
+    version: v0.2.0
+  - name: VolumeNFSServer
+    image: volume/nfs
+    registry: PromoterE2eRegistry
+    version: 1.3
+  - name: VolumeISCSIServer
+    image: volume/iscsi
+    registry: PromoterE2eRegistry
+    version: 2.3
+  - name: VolumeGlusterServer
+    image: volume/gluster
+    registry: PromoterE2eRegistry
+    version: 1.3
+  - name: VolumeRBDServer
+    image: volume/rbd
+    registry: PromoterE2eRegistry
+    version: 1.0.4
+  - name: WindowsServer
+    image: windows
+    registry: MicrosoftRegistry
+    version: 1809

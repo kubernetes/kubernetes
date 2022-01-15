@@ -163,15 +163,17 @@ func TestGetOriginalImageConfigs(t *testing.T) {
 }
 
 func TestGetMappedImageConfigs(t *testing.T) {
-	originals := map[int]Config{
-		0: {registry: "docker.io", name: "source/repo", version: "1.0"},
+	originals := Configs{
+		Configs: []Config{
+			{Registry: "docker.io", Name: "source/repo", Version: "1.0"},
+		},
 	}
-	mapping := GetMappedImageConfigs(originals, "quay.io/repo/for-test")
+	mapping := GetMappedImageConfigs(RegistryList{}, originals, "quay.io/repo/for-test")
 
 	actual := make(map[string]string)
-	for i, mapping := range mapping {
-		source := originals[i]
-		actual[source.GetE2EImage()] = mapping.GetE2EImage()
+	for _, mapping := range mapping.Configs {
+		source := originals
+		actual[source.Configs[0].GetE2EImage()] = mapping.GetE2EImage()
 	}
 	expected := map[string]string{
 		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
@@ -179,4 +181,9 @@ func TestGetMappedImageConfigs(t *testing.T) {
 	if !reflect.DeepEqual(expected, actual) {
 		t.Fatal(diff.ObjectReflectDiff(expected, actual))
 	}
+}
+
+func TestGetMappedImageConfigs1(t *testing.T) {
+	i := GetImageConfigs()
+	fmt.Println(i)
 }
