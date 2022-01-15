@@ -43,7 +43,6 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
-			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          "* * * * ?",

@@ -1296,7 +1296,6 @@ func TestFindingPreboundVolumes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim01",
 			Namespace: "myns",
-			SelfLink:  "/api/v1/namespaces/myns/persistentvolumeclaims/claim01",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},

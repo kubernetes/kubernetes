@@ -43,7 +43,6 @@ func TestEventCompatibility(t *testing.T) {
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/default/pods/foo",
 			Name:      "foo",
 			Namespace: "default",
 			UID:       "bar",

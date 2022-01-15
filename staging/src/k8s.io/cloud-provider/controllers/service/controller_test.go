@@ -54,7 +54,6 @@ func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Serv
 			Name:      name,
 			Namespace: "default",
 			UID:       uid,
-			SelfLink:  "/api/v1/namespaces/default/services/" + name,
 		},
 		Spec: v1.ServiceSpec{
 			Type: serviceType,
@@ -167,7 +166,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "udp-service",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/udp-service",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -188,7 +186,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/basic-service1",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -209,7 +206,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "sctp-service",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/sctp-service",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -294,7 +290,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/basic-service1",
 					DeletionTimestamp: &metav1.Time{
 						Time: time.Now(),
 					},
@@ -327,7 +322,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/basic-service1",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -348,7 +342,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "basic-service1",
 					Namespace:  "default",
-					SelfLink:   "/api/v1/namespaces/default/services/basic-service1",
 					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
 				},
 				Spec: v1.ServiceSpec{
