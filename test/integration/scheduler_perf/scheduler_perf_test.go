@@ -321,9 +321,10 @@ func (dno *deleteNodesOp) collectsMetrics() bool {
 
 func (dno deleteNodesOp) patchParams(w *workload) (realOp, error) {
 	if dno.CountParam != "" {
-		var ok bool
-		if dno.Count, ok = w.Params[dno.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", dno.CountParam)
+		var err error
+		dno.Count, err = w.Params.get(dno.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &dno, (&dno).isValid(false)
