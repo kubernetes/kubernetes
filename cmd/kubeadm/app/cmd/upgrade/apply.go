@@ -170,7 +170,7 @@ func runApply(flags *applyFlags, args []string) error {
 	}
 
 	if flags.dryRun {
-		fmt.Println("[dryrun] Finished dryrunning successfully!")
+		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 		return nil
 	}
 

@@ -118,7 +118,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 					return errors.Wrapf(err, "error updating the CRI socket for Node %q", nro.Name)
 				}
 			} else {
-				fmt.Println("[dryrun] would update the node CRI socket path to include an URL scheme")
+				fmt.Println("[upgrade] Would update the node CRI socket path to include an URL scheme")
 			}
 		}
 
