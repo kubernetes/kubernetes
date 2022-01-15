@@ -76,24 +76,35 @@ func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
 		podNamespaces  string
 		podLabels      map[string]string
 		expectedResult bool
+		selector       labels.Selector
 	}{
 		{
 			"namespace_not_in",
 			metav1.NamespaceDefault,
 			map[string]string{"service": "topologies_service1"},
 			false,
+			fakeSelector,
 		},
 		{
 			"label_not_match",
 			metav1.NamespacePublic,
 			map[string]string{"service": "topologies_service3"},
 			false,
+			fakeSelector,
 		},
 		{
 			"normal_case",
 			metav1.NamespacePublic,
 			map[string]string{"service": "topologies_service1"},
 			true,
+			fakeSelector,
+		},
+		{
+			"selector_nil_case",
+			metav1.NamespacePublic,
+			map[string]string{"service": "topologies_service1"},
+			false,
+			nil,
 		},
 	}
 
@@ -103,7 +114,7 @@ func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
 			fakeTestPod.Namespace = test.podNamespaces
 			fakeTestPod.Labels = test.podLabels
 
-			realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, fakeSelector)
+			realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, test.selector)
 			assert.EqualValuesf(t, test.expectedResult, realValue, "Failed to test: %s", test.name)
 		})
 	}
