@@ -149,7 +149,10 @@ func (q *Type) Get() (item interface{}, shutdown bool) {
 		return nil, true
 	}
 
-	item, q.queue = q.queue[0], q.queue[1:]
+	item = q.queue[0]
+	// The underlying array still exists and reference this object, so the object will not be garbage collected.
+	q.queue[0] = nil
+	q.queue = q.queue[1:]
 
 	q.metrics.get(item)
 
