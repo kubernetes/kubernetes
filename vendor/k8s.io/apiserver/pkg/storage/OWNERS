@@ -1,0 +1,22 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - lavalamp
+  - liggitt
+  - timothysc
+  - wojtek-t
+reviewers:
+  - lavalamp
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - caesarxuchao
+  - mikedanese
+  - liggitt
+  - ncdc
+  - timothysc
+  - ingvagabund
+  - resouer
+  - enj
+emeritus_approvers:
+  - xiang90

@@ -19,9 +19,9 @@ package ipvs
 import (
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
@@ -54,7 +54,7 @@ type Interface interface {
 // VirtualServer is an user-oriented definition of an IPVS virtual server in its entirety.
 type VirtualServer struct {
 	Address   net.IP
-	Protocol  string
+	Protocol  v1.Protocol
 	Port      uint16
 	Scheduler string
 	Flags     ServiceFlags
@@ -99,7 +99,7 @@ func (svc *VirtualServer) Equal(other *VirtualServer) bool {
 }
 
 func (svc *VirtualServer) String() string {
-	return net.JoinHostPort(svc.Address.String(), strconv.Itoa(int(svc.Port))) + "/" + svc.Protocol
+	return net.JoinHostPort(svc.Address.String(), strconv.Itoa(int(svc.Port))) + "/" + string(svc.Protocol)
 }
 
 // RealServer is an user-oriented definition of an IPVS real server in its entirety.
@@ -134,6 +134,6 @@ func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
 }
 
 // IsRsGracefulTerminationNeeded returns true if protocol requires graceful termination for the stale connections
-func IsRsGracefulTerminationNeeded(proto string) bool {
-	return !strings.EqualFold(proto, "UDP") && !strings.EqualFold(proto, "SCTP")
+func IsRsGracefulTerminationNeeded(proto v1.Protocol) bool {
+	return proto != v1.ProtocolUDP && proto != v1.ProtocolSCTP
 }
