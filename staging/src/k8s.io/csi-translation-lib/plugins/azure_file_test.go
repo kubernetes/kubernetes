@@ -120,6 +120,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 		{
 			name: "azure file volume",
 			volume: &corev1.Volume{
+				Name: "name",
 				VolumeSource: corev1.VolumeSource{
 					AzureFile: &corev1.AzureFileVolumeSource{
 						ReadOnly:   true,
@@ -130,7 +131,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 			},
 			expVol: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "file.csi.azure.com-sharename",
+					Name: "#secretname#sharename#name",
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
@@ -142,7 +143,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 							},
 							ReadOnly:         true,
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "#secretname#sharename#",
+							VolumeHandle:     "#secretname#sharename#name",
 						},
 					},
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
@@ -152,6 +153,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 		{
 			name: "azure file volume with a pod namespace",
 			volume: &corev1.Volume{
+				Name: "name",
 				VolumeSource: corev1.VolumeSource{
 					AzureFile: &corev1.AzureFileVolumeSource{
 						ReadOnly:   true,
@@ -163,7 +165,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 			podNamespace: "test",
 			expVol: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "file.csi.azure.com-sharename",
+					Name: "#secretname#sharename#name",
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
@@ -175,7 +177,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 							},
 							ReadOnly:         true,
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "#secretname#sharename#",
+							VolumeHandle:     "#secretname#sharename#name",
 						},
 					},
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
@@ -225,7 +227,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 			name: "azure file volume",
 			volume: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "file.csi.azure.com-sharename",
+					Name: "uuid",
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
@@ -240,7 +242,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 			},
 			expVol: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "file.csi.azure.com-sharename",
+					Name: "uuid",
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
@@ -252,7 +254,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 								Namespace: secretNamespace,
 							},
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "#secretname#sharename#",
+							VolumeHandle:     "#secretname#sharename#uuid",
 						},
 					},
 				},
@@ -262,7 +264,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 			name: "azure file volume with rg annotation",
 			volume: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "file.csi.azure.com-sharename",
+					Name:        "uuid",
 					Annotations: map[string]string{resourceGroupAnnotation: "rg"},
 				},
 				Spec: corev1.PersistentVolumeSpec{
@@ -278,7 +280,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 			},
 			expVol: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "file.csi.azure.com-sharename",
+					Name:        "uuid",
 					Annotations: map[string]string{resourceGroupAnnotation: "rg"},
 				},
 				Spec: corev1.PersistentVolumeSpec{
@@ -291,7 +293,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 								Namespace: secretNamespace,
 							},
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "rg#secretname#sharename#",
+							VolumeHandle:     "rg#secretname#sharename#uuid",
 						},
 					},
 				},
