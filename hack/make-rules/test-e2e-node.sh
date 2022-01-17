@@ -48,10 +48,15 @@ timeout_arg=""
 system_spec_name=${SYSTEM_SPEC_NAME:-}
 extra_envs=${EXTRA_ENVS:-}
 runtime_config=${RUNTIME_CONFIG:-}
-ssh_user=${SSH_USER:-"${USER}"}
 ssh_key=${SSH_KEY:-}
 ssh_options=${SSH_OPTIONS:-}
 kubelet_config_file=${KUBELET_CONFIG_FILE:-"test/e2e_node/jenkins/default-kubelet-config.yaml"}
+
+if [[ ${KUBE_SSH_USER} != "" ]]; then
+  ssh_user=${KUBE_SSH_USER}
+else
+  ssh_user=${USER}
+fi
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
