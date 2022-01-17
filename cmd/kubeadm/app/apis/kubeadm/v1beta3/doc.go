@@ -173,7 +173,7 @@ limitations under the License.
 // 	  - system:bootstrappers:kubeadm:default-node-token
 // 	nodeRegistration:
 // 	  name: "ec2-10-100-0-1"
-// 	  criSocket: "unix:///var/run/dockershim.sock"
+// 	  criSocket: "unix:///var/run/containerd/containerd.sock"
 // 	  taints:
 // 	  - key: "kubeadmNode"
 // 	    value: "master"

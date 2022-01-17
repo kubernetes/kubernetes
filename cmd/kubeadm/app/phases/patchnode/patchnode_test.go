@@ -52,7 +52,7 @@ func TestAnnotateCRISocket(t *testing.T) {
 		},
 		{
 			name:                       "CRI-socket annotation needs to be updated",
-			currentCRISocketAnnotation: "unix:///var/run/dockershim.sock",
+			currentCRISocketAnnotation: "unix:///foo/bar",
 			newCRISocketAnnotation:     "unix:///run/containerd/containerd.sock",
 			expectedPatch:              `{"metadata":{"annotations":{"kubeadm.alpha.kubernetes.io/cri-socket":"unix:///run/containerd/containerd.sock"}}}`,
 		},

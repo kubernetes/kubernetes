@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
@@ -49,17 +48,10 @@ var (
 
 	Additionally, a control plane component may have crashed or exited when started by the container runtime.
 	To troubleshoot, list all containers using your preferred container runtimes CLI.
-{{ if .IsDocker }}
-	Here is one example how you may list all Kubernetes containers running in docker:
-		- 'docker ps -a | grep kube | grep -v pause'
-		Once you have found the failing container, you can inspect its logs with:
-		- 'docker logs CONTAINERID'
-{{ else }}
-	Here is one example how you may list all Kubernetes containers running in cri-o/containerd using crictl:
+	Here is one example how you may list all running Kubernetes containers by using crictl:
 		- 'crictl --runtime-endpoint {{ .Socket }} ps -a | grep kube | grep -v pause'
 		Once you have found the failing container, you can inspect its logs with:
 		- 'crictl --runtime-endpoint {{ .Socket }} logs CONTAINERID'
-{{ end }}
 	`)))
 )
 
@@ -105,13 +97,11 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 
 	if err := waiter.WaitForKubeletAndFunc(waiter.WaitForAPI); err != nil {
 		context := struct {
-			Error    string
-			Socket   string
-			IsDocker bool
+			Error  string
+			Socket string
 		}{
-			Error:    fmt.Sprintf("%v", err),
-			Socket:   data.Cfg().NodeRegistration.CRISocket,
-			IsDocker: data.Cfg().NodeRegistration.CRISocket == kubeadmconstants.DefaultDockerCRISocket,
+			Error:  fmt.Sprintf("%v", err),
+			Socket: data.Cfg().NodeRegistration.CRISocket,
 		}
 
 		kubeletFailTempl.Execute(data.OutputWriter(), context)

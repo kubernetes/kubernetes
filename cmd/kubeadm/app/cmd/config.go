@@ -211,7 +211,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 			},
 		},
 		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
+			CRISocket: constants.DefaultCRISocket, // avoid CRI detection
 		},
 	})
 	if err != nil {

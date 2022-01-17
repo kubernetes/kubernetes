@@ -24,11 +24,6 @@ import (
 	"net/url"
 )
 
-const (
-	dockerSocket     = "unix:///var/run/docker.sock" // The Docker socket is not CRI compatible
-	containerdSocket = "unix:///run/containerd/containerd.sock"
-)
-
 // isExistingSocket checks if path exists and is domain socket
 func isExistingSocket(path string) bool {
 	u, err := url.Parse(path)

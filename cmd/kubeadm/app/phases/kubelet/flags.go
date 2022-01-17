@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -102,7 +103,13 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	// Once that happens only the "remote" branch option should be left.
 	// TODO: https://github.com/kubernetes/kubeadm/issues/2626
 	hasDockershim := opts.kubeletVersion.Major() == 1 && opts.kubeletVersion.Minor() < 24
-	if opts.nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket && hasDockershim {
+	var dockerSocket string
+	if runtime.GOOS == "windows" {
+		dockerSocket = "npipe:////./pipe/dockershim"
+	} else {
+		dockerSocket = "unix:///var/run/dockershim.sock"
+	}
+	if opts.nodeRegOpts.CRISocket == dockerSocket && hasDockershim {
 		kubeletFlags["network-plugin"] = "cni"
 	} else {
 		kubeletFlags["container-runtime"] = "remote"

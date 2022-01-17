@@ -195,7 +195,7 @@ func DefaultedStaticInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 		BootstrapTokens:  []bootstraptokenv1.BootstrapToken{PlaceholderToken},
 		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: kubeadmconstants.DefaultDockerCRISocket, // avoid CRI detection
+			CRISocket: kubeadmconstants.DefaultCRISocket, // avoid CRI detection
 			Name:      "node",
 		},
 	}

@@ -579,7 +579,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/dockershim.sock",
+				CRISocket: "unix:///var/run/containerd/containerd.sock",
 			},
 		}, true},
 		{&kubeadmapi.JoinConfiguration{ // Pass with JoinControlPlane
@@ -594,7 +594,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/dockershim.sock",
+				CRISocket: "unix:///var/run/containerd/containerd.sock",
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -615,7 +615,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/dockershim.sock",
+				CRISocket: "unix:///var/run/containerd/containerd.sock",
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -636,7 +636,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "/var/run/dockershim.sock",
+				CRISocket: "unix:///var/run/containerd/containerd.sock",
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
