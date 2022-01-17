@@ -711,6 +711,7 @@ func max(a, b int64) int64 {
 	return b
 }
 
+//
 // resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res

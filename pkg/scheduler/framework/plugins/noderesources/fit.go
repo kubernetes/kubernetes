@@ -159,6 +159,7 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 //       Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
+//
 func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterState {
 	result := &preFilterState{}
 	for _, container := range pod.Spec.Containers {

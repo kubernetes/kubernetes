@@ -18,8 +18,11 @@ package corev1
 
 import (
 	"encoding/json"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
+	corev1helpers "k8s.io/component-helpers/apis/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
 
@@ -98,4 +101,199 @@ func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1
 		filteredTaints = append(filteredTaints, taint)
 	}
 	return filteredTaints
+}
+
+// Resource is a collection of compute resource.
+type Resource struct {
+	MilliCPU         int64
+	Memory           int64
+	EphemeralStorage int64
+	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
+	// explicitly as int, to avoid conversions and improve performance.
+	AllowedPodNumber int
+	// ScalarResources
+	ScalarResources map[v1.ResourceName]int64
+}
+
+// NewResource creates a Resource from ResourceList
+func NewResource(rl v1.ResourceList) *Resource {
+	r := &Resource{}
+	r.Add(rl)
+	return r
+}
+
+// Add adds ResourceList into Resource.
+func (r *Resource) Add(rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuant := range rl {
+		switch rName {
+		case v1.ResourceCPU:
+			r.MilliCPU += rQuant.MilliValue()
+		case v1.ResourceMemory:
+			r.Memory += rQuant.Value()
+		case v1.ResourcePods:
+			r.AllowedPodNumber += int(rQuant.Value())
+		case v1.ResourceEphemeralStorage:
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				// if the local storage capacity isolation feature gate is disabled, pods request 0 disk.
+				r.EphemeralStorage += rQuant.Value()
+			}
+		default:
+			if IsScalarResourceName(rName) {
+				r.AddScalar(rName, rQuant.Value())
+			}
+		}
+	}
+}
+
+// Clone returns a copy of this resource.
+func (r *Resource) Clone() *Resource {
+	res := &Resource{
+		MilliCPU:         r.MilliCPU,
+		Memory:           r.Memory,
+		AllowedPodNumber: r.AllowedPodNumber,
+		EphemeralStorage: r.EphemeralStorage,
+	}
+	if r.ScalarResources != nil {
+		res.ScalarResources = make(map[v1.ResourceName]int64)
+		for k, v := range r.ScalarResources {
+			res.ScalarResources[k] = v
+		}
+	}
+	return res
+}
+
+// AddScalar adds a resource by a scalar value of this resource.
+func (r *Resource) AddScalar(name v1.ResourceName, quantity int64) {
+	r.SetScalar(name, r.ScalarResources[name]+quantity)
+}
+
+// SetScalar sets a resource by a scalar value of this resource.
+func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
+	// Lazily allocate scalar resource map.
+	if r.ScalarResources == nil {
+		r.ScalarResources = map[v1.ResourceName]int64{}
+	}
+	r.ScalarResources[name] = quantity
+}
+
+// SetMaxResource compares with ResourceList and takes max value for each Resource.
+func (r *Resource) SetMaxResource(rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuantity := range rl {
+		switch rName {
+		case v1.ResourceMemory:
+			r.Memory = max(r.Memory, rQuantity.Value())
+		case v1.ResourceCPU:
+			r.MilliCPU = max(r.MilliCPU, rQuantity.MilliValue())
+		case v1.ResourceEphemeralStorage:
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
+			}
+		default:
+			if IsScalarResourceName(rName) {
+				r.SetScalar(rName, max(r.ScalarResources[rName], rQuantity.Value()))
+			}
+		}
+	}
+}
+
+// IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources
+func IsScalarResourceName(name v1.ResourceName) bool {
+	return corev1helpers.IsExtendedResourceName(name) || corev1helpers.IsHugePageResourceName(name) ||
+		corev1helpers.IsPrefixedNativeResource(name) || corev1helpers.IsAttachableVolumeResourceName(name)
+}
+
+func max(a, b int64) int64 {
+	if a >= b {
+		return a
+	}
+	return b
+}
+
+// computePodResourceRequest returns a framework.Resource that covers the largest
+// width in each resource dimension. Because init-containers run sequentially, we collect
+// the max in each dimension iteratively. In contrast, we sum the resource vectors for
+// regular containers since they run simultaneously.
+//
+// If Pod Overhead is specified and the feature gate is set, the resources defined for Overhead
+// are added to the calculated Resource request sum
+//
+// Example:
+//
+// Pod:
+//   InitContainers
+//     IC1:
+//       CPU: 2
+//       Memory: 1G
+//     IC2:
+//       CPU: 2
+//       Memory: 3G
+//   Containers
+//     C1:
+//       CPU: 2
+//       Memory: 1G
+//     C2:
+//       CPU: 1
+//       Memory: 1G
+//
+// Result: CPU: 3, Memory: 3G
+//
+func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *Resource {
+	result := &Resource{}
+	for _, container := range pod.Spec.Containers {
+		result.Add(container.Resources.Requests)
+	}
+
+	// take max_resource(sum_pod, any_init_container)
+	for _, container := range pod.Spec.InitContainers {
+		result.SetMaxResource(container.Resources.Requests)
+	}
+
+	// If Overhead is being utilized, add to the total requests for the pod
+	if pod.Spec.Overhead != nil && enablePodOverhead {
+		result.Add(pod.Spec.Overhead)
+	}
+
+	return result
+}
+
+//
+// resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
+func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
+	resPtr := &res
+	for _, c := range pod.Spec.Containers {
+		resPtr.Add(c.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPU += non0CPUReq
+		non0Mem += non0MemReq
+		// No non-zero resources for GPUs or opaque resources.
+	}
+
+	for _, ic := range pod.Spec.InitContainers {
+		resPtr.SetMaxResource(ic.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
+		non0CPU = max(non0CPU, non0CPUReq)
+		non0Mem = max(non0Mem, non0MemReq)
+	}
+
+	// If Overhead is being utilized, add to the total requests for the pod
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		resPtr.Add(pod.Spec.Overhead)
+		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
+			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
+		}
+
+		if _, found := pod.Spec.Overhead[v1.ResourceMemory]; found {
+			non0Mem += pod.Spec.Overhead.Memory().Value()
+		}
+	}
+
+	return
 }
