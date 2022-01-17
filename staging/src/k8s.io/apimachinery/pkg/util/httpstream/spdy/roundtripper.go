@@ -173,12 +173,14 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		Host:   targetHost,
 	}
 
+	proxyReq = *proxyReq.WithContext(req.Context())
+
 	if pa := s.proxyAuth(proxyURL); pa != "" {
 		proxyReq.Header = http.Header{}
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
-	proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
+	proxyDialConn, err := s.dialWithoutProxy(proxyReq.Context(), proxyURL)
 	if err != nil {
 		return nil, err
 	}
