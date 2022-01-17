@@ -195,7 +195,16 @@ func findContainerDeviceByName(devs []*kubeletpodresourcesv1.ContainerDevices, r
 	return nil
 }
 
-func matchPodDescWithResources(expected []podDesc, found podResMap) error {
+func matchPodDescWithResources(expected []podDesc, found podResMap, onlineCPUsSize int) error {
+	var totalExclusiveCpus int
+
+	totalExclusiveCpus = 0
+	for _, pod := range expected {
+		exclusiveCpus := pod.CpuRequestExclusive()
+		totalExclusiveCpus += exclusiveCpus
+	}
+
+	framework.Logf("cpuTotal consumed: %#v", totalExclusiveCpus)
 	for _, podReq := range expected {
 		framework.Logf("matching: %#v", podReq)
 
@@ -215,11 +224,13 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 				}
 				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, exclusiveCpus, cntInfo.CpuIds)
 			}
-			if exclusiveCpus == 0 && len(cntInfo.CpuAffinity) == 0 {
+			// We want to make sure that cpus exclusively allocated to pods are excluded from the shared pool
+			// NOTE: Reserved CPUs are also considered part of the shared pool.
+			if onlineCPUsSize != -1 && exclusiveCpus == 0 && len(cntInfo.CpuAffinity) != onlineCPUsSize-totalExclusiveCpus {
 				return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuAffinity)
 			}
 		} else {
-			if len(cntInfo.CpuAffinity) == 0 {
+			if onlineCPUsSize != -1 && len(cntInfo.CpuAffinity) != onlineCPUsSize-totalExclusiveCpus {
 				return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuAffinity)
 			}
 		}
@@ -255,10 +266,10 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 	return nil
 }
 
-func expectPodResources(offset int, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc) {
+func expectPodResources(offset int, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc, onlineCPUsSize int) {
 	gomega.EventuallyWithOffset(1+offset, func() error {
 		found := getPodResources(cli)
-		return matchPodDescWithResources(expected, found)
+		return matchPodDescWithResources(expected, found, onlineCPUsSize)
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
 }
 
@@ -273,7 +284,7 @@ func filterOutDesc(descs []podDesc, name string) []podDesc {
 	return ret
 }
 
-func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData) {
+func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUsSize int) {
 	var tpd *testPodData
 
 	var found podResMap
@@ -302,7 +313,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 		},
 	}
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected)
+	expectPodResources(1, cli, expected, onlineCPUsSize)
 	tpd.deletePodsForTest(f)
 
 	tpd = newTestPodData()
@@ -358,7 +369,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 
 	}
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected)
+	expectPodResources(1, cli, expected, onlineCPUsSize)
 	tpd.deletePodsForTest(f)
 
 	tpd = newTestPodData()
@@ -402,7 +413,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	}
 
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected)
+	expectPodResources(1, cli, expected, onlineCPUsSize)
 
 	if sd != nil {
 		extra = podDesc{
@@ -426,7 +437,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	})
 
 	expected = append(expected, extra)
-	expectPodResources(1, cli, expected)
+	expectPodResources(1, cli, expected, onlineCPUsSize)
 	tpd.deletePodsForTest(f)
 
 	tpd = newTestPodData()
@@ -482,11 +493,11 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 		}
 	}
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected)
+	expectPodResources(1, cli, expected, onlineCPUsSize)
 
 	tpd.deletePod(f, "pod-01")
 	expectedPostDelete := filterOutDesc(expected, "pod-01")
-	expectPodResources(1, cli, expectedPostDelete)
+	expectPodResources(1, cli, expectedPostDelete, onlineCPUsSize)
 	tpd.deletePodsForTest(f)
 
 	tpd = newTestPodData()
@@ -517,7 +528,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 
 	}
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected)
+	expectPodResources(1, cli, expected, onlineCPUsSize)
 	tpd.deletePodsForTest(f)
 
 }
@@ -613,7 +624,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					waitForSRIOVResources(f, sd)
 
 					ginkgo.By("checking List()")
-					podresourcesListTests(f, cli, sd)
+					podresourcesListTests(f, cli, sd, onlineCPUs.Size())
 					ginkgo.By("checking GetAllocatableResources()")
 					podresourcesGetAllocatableResourcesTests(cli, sd, onlineCPUs, reservedSystemCPUs)
 				})
@@ -680,16 +691,16 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				ginkgo.It("should return the expected responses", func() {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err)
-
+					framework.Logf("configurePodResourcesInKubelet: onlineCPUs=%q", onlineCPUs)
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err)
 
 					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err)
 					defer conn.Close()
-
-					podresourcesListTests(f, cli, nil)
+					podresourcesListTests(f, cli, nil, onlineCPUs.Size())
 					podresourcesGetAllocatableResourcesTests(cli, nil, onlineCPUs, reservedSystemCPUs)
+
 				})
 			})
 		})
@@ -803,7 +814,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 						desc,
 					})
 
-					expectPodResources(1, cli, []podDesc{desc})
+					expectPodResources(1, cli, []podDesc{desc}, -1)
 
 					restartTime := time.Now()
 					ginkgo.By("Restarting Kubelet")
@@ -823,7 +834,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 						return false
 					}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 
-					expectPodResources(1, cli, []podDesc{desc})
+					expectPodResources(1, cli, []podDesc{desc}, -1)
 					tpd.deletePodsForTest(f)
 				})
 			})
