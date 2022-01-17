@@ -318,7 +318,20 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	responseReader := bufio.NewReader(conn)
 
-	resp, err := http.ReadResponse(responseReader, nil)
+	var resp *http.Response
+	done := make(chan struct{})
+	go func() {
+		resp, err = http.ReadResponse(responseReader, nil)
+		close(done)
+	}()
+
+	select {
+	case <-req.Context().Done():
+		conn.Close() // this will unblock http.ReadResponse
+		return nil, req.Context().Err()
+	case <-done:
+	}
+
 	if err != nil {
 		conn.Close()
 		return nil, err
