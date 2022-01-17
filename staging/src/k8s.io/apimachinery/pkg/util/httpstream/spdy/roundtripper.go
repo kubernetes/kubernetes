@@ -167,11 +167,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	targetHost := netutil.CanonicalAddr(req.URL)
 
 	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
-	proxyReq := http.Request{
+	proxyReq := (&http.Request{
 		Method: "CONNECT",
 		URL:    &url.URL{},
 		Host:   targetHost,
-	}
+	}).WithContext(req.Context())
 
 	if pa := s.proxyAuth(proxyURL); pa != "" {
 		proxyReq.Header = http.Header{}
@@ -185,7 +185,7 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 
 	//nolint:staticcheck // SA1019 ignore deprecated httputil.NewProxyClientConn
 	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
-	_, err = proxyClientConn.Do(&proxyReq)
+	_, err = proxyClientConn.Do(proxyReq)
 	//nolint:staticcheck // SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
 	// returned from the invocation of proxyClientConn.Do
 	if err != nil && err != httputil.ErrPersistEOF {
@@ -214,8 +214,8 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 
 	tlsConn := tls.Client(rwc, tlsConfig)
 
-	// need to manually call Handshake() so we can call VerifyHostname() below
-	if err := tlsConn.Handshake(); err != nil {
+	// need to manually call HandshakeContext() so we can call VerifyHostname() below
+	if err := tlsConn.HandshakeContext(req.Context()); err != nil {
 		return nil, err
 	}
 
@@ -245,13 +245,11 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 	}
 
 	// TODO validate the TLSClientConfig is set up?
-	var conn *tls.Conn
-	var err error
-	if s.Dialer == nil {
-		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
-	} else {
-		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
+	tlsDialer := tls.Dialer{
+		NetDialer: s.Dialer,
+		Config:    s.tlsConfig,
 	}
+	conn, err := tlsDialer.DialContext(ctx, "tcp", dialAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +266,7 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 	if s.tlsConfig != nil && len(s.tlsConfig.ServerName) > 0 {
 		host = s.tlsConfig.ServerName
 	}
-	err = conn.VerifyHostname(host)
+	err = conn.(*tls.Conn).VerifyHostname(host)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +299,7 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	)
 
 	if s.followRedirects {
-		conn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s, s.requireSameHostRedirects)
+		conn, rawResponse, err = utilnet.ConnectWithRedirects(req.Context(), req.Method, req.URL, header, req.Body, s, s.requireSameHostRedirects)
 	} else {
 		clone := utilnet.CloneRequest(req)
 		clone.Header = header
@@ -310,6 +308,10 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, cancel := context.WithCancel(req.Context())
+	defer utilnet.ExceedDeadlineOnCancel(ctx, conn)()
+	defer cancel()
 
 	responseReader := bufio.NewReader(
 		io.MultiReader(

@@ -17,10 +17,12 @@ limitations under the License.
 package net
 
 import (
+	"context"
 	"errors"
 	"net"
 	"reflect"
 	"syscall"
+	"time"
 )
 
 // IPNetEqual checks if the two input IPNets are representing the same subnet.
@@ -53,4 +55,22 @@ func IsConnectionRefused(err error) bool {
 		return errno == syscall.ECONNREFUSED
 	}
 	return false
+}
+
+// ExceedDeadlineOnCancel cancels the connection upon context cancellation. It does so by setting an exceeded deadline
+// on the connection, which leads to a timeout. If the connection should not have a deadline in the end, the returned
+// function will remove it again. That function is usually deferred.
+func ExceedDeadlineOnCancel(ctx context.Context, conn net.Conn) (removeDeadline func()) {
+	done := make(chan struct{})
+
+	go func() {
+		<-ctx.Done()
+		_ = conn.SetDeadline(time.Unix(0, 0))
+		close(done)
+	}()
+
+	return func() {
+		<-done
+		_ = conn.SetDeadline(time.Time{})
+	}
 }

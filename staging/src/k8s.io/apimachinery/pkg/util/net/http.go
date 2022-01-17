@@ -449,7 +449,7 @@ type Dialer interface {
 // ConnectWithRedirects uses dialer to send req, following up to 10 redirects (relative to
 // originalLocation). It returns the opened net.Conn and the raw response bytes.
 // If requireSameHostRedirects is true, only redirects to the same host are permitted.
-func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer, requireSameHostRedirects bool) (net.Conn, []byte, error) {
+func ConnectWithRedirects(ctx context.Context, originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer, requireSameHostRedirects bool) (net.Conn, []byte, error) {
 	const (
 		maxRedirects    = 9     // Fail on the 10th redirect
 		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
@@ -475,7 +475,7 @@ redirectLoop:
 			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
 		}
 
-		req, err := http.NewRequest(method, location.String(), body)
+		req, err := http.NewRequestWithContext(ctx, method, location.String(), body)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -486,6 +486,10 @@ redirectLoop:
 		if err != nil {
 			return nil, nil, err
 		}
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer ExceedDeadlineOnCancel(ctx, intermediateConn)()
+		defer cancel()
 
 		// Peek at the backend response.
 		rawResponse.Reset()
