@@ -282,9 +282,9 @@ func (*IntervalClock) Tick(d time.Duration) <-chan time.Time {
 
 // NewTicker has no implementation yet and is omitted.
 // TODO: make interval clock use FakeClock so this can be implemented.
-//func (*IntervalClock) NewTicker(d time.Duration) clock.Ticker {
-//	panic("IntervalClock doesn't implement NewTicker")
-//}
+func (*IntervalClock) NewTicker(d time.Duration) clock.Ticker {
+	panic("IntervalClock doesn't implement NewTicker")
+}
 
 // Sleep is unimplemented, will panic.
 func (*IntervalClock) Sleep(d time.Duration) {

@@ -17,10 +17,11 @@ require (
 	k8s.io/component-helpers v0.0.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/klog/v2 v2.30.0
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
 )
 
 replace (
+	github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.33.2-0.20220117214446-bb33a1245805
 	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.0
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
