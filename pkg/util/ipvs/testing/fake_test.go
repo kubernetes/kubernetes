@@ -30,7 +30,7 @@ func TestVirtualServer(t *testing.T) {
 	vs1 := &utilipvs.VirtualServer{
 		Address:  netutils.ParseIPSloppy("1.2.3.4"),
 		Port:     uint16(80),
-		Protocol: string("TCP"),
+		Protocol: "TCP",
 		Flags:    utilipvs.FlagHashed,
 	}
 	err := fake.AddVirtualServer(vs1)
@@ -49,7 +49,7 @@ func TestVirtualServer(t *testing.T) {
 	vs12 := &utilipvs.VirtualServer{
 		Address:  netutils.ParseIPSloppy("1.2.3.4"),
 		Port:     uint16(80),
-		Protocol: string("TCP"),
+		Protocol: "TCP",
 		Flags:    utilipvs.FlagPersistent,
 	}
 	err = fake.UpdateVirtualServer(vs12)
@@ -68,7 +68,7 @@ func TestVirtualServer(t *testing.T) {
 	vs2 := &utilipvs.VirtualServer{
 		Address:  netutils.ParseIPSloppy("10::40"),
 		Port:     uint16(8080),
-		Protocol: string("UDP"),
+		Protocol: "UDP",
 	}
 	err = fake.AddVirtualServer(vs2)
 	if err != nil {
@@ -78,7 +78,7 @@ func TestVirtualServer(t *testing.T) {
 	vs3 := &utilipvs.VirtualServer{
 		Address:  netutils.ParseIPSloppy("10::40"),
 		Port:     uint16(7777),
-		Protocol: string("SCTP"),
+		Protocol: "SCTP",
 	}
 	err = fake.AddVirtualServer(vs3)
 	if err != nil {
@@ -124,7 +124,7 @@ func TestRealServer(t *testing.T) {
 	vs := &utilipvs.VirtualServer{
 		Address:  netutils.ParseIPSloppy("10.20.30.40"),
 		Port:     uint16(80),
-		Protocol: string("TCP"),
+		Protocol: "TCP",
 	}
 	rss := []*utilipvs.RealServer{
 		{Address: netutils.ParseIPSloppy("172.16.2.1"), Port: 8080, Weight: 1},

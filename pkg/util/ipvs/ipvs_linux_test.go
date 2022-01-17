@@ -29,6 +29,7 @@ import (
 	libipvs "github.com/moby/ipvs"
 
 	"golang.org/x/sys/unix"
+	"k8s.io/api/core/v1"
 )
 
 func Test_toVirtualServer(t *testing.T) {
@@ -384,33 +385,33 @@ func Test_toIPVSDestination(t *testing.T) {
 	}
 }
 
-func Test_stringToProtocol(t *testing.T) {
-	tests := []string{
-		"TCP", "UDP", "ICMP", "SCTP",
+func Test_k8sProtocolToUnixProtocol(t *testing.T) {
+	tests := []v1.Protocol{
+		v1.ProtocolTCP, v1.ProtocolUDP, v1.Protocol("ICMP"), v1.ProtocolSCTP,
 	}
 	expected := []uint16{
 		uint16(unix.IPPROTO_TCP), uint16(unix.IPPROTO_UDP), uint16(0), uint16(unix.IPPROTO_SCTP),
 	}
 	for i := range tests {
-		got := stringToProtocol(tests[i])
+		got := k8sProtocolToUnixProtocol(tests[i])
 		if got != expected[i] {
-			t.Errorf("stringToProtocol() failed - got %#v, want %#v",
+			t.Errorf("k8sProtocolToUnixProtocol() failed - got %#v, want %#v",
 				got, expected[i])
 		}
 	}
 }
 
-func Test_protocolToString(t *testing.T) {
+func Test_unixProtocolToK8sProtocol(t *testing.T) {
 	tests := []Protocol{
 		unix.IPPROTO_TCP, unix.IPPROTO_UDP, Protocol(0), unix.IPPROTO_SCTP,
 	}
-	expected := []string{
-		"TCP", "UDP", "", "SCTP",
+	expected := []v1.Protocol{
+		v1.ProtocolTCP, v1.ProtocolUDP, v1.Protocol(""), v1.ProtocolSCTP,
 	}
 	for i := range tests {
-		got := protocolToString(tests[i])
+		got := unixProtocolToK8sProtocol(tests[i])
 		if got != expected[i] {
-			t.Errorf("protocolToString() failed - got %#v, want %#v",
+			t.Errorf("unixProtocolToK8sProtocol() failed - got %#v, want %#v",
 				got, expected[i])
 		}
 	}

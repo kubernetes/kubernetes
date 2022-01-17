@@ -1725,7 +1725,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 	}
 	found := false
 	for _, svc := range services {
-		if svc.Address.String() == svcExternalIPs && svc.Port == uint16(svcPort) && svc.Protocol == string(v1.ProtocolTCP) {
+		if svc.Address.String() == svcExternalIPs && svc.Port == uint16(svcPort) && svc.Protocol == v1.ProtocolTCP {
 			found = true
 			destinations, _ := ipvs.GetRealServers(svc)
 			if len(destinations) != 0 {
@@ -1794,7 +1794,7 @@ func TestExternalIPs(t *testing.T) {
 	}
 	found := false
 	for _, svc := range services {
-		if svcExternalIPs.Has(svc.Address.String()) && svc.Port == uint16(svcPort) && svc.Protocol == string(v1.ProtocolTCP) {
+		if svcExternalIPs.Has(svc.Address.String()) && svc.Port == uint16(svcPort) && svc.Protocol == v1.ProtocolTCP {
 			found = true
 			destinations, _ := ipvs.GetRealServers(svc)
 			for _, dest := range destinations {
@@ -1873,7 +1873,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	}
 	found := false
 	for _, svc := range services {
-		if svcExternalIPs.Has(svc.Address.String()) && svc.Port == uint16(svcPort) && svc.Protocol == string(v1.ProtocolTCP) {
+		if svcExternalIPs.Has(svc.Address.String()) && svc.Port == uint16(svcPort) && svc.Protocol == v1.ProtocolTCP {
 			found = true
 			destinations, _ := ipvs.GetRealServers(svc)
 			if len(destinations) != 1 {
@@ -3609,7 +3609,7 @@ func Test_syncService(t *testing.T) {
 			// case 0, old virtual server is same as new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolTCP),
+				Protocol:  v1.ProtocolTCP,
 				Port:      80,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3617,7 +3617,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "foo",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolTCP),
+				Protocol:  v1.ProtocolTCP,
 				Port:      80,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3629,7 +3629,7 @@ func Test_syncService(t *testing.T) {
 			// case 1, old virtual server is different from new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolTCP),
+				Protocol:  v1.ProtocolTCP,
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3637,7 +3637,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "bar",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolTCP),
+				Protocol:  v1.ProtocolTCP,
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagPersistent,
@@ -3649,7 +3649,7 @@ func Test_syncService(t *testing.T) {
 			// case 2, old virtual server is different from new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolTCP),
+				Protocol:  v1.ProtocolTCP,
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3657,7 +3657,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "bar",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolTCP),
+				Protocol:  v1.ProtocolTCP,
 				Port:      8080,
 				Scheduler: "wlc",
 				Flags:     utilipvs.FlagHashed,
@@ -3671,7 +3671,7 @@ func Test_syncService(t *testing.T) {
 			svcName:          "baz",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolUDP),
+				Protocol:  v1.ProtocolUDP,
 				Port:      53,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3683,7 +3683,7 @@ func Test_syncService(t *testing.T) {
 			// case 4, SCTP, old virtual server is same as new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      80,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3691,7 +3691,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "foo",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      80,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3703,7 +3703,7 @@ func Test_syncService(t *testing.T) {
 			// case 5, old virtual server is different from new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3711,7 +3711,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "bar",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagPersistent,
@@ -3723,7 +3723,7 @@ func Test_syncService(t *testing.T) {
 			// case 6, old virtual server is different from new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3731,7 +3731,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "bar",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      8080,
 				Scheduler: "wlc",
 				Flags:     utilipvs.FlagHashed,
@@ -3745,7 +3745,7 @@ func Test_syncService(t *testing.T) {
 			svcName:          "baz",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      53,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3757,7 +3757,7 @@ func Test_syncService(t *testing.T) {
 			// case 8, virtual server address already binded, skip sync
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      53,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3765,7 +3765,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "baz",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy("1.2.3.4"),
-				Protocol:  string(v1.ProtocolSCTP),
+				Protocol:  v1.ProtocolSCTP,
 				Port:      53,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -3884,7 +3884,7 @@ func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer)
 		t.Errorf("Expect %d ipvs services, got %d", vs.VSNum, len(services))
 	}
 	for _, svc := range services {
-		if svc.Address.String() == vs.IP && svc.Port == vs.Port && svc.Protocol == vs.Protocol {
+		if svc.Address.String() == vs.IP && svc.Port == vs.Port && string(svc.Protocol) == vs.Protocol {
 			destinations, _ := fp.ipvs.GetRealServers(svc)
 			if len(destinations) != len(vs.RS) {
 				t.Errorf("Expected %d destinations, got %d destinations", len(vs.RS), len(destinations))
@@ -3912,7 +3912,7 @@ func TestCleanLegacyService(t *testing.T) {
 		// Created by kube-proxy.
 		"ipvs0": {
 			Address:   netutils.ParseIPSloppy("1.1.1.1"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      53,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -3920,7 +3920,7 @@ func TestCleanLegacyService(t *testing.T) {
 		// Created by kube-proxy.
 		"ipvs1": {
 			Address:   netutils.ParseIPSloppy("2.2.2.2"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      54,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -3928,7 +3928,7 @@ func TestCleanLegacyService(t *testing.T) {
 		// Created by an external party.
 		"ipvs2": {
 			Address:   netutils.ParseIPSloppy("3.3.3.3"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      55,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -3936,7 +3936,7 @@ func TestCleanLegacyService(t *testing.T) {
 		// Created by an external party.
 		"ipvs3": {
 			Address:   netutils.ParseIPSloppy("4.4.4.4"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      56,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -3944,7 +3944,7 @@ func TestCleanLegacyService(t *testing.T) {
 		// Created by an external party.
 		"ipvs4": {
 			Address:   netutils.ParseIPSloppy("5.5.5.5"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      57,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -3952,7 +3952,7 @@ func TestCleanLegacyService(t *testing.T) {
 		// Created by kube-proxy, but now stale.
 		"ipvs5": {
 			Address:   netutils.ParseIPSloppy("6.6.6.6"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      58,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4017,21 +4017,21 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 	currentServices := map[string]*utilipvs.VirtualServer{
 		"ipvs0": { // deleted with real servers
 			Address:   netutils.ParseIPSloppy("1.1.1.1"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      53,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
 		},
 		"ipvs1": { // deleted no real server
 			Address:   netutils.ParseIPSloppy("2.2.2.2"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      54,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
 		},
 		"ipvs2": { // not deleted
 			Address:   netutils.ParseIPSloppy("3.3.3.3"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      54,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4042,7 +4042,7 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 	realServers := map[*utilipvs.VirtualServer]*utilipvs.RealServer{
 		{
 			Address:   netutils.ParseIPSloppy("1.1.1.1"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      53,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4109,7 +4109,7 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 
 	vs := &utilipvs.VirtualServer{
 		Address:   netutils.ParseIPSloppy("4.4.4.4"),
-		Protocol:  string(v1.ProtocolUDP),
+		Protocol:  v1.ProtocolUDP,
 		Port:      56,
 		Scheduler: "rr",
 		Flags:     utilipvs.FlagHashed,
@@ -4169,7 +4169,7 @@ func TestCleanLegacyService6(t *testing.T) {
 		// Created by kube-proxy.
 		"ipvs0": {
 			Address:   netutils.ParseIPSloppy("1000::1"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      53,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4177,7 +4177,7 @@ func TestCleanLegacyService6(t *testing.T) {
 		// Created by kube-proxy.
 		"ipvs1": {
 			Address:   netutils.ParseIPSloppy("1000::2"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      54,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4185,7 +4185,7 @@ func TestCleanLegacyService6(t *testing.T) {
 		// Created by an external party.
 		"ipvs2": {
 			Address:   netutils.ParseIPSloppy("3000::1"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      55,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4193,7 +4193,7 @@ func TestCleanLegacyService6(t *testing.T) {
 		// Created by an external party.
 		"ipvs3": {
 			Address:   netutils.ParseIPSloppy("4000::1"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      56,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4201,7 +4201,7 @@ func TestCleanLegacyService6(t *testing.T) {
 		// Created by an external party.
 		"ipvs4": {
 			Address:   netutils.ParseIPSloppy("5000::1"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      57,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,
@@ -4209,7 +4209,7 @@ func TestCleanLegacyService6(t *testing.T) {
 		// Created by kube-proxy, but now stale.
 		"ipvs5": {
 			Address:   netutils.ParseIPSloppy("1000::6"),
-			Protocol:  string(v1.ProtocolUDP),
+			Protocol:  v1.ProtocolUDP,
 			Port:      58,
 			Scheduler: "rr",
 			Flags:     utilipvs.FlagHashed,

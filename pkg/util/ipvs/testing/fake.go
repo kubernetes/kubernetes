@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/api/core/v1"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
 
@@ -36,11 +37,11 @@ type FakeIPVS struct {
 type ServiceKey struct {
 	IP       string
 	Port     uint16
-	Protocol string
+	Protocol v1.Protocol
 }
 
 func (s *ServiceKey) String() string {
-	return fmt.Sprintf("%s:%d/%s", s.IP, s.Port, s.Protocol)
+	return fmt.Sprintf("%s:%d/%s", s.IP, s.Port, string(s.Protocol))
 }
 
 // RealServerKey uniquely identifies an Endpoint for an IPVS real server

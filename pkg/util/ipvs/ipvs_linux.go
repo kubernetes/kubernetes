@@ -30,6 +30,7 @@ import (
 	libipvs "github.com/moby/ipvs"
 
 	"golang.org/x/sys/unix"
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -221,7 +222,7 @@ func toVirtualServer(svc *libipvs.Service) (*VirtualServer, error) {
 		Address:   svc.Address,
 		Port:      svc.Port,
 		Scheduler: svc.SchedName,
-		Protocol:  protocolToString(Protocol(svc.Protocol)),
+		Protocol:  unixProtocolToK8sProtocol(Protocol(svc.Protocol)),
 		Timeout:   svc.Timeout,
 	}
 
@@ -264,7 +265,7 @@ func toIPVSService(vs *VirtualServer) (*libipvs.Service, error) {
 	}
 	ipvsSvc := &libipvs.Service{
 		Address:   vs.Address,
-		Protocol:  stringToProtocol(vs.Protocol),
+		Protocol:  k8sProtocolToUnixProtocol(vs.Protocol),
 		Port:      vs.Port,
 		SchedName: vs.Scheduler,
 		Flags:     uint32(vs.Flags),
@@ -293,28 +294,28 @@ func toIPVSDestination(rs *RealServer) (*libipvs.Destination, error) {
 	}, nil
 }
 
-// stringToProtocolType returns the protocol type for the given name
-func stringToProtocol(protocol string) uint16 {
-	switch strings.ToLower(protocol) {
-	case "tcp":
+// k8sProtocolToUnixProtocol returns the unix protocol type for the k8s Protocol
+func k8sProtocolToUnixProtocol(protocol v1.Protocol) uint16 {
+	switch v1.Protocol(strings.ToUpper(string(protocol))) {
+	case v1.ProtocolTCP:
 		return uint16(unix.IPPROTO_TCP)
-	case "udp":
+	case v1.ProtocolUDP:
 		return uint16(unix.IPPROTO_UDP)
-	case "sctp":
+	case v1.ProtocolSCTP:
 		return uint16(unix.IPPROTO_SCTP)
 	}
 	return uint16(0)
 }
 
-// protocolTypeToString returns the name for the given protocol.
-func protocolToString(proto Protocol) string {
+// unixProtocolToK8sProtocol returns the k8s protocol for the given unix protocol.
+func unixProtocolToK8sProtocol(proto Protocol) v1.Protocol {
 	switch proto {
 	case unix.IPPROTO_TCP:
-		return "TCP"
+		return v1.ProtocolTCP
 	case unix.IPPROTO_UDP:
-		return "UDP"
+		return v1.ProtocolUDP
 	case unix.IPPROTO_SCTP:
-		return "SCTP"
+		return v1.ProtocolSCTP
 	}
-	return ""
+	return v1.Protocol("")
 }

@@ -1195,7 +1195,7 @@ func (proxier *Proxier) syncProxyRules() {
 		serv := &utilipvs.VirtualServer{
 			Address:   svcInfo.ClusterIP(),
 			Port:      uint16(svcInfo.Port()),
-			Protocol:  string(svcInfo.Protocol()),
+			Protocol:  svcInfo.Protocol(),
 			Scheduler: proxier.ipvsScheduler,
 		}
 		// Set session affinity flag and timeout for IPVS service
@@ -1284,7 +1284,7 @@ func (proxier *Proxier) syncProxyRules() {
 			serv := &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy(externalIP),
 				Port:      uint16(svcInfo.Port()),
-				Protocol:  string(svcInfo.Protocol()),
+				Protocol:  svcInfo.Protocol(),
 				Scheduler: proxier.ipvsScheduler,
 			}
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
@@ -1384,7 +1384,7 @@ func (proxier *Proxier) syncProxyRules() {
 			serv := &utilipvs.VirtualServer{
 				Address:   netutils.ParseIPSloppy(ingress),
 				Port:      uint16(svcInfo.Port()),
-				Protocol:  string(svcInfo.Protocol()),
+				Protocol:  svcInfo.Protocol(),
 				Scheduler: proxier.ipvsScheduler,
 			}
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
@@ -1551,7 +1551,7 @@ func (proxier *Proxier) syncProxyRules() {
 				serv := &utilipvs.VirtualServer{
 					Address:   nodeIP,
 					Port:      uint16(svcInfo.NodePort()),
-					Protocol:  string(svcInfo.Protocol()),
+					Protocol:  svcInfo.Protocol(),
 					Scheduler: proxier.ipvsScheduler,
 				}
 				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
