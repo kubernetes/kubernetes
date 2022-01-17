@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
@@ -595,7 +596,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if closeAllConns == nil {
 			return errors.New("closeAllConns must be a valid function other than nil")
 		}
-		kubeDeps.OnHeartbeatFailure = closeAllConns
+		kubeDeps.OnHeartbeatFailure = createHeartbeatFailureHandler(closeAllConns, 5 * time.Minute)
 
 		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
@@ -828,6 +829,41 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	return nil
+}
+
+// createHeartbeatFailureHandler wraps closeAllConnections, to make sure it doesn't get called
+// too often. If there is no limit on how often it gets called, we can get a vicious circle
+// in which high API server load causes heartbeat failures, which in turn cause closing of all
+// connections, which triggers kubelet to repeat its LIST queries, which creates more high load
+// on the API server.
+// Why do we sometimes actually need to close all the connections? See
+// https://github.com/kubernetes/kubernetes/issues/48638. For the reasons described in that issue, it's not safe to
+// use a really long minTimeBetweenCloses. For instance, longer than 15 minutes.  So, to prevent any possible
+// misconfiguration, we cap the interval here. In practice, 5 minutes should be plenty since when testing this code
+// on a 5000 node cluster, all the heartbeat failures happened in just the first 90 seconds.
+func createHeartbeatFailureHandler(closeAllConnections func(), minTimeBetweenCloses time.Duration) func(){
+
+	const cap = 7 * time.Minute
+	if minTimeBetweenCloses > cap {
+		minTimeBetweenCloses = cap
+	}
+	mu := &sync.Mutex{}
+	var lastClose *time.Time
+
+	return func(){
+		mu.Lock()
+		defer mu.Unlock()
+
+		if lastClose != nil && time.Now().Before(lastClose.Add(minTimeBetweenCloses)) {
+			klog.Info("Close of all connections was requested, but will not be performed because connections were already closed recently")
+			return
+		}
+
+		now := time.Now()
+		lastClose = &now
+		klog.Info("Close of all connections was requested, and will now be done")
+		closeAllConnections()
+	}
 }
 
 // buildKubeletClientConfig constructs the appropriate client config for the kubelet depending on whether
