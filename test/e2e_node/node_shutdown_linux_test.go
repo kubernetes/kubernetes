@@ -264,6 +264,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func() {
+			if err := lookEmitSignalCommand(); err != nil {
+				e2eskipper.Skipf("skipping test because: %v", err)
+				return
+			}
+
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady()
 
