@@ -251,7 +251,7 @@ func LabelOldControlPlaneNodes(client clientset.Interface) error {
 func UpdateKubeletDynamicEnvFileWithURLScheme(dryRun bool) error {
 	filePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
 	if dryRun {
-		fmt.Printf("[dryrun] Would ensure that %q includes a CRI endpoint URL scheme\n", filePath)
+		fmt.Printf("[upgrade] Would ensure that %q includes a CRI endpoint URL scheme\n", filePath)
 		return nil
 	}
 	klog.V(2).Infof("Ensuring that %q includes a CRI endpoint URL scheme", filePath)

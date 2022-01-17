@@ -30,12 +30,12 @@ func TryStartKubelet() {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Println("[kubelet-start] no supported init system detected, won't make sure the kubelet is running properly.")
+		fmt.Println("[kubelet-start] No supported init system detected, won't make sure the kubelet is running properly.")
 		return
 	}
 
 	if !initSystem.ServiceExists(kubeadmconstants.Kubelet) {
-		fmt.Println("[kubelet-start] couldn't detect a kubelet service, can't make sure the kubelet is running properly.")
+		fmt.Println("[kubelet-start] Couldn't detect a kubelet service, can't make sure the kubelet is running properly.")
 	}
 
 	// This runs "systemctl daemon-reload && systemctl restart kubelet"
@@ -50,12 +50,12 @@ func TryStopKubelet() {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Println("[kubelet-start] no supported init system detected, won't make sure the kubelet not running for a short period of time while setting up configuration for it.")
+		fmt.Println("[kubelet-start] No supported init system detected, won't make sure the kubelet not running for a short period of time while setting up configuration for it.")
 		return
 	}
 
 	if !initSystem.ServiceExists(kubeadmconstants.Kubelet) {
-		fmt.Println("[kubelet-start] couldn't detect a kubelet service, can't make sure the kubelet not running for a short period of time while setting up configuration for it.")
+		fmt.Println("[kubelet-start] Couldn't detect a kubelet service, can't make sure the kubelet not running for a short period of time while setting up configuration for it.")
 	}
 
 	// This runs "systemctl daemon-reload && systemctl stop kubelet"
@@ -69,12 +69,12 @@ func TryRestartKubelet() {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Println("[kubelet-start] no supported init system detected, won't make sure the kubelet not running for a short period of time while setting up configuration for it.")
+		fmt.Println("[kubelet-start] No supported init system detected, won't make sure the kubelet not running for a short period of time while setting up configuration for it.")
 		return
 	}
 
 	if !initSystem.ServiceExists(kubeadmconstants.Kubelet) {
-		fmt.Println("[kubelet-start] couldn't detect a kubelet service, can't make sure the kubelet not running for a short period of time while setting up configuration for it.")
+		fmt.Println("[kubelet-start] Couldn't detect a kubelet service, can't make sure the kubelet not running for a short period of time while setting up configuration for it.")
 	}
 
 	// This runs "systemctl daemon-reload && systemctl stop kubelet"
