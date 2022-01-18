@@ -124,10 +124,12 @@ const (
 	WatchBookmark featuregate.Feature = "WatchBookmark"
 
 	// owner: @MikeSpreitzer @yue9944882
-	// alpha: v1.15
+	// alpha: v1.18
 	// beta: v1.20
 	//
-	// Enables managing request concurrency with prioritization and fairness at each server
+	// Enables managing request concurrency with prioritization and fairness at each server.
+	// The FeatureGate was introduced in release 1.15 but the feature
+	// was not really implemented before 1.18.
 	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
 
 	// owner: @wojtek-t
