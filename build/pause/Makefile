@@ -67,8 +67,8 @@ TRIPLE.linux-arm64 := aarch64-linux-gnu
 TRIPLE.linux-ppc64le := powerpc64le-linux-gnu
 TRIPLE.linux-s390x := s390x-linux-gnu
 TRIPLE := ${TRIPLE.${OS}-${ARCH}}
-BASE.linux := scratch
-BASE.windows := mcr.microsoft.com/windows/nanoserver
+BASE.linux ?= scratch
+BASE.windows ?= mcr.microsoft.com/windows/nanoserver:${OSVERSION}
 BASE := ${BASE.${OS}}
 
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -85,8 +85,7 @@ push-manifest:
 	set -x; \
 	for arch in $(ALL_ARCH.windows);  do \
 		for osversion in ${ALL_OSVERSIONS.windows}; do \
-			BASEIMAGE=${BASE.windows}:$${osversion}; \
-			full_version=`docker manifest inspect ${BASE.windows}:$${osversion} | grep "os.version" | head -n 1 | awk -F\" '{print $$4}'` || true; \
+			full_version=`docker manifest inspect mcr.microsoft.com/windows/nanoserver:$${osversion} | grep "os.version" | head -n 1 | awk -F\" '{print $$4}'` || true; \
 			docker manifest annotate --os windows --arch $${arch} --os-version $${full_version} ${IMAGE}:${TAG} ${IMAGE}:${TAG}-windows-$${arch}-$${osversion}; \
 		done; \
 	done
@@ -122,7 +121,7 @@ container: .container-${OS}-$(ARCH)
 
 .container-windows-$(ARCH): $(foreach binary, ${BIN}, bin/${binary}-${OS}-${ARCH})
 	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
-		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=${BASE}:${OSVERSION} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
+		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=${BASE} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
 	touch $@
 
 # Useful for testing, not automatically included in container image
