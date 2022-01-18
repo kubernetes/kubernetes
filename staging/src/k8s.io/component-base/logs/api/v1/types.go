@@ -31,6 +31,9 @@ const (
 	JSONLogFormat = "json"
 )
 
+// The alpha or beta level of structs is the highest stability level of any field
+// inside it. Feature gates will get checked during LoggingConfiguration.ValidateAndApply.
+
 // LoggingConfiguration contains logging options.
 type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
@@ -48,26 +51,30 @@ type LoggingConfiguration struct {
 	// VModule overrides the verbosity threshold for individual files.
 	// Only supported for "text" log format.
 	VModule VModuleConfiguration `json:"vmodule,omitempty"`
-	// [Experimental] Options holds additional parameters that are specific
+	// [Alpha] Options holds additional parameters that are specific
 	// to the different logging formats. Only the options for the selected
 	// format get used, but all of them get validated.
+	// Only available when the LoggingAlphaOptions feature gate is enabled.
 	Options FormatOptions `json:"options,omitempty"`
 }
 
 // FormatOptions contains options for the different logging formats.
 type FormatOptions struct {
-	// [Experimental] JSON contains options for logging format "json".
+	// [Alpha] JSON contains options for logging format "json".
+	// Only available when the LoggingAlphaOptions feature gate is enabled.
 	JSON JSONOptions `json:"json,omitempty"`
 }
 
 // JSONOptions contains options for logging format "json".
 type JSONOptions struct {
-	// [Experimental] SplitStream redirects error messages to stderr while
+	// [Alpha] SplitStream redirects error messages to stderr while
 	// info messages go to stdout, with buffering. The default is to write
-	// both to stdout, without buffering.
+	// both to stdout, without buffering. Only available when
+	// the LoggingAlphaOptions feature gate is enabled.
 	SplitStream bool `json:"splitStream,omitempty"`
-	// [Experimental] InfoBufferSize sets the size of the info stream when
+	// [Alpha] InfoBufferSize sets the size of the info stream when
 	// using split streams. The default is zero, which disables buffering.
+	// Only available when the LoggingAlphaOptions feature gate is enabled.
 	InfoBufferSize resource.QuantityValue `json:"infoBufferSize,omitempty"`
 }
 

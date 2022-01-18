@@ -23,7 +23,7 @@ import (
 
 func init() {
 	// JSON format is optional klog format
-	if err := logsapi.RegisterLogFormat(logsapi.JSONLogFormat, json.Factory{}); err != nil {
+	if err := logsapi.RegisterLogFormat(logsapi.JSONLogFormat, json.Factory{}, logsapi.LoggingBetaOptions); err != nil {
 		panic(err)
 	}
 }

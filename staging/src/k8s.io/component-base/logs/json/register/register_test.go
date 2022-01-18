@@ -37,7 +37,7 @@ func TestJSONFlag(t *testing.T) {
 	c.AddFlags(fs)
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
-	wantSubstring := `Permitted formats: "json", "text".`
+	wantSubstring := `Permitted formats: "json" (gated by LoggingBetaOptions), "text".`
 	if !assert.Contains(t, output.String(), wantSubstring) {
 		t.Errorf("JSON logging format flag is not available. expect to contain %q, got %q", wantSubstring, output.String())
 	}
@@ -46,13 +46,62 @@ func TestJSONFlag(t *testing.T) {
 func TestJSONFormatRegister(t *testing.T) {
 	config := logsapi.NewLoggingConfiguration()
 	klogr := klog.Background()
+	defaultGate := featuregate.NewFeatureGate()
+	err := logsapi.AddFeatureGates(defaultGate)
+	require.NoError(t, err)
+	allEnabled := defaultGate.DeepCopy()
+	allDisabled := defaultGate.DeepCopy()
+	for feature := range defaultGate.GetAll() {
+		if err := allEnabled.SetFromMap(map[string]bool{string(feature): true}); err != nil {
+			panic(err)
+		}
+		if err := allDisabled.SetFromMap(map[string]bool{string(feature): false}); err != nil {
+			panic(err)
+		}
+	}
 	testcases := []struct {
 		name              string
 		args              []string
 		contextualLogging bool
+		featureGate       featuregate.FeatureGate
 		want              *logsapi.LoggingConfiguration
 		errs              field.ErrorList
 	}{
+		{
+			name: "JSON log format, default gates",
+			args: []string{"--logging-format=json"},
+			want: func() *logsapi.LoggingConfiguration {
+				c := config.DeepCopy()
+				c.Format = logsapi.JSONLogFormat
+				return c
+			}(),
+		},
+		{
+			name:        "JSON log format, disabled gates",
+			args:        []string{"--logging-format=json"},
+			featureGate: allDisabled,
+			want: func() *logsapi.LoggingConfiguration {
+				c := config.DeepCopy()
+				c.Format = logsapi.JSONLogFormat
+				return c
+			}(),
+			errs: field.ErrorList{&field.Error{
+				Type:     "FieldValueForbidden",
+				Field:    "format",
+				BadValue: "",
+				Detail:   "Log format json is disabled, see LoggingBetaOptions feature",
+			}},
+		},
+		{
+			name:        "JSON log format, enabled gates",
+			args:        []string{"--logging-format=json"},
+			featureGate: allEnabled,
+			want: func() *logsapi.LoggingConfiguration {
+				c := config.DeepCopy()
+				c.Format = logsapi.JSONLogFormat
+				return c
+			}(),
+		},
 		{
 			name: "JSON log format",
 			args: []string{"--logging-format=json"},
@@ -98,10 +147,14 @@ func TestJSONFormatRegister(t *testing.T) {
 			if !assert.Equal(t, tc.want, c) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
 			}
-			featureGate := featuregate.NewFeatureGate()
-			logsapi.AddFeatureGates(featureGate)
-			err := featureGate.SetFromMap(map[string]bool{string(logsapi.ContextualLogging): tc.contextualLogging})
+			featureGate := tc.featureGate
+			if featureGate == nil {
+				featureGate = defaultGate
+			}
+			mutable := featureGate.DeepCopy()
+			err := mutable.SetFromMap(map[string]bool{string(logsapi.ContextualLogging): tc.contextualLogging})
 			require.NoError(t, err)
+			featureGate = mutable
 			errs := c.ValidateAndApply(featureGate)
 			defer klog.ClearLogger()
 			if !assert.ElementsMatch(t, tc.errs, errs) {

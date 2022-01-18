@@ -55,7 +55,6 @@ func TestOptions(t *testing.T) {
 	testcases := []struct {
 		name string
 		args []string
-		path *field.Path
 		want *LoggingConfiguration
 		errs field.ErrorList
 	}{
