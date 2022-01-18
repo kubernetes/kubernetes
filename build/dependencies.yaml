@@ -53,13 +53,6 @@ dependencies:
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CRICTL_VERSION=
 
-  # Docker
-  - name: "docker"
-    version: 20.10
-    refPaths:
-    - path: vendor/k8s.io/system-validators/validators/docker_validator.go
-      match: latestValidatedDockerVersion
-
   # etcd
   - name: "etcd"
     version: 3.5.1
