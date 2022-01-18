@@ -411,7 +411,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			// open(2) to create the file, so the final mode used is "mode &
 			// ~umask". But we want to make sure the specified mode is used
 			// in the file no matter what the umask is.
-			if err := m.osInterface.Chmod(containerLogPath, 0666); err != nil {
+			if err := m.osInterface.Chmod(containerLogPath, 0660); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
 			}
 
