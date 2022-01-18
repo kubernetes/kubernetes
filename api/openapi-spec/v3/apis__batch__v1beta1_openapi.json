@@ -4212,6 +4212,7 @@
     },
     "/apis/batch/v1beta1/cronjobs": {
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind CronJob",
         "operationId": "listBatchV1beta1CronJobForAllNamespaces",
         "responses": {
@@ -4345,6 +4346,7 @@
     },
     "/apis/batch/v1beta1/namespaces/{namespace}/cronjobs": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of CronJob",
         "operationId": "deleteBatchV1beta1CollectionNamespacedCronJob",
         "parameters": [
@@ -4484,6 +4486,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind CronJob",
         "operationId": "listBatchV1beta1NamespacedCronJob",
         "parameters": [
@@ -4627,6 +4630,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a CronJob",
         "operationId": "createBatchV1beta1NamespacedCronJob",
         "parameters": [
@@ -4736,6 +4740,7 @@
     },
     "/apis/batch/v1beta1/namespaces/{namespace}/cronjobs/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a CronJob",
         "operationId": "deleteBatchV1beta1NamespacedCronJob",
         "parameters": [
@@ -4832,6 +4837,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified CronJob",
         "operationId": "readBatchV1beta1NamespacedCronJob",
         "responses": {
@@ -4892,6 +4898,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified CronJob",
         "operationId": "patchBatchV1beta1NamespacedCronJob",
         "parameters": [
@@ -4988,6 +4995,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified CronJob",
         "operationId": "replaceBatchV1beta1NamespacedCronJob",
         "parameters": [
@@ -5077,6 +5085,7 @@
     },
     "/apis/batch/v1beta1/namespaces/{namespace}/cronjobs/{name}/status": {
       "get": {
+        "deprecated": true,
         "description": "read status of the specified CronJob",
         "operationId": "readBatchV1beta1NamespacedCronJobStatus",
         "responses": {
@@ -5137,6 +5146,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update status of the specified CronJob",
         "operationId": "patchBatchV1beta1NamespacedCronJobStatus",
         "parameters": [
@@ -5233,6 +5243,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace status of the specified CronJob",
         "operationId": "replaceBatchV1beta1NamespacedCronJobStatus",
         "parameters": [
@@ -5322,6 +5333,7 @@
     },
     "/apis/batch/v1beta1/watch/cronjobs": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of CronJob. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchBatchV1beta1CronJobListForAllNamespaces",
         "responses": {
@@ -5455,6 +5467,7 @@
     },
     "/apis/batch/v1beta1/watch/namespaces/{namespace}/cronjobs": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of CronJob. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchBatchV1beta1NamespacedCronJobList",
         "responses": {
@@ -5598,6 +5611,7 @@
     },
     "/apis/batch/v1beta1/watch/namespaces/{namespace}/cronjobs/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind CronJob. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchBatchV1beta1NamespacedCronJob",
         "responses": {

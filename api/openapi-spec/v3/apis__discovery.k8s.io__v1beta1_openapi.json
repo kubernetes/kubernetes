@@ -1298,6 +1298,7 @@
     },
     "/apis/discovery.k8s.io/v1beta1/endpointslices": {
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind EndpointSlice",
         "operationId": "listDiscoveryV1beta1EndpointSliceForAllNamespaces",
         "responses": {
@@ -1431,6 +1432,7 @@
     },
     "/apis/discovery.k8s.io/v1beta1/namespaces/{namespace}/endpointslices": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of EndpointSlice",
         "operationId": "deleteDiscoveryV1beta1CollectionNamespacedEndpointSlice",
         "parameters": [
@@ -1570,6 +1572,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind EndpointSlice",
         "operationId": "listDiscoveryV1beta1NamespacedEndpointSlice",
         "parameters": [
@@ -1713,6 +1716,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create an EndpointSlice",
         "operationId": "createDiscoveryV1beta1NamespacedEndpointSlice",
         "parameters": [
@@ -1822,6 +1826,7 @@
     },
     "/apis/discovery.k8s.io/v1beta1/namespaces/{namespace}/endpointslices/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete an EndpointSlice",
         "operationId": "deleteDiscoveryV1beta1NamespacedEndpointSlice",
         "parameters": [
@@ -1918,6 +1923,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified EndpointSlice",
         "operationId": "readDiscoveryV1beta1NamespacedEndpointSlice",
         "responses": {
@@ -1978,6 +1984,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified EndpointSlice",
         "operationId": "patchDiscoveryV1beta1NamespacedEndpointSlice",
         "parameters": [
@@ -2074,6 +2081,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified EndpointSlice",
         "operationId": "replaceDiscoveryV1beta1NamespacedEndpointSlice",
         "parameters": [
@@ -2163,6 +2171,7 @@
     },
     "/apis/discovery.k8s.io/v1beta1/watch/endpointslices": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of EndpointSlice. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchDiscoveryV1beta1EndpointSliceListForAllNamespaces",
         "responses": {
@@ -2296,6 +2305,7 @@
     },
     "/apis/discovery.k8s.io/v1beta1/watch/namespaces/{namespace}/endpointslices": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of EndpointSlice. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchDiscoveryV1beta1NamespacedEndpointSliceList",
         "responses": {
@@ -2439,6 +2449,7 @@
     },
     "/apis/discovery.k8s.io/v1beta1/watch/namespaces/{namespace}/endpointslices/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind EndpointSlice. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchDiscoveryV1beta1NamespacedEndpointSlice",
         "responses": {

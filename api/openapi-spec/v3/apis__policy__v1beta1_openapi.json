@@ -1763,6 +1763,7 @@
     },
     "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of PodDisruptionBudget",
         "operationId": "deletePolicyV1beta1CollectionNamespacedPodDisruptionBudget",
         "parameters": [
@@ -1902,6 +1903,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind PodDisruptionBudget",
         "operationId": "listPolicyV1beta1NamespacedPodDisruptionBudget",
         "parameters": [
@@ -2045,6 +2047,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a PodDisruptionBudget",
         "operationId": "createPolicyV1beta1NamespacedPodDisruptionBudget",
         "parameters": [
@@ -2154,6 +2157,7 @@
     },
     "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a PodDisruptionBudget",
         "operationId": "deletePolicyV1beta1NamespacedPodDisruptionBudget",
         "parameters": [
@@ -2250,6 +2254,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified PodDisruptionBudget",
         "operationId": "readPolicyV1beta1NamespacedPodDisruptionBudget",
         "responses": {
@@ -2310,6 +2315,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified PodDisruptionBudget",
         "operationId": "patchPolicyV1beta1NamespacedPodDisruptionBudget",
         "parameters": [
@@ -2406,6 +2412,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified PodDisruptionBudget",
         "operationId": "replacePolicyV1beta1NamespacedPodDisruptionBudget",
         "parameters": [
@@ -2495,6 +2502,7 @@
     },
     "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}/status": {
       "get": {
+        "deprecated": true,
         "description": "read status of the specified PodDisruptionBudget",
         "operationId": "readPolicyV1beta1NamespacedPodDisruptionBudgetStatus",
         "responses": {
@@ -2555,6 +2563,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update status of the specified PodDisruptionBudget",
         "operationId": "patchPolicyV1beta1NamespacedPodDisruptionBudgetStatus",
         "parameters": [
@@ -2651,6 +2660,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace status of the specified PodDisruptionBudget",
         "operationId": "replacePolicyV1beta1NamespacedPodDisruptionBudgetStatus",
         "parameters": [
@@ -2740,6 +2750,7 @@
     },
     "/apis/policy/v1beta1/poddisruptionbudgets": {
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind PodDisruptionBudget",
         "operationId": "listPolicyV1beta1PodDisruptionBudgetForAllNamespaces",
         "responses": {
@@ -2873,6 +2884,7 @@
     },
     "/apis/policy/v1beta1/podsecuritypolicies": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of PodSecurityPolicy",
         "operationId": "deletePolicyV1beta1CollectionPodSecurityPolicy",
         "parameters": [
@@ -3012,6 +3024,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind PodSecurityPolicy",
         "operationId": "listPolicyV1beta1PodSecurityPolicy",
         "parameters": [
@@ -3145,6 +3158,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a PodSecurityPolicy",
         "operationId": "createPolicyV1beta1PodSecurityPolicy",
         "parameters": [
@@ -3254,6 +3268,7 @@
     },
     "/apis/policy/v1beta1/podsecuritypolicies/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a PodSecurityPolicy",
         "operationId": "deletePolicyV1beta1PodSecurityPolicy",
         "parameters": [
@@ -3350,6 +3365,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified PodSecurityPolicy",
         "operationId": "readPolicyV1beta1PodSecurityPolicy",
         "responses": {
@@ -3400,6 +3416,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified PodSecurityPolicy",
         "operationId": "patchPolicyV1beta1PodSecurityPolicy",
         "parameters": [
@@ -3496,6 +3513,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified PodSecurityPolicy",
         "operationId": "replacePolicyV1beta1PodSecurityPolicy",
         "parameters": [
@@ -3585,6 +3603,7 @@
     },
     "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of PodDisruptionBudget. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchPolicyV1beta1NamespacedPodDisruptionBudgetList",
         "responses": {
@@ -3728,6 +3747,7 @@
     },
     "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind PodDisruptionBudget. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchPolicyV1beta1NamespacedPodDisruptionBudget",
         "responses": {
@@ -3881,6 +3901,7 @@
     },
     "/apis/policy/v1beta1/watch/poddisruptionbudgets": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of PodDisruptionBudget. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchPolicyV1beta1PodDisruptionBudgetListForAllNamespaces",
         "responses": {
@@ -4014,6 +4035,7 @@
     },
     "/apis/policy/v1beta1/watch/podsecuritypolicies": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchPolicyV1beta1PodSecurityPolicyList",
         "responses": {
@@ -4147,6 +4169,7 @@
     },
     "/apis/policy/v1beta1/watch/podsecuritypolicies/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind PodSecurityPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchPolicyV1beta1PodSecurityPolicy",
         "responses": {

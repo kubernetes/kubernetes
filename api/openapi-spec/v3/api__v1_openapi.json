@@ -7759,6 +7759,7 @@
     },
     "/api/v1/componentstatuses": {
       "get": {
+        "deprecated": true,
         "description": "list objects of kind ComponentStatus",
         "operationId": "listCoreV1ComponentStatus",
         "responses": {
@@ -7892,6 +7893,7 @@
     },
     "/api/v1/componentstatuses/{name}": {
       "get": {
+        "deprecated": true,
         "description": "read the specified ComponentStatus",
         "operationId": "readCoreV1ComponentStatus",
         "responses": {

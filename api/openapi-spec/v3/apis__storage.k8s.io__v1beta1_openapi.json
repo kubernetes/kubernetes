@@ -1200,6 +1200,7 @@
     },
     "/apis/storage.k8s.io/v1beta1/csistoragecapacities": {
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind CSIStorageCapacity",
         "operationId": "listStorageV1beta1CSIStorageCapacityForAllNamespaces",
         "responses": {
@@ -1333,6 +1334,7 @@
     },
     "/apis/storage.k8s.io/v1beta1/namespaces/{namespace}/csistoragecapacities": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of CSIStorageCapacity",
         "operationId": "deleteStorageV1beta1CollectionNamespacedCSIStorageCapacity",
         "parameters": [
@@ -1472,6 +1474,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind CSIStorageCapacity",
         "operationId": "listStorageV1beta1NamespacedCSIStorageCapacity",
         "parameters": [
@@ -1615,6 +1618,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a CSIStorageCapacity",
         "operationId": "createStorageV1beta1NamespacedCSIStorageCapacity",
         "parameters": [
@@ -1724,6 +1728,7 @@
     },
     "/apis/storage.k8s.io/v1beta1/namespaces/{namespace}/csistoragecapacities/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a CSIStorageCapacity",
         "operationId": "deleteStorageV1beta1NamespacedCSIStorageCapacity",
         "parameters": [
@@ -1820,6 +1825,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified CSIStorageCapacity",
         "operationId": "readStorageV1beta1NamespacedCSIStorageCapacity",
         "responses": {
@@ -1880,6 +1886,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified CSIStorageCapacity",
         "operationId": "patchStorageV1beta1NamespacedCSIStorageCapacity",
         "parameters": [
@@ -1976,6 +1983,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified CSIStorageCapacity",
         "operationId": "replaceStorageV1beta1NamespacedCSIStorageCapacity",
         "parameters": [
@@ -2065,6 +2073,7 @@
     },
     "/apis/storage.k8s.io/v1beta1/watch/csistoragecapacities": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of CSIStorageCapacity. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchStorageV1beta1CSIStorageCapacityListForAllNamespaces",
         "responses": {
@@ -2198,6 +2207,7 @@
     },
     "/apis/storage.k8s.io/v1beta1/watch/namespaces/{namespace}/csistoragecapacities": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of CSIStorageCapacity. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchStorageV1beta1NamespacedCSIStorageCapacityList",
         "responses": {
@@ -2341,6 +2351,7 @@
     },
     "/apis/storage.k8s.io/v1beta1/watch/namespaces/{namespace}/csistoragecapacities/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind CSIStorageCapacity. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchStorageV1beta1NamespacedCSIStorageCapacity",
         "responses": {

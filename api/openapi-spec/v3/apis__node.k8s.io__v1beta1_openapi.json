@@ -1213,6 +1213,7 @@
     },
     "/apis/node.k8s.io/v1beta1/runtimeclasses": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of RuntimeClass",
         "operationId": "deleteNodeV1beta1CollectionRuntimeClass",
         "parameters": [
@@ -1352,6 +1353,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind RuntimeClass",
         "operationId": "listNodeV1beta1RuntimeClass",
         "parameters": [
@@ -1485,6 +1487,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a RuntimeClass",
         "operationId": "createNodeV1beta1RuntimeClass",
         "parameters": [
@@ -1594,6 +1597,7 @@
     },
     "/apis/node.k8s.io/v1beta1/runtimeclasses/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a RuntimeClass",
         "operationId": "deleteNodeV1beta1RuntimeClass",
         "parameters": [
@@ -1690,6 +1694,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified RuntimeClass",
         "operationId": "readNodeV1beta1RuntimeClass",
         "responses": {
@@ -1740,6 +1745,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified RuntimeClass",
         "operationId": "patchNodeV1beta1RuntimeClass",
         "parameters": [
@@ -1836,6 +1842,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified RuntimeClass",
         "operationId": "replaceNodeV1beta1RuntimeClass",
         "parameters": [
@@ -1925,6 +1932,7 @@
     },
     "/apis/node.k8s.io/v1beta1/watch/runtimeclasses": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of RuntimeClass. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchNodeV1beta1RuntimeClassList",
         "responses": {
@@ -2058,6 +2066,7 @@
     },
     "/apis/node.k8s.io/v1beta1/watch/runtimeclasses/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind RuntimeClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchNodeV1beta1RuntimeClass",
         "responses": {

@@ -1645,6 +1645,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of FlowSchema",
         "operationId": "deleteFlowcontrolApiserverV1beta1CollectionFlowSchema",
         "parameters": [
@@ -1784,6 +1785,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind FlowSchema",
         "operationId": "listFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
@@ -1917,6 +1919,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a FlowSchema",
         "operationId": "createFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
@@ -2026,6 +2029,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a FlowSchema",
         "operationId": "deleteFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
@@ -2122,6 +2126,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified FlowSchema",
         "operationId": "readFlowcontrolApiserverV1beta1FlowSchema",
         "responses": {
@@ -2172,6 +2177,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified FlowSchema",
         "operationId": "patchFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
@@ -2268,6 +2274,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified FlowSchema",
         "operationId": "replaceFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
@@ -2357,6 +2364,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas/{name}/status": {
       "get": {
+        "deprecated": true,
         "description": "read status of the specified FlowSchema",
         "operationId": "readFlowcontrolApiserverV1beta1FlowSchemaStatus",
         "responses": {
@@ -2407,6 +2415,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update status of the specified FlowSchema",
         "operationId": "patchFlowcontrolApiserverV1beta1FlowSchemaStatus",
         "parameters": [
@@ -2503,6 +2512,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace status of the specified FlowSchema",
         "operationId": "replaceFlowcontrolApiserverV1beta1FlowSchemaStatus",
         "parameters": [
@@ -2592,6 +2602,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/prioritylevelconfigurations": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of PriorityLevelConfiguration",
         "operationId": "deleteFlowcontrolApiserverV1beta1CollectionPriorityLevelConfiguration",
         "parameters": [
@@ -2731,6 +2742,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind PriorityLevelConfiguration",
         "operationId": "listFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
@@ -2864,6 +2876,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a PriorityLevelConfiguration",
         "operationId": "createFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
@@ -2973,6 +2986,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/prioritylevelconfigurations/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a PriorityLevelConfiguration",
         "operationId": "deleteFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
@@ -3069,6 +3083,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified PriorityLevelConfiguration",
         "operationId": "readFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "responses": {
@@ -3119,6 +3134,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified PriorityLevelConfiguration",
         "operationId": "patchFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
@@ -3215,6 +3231,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified PriorityLevelConfiguration",
         "operationId": "replaceFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
@@ -3304,6 +3321,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/prioritylevelconfigurations/{name}/status": {
       "get": {
+        "deprecated": true,
         "description": "read status of the specified PriorityLevelConfiguration",
         "operationId": "readFlowcontrolApiserverV1beta1PriorityLevelConfigurationStatus",
         "responses": {
@@ -3354,6 +3372,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update status of the specified PriorityLevelConfiguration",
         "operationId": "patchFlowcontrolApiserverV1beta1PriorityLevelConfigurationStatus",
         "parameters": [
@@ -3450,6 +3469,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace status of the specified PriorityLevelConfiguration",
         "operationId": "replaceFlowcontrolApiserverV1beta1PriorityLevelConfigurationStatus",
         "parameters": [
@@ -3539,6 +3559,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/flowschemas": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of FlowSchema. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchFlowcontrolApiserverV1beta1FlowSchemaList",
         "responses": {
@@ -3672,6 +3693,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/flowschemas/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind FlowSchema. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchFlowcontrolApiserverV1beta1FlowSchema",
         "responses": {
@@ -3815,6 +3837,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/prioritylevelconfigurations": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of PriorityLevelConfiguration. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchFlowcontrolApiserverV1beta1PriorityLevelConfigurationList",
         "responses": {
@@ -3948,6 +3971,7 @@
     },
     "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/prioritylevelconfigurations/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind PriorityLevelConfiguration. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "responses": {

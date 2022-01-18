@@ -1670,6 +1670,7 @@
     },
     "/apis/autoscaling/v2beta1/horizontalpodautoscalers": {
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind HorizontalPodAutoscaler",
         "operationId": "listAutoscalingV2beta1HorizontalPodAutoscalerForAllNamespaces",
         "responses": {
@@ -1803,6 +1804,7 @@
     },
     "/apis/autoscaling/v2beta1/namespaces/{namespace}/horizontalpodautoscalers": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of HorizontalPodAutoscaler",
         "operationId": "deleteAutoscalingV2beta1CollectionNamespacedHorizontalPodAutoscaler",
         "parameters": [
@@ -1942,6 +1944,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind HorizontalPodAutoscaler",
         "operationId": "listAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
         "parameters": [
@@ -2085,6 +2088,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create a HorizontalPodAutoscaler",
         "operationId": "createAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
         "parameters": [
@@ -2194,6 +2198,7 @@
     },
     "/apis/autoscaling/v2beta1/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete a HorizontalPodAutoscaler",
         "operationId": "deleteAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
         "parameters": [
@@ -2290,6 +2295,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified HorizontalPodAutoscaler",
         "operationId": "readAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
         "responses": {
@@ -2350,6 +2356,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified HorizontalPodAutoscaler",
         "operationId": "patchAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
         "parameters": [
@@ -2446,6 +2453,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified HorizontalPodAutoscaler",
         "operationId": "replaceAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
         "parameters": [
@@ -2535,6 +2543,7 @@
     },
     "/apis/autoscaling/v2beta1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status": {
       "get": {
+        "deprecated": true,
         "description": "read status of the specified HorizontalPodAutoscaler",
         "operationId": "readAutoscalingV2beta1NamespacedHorizontalPodAutoscalerStatus",
         "responses": {
@@ -2595,6 +2604,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update status of the specified HorizontalPodAutoscaler",
         "operationId": "patchAutoscalingV2beta1NamespacedHorizontalPodAutoscalerStatus",
         "parameters": [
@@ -2691,6 +2701,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace status of the specified HorizontalPodAutoscaler",
         "operationId": "replaceAutoscalingV2beta1NamespacedHorizontalPodAutoscalerStatus",
         "parameters": [
@@ -2780,6 +2791,7 @@
     },
     "/apis/autoscaling/v2beta1/watch/horizontalpodautoscalers": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchAutoscalingV2beta1HorizontalPodAutoscalerListForAllNamespaces",
         "responses": {
@@ -2913,6 +2925,7 @@
     },
     "/apis/autoscaling/v2beta1/watch/namespaces/{namespace}/horizontalpodautoscalers": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchAutoscalingV2beta1NamespacedHorizontalPodAutoscalerList",
         "responses": {
@@ -3056,6 +3069,7 @@
     },
     "/apis/autoscaling/v2beta1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind HorizontalPodAutoscaler. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
         "responses": {

@@ -1259,6 +1259,7 @@
     },
     "/apis/events.k8s.io/v1beta1/events": {
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind Event",
         "operationId": "listEventsV1beta1EventForAllNamespaces",
         "responses": {
@@ -1392,6 +1393,7 @@
     },
     "/apis/events.k8s.io/v1beta1/namespaces/{namespace}/events": {
       "delete": {
+        "deprecated": true,
         "description": "delete collection of Event",
         "operationId": "deleteEventsV1beta1CollectionNamespacedEvent",
         "parameters": [
@@ -1531,6 +1533,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "list or watch objects of kind Event",
         "operationId": "listEventsV1beta1NamespacedEvent",
         "parameters": [
@@ -1674,6 +1677,7 @@
         }
       ],
       "post": {
+        "deprecated": true,
         "description": "create an Event",
         "operationId": "createEventsV1beta1NamespacedEvent",
         "parameters": [
@@ -1783,6 +1787,7 @@
     },
     "/apis/events.k8s.io/v1beta1/namespaces/{namespace}/events/{name}": {
       "delete": {
+        "deprecated": true,
         "description": "delete an Event",
         "operationId": "deleteEventsV1beta1NamespacedEvent",
         "parameters": [
@@ -1879,6 +1884,7 @@
         ]
       },
       "get": {
+        "deprecated": true,
         "description": "read the specified Event",
         "operationId": "readEventsV1beta1NamespacedEvent",
         "responses": {
@@ -1939,6 +1945,7 @@
         }
       ],
       "patch": {
+        "deprecated": true,
         "description": "partially update the specified Event",
         "operationId": "patchEventsV1beta1NamespacedEvent",
         "parameters": [
@@ -2035,6 +2042,7 @@
         ]
       },
       "put": {
+        "deprecated": true,
         "description": "replace the specified Event",
         "operationId": "replaceEventsV1beta1NamespacedEvent",
         "parameters": [
@@ -2124,6 +2132,7 @@
     },
     "/apis/events.k8s.io/v1beta1/watch/events": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchEventsV1beta1EventListForAllNamespaces",
         "responses": {
@@ -2257,6 +2266,7 @@
     },
     "/apis/events.k8s.io/v1beta1/watch/namespaces/{namespace}/events": {
       "get": {
+        "deprecated": true,
         "description": "watch individual changes to a list of Event. deprecated: use the 'watch' parameter with a list operation instead.",
         "operationId": "watchEventsV1beta1NamespacedEventList",
         "responses": {
@@ -2400,6 +2410,7 @@
     },
     "/apis/events.k8s.io/v1beta1/watch/namespaces/{namespace}/events/{name}": {
       "get": {
+        "deprecated": true,
         "description": "watch changes to an object of kind Event. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
         "operationId": "watchEventsV1beta1NamespacedEvent",
         "responses": {
