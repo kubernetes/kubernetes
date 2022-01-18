@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
@@ -75,6 +76,9 @@ var (
 )
 
 func TestValidateKubeletConfiguration(t *testing.T) {
+	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	logsapi.AddFeatureGates(featureGate)
+
 	cases := []struct {
 		name      string
 		configure func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration
@@ -497,7 +501,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validation.ValidateKubeletConfiguration(tc.configure(successConfig.DeepCopy()))
+			errs := validation.ValidateKubeletConfiguration(tc.configure(successConfig.DeepCopy()), featureGate)
 
 			if len(tc.errMsg) == 0 {
 				if errs != nil {

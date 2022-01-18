@@ -24,7 +24,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -38,12 +38,12 @@ var (
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
-func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
+func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
 	allErrors := []error{}
 
-	// Make a local copy of the global feature gates and combine it with the gates set by this configuration.
+	// Make a local copy of the feature gates and combine it with the gates set by this configuration.
 	// This allows us to validate the config against the set of gates it will actually run against.
-	localFeatureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	localFeatureGate := featureGate.DeepCopy()
 	if err := localFeatureGate.SetFromMap(kc.FeatureGates); err != nil {
 		return err
 	}

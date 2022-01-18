@@ -248,7 +248,7 @@ func NewKubeletServer() (*KubeletServer, error) {
 // ValidateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid.
 func ValidateKubeletServer(s *KubeletServer) error {
 	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
-	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
+	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration, utilfeature.DefaultFeatureGate); err != nil {
 		return err
 	}
 	if err := ValidateKubeletFlags(&s.KubeletFlags); err != nil {

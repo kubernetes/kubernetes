@@ -26,6 +26,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
@@ -85,6 +86,10 @@ func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
 type Factory struct{}
 
 var _ logsapi.LogFormatFactory = Factory{}
+
+func (f Factory) Feature() featuregate.Feature {
+	return logsapi.LoggingBetaOptions
+}
 
 func (f Factory) Create(c logsapi.LoggingConfiguration) (logr.Logger, func()) {
 	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,

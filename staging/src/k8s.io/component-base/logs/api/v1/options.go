@@ -92,8 +92,19 @@ func (c *LoggingConfiguration) Validate(featureGate featuregate.FeatureGate, fld
 			}
 		}
 	}
-	if _, err := logRegistry.get(c.Format); err != nil {
+	format, err := logRegistry.get(c.Format)
+	if err != nil {
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
+	} else if format != nil {
+		if format.feature != LoggingStableOptions {
+			enabled := featureGates()[format.feature].Default
+			if featureGate != nil {
+				enabled = featureGate.Enabled(format.feature)
+			}
+			if !enabled {
+				errs = append(errs, field.Forbidden(fldPath.Child("format"), fmt.Sprintf("Log format %s is disabled, see %s feature", c.Format, format.feature)))
+			}
+		}
 	}
 
 	// The type in our struct is uint32, but klog only accepts positive int32.
@@ -116,8 +127,33 @@ func (c *LoggingConfiguration) Validate(featureGate featuregate.FeatureGate, fld
 		}
 	}
 
-	// Currently nothing to validate for c.Options.
+	errs = append(errs, c.validateFormatOptions(featureGate, fldPath.Child("options"))...)
 	return errs
+}
+
+func (c *LoggingConfiguration) validateFormatOptions(featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
+	errs = append(errs, c.validateJSONOptions(featureGate, fldPath.Child("json"))...)
+	return errs
+}
+
+func (c *LoggingConfiguration) validateJSONOptions(featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
+	if gate := LoggingAlphaOptions; c.Options.JSON.SplitStream && !featureEnabled(featureGate, gate) {
+		errs = append(errs, field.Forbidden(fldPath.Child("splitStream"), fmt.Sprintf("Feature %s is disabled", gate)))
+	}
+	if gate := LoggingAlphaOptions; c.Options.JSON.InfoBufferSize.Value() != 0 && !featureEnabled(featureGate, gate) {
+		errs = append(errs, field.Forbidden(fldPath.Child("infoBufferSize"), fmt.Sprintf("Feature %s is disabled", gate)))
+	}
+	return errs
+}
+
+func featureEnabled(featureGate featuregate.FeatureGate, feature featuregate.Feature) bool {
+	enabled := false
+	if featureGate != nil {
+		enabled = featureGate.Enabled(feature)
+	}
+	return enabled
 }
 
 func (c *LoggingConfiguration) apply(featureGate featuregate.FeatureGate) error {
@@ -127,11 +163,11 @@ func (c *LoggingConfiguration) apply(featureGate featuregate.FeatureGate) error 
 	}
 
 	// if log format not exists, use nil loggr
-	factory, _ := logRegistry.get(c.Format)
-	if factory == nil {
+	format, _ := logRegistry.get(c.Format)
+	if format.factory == nil {
 		klog.ClearLogger()
 	} else {
-		log, flush := factory.Create(*c)
+		log, flush := format.factory.Create(*c)
 		klog.SetLoggerWithOptions(log, klog.ContextualLogger(contextualLoggingEnabled), klog.FlushLogger(flush))
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(VerbosityLevelPflag(&c.Verbosity).String()); err != nil {
@@ -151,7 +187,7 @@ func (c *LoggingConfiguration) AddFlags(fs *pflag.FlagSet) {
 	// hyphens, even if currently no normalization function is set for the
 	// flag set yet.
 	unsupportedFlags := strings.Join(unsupportedLoggingFlagNames(cliflag.WordSepNormalizeFunc), ", ")
-	formats := fmt.Sprintf(`"%s"`, strings.Join(logRegistry.list(), `", "`))
+	formats := logRegistry.list()
 	fs.StringVar(&c.Format, "logging-format", c.Format, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
 	// No new log formats should be added after generation is of flag options
 	logRegistry.freeze()
@@ -163,8 +199,8 @@ func (c *LoggingConfiguration) AddFlags(fs *pflag.FlagSet) {
 	// JSON options. We only register them if "json" is a valid format. The
 	// config file API however always has them.
 	if _, err := logRegistry.get("json"); err == nil {
-		fs.BoolVar(&c.Options.JSON.SplitStream, "log-json-split-stream", false, "[Experimental] In JSON format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout.")
-		fs.Var(&c.Options.JSON.InfoBufferSize, "log-json-info-buffer-size", "[Experimental] In JSON format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi).")
+		fs.BoolVar(&c.Options.JSON.SplitStream, "log-json-split-stream", false, "[Alpha] In JSON format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.")
+		fs.Var(&c.Options.JSON.InfoBufferSize, "log-json-info-buffer-size", "[Alpha] In JSON format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.")
 	}
 }
 
