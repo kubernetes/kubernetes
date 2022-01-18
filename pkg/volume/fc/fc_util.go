@@ -254,7 +254,15 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 		return "", err
 	}
 
-	return devicePath, nil
+	exists, err := mount.PathExists(devicePath)
+	if exists && err == nil {
+		return devicePath, nil
+	}
+	if exists == false {
+		return "", fmt.Errorf("device %s does not exist", devicePath)
+	} else {
+		return "", err
+	}
 }
 
 // DetachDisk removes scsi device file such as /dev/sdX from the node.
