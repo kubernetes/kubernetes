@@ -36,7 +36,7 @@ type ControllerMetrics struct {
 func NewControllerMetrics() *ControllerMetrics {
 	controllerInstanceCount := k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
-			Name:           "managed_controller_started",
+			Name:           "running_managed_controllers",
 			Help:           "Indicates where instances of a controller are currently running",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
