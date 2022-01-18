@@ -496,7 +496,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	normalizeStatus(pod, &status)
-
+	// Since kubectl prefers using container reason to supercede pod reason to display pod STATUS,
+	// so when pod was evicted, preempted or even terminated in response to imminent node shutdown,
+	// and pod phase is Failed, then we override container reason by pod reason unless unset.
+	// See issue #105467 for detail.
+	normalizeContainerResaon(pod, &status)
 	// Perform some more extensive logging of container termination state to assist in
 	// debugging production races (generally not needed).
 	if klogV := klog.V(5); klogV.Enabled() {
@@ -837,7 +841,6 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 // running containers have terminated. This method does not modify the old status.
 func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers bool) v1.PodStatus {
 	podConditions := make([]v1.PodCondition, 0, len(oldPodStatus.Conditions)+len(newPodStatus.Conditions))
-
 	for _, c := range oldPodStatus.Conditions {
 		if !kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
@@ -887,4 +890,33 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+func normalizeContainerResaon(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
+	// When pod was evicted, preempted, admitted failure or even terminated in response to imminent node shutdown,
+	// the pod became Failed, kubelet would set accurate reason for the pod.
+	// If the restart policy is Never and the pod becomes failed, kubelet would not set reason, that is not the case.
+	if status.Phase == v1.PodFailed && len(status.Reason) != 0 {
+		// update container reason
+		for i := range status.ContainerStatuses {
+			cstatus := &status.ContainerStatuses[i]
+			if cstatus.State.Terminated != nil {
+				cstatus.State.Terminated.Reason = status.Reason
+			} else if cstatus.State.Waiting != nil {
+				cstatus.State.Waiting.Reason = status.Reason
+			}
+		}
+
+		// update init container reason
+		for i := range status.InitContainerStatuses {
+			cstatus := &status.InitContainerStatuses[i]
+			if cstatus.State.Terminated != nil {
+				cstatus.State.Terminated.Reason = status.Reason
+			} else if cstatus.State.Waiting != nil {
+				cstatus.State.Waiting.Reason = status.Reason
+			}
+
+		}
+	}
+	return status
 }

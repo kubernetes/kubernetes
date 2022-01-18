@@ -986,6 +986,31 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 	}
 }
 
+func TestEvictedPodStatusReason(t *testing.T) {
+	syncer := newTestManager(&fake.Clientset{})
+	testPod := getTestPod()
+	t.Logf("update the pod's status to Failed.  TerminatePod should preserve this status update.")
+	firstStatus := getRandomPodStatus()
+	firstStatus.Phase = v1.PodFailed
+	firstStatus.Reason = "Evicted"
+	firstStatus.InitContainerStatuses = []v1.ContainerStatus{
+		{Name: "init-test-1", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 0}}},
+	}
+	firstStatus.ContainerStatuses = []v1.ContainerStatus{
+		{Name: "test-1", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Error", ExitCode: 2}}},
+	}
+	syncer.SetPodStatus(testPod, firstStatus)
+
+	t.Logf("we expect the container reason to be overridden by pod reason")
+	newStatus := expectPodStatus(t, syncer, testPod)
+	for i := range newStatus.ContainerStatuses {
+		assert.Equal(t, firstStatus.Reason, newStatus.ContainerStatuses[i].State.Terminated.Reason)
+	}
+	for i := range newStatus.InitContainerStatuses {
+		assert.Equal(t, firstStatus.Reason, newStatus.InitContainerStatuses[i].State.Terminated.Reason)
+	}
+}
+
 func TestSetContainerReadiness(t *testing.T) {
 	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
 	cID2 := kubecontainer.ContainerID{Type: "test", ID: "2"}
