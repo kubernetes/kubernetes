@@ -978,6 +978,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
 		for _, route := range routes {
+			addDeprecatedAnnotation(deprecated, route)
 			route.Metadata(ROUTE_META_GVK, metav1.GroupVersionKind{
 				Group:   reqScope.Kind.Group,
 				Version: reqScope.Kind.Version,
@@ -1012,6 +1013,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
 
 	return &apiResource, resourceInfo, nil
+}
+
+// addDeprecatedAnnotation sets the deprecated field to true in a route
+func addDeprecatedAnnotation(deprecated bool, route *restful.RouteBuilder) {
+	if deprecated {
+		route = route.Deprecate()
+	}
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer
