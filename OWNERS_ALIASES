@@ -424,7 +424,7 @@ aliases:
   # sig-cluster-lifecycle-api-reviewers:
   #   -
   #   -
-  sig-contribex-approvers:
+  sig-contributor-experience-approvers:
     - mrbobbytables
     - cblecker
     - nikhita
