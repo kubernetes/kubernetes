@@ -128,6 +128,9 @@ func blocklisted(t *types.Type, member types.Member) bool {
 	if objectMeta.Name == t.Name && member.Name == "ManagedFields" {
 		return true
 	}
+	if objectMeta.Name == t.Name && member.Name == "SelfLink" {
+		return true
+	}
 	return false
 }
 
