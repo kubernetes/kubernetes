@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,6 +45,8 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	utilpointer "k8s.io/utils/pointer"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const region = "us-central"
@@ -555,7 +558,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			controller, cloud, _ := newController()
 			controller.nodeLister = newFakeNodeLister(nil, nodes...)
 
-			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); servicesToRetry != nil {
+			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); len(servicesToRetry) != 0 {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
 			compareUpdateCalls(t, item.expectedUpdateCalls, cloud.UpdateCalls)
@@ -576,6 +579,11 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		newService("s4", "123", v1.ServiceTypeLoadBalancer),
 	}
 
+	serviceNames := sets.NewString()
+	for _, svc := range services {
+		serviceNames.Insert(fmt.Sprintf("%s/%s", svc.GetObjectMeta().GetNamespace(), svc.GetObjectMeta().GetName()))
+	}
+
 	controller, cloud, _ := newController()
 	for _, tc := range []struct {
 		desc                  string
@@ -583,7 +591,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		expectedUpdateCalls   []fakecloud.UpdateBalancerCall
 		worker                int
 		nodeListerErr         error
-		expectedRetryServices []*v1.Service
+		expectedRetryServices sets.String
 	}{
 		{
 			desc:  "only 1 node",
@@ -596,7 +604,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                3,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: sets.NewString(),
 		},
 		{
 			desc:  "2 nodes",
@@ -609,7 +617,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                1,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: sets.NewString(),
 		},
 		{
 			desc:  "4 nodes",
@@ -622,7 +630,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                3,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: sets.NewString(),
 		},
 		{
 			desc:                  "error occur during sync",
@@ -630,7 +638,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
 			worker:                3,
 			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: services,
+			expectedRetryServices: serviceNames,
 		},
 		{
 			desc:                  "error occur during sync with 1 workers",
@@ -638,7 +646,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
 			worker:                1,
 			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: services,
+			expectedRetryServices: serviceNames,
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -646,34 +654,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			defer cancel()
 			controller.nodeLister = newFakeNodeLister(tc.nodeListerErr, tc.nodes...)
 			servicesToRetry := controller.updateLoadBalancerHosts(ctx, services, tc.worker)
-			compareServiceList(t, tc.expectedRetryServices, servicesToRetry)
+			assert.Truef(t, tc.expectedRetryServices.Equal(servicesToRetry), "Services to retry are not expected")
 			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
 			cloud.UpdateCalls = []fakecloud.UpdateBalancerCall{}
 		})
-	}
-}
-
-// compareServiceList compares if both left and right inputs contains the same service list despite the order.
-func compareServiceList(t *testing.T, left, right []*v1.Service) {
-	if len(left) != len(right) {
-		t.Errorf("expect len(left) == len(right), but got %v != %v", len(left), len(right))
-	}
-
-	mismatch := false
-	for _, l := range left {
-		found := false
-		for _, r := range right {
-			if reflect.DeepEqual(l, r) {
-				found = true
-			}
-		}
-		if !found {
-			mismatch = true
-			break
-		}
-	}
-	if mismatch {
-		t.Errorf("expected service list to match, expected %+v, got %+v", left, right)
 	}
 }
 
