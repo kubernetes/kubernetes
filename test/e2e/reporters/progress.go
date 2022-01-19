@@ -25,10 +25,9 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/types"
+	"k8s.io/klog/v2"
 )
 
 // ProgressReporter is a ginkgo reporter which tracks the total number of tests to be run/passed/failed/skipped.
@@ -43,6 +42,10 @@ type ProgressReporter struct {
 	TestsFailed    int `json:"failed"`
 
 	Failures []string `json:"failures,omitempty"`
+
+	AppendTotals    bool     `json:"appendtotals,omitempty"`
+	AppendCompleted int64    `json:"appendcompleted,omitempty"`
+	AppendFailing   []string `json:"appendfailing,omitempty"`
 
 	progressURL string
 	client      *http.Client
@@ -66,6 +69,12 @@ func NewProgressReporter(progressReportURL string) *ProgressReporter {
 // antipate the number of tests which will be run.
 func (reporter *ProgressReporter) SpecSuiteWillBegin(cfg config.GinkgoConfigType, summary *types.SuiteSummary) {
 	reporter.TestsTotal = summary.NumberOfSpecsThatWillBeRun
+	if summary.NumberOfSpecsThatWillBeRun <0 {
+		// This situation is when running in parallel and each ginkgo node doesn't know
+		// the total number of tests to run. Just set the reporter into the "append" mode.
+		reporter.TestsTotal=0
+		reporter.AppendTotals=true
+	}
 	reporter.LastMsg = "Test Suite starting"
 	reporter.sendUpdates()
 }
@@ -83,16 +92,20 @@ func (reporter *ProgressReporter) SpecDidComplete(specSummary *types.SpecSummary
 	case types.SpecStateFailed:
 		if len(specSummary.ComponentTexts) > 0 {
 			reporter.Failures = append(reporter.Failures, testname)
+			reporter.AppendFailing=[]string{testname}
 		} else {
 			reporter.Failures = append(reporter.Failures, "Unknown test name")
+			reporter.AppendFailing=[]string{"unknown test name"}
 		}
 		reporter.TestsFailed++
 		reporter.LastMsg = fmt.Sprintf("FAILED %v", testname)
 	case types.SpecStatePassed:
 		reporter.TestsCompleted++
+		reporter.AppendCompleted=1
 		reporter.LastMsg = fmt.Sprintf("PASSED %v", testname)
 	case types.SpecStateSkipped:
 		reporter.TestsSkipped++
+		reporter.AppendCompleted=1
 		return
 	default:
 		return
