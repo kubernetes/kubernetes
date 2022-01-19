@@ -59,6 +59,7 @@ aliases:
     - wojtek-t
   sig-auth-encryption-at-rest-approvers:
     - smarterclayton
+    - enj
   sig-auth-encryption-at-rest-reviewers:
     - enj
     - lavalamp
