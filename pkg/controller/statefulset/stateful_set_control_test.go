@@ -53,7 +53,7 @@ import (
 
 type invariantFunc func(set *apps.StatefulSet, om *fakeObjectManager) error
 
-func setupController(client clientset.Interface) (*fakeObjectManager, *fakeStatefulSetStatusUpdater, StatefulSetControlInterface, chan struct{}) {
+func setupController(client clientset.Interface) (*fakeObjectManager, *fakeStatefulSetStatusUpdater, StatefulSetControlInterface) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	om := newFakeObjectManager(informerFactory)
 	spc := NewStatefulPodControlFromManager(om, &noopRecorder{})
@@ -61,15 +61,25 @@ func setupController(client clientset.Interface) (*fakeObjectManager, *fakeState
 	recorder := &noopRecorder{}
 	ssc := NewDefaultStatefulSetControl(spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
 
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
-	cache.WaitForCacheSync(
-		stop,
-		informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
-		informerFactory.Core().V1().Pods().Informer().HasSynced,
-		informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
-	)
-	return om, ssu, ssc, stop
+	// The informer is not started. The tests here manipulate the local cache (indexers) directly, and there is no waiting
+	// for client state to sync. In fact, because the client is not updated during tests, informer updates will break tests
+	// by unexpectedly deleting objects.
+	//
+	// TODO: It might be better to rewrite all these tests manipulate the client an explicitly sync to ensure consistent
+	// state, or to create a fake client that does not use a local cache.
+
+	// The client is passed initial sets, so we have to put them in the local setsIndexer cache.
+	if sets, err := client.AppsV1().StatefulSets("").List(context.TODO(), metav1.ListOptions{}); err != nil {
+		panic(err)
+	} else {
+		for _, set := range sets.Items {
+			if err := om.setsIndexer.Update(&set); err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	return om, ssu, ssc
 }
 
 func burst(set *apps.StatefulSet) *apps.StatefulSet {
@@ -189,8 +199,7 @@ func TestStatefulSetControl(t *testing.T) {
 
 func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
@@ -213,8 +222,7 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 
 func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
@@ -241,8 +249,7 @@ func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 
 func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
@@ -275,8 +282,7 @@ func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 
 func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
@@ -359,8 +365,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 
 func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset()
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
@@ -398,8 +403,7 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 
 func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 	om.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil && isOrHasInternalError(err) {
@@ -431,8 +435,7 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 
 func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 	om.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
 
 	// have to have 1 successful loop first
@@ -474,8 +477,7 @@ func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 
 func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, ssu, ssc, stop := setupController(client)
-	defer close(stop)
+	om, ssu, ssc := setupController(client)
 	ssu.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil && isOrHasInternalError(err) {
@@ -507,8 +509,7 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 
 func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, _, ssc, stop := setupController(client)
-	defer close(stop)
+	om, _, ssc := setupController(client)
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -559,8 +560,7 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 			set.Spec.PersistentVolumeClaimRetentionPolicy = policy
 			invariants := assertMonotonicInvariants
 			client := fake.NewSimpleClientset(set)
-			om, _, ssc, stop := setupController(client)
-			defer close(stop)
+			om, _, ssc := setupController(client)
 
 			if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 				t.Errorf("Failed to turn up StatefulSet : %s", err)
@@ -740,8 +740,7 @@ func TestStatefulSetControlRollingUpdate(t *testing.T) {
 	testFn := func(test *testcase, t *testing.T) {
 		set := test.initial()
 		client := fake.NewSimpleClientset(set)
-		om, _, ssc, stop := setupController(client)
-		defer close(stop)
+		om, _, ssc := setupController(client)
 		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -918,8 +917,7 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 		set.Spec.PersistentVolumeClaimRetentionPolicy = policy
 		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType}
 		client := fake.NewSimpleClientset(set)
-		om, _, ssc, stop := setupController(client)
-		defer close(stop)
+		om, _, ssc := setupController(client)
 		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1229,8 +1227,7 @@ func TestStatefulSetControlRollingUpdateWithPartition(t *testing.T) {
 			}(),
 		}
 		client := fake.NewSimpleClientset(set)
-		om, _, ssc, stop := setupController(client)
-		defer close(stop)
+		om, _, ssc := setupController(client)
 		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1374,8 +1371,7 @@ func TestStatefulSetHonorRevisionHistoryLimit(t *testing.T) {
 		set := newStatefulSet(3)
 		set.Spec.PersistentVolumeClaimRetentionPolicy = policy
 		client := fake.NewSimpleClientset(set)
-		om, ssu, ssc, stop := setupController(client)
-		defer close(stop)
+		om, ssu, ssc := setupController(client)
 
 		if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
 			t.Errorf("Failed to turn up StatefulSet : %s", err)
@@ -1417,8 +1413,7 @@ func TestStatefulSetControlLimitsHistory(t *testing.T) {
 	testFn := func(t *testing.T, test *testcase) {
 		set := test.initial()
 		client := fake.NewSimpleClientset(set)
-		om, _, ssc, stop := setupController(client)
-		defer close(stop)
+		om, _, ssc := setupController(client)
 		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1493,8 +1488,7 @@ func TestStatefulSetControlRollback(t *testing.T) {
 	testFn := func(t *testing.T, test *testcase) {
 		set := test.initial()
 		client := fake.NewSimpleClientset(set)
-		om, _, ssc, stop := setupController(client)
-		defer close(stop)
+		om, _, ssc := setupController(client)
 		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1769,8 +1763,7 @@ func TestStatefulSetAvailability(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.minReadySecondsFeaturegateEnabled)()
 		set := test.inputSTS
 		client := fake.NewSimpleClientset(set)
-		spc, _, ssc, stop := setupController(client)
-		defer close(stop)
+		spc, _, ssc := setupController(client)
 		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
