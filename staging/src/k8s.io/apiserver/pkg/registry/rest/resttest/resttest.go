@@ -1453,13 +1453,12 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	}
 	m.SetContinue("continuetoken")
 	m.SetResourceVersion("11")
-	m.SetSelfLink("/list/link")
 
 	table, err := t.storage.(rest.TableConvertor).ConvertToTable(ctx, listObj, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if table.ResourceVersion != "11" || table.SelfLink != "/list/link" || table.Continue != "continuetoken" {
+	if table.ResourceVersion != "11" || table.Continue != "continuetoken" {
 		t.Errorf("printer lost list meta: %#v", table.ListMeta)
 	}
 	if len(table.Rows) != len(items) {

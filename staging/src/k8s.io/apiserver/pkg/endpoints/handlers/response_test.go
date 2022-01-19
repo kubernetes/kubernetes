@@ -171,7 +171,6 @@ func TestAsPartialObjectMetadataList(t *testing.T) {
 	var remainingItemCount int64 = 10
 	pods := &examplev1.PodList{
 		ListMeta: metav1.ListMeta{
-			SelfLink:           "/test/link",
 			ResourceVersion:    "10",
 			Continue:           "continuetoken",
 			RemainingItemCount: &remainingItemCount,
