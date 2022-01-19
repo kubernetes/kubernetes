@@ -3,6 +3,9 @@
 package libcontainer
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
 )
@@ -54,6 +57,12 @@ type Bytemsg struct {
 
 func (msg *Bytemsg) Serialize() []byte {
 	l := msg.Len()
+	if l > math.MaxUint16 {
+		// We cannot return nil nor an error here, so we panic with
+		// a specific type instead, which is handled via recover in
+		// bootstrapData.
+		panic(netlinkError{fmt.Errorf("netlink: cannot serialize bytemsg of length %d (larger than UINT16_MAX)", l)})
+	}
 	buf := make([]byte, (l+unix.NLA_ALIGNTO-1) & ^(unix.NLA_ALIGNTO-1))
 	native := nl.NativeEndian()
 	native.PutUint16(buf[0:2], uint16(l))
