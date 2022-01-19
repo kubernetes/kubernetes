@@ -3,8 +3,10 @@
 approvers:
   - serathius
   - sig-instrumentation-approvers
+  - yangjunmyfm192085
 reviewers:
   - sig-instrumentation-reviewers
+  - yangjunmyfm192085
 labels:
   - sig/instrumentation
 emeritus_approvers:
