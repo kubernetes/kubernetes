@@ -105,3 +105,9 @@ func convertToExternalPluginConfigArgs(out *v1beta2.KubeSchedulerConfiguration) 
 	}
 	return nil
 }
+
+// Convert_config_KubeSchedulerProfile_To_v1beta2_KubeSchedulerProfile is defined here, because public
+// conversion is not auto-generated due to existing warnings.
+func Convert_config_KubeSchedulerProfile_To_v1beta2_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta2.KubeSchedulerProfile, s conversion.Scope) error {
+	return autoConvert_config_KubeSchedulerProfile_To_v1beta2_KubeSchedulerProfile(in, out, s)
+}

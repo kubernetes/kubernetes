@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	componentbaseconfig "k8s.io/component-base/config"
 )
@@ -75,6 +76,7 @@ type KubeSchedulerConfiguration struct {
 	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
 	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
 	// nodes will be scored.
+	// Note: This field will be overridden by the profile-level NumOfNodesToScore when set.
 	PercentageOfNodesToScore int32
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
@@ -104,6 +106,26 @@ type KubeSchedulerProfile struct {
 	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
 	// is scheduled with this profile.
 	SchedulerName string
+
+	// NumOfNodesToScore is the number of nodes that once found feasible
+	// for running a pod, the scheduler stops its search for more feasible nodes in
+	// the cluster. This helps improve scheduler's performance. Value can be a positive
+	// number (ex: 5) or a non-decimal percentage of desired nodes in range [0% - 100%] (ex: 10%).
+	// When the value is a percentage, scheduler always tries to find at least
+	// "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// Examples:
+	//   - if the cluster size is 500 nodes and the value of this flag is 30,
+	//     then scheduler stops finding further feasible nodes once it finds 30 feasible ones.
+	//   - if the cluster size is 500 nodes and the value of this flag is 30%,
+	//     then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	//   - if the cluster size is 500 nodes and the value of this flag is 1%,
+	//     then scheduler stops finding further feasible nodes once it finds 100 feasible ones.
+	// When the value is 0%, default percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored.
+	// When the field is unset, the PercentageOfNodesToScore in the top-level
+	// KubeSchedulerConfiguration will be used.
+	// Note: This field will override the top-level PercentageOfNodesToScore when set.
+	NumOfNodesToScore *intstr.IntOrString
 
 	// Plugins specify the set of plugins that should be enabled or disabled.
 	// Enabled plugins are the ones that should be enabled in addition to the

@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	v1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1beta3 "k8s.io/kube-scheduler/config/v1beta3"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -475,6 +476,7 @@ func autoConvert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in 
 	if err := v1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
+	out.NumOfNodesToScore = (*intstr.IntOrString)(unsafe.Pointer(in.NumOfNodesToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(config.Plugins)
@@ -507,6 +509,7 @@ func autoConvert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(in 
 	if err := v1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
+	out.NumOfNodesToScore = (*intstr.IntOrString)(unsafe.Pointer(in.NumOfNodesToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(v1beta3.Plugins)

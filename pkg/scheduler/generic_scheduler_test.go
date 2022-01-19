@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -1359,6 +1360,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 	tests := []struct {
 		name                     string
 		percentageOfNodesToScore int32
+		numOfNodesToScoreStr     string
 		numAllNodes              int32
 		wantNumNodes             int32
 	}{
@@ -1395,13 +1397,60 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			numAllNodes:              6000,
 			wantNumNodes:             2400,
 		},
+		{
+			name:                     "set numOfNodesToScore 100% and nodes number more than minFeasibleNodesToFind",
+			percentageOfNodesToScore: 40,
+			numOfNodesToScoreStr:     "100%",
+			numAllNodes:              6000,
+			wantNumNodes:             6000,
+		},
+		{
+			name:                     "set numOfNodesToScore 0% and use default percentage",
+			percentageOfNodesToScore: 40,
+			numOfNodesToScoreStr:     "0%",
+			numAllNodes:              6000,
+			wantNumNodes:             300,
+		},
+		{
+			name:                     "set numOfNodesToScore as percent and the result is less than minFeasibleNodesToFind",
+			percentageOfNodesToScore: 40,
+			numOfNodesToScoreStr:     "1%",
+			numAllNodes:              6000,
+			wantNumNodes:             100,
+		},
+		{
+			name:                     "set numOfNodesToScore as percent and the result is more than minFeasibleNodesToFind",
+			percentageOfNodesToScore: 40,
+			numOfNodesToScoreStr:     "75%",
+			numAllNodes:              6000,
+			wantNumNodes:             4500,
+		},
+		{
+			name:                     "set numOfNodesToScore as int and less than nodes number",
+			percentageOfNodesToScore: 40,
+			numOfNodesToScoreStr:     "200",
+			numAllNodes:              6000,
+			wantNumNodes:             200,
+		},
+		{
+			name:                     "set numOfNodesToScore as int and more than nodes number",
+			percentageOfNodesToScore: 40,
+			numOfNodesToScoreStr:     "20000",
+			numAllNodes:              6000,
+			wantNumNodes:             6000,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &genericScheduler{
 				percentageOfNodesToScore: tt.percentageOfNodesToScore,
 			}
-			if gotNumNodes := g.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+			var numOfNodesToScore *intstr.IntOrString
+			if len(tt.numOfNodesToScoreStr) > 0 {
+				numOfNodesToScoreVal := intstr.Parse(tt.numOfNodesToScoreStr)
+				numOfNodesToScore = &numOfNodesToScoreVal
+			}
+			if gotNumNodes := g.numFeasibleNodesToFind(tt.numAllNodes, numOfNodesToScore); gotNumNodes != tt.wantNumNodes {
 				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
@@ -1431,7 +1480,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// To make numAllNodes % nodesToFind != 0
 	g.percentageOfNodesToScore = 30
-	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
+	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes), nil))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {

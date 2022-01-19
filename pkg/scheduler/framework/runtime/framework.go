@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -92,8 +93,9 @@ type frameworkImpl struct {
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
 
-	metricsRecorder *metricsRecorder
-	profileName     string
+	metricsRecorder   *metricsRecorder
+	profileName       string
+	numOfNodesToScore *intstr.IntOrString
 
 	extenders []framework.Extender
 	framework.PodNominator
@@ -285,6 +287,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	}
 
 	f.profileName = profile.SchedulerName
+	f.numOfNodesToScore = profile.NumOfNodesToScore
 	if profile.Plugins == nil {
 		return f, nil
 	}
@@ -1288,6 +1291,10 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.String {
 // ProfileName returns the profile name associated to this framework.
 func (f *frameworkImpl) ProfileName() string {
 	return f.profileName
+}
+
+func (f *frameworkImpl) NumOfNodesToScore() *intstr.IntOrString {
+	return f.numOfNodesToScore
 }
 
 // Parallelizer returns a parallelizer holding parallelism for scheduler.

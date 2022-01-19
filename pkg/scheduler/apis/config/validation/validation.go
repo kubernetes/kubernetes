@@ -27,10 +27,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	componentbasevalidation "k8s.io/component-base/config/validation"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
@@ -167,8 +169,43 @@ func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *
 	if len(profile.SchedulerName) == 0 {
 		errs = append(errs, field.Required(path.Child("schedulerName"), ""))
 	}
+
+	if profile.NumOfNodesToScore != nil {
+		errs = append(errs, ValidatePositiveIntOrNotMoreThan100Percent(*profile.NumOfNodesToScore, path.Child("numOfNodesToScore"))...)
+	}
+
 	errs = append(errs, validatePluginConfig(path, apiVersion, profile)...)
+
 	return errs
+}
+
+// ValidatePositiveIntOrNotMoreThan100Percent tests if a given value is a positive int or
+// percentage in range [0-100].
+func ValidatePositiveIntOrNotMoreThan100Percent(intOrPercent intstr.IntOrString, fldPath *field.Path) []error {
+	var allErrs []error
+	switch intOrPercent.Type {
+	case intstr.String:
+		for _, msg := range validation.IsValidPercent(intOrPercent.StrVal) {
+			allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, msg))
+		}
+		for _, err := range appsvalidation.IsNotMoreThan100Percent(intOrPercent, fldPath) {
+			allErrs = append(allErrs, err)
+		}
+	case intstr.Int:
+		allErrs = append(allErrs, ValidatePositiveField(int64(intOrPercent.IntValue()), fldPath)...)
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, intOrPercent, "must be an integer or percentage (e.g '5%%')"))
+	}
+	return allErrs
+}
+
+// Validates that given value is positive.
+func ValidatePositiveField(value int64, fldPath *field.Path) []error {
+	var allErrs []error
+	if value <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, `must be greater than zero`))
+	}
+	return allErrs
 }
 
 func validatePluginConfig(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {

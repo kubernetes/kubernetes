@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -558,6 +559,9 @@ type Framework interface {
 
 	// ProfileName returns the profile name associated to this framework.
 	ProfileName() string
+
+	// NumOfNodesToScore returns the NumOfNodesToScore associated to this framework.
+	NumOfNodesToScore() *intstr.IntOrString
 }
 
 // Handle provides data and some tools that plugins can use. It is

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
@@ -302,6 +303,13 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	}
 }
 
+// setNumOfNodesToScore sets the NumOfNodesToScore of the specified Profile in the KubeSchedulerConfiguration
+func setNumOfNodesToScore(config *config.KubeSchedulerConfiguration, idx int, val string) *config.KubeSchedulerConfiguration {
+	value := intstr.Parse(val)
+	config.Profiles[idx].NumOfNodesToScore = &value
+	return config
+}
+
 func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
@@ -555,6 +563,46 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		"good-removed-plugins-2": {
 			expectedToFail: false,
 			config:         goodRemovedPlugins2,
+		},
+		"invalid-num-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "invalid"),
+		},
+		"negative-percent-num-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "-10%"),
+		},
+		"zero-percent-num-of-nodes-to-score": {
+			expectedToFail: false,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "0%"),
+		},
+		"normal-percent-num-of-nodes-to-score": {
+			expectedToFail: false,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "30%"),
+		},
+		"decimal-percent-num-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "33.33%"),
+		},
+		"100-percent-num-of-nodes-to-score": {
+			expectedToFail: false,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "100%"),
+		},
+		"150-percent-num-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "150%"),
+		},
+		"negative-int-num-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "-10"),
+		},
+		"zero-int-num-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "0"),
+		},
+		"normal-int-num-of-nodes-to-score": {
+			expectedToFail: false,
+			config:         setNumOfNodesToScore(validConfig.DeepCopy(), 0, "50"),
 		},
 	}
 

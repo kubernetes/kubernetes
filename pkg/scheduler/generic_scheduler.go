@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -166,12 +168,30 @@ func (g *genericScheduler) selectHost(nodeScoreList framework.NodeScoreList) (st
 
 // numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
 // its search for more feasible nodes.
-func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes int32) {
-	if numAllNodes < minFeasibleNodesToFind || g.percentageOfNodesToScore >= 100 {
+func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32, numOfNodesToScore *intstr.IntOrString) (numNodes int32) {
+	// percentageOfNodesToScore will be overridden by the numOfNodesToScore when set
+	if numOfNodesToScore != nil && numOfNodesToScore.Type == intstr.Int {
+		// After validation, numOfNodesToScore is positive int value
+		numNodesToFind := numOfNodesToScore.IntVal
+		if numAllNodes < numNodesToFind {
+			return numAllNodes
+		}
+		return numNodesToFind
+	}
+
+	if numAllNodes < minFeasibleNodesToFind {
 		return numAllNodes
 	}
 
 	adaptivePercentage := g.percentageOfNodesToScore
+	if numOfNodesToScore != nil && numOfNodesToScore.Type == intstr.String {
+		// Error caught by validation. After validation, numOfNodesToScore is in range [0-100]
+		val, _ := strconv.Atoi(numOfNodesToScore.StrVal[:len(numOfNodesToScore.StrVal)-1])
+		adaptivePercentage = int32(val)
+	}
+	if adaptivePercentage >= 100 {
+		return numAllNodes
+	}
 	if adaptivePercentage <= 0 {
 		basePercentageOfNodesToScore := int32(50)
 		adaptivePercentage = basePercentageOfNodesToScore - numAllNodes/125
@@ -268,7 +288,7 @@ func (g *genericScheduler) findNodesThatPassFilters(
 	pod *v1.Pod,
 	diagnosis framework.Diagnosis,
 	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
-	numNodesToFind := g.numFeasibleNodesToFind(int32(len(nodes)))
+	numNodesToFind := g.numFeasibleNodesToFind(int32(len(nodes)), fwk.NumOfNodesToScore())
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
