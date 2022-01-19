@@ -427,7 +427,8 @@ func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 }
 
 // waitLogs wait for the next log write. It returns two booleans and an error. The first boolean
-// indicates whether a new log is found; the second boolean if the log file was recreated;
+// indicates whether a new log is found(not new log line found, just when container not running or
+// error found i.e, it should be return a false); The second boolean if the log file was recreated;
 // the error is error happens during waiting new logs.
 func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	// no need to wait if the pod is not running
@@ -443,13 +444,18 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 			switch e.Op {
 			case fsnotify.Write:
 				return true, false, nil
+			// when use 'kubectl logs -f', exceptional constant reporting of chmod events on arm
+			// could cause the pod log to loop indefinitely. this could be a kernel bug or a fsnotify bug.
+			// but for chmod, the first boolean should be return a true, refer to:
+			// https://github.com/kubernetes/kubernetes/issues/103500
+			// https://github.com/fsnotify/fsnotify/issues/421
+			case fsnotify.Chmod:
+				return true, false, nil
 			case fsnotify.Create:
 				fallthrough
 			case fsnotify.Rename:
 				fallthrough
 			case fsnotify.Remove:
-				fallthrough
-			case fsnotify.Chmod:
 				return true, true, nil
 			default:
 				klog.ErrorS(nil, "Received unexpected fsnotify event, retrying", "event", e)
