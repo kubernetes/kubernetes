@@ -638,7 +638,7 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 					},
 					"gracePeriodSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+							Description: "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

@@ -6726,7 +6726,7 @@
             "type": "array"
           },
           "gracePeriodSeconds": {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "format": "int64",
             "type": "integer"
           },
@@ -8812,7 +8812,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedConfigMap",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -9203,7 +9203,7 @@
         "operationId": "deleteCoreV1NamespacedConfigMap",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -9544,7 +9544,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedEndpoints",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -9935,7 +9935,7 @@
         "operationId": "deleteCoreV1NamespacedEndpoints",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -10276,7 +10276,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedEvent",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -10667,7 +10667,7 @@
         "operationId": "deleteCoreV1NamespacedEvent",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -11008,7 +11008,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedLimitRange",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -11399,7 +11399,7 @@
         "operationId": "deleteCoreV1NamespacedLimitRange",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -11740,7 +11740,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedPersistentVolumeClaim",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -12131,7 +12131,7 @@
         "operationId": "deleteCoreV1NamespacedPersistentVolumeClaim",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -12717,7 +12717,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedPod",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -13108,7 +13108,7 @@
         "operationId": "deleteCoreV1NamespacedPod",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -14990,7 +14990,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedPodTemplate",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -15381,7 +15381,7 @@
         "operationId": "deleteCoreV1NamespacedPodTemplate",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -15722,7 +15722,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedReplicationController",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -16113,7 +16113,7 @@
         "operationId": "deleteCoreV1NamespacedReplicationController",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -16944,7 +16944,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedResourceQuota",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -17335,7 +17335,7 @@
         "operationId": "deleteCoreV1NamespacedResourceQuota",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -17921,7 +17921,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedSecret",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -18312,7 +18312,7 @@
         "operationId": "deleteCoreV1NamespacedSecret",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -18653,7 +18653,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedServiceAccount",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -19044,7 +19044,7 @@
         "operationId": "deleteCoreV1NamespacedServiceAccount",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -19523,7 +19523,7 @@
         "operationId": "deleteCoreV1CollectionNamespacedService",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -19914,7 +19914,7 @@
         "operationId": "deleteCoreV1NamespacedService",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -20842,7 +20842,7 @@
         "operationId": "deleteCoreV1Namespace",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -21516,7 +21516,7 @@
         "operationId": "deleteCoreV1CollectionNode",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -21897,7 +21897,7 @@
         "operationId": "deleteCoreV1Node",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -22918,7 +22918,7 @@
         "operationId": "deleteCoreV1CollectionPersistentVolume",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
@@ -23299,7 +23299,7 @@
         "operationId": "deleteCoreV1PersistentVolume",
         "parameters": [
           {
-            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+            "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used.",
             "in": "query",
             "name": "gracePeriodSeconds",
             "schema": {
