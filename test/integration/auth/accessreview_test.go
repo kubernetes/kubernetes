@@ -49,7 +49,9 @@ func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (au
 func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name: "alice",
+			Name:   "alice",
+			UID:    "alice",
+			Groups: []string{user.AllAuthenticated},
 		},
 	}, true, nil
 }
@@ -149,7 +151,11 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{
-			User: &user.DefaultInfo{Name: username},
+			User: &user.DefaultInfo{
+				Name:   username,
+				UID:    username,
+				Groups: []string{user.AllAuthenticated},
+			},
 		}, true, nil
 	})
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
