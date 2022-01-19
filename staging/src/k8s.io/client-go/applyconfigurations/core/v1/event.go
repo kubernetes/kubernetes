@@ -138,15 +138,6 @@ func (b *EventApplyConfiguration) WithNamespace(value string) *EventApplyConfigu
 	return b
 }
 
-// WithSelfLink sets the SelfLink field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SelfLink field is set to the value of the last call.
-func (b *EventApplyConfiguration) WithSelfLink(value string) *EventApplyConfiguration {
-	b.ensureObjectMetaApplyConfigurationExists()
-	b.SelfLink = &value
-	return b
-}
-
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UID field is set to the value of the last call.
