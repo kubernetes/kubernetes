@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -548,7 +549,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			controller, cloud, _ := newController()
 			controller.nodeLister = newFakeNodeLister(nil, nodes...)
 
-			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); servicesToRetry != nil {
+			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); len(servicesToRetry) != 0 {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
 			compareUpdateCalls(t, item.expectedUpdateCalls, cloud.UpdateCalls)
@@ -569,6 +570,11 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		newService("s4", "123", v1.ServiceTypeLoadBalancer),
 	}
 
+	var serviceNames []string
+	for _, svc := range services {
+		serviceNames = append(serviceNames, fmt.Sprintf("%s/%s", svc.GetObjectMeta().GetNamespace(), svc.GetObjectMeta().GetName()))
+	}
+
 	controller, cloud, _ := newController()
 	for _, tc := range []struct {
 		desc                  string
@@ -576,7 +582,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		expectedUpdateCalls   []fakecloud.UpdateBalancerCall
 		worker                int
 		nodeListerErr         error
-		expectedRetryServices []*v1.Service
+		expectedRetryServices []string
 	}{
 		{
 			desc:  "only 1 node",
@@ -589,7 +595,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                3,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: []string{},
 		},
 		{
 			desc:  "2 nodes",
@@ -602,7 +608,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                1,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: []string{},
 		},
 		{
 			desc:  "4 nodes",
@@ -615,7 +621,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                3,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: []string{},
 		},
 		{
 			desc:                  "error occur during sync",
@@ -623,7 +629,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
 			worker:                3,
 			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: services,
+			expectedRetryServices: serviceNames,
 		},
 		{
 			desc:                  "error occur during sync with 1 workers",
@@ -631,42 +637,75 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
 			worker:                1,
 			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: services,
+			expectedRetryServices: serviceNames,
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			controller.nodeLister = newFakeNodeLister(tc.nodeListerErr, tc.nodes...)
-			servicesToRetry := controller.updateLoadBalancerHosts(ctx, services, tc.worker)
-			compareServiceList(t, tc.expectedRetryServices, servicesToRetry)
+			var servicesToRetry []string
+			for key := range controller.updateLoadBalancerHosts(ctx, services, tc.worker) {
+				servicesToRetry = append(servicesToRetry, key)
+			}
+			compareServiceNameList(t, tc.expectedRetryServices, servicesToRetry)
 			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
 			cloud.UpdateCalls = []fakecloud.UpdateBalancerCall{}
 		})
 	}
 }
 
-// compareServiceList compares if both left and right inputs contains the same service list despite the order.
-func compareServiceList(t *testing.T, left, right []*v1.Service) {
+// TestServiceUpdateWithLatestSpec tests if Services are updated with stale specs or the latest ones.
+// service0 has ServicePort: 80 at the beginning and controller.getServicesToUpdate returns a Service
+// with Port 80. Then the Service cache is updated to ServicePort: 8080. This time, controller.getServicesToUpdate
+// returns a Service with Port 8080.
+func TestServiceUpdateWithLatestSpec(t *testing.T) {
+	controller, _, _ := newController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	node0 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	controller.nodeLister = newFakeNodeLister(nil, node0)
+
+	service0 := newService("s0", "000", v1.ServiceTypeLoadBalancer)
+	service0.Spec.Ports = []v1.ServicePort{{Port: 80}}
+	serviceKey0 := fmt.Sprintf("%s/%s", service0.GetObjectMeta().GetNamespace(), service0.GetObjectMeta().GetName())
+	cachedSvc := controller.cache.getOrCreate(serviceKey0)
+	cachedSvc.state = service0
+	controller.cache.set(serviceKey0, cachedSvc)
+	controller.needFullSync = false
+	controller.servicesToUpdate = sets.NewString(serviceKey0)
+
+	servicesToUpdate, _ := controller.getServicesToUpdate(ctx, 1)
+	if len(servicesToUpdate) != 1 || !reflect.DeepEqual(service0, servicesToUpdate[0]) {
+		t.Fatalf("servicesToUpdate is not as expected, expected: %s, actual: %v", service0, servicesToUpdate)
+	}
+
+	// This time, Service spec is updated so controller.getServicesToUpdate should return Service with new spec.
+	service0 = newService("s0", "000", v1.ServiceTypeLoadBalancer)
+	service0.Spec.Ports = []v1.ServicePort{{Port: 8080}}
+	controller.cache.set(serviceKey0, &cachedService{service0})
+
+	servicesToUpdate, _ = controller.getServicesToUpdate(ctx, 1)
+	if len(servicesToUpdate) != 1 || !reflect.DeepEqual(service0, servicesToUpdate[0]) {
+		t.Fatalf("servicesToUpdate is not as expected, expected: %s, actual: %v", service0, servicesToUpdate)
+	}
+}
+
+// compareServiceNameList compares if both left and right inputs contains the same Service name list despite the order.
+func compareServiceNameList(t *testing.T, left, right []string) {
 	if len(left) != len(right) {
 		t.Errorf("expect len(left) == len(right), but got %v != %v", len(left), len(right))
 	}
-
-	mismatch := false
-	for _, l := range left {
-		found := false
-		for _, r := range right {
-			if reflect.DeepEqual(l, r) {
-				found = true
-			}
-		}
-		if !found {
-			mismatch = true
-			break
-		}
+	if len(left) == 0 {
+		return
 	}
-	if mismatch {
-		t.Errorf("expected service list to match, expected %+v, got %+v", left, right)
+
+	sort.Strings(left)
+	sort.Strings(right)
+
+	if !reflect.DeepEqual(left, right) {
+		t.Errorf("expected service name list to match, expected %v, got %v", left, right)
 	}
 }
 
