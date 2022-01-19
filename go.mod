@@ -186,7 +186,7 @@ replace (
 	github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
 	github.com/certifi/gocertifi => github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054
 	github.com/cespare/xxhash => github.com/cespare/xxhash v1.1.0
-	github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
+	github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.2
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu/v5 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
 	github.com/chzyer/logex => github.com/chzyer/logex v1.1.10

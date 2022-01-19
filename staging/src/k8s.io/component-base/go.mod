@@ -6,6 +6,7 @@ go 1.16
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/go-logr/logr v1.2.0
 	github.com/go-logr/zapr v1.2.0
 	github.com/google/go-cmp v0.5.5
