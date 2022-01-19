@@ -18,7 +18,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 	"github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg"
 
