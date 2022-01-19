@@ -197,7 +197,6 @@ func FindMatchingVolume(
 	if claim.Spec.Selector != nil {
 		internalSelector, err := metav1.LabelSelectorAsSelector(claim.Spec.Selector)
 		if err != nil {
-			// should be unreachable code due to validation
 			return nil, fmt.Errorf("error creating internal label selector for claim: %v: %v", claimToClaimKey(claim), err)
 		}
 		selector = internalSelector
