@@ -478,6 +478,12 @@ const (
 	// Disables Accelerator Metrics Collected by Kubelet
 	DisableAcceleratorUsageMetrics featuregate.Feature = "DisableAcceleratorUsageMetrics"
 
+	// owner: @pacoxu
+	// alpha: v1.24
+	//
+	// Disables Cadvisor Process Metrics Collected by Kubelet
+	DisableCadvisorProcessMetrics featuregate.Feature = "DisableCadvisorProcessMetrics"
+
 	// owner: @arjunrn @mwielgus @josephburnett
 	// alpha: v1.20
 	//
@@ -910,6 +916,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinOverlay:                                     {Default: true, PreRelease: featuregate.Beta},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
 	DisableAcceleratorUsageMetrics:                 {Default: true, PreRelease: featuregate.Beta},
+	DisableCadvisorProcessMetrics:                  {Default: false, PreRelease: featuregate.Alpha},
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	SizeMemoryBackedVolumes:                        {Default: true, PreRelease: featuregate.Beta},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update

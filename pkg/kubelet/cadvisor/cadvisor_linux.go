@@ -90,13 +90,17 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		cadvisormetrics.DiskIOMetrics:       struct{}{},
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:          struct{}{},
-		cadvisormetrics.ProcessMetrics:      struct{}{},
 		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
-
 	// Only add the Accelerator metrics if the feature is inactive
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableAcceleratorUsageMetrics) {
 		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
+	}
+
+	// Only add the process metrics if the feature is inactive
+	// ProcessMetrics may cause performance issues on some scenarios
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCadvisorProcessMetrics) {
+		includedMetrics[cadvisormetrics.ProcessMetrics] = struct{}{}
 	}
 
 	if usingLegacyStats || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
