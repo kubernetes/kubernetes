@@ -44,20 +44,20 @@ func fromV1alpha2ContainerStatus(from *v1alpha2.ContainerStatus) *runtimeapi.Con
 }
 
 func fromV1alpha2ExecResponse(from *v1alpha2.ExecResponse) *runtimeapi.ExecResponse {
-	// If this function changes, also adapt the corresponding Exec dockershim code in
-	// pkg/kubelet/dockershim/docker_streaming.go
+	// If this function changes, also adapt the corresponding Exec code in
+	// pkg/kubelet/cri/remote/remote_runtime.go
 	return (*runtimeapi.ExecResponse)(unsafe.Pointer(from))
 }
 
 func fromV1alpha2AttachResponse(from *v1alpha2.AttachResponse) *runtimeapi.AttachResponse {
-	// If this function changes, also adapt the corresponding Attach dockershim code in
-	// pkg/kubelet/dockershim/docker_streaming.go
+	// If this function changes, also adapt the corresponding Attach code in
+	// pkg/kubelet/cri/remote/remote_runtime.go
 	return (*runtimeapi.AttachResponse)(unsafe.Pointer(from))
 }
 
 func fromV1alpha2PortForwardResponse(from *v1alpha2.PortForwardResponse) *runtimeapi.PortForwardResponse {
-	// If this function changes, also adapt the corresponding PortForward dockershim code in
-	// pkg/kubelet/dockershim/docker_streaming.go
+	// If this function changes, also adapt the corresponding PortForward code in
+	// pkg/kubelet/cri/remote/remote_runtime.go
 	return (*runtimeapi.PortForwardResponse)(unsafe.Pointer(from))
 }
 
@@ -114,20 +114,20 @@ func v1alpha2LinuxContainerResources(from *runtimeapi.LinuxContainerResources) *
 }
 
 func v1alpha2ExecRequest(from *runtimeapi.ExecRequest) *v1alpha2.ExecRequest {
-	// If this function changes, also adapt the corresponding Exec dockershim code in
-	// pkg/kubelet/dockershim/docker_streaming.go
+	// If this function changes, also adapt the corresponding Exec code in
+	// pkg/kubelet/cri/remote/remote_runtime.go
 	return (*v1alpha2.ExecRequest)(unsafe.Pointer(from))
 }
 
 func v1alpha2AttachRequest(from *runtimeapi.AttachRequest) *v1alpha2.AttachRequest {
-	// If this function changes, also adapt the corresponding Attach dockershim code in
-	// pkg/kubelet/dockershim/docker_streaming.go
+	// If this function changes, also adapt the corresponding Attach code in
+	// pkg/kubelet/cri/remote/remote_runtime.go
 	return (*v1alpha2.AttachRequest)(unsafe.Pointer(from))
 }
 
 func v1alpha2PortForwardRequest(from *runtimeapi.PortForwardRequest) *v1alpha2.PortForwardRequest {
-	// If this function changes, also adapt the corresponding PortForward dockershim code in
-	// pkg/kubelet/dockershim/docker_streaming.go
+	// If this function changes, also adapt the corresponding PortForward code in
+	// pkg/kubelet/cri/remote/remote_runtime.go
 	return (*v1alpha2.PortForwardRequest)(unsafe.Pointer(from))
 }
 

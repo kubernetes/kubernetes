@@ -56,7 +56,7 @@ const (
 type CRIVersion string
 
 const (
-	// APIVersionV1 references the v1 CRI API.
+	// CRIVersionV1 references the v1 CRI API.
 	CRIVersionV1 CRIVersion = "v1"
 
 	// CRIVersionV1alpha2 references the v1alpha2 CRI API.
