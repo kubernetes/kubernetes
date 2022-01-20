@@ -19,6 +19,10 @@
 ETCD_VERSION=${ETCD_VERSION:-3.5.1}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
+# This is intentionally not called ETCD_LOG_LEVEL:
+# etcd checks that and compains when it is set in addition
+# to the command line argument, even when both have the same value.
+ETCD_LOGLEVEL=${ETCD_LOGLEVEL:-debug}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
 
 kube::etcd::validate() {
@@ -82,8 +86,8 @@ kube::etcd::start() {
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi
-  kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --log-level=debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
-  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --log-level=debug 2> "${ETCD_LOGFILE}" >/dev/null &
+  kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --log-level=${ETCD_LOGLEVEL} > \"${ETCD_LOGFILE}\" 2>/dev/null"
+  etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --log-level="${ETCD_LOGLEVEL}" 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
