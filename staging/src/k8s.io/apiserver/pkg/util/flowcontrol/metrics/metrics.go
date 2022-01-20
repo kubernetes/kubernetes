@@ -324,6 +324,16 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	apiserverDispatchWithNoAccommodation = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_dispatch_no_accommodation_total",
+			Help:           "Number of times a dispatch attempt resulted in a non accommodation due to lack of available seats",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
 
 	metrics = Registerables{
 		apiserverRejectedRequestsTotal,
@@ -343,6 +353,7 @@ var (
 		watchCountSamples,
 		apiserverEpochAdvances,
 		apiserverWorkEstimatedSeats,
+		apiserverDispatchWithNoAccommodation,
 	}.
 		Append(PriorityLevelExecutionSeatsObserverGenerator.metrics()...).
 		Append(PriorityLevelConcurrencyObserverPairGenerator.metrics()...).
@@ -427,4 +438,10 @@ func AddEpochAdvance(ctx context.Context, priorityLevel string, success bool) {
 // ObserveWorkEstimatedSeats notes a sampling of estimated seats associated with a request
 func ObserveWorkEstimatedSeats(priorityLevel, flowSchema string, seats int) {
 	apiserverWorkEstimatedSeats.WithLabelValues(priorityLevel, flowSchema).Observe(float64(seats))
+}
+
+// AddDispatchWithNoAccommodation keeps track of number of times dispatch attempt results
+// in a non accommodation due to lack of available seats.
+func AddDispatchWithNoAccommodation(priorityLevel, flowSchema string) {
+	apiserverDispatchWithNoAccommodation.WithLabelValues(priorityLevel, flowSchema).Inc()
 }
