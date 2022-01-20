@@ -2045,7 +2045,7 @@ func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
 	resizeDone, err := og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 	if err != nil {
 		e1, e2 := volumeToMount.GenerateError("NodeExpandVolume.NodeExpandVolume failed", err)
-		klog.ErrorS(err, "NodeExpandVolume.NodeExpandVolume failed", "volumeName", volumeToMount.VolumeName, "volume")
+		klog.ErrorS(err, "NodeExpandVolume.NodeExpandVolume failed", "volumeName", volumeToMount.VolumeName)
 		return false, e1, e2
 	}
 	if resizeDone {
