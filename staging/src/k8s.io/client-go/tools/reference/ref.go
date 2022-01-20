@@ -19,6 +19,7 @@ package reference
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,7 +37,7 @@ var (
 // that would allow this.
 // TODO: should take a meta.Interface see http://issue.k8s.io/7127
 func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReference, error) {
-	if obj == nil {
+	if obj == nil || (reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil()) {
 		return nil, ErrNilObject
 	}
 	if ref, ok := obj.(*v1.ObjectReference); ok {

@@ -72,3 +72,12 @@ func TestGetReferenceRefVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestGetReferenceNilObject(t *testing.T) {
+	var p *TestRuntimeObj
+	scheme := runtime.NewScheme()
+	_, err := GetReference(scheme, p)
+	if err != ErrNilObject {
+		t.Fatalf("expected error to be '%s', got '%s'", ErrNilObject.Error(), err.Error())
+	}
+}
