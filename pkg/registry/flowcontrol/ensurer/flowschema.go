@@ -41,9 +41,14 @@ type FlowSchemaEnsurer interface {
 	Ensure([]*flowcontrolv1beta2.FlowSchema) error
 }
 
-// FlowSchemaRemover removes the specified bootstrap configuration objects
+// FlowSchemaRemover is the interface that wraps the
+// RemoveAutoUpdateEnabledObjects method.
+//
+// RemoveAutoUpdateEnabledObjects removes a set of bootstrap FlowSchema
+// objects specified via their names. The function removes an object
+// only if automatic update of the spec is enabled for it.
 type FlowSchemaRemover interface {
-	Remove([]string) error
+	RemoveAutoUpdateEnabledObjects([]string) error
 }
 
 // NewSuggestedFlowSchemaEnsurer returns a FlowSchemaEnsurer instance that
@@ -83,11 +88,11 @@ func NewFlowSchemaRemover(client flowcontrolclient.FlowSchemaInterface, lister f
 	}
 }
 
-// GetFlowSchemaRemoveCandidate returns a list of FlowSchema object
+// GetFlowSchemaRemoveCandidates returns a list of FlowSchema object
 // names that are candidates for deletion from the cluster.
 // bootstrap: a set of hard coded FlowSchema configuration objects
 // kube-apiserver maintains in-memory.
-func GetFlowSchemaRemoveCandidate(lister flowcontrollisters.FlowSchemaLister, bootstrap []*flowcontrolv1beta2.FlowSchema) ([]string, error) {
+func GetFlowSchemaRemoveCandidates(lister flowcontrollisters.FlowSchemaLister, bootstrap []*flowcontrolv1beta2.FlowSchema) ([]string, error) {
 	fsList, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list FlowSchema - %w", err)
@@ -103,7 +108,7 @@ func GetFlowSchemaRemoveCandidate(lister flowcontrollisters.FlowSchemaLister, bo
 		currentObjects[i] = fsList[i]
 	}
 
-	return getRemoveCandidate(bootstrapNames, currentObjects), nil
+	return getDanglingBootstrapObjectNames(bootstrapNames, currentObjects), nil
 }
 
 type fsEnsurer struct {
@@ -121,9 +126,9 @@ func (e *fsEnsurer) Ensure(flowSchemas []*flowcontrolv1beta2.FlowSchema) error {
 	return nil
 }
 
-func (e *fsEnsurer) Remove(flowSchemas []string) error {
+func (e *fsEnsurer) RemoveAutoUpdateEnabledObjects(flowSchemas []string) error {
 	for _, flowSchema := range flowSchemas {
-		if err := removeConfiguration(e.wrapper, flowSchema); err != nil {
+		if err := removeAutoUpdateEnabledConfiguration(e.wrapper, flowSchema); err != nil {
 			return err
 		}
 	}

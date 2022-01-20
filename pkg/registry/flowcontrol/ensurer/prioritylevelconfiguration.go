@@ -41,9 +41,15 @@ type PriorityLevelEnsurer interface {
 	Ensure([]*flowcontrolv1beta2.PriorityLevelConfiguration) error
 }
 
-// PriorityLevelRemover removes the specified bootstrap configuration objects
+// PriorityLevelRemover is the interface that wraps the
+// RemoveAutoUpdateEnabledObjects method.
+//
+// RemoveAutoUpdateEnabledObjects removes a set of bootstrap
+// PriorityLevelConfiguration objects specified via their names.
+// The function removes an object only if automatic update
+// of the spec is enabled for it.
 type PriorityLevelRemover interface {
-	Remove([]string) error
+	RemoveAutoUpdateEnabledObjects([]string) error
 }
 
 // NewSuggestedPriorityLevelEnsurerEnsurer returns a PriorityLevelEnsurer instance that
@@ -83,11 +89,11 @@ func NewPriorityLevelRemover(client flowcontrolclient.PriorityLevelConfiguration
 	}
 }
 
-// GetPriorityLevelRemoveCandidate returns a list of PriorityLevelConfiguration
+// GetPriorityLevelRemoveCandidates returns a list of PriorityLevelConfiguration
 // names that are candidates for removal from the cluster.
 // bootstrap: a set of hard coded PriorityLevelConfiguration configuration
 // objects kube-apiserver maintains in-memory.
-func GetPriorityLevelRemoveCandidate(lister flowcontrollisters.PriorityLevelConfigurationLister, bootstrap []*flowcontrolv1beta2.PriorityLevelConfiguration) ([]string, error) {
+func GetPriorityLevelRemoveCandidates(lister flowcontrollisters.PriorityLevelConfigurationLister, bootstrap []*flowcontrolv1beta2.PriorityLevelConfiguration) ([]string, error) {
 	plList, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list PriorityLevelConfiguration - %w", err)
@@ -103,7 +109,7 @@ func GetPriorityLevelRemoveCandidate(lister flowcontrollisters.PriorityLevelConf
 		currentObjects[i] = plList[i]
 	}
 
-	return getRemoveCandidate(bootstrapNames, currentObjects), nil
+	return getDanglingBootstrapObjectNames(bootstrapNames, currentObjects), nil
 }
 
 type plEnsurer struct {
@@ -121,9 +127,9 @@ func (e *plEnsurer) Ensure(priorityLevels []*flowcontrolv1beta2.PriorityLevelCon
 	return nil
 }
 
-func (e *plEnsurer) Remove(priorityLevels []string) error {
+func (e *plEnsurer) RemoveAutoUpdateEnabledObjects(priorityLevels []string) error {
 	for _, priorityLevel := range priorityLevels {
-		if err := removeConfiguration(e.wrapper, priorityLevel); err != nil {
+		if err := removeAutoUpdateEnabledConfiguration(e.wrapper, priorityLevel); err != nil {
 			return err
 		}
 	}
