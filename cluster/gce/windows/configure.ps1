@@ -147,21 +147,6 @@ try {
   # Set the TCP/IP Parameters to keep idle connections alive.
   Set-WindowsTCPParameters
 
-  # Install Docker if the select CRI is not containerd and docker is not already
-  # installed.
-  if (${env:CONTAINER_RUNTIME} -ne "containerd") {
-    if (-not (Test-DockerIsInstalled)) {
-      Install-Docker
-    }
-    # For some reason the docker service may not be started automatically on the
-    # first reboot, although it seems to work fine on subsequent reboots.
-    Restart-Service docker
-    Start-Sleep 5
-    if (-not (Test-DockerIsRunning)) {
-        throw "docker service failed to start or stay running"
-    }
-  }
-
   Set-PrerequisiteOptions
 
   if (Test-IsTestCluster $kube_env) {

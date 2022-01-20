@@ -486,11 +486,6 @@ func AfterReadingAllFlags(t *TestContextType) {
 		TestContext.Provider = "skeleton"
 	}
 
-	// TODO: Fix tests scripts that set CONTAINER_RUNTIME="containerd"
-	if TestContext.ContainerRuntime == "containerd" {
-		klog.Warningf("The --container-runtime flag is set to 'containerd' instead of 'remote'.")
-		TestContext.ContainerRuntime = "remote"
-	}
 	// Make sure that container runtime is valid
 	if TestContext.ContainerRuntime != "remote" {
 		klog.Errorf("Unsupported CRI container runtime: %q", TestContext.ContainerRuntime)
