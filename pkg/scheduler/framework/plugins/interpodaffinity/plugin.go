@@ -135,6 +135,6 @@ func GetNamespaceLabelsSnapshot(ns string, nsLister listersv1.NamespaceLister) (
 		// Create and return snapshot of the labels.
 		return labels.Merge(podNS.Labels, nil)
 	}
-	klog.ErrorS(err, "getting namespace, assuming empty set of namespace labels", "namespace", ns)
+	klog.V(3).InfoS("getting namespace, assuming empty set of namespace labels", "namespace", ns, "err", err)
 	return
 }
