@@ -66,8 +66,6 @@ fi
 # Disable container security
 oc adm policy add-scc-to-group privileged system:authenticated system:serviceaccounts
 oc adm policy add-scc-to-group anyuid system:authenticated system:serviceaccounts
-# Mark the master nodes as unschedulable so tests ignore them
-oc get nodes -o name -l 'node-role.kubernetes.io/master' | xargs -L1 oc adm cordon
 unschedulable="$( ( oc get nodes -o name -l 'node-role.kubernetes.io/master'; ) | wc -l )"
 
 test_report_dir="${ARTIFACTS:-/tmp/artifacts}"
