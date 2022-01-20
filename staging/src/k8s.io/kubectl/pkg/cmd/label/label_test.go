@@ -678,6 +678,41 @@ func TestLabelMsg(t *testing.T) {
 			},
 			expectMsg: MsgLabeled,
 		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"status": "unhealthy"},
+				},
+			},
+			labels:    map[string]string{"status": "healthy"},
+			overwrite: true,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"status": "healthy",
+					},
+				},
+			},
+			expectMsg: MsgLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"status": "unhealthy"},
+				},
+			},
+			labels:    map[string]string{"status": "healthy"},
+			overwrite: false,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"status": "unhealthy",
+					},
+				},
+			},
+			expectMsg: MsgNotLabeled,
+			expectErr: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -700,7 +735,7 @@ func TestLabelMsg(t *testing.T) {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
 
-		dataChangeMsg := updateDataChangeMsg(oldData, newObj)
+		dataChangeMsg := updateDataChangeMsg(oldData, newObj, test.overwrite)
 		if dataChangeMsg != test.expectMsg {
 			t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, test)
 		}
