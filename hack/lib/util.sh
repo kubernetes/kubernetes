@@ -221,8 +221,8 @@ kube::util::find-binary-for-platform() {
   fi
 
   # looks for $1 in the $PATH
-  if which ${lookfor} >/dev/null; then
-    local -r local_bin="$(which ${lookfor})"
+  if which "${lookfor}" >/dev/null; then
+    local -r local_bin="$(which "${lookfor}")"
     locations+=( "${local_bin}"  );
   fi
 
