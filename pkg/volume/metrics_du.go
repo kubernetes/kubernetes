@@ -17,11 +17,8 @@ limitations under the License.
 package volume
 
 import (
-	"time"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
@@ -44,9 +41,6 @@ func NewMetricsDu(path string) MetricsProvider {
 // and gathering filesystem info for the Volume path.
 // See MetricsProvider.GetMetrics
 func (md *metricsDu) GetMetrics() (*Metrics, error) {
-	startTime := time.Now()
-	defer servermetrics.CollectVolumeStatCalDuration("du", startTime)
-
 	metrics := &Metrics{Time: metav1.Now()}
 	if md.path == "" {
 		return metrics, NewNoPathDefinedError()
