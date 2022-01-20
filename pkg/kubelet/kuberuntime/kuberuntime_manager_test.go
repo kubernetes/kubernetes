@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -332,6 +335,81 @@ func TestGetPodStatus(t *testing.T) {
 	assert.Equal(t, pod.Name, podStatus.Name)
 	assert.Equal(t, pod.Namespace, podStatus.Namespace)
 	assert.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
+}
+
+func TestStopContainerWithNotFoundError(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		{
+			Name:            "foo2",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	// Set fake sandbox and faked containers to fakeRuntime.
+	makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeRuntime.InjectError("StopContainer", status.Error(codes.NotFound, "No such container"))
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	require.NoError(t, err)
+	p := kubecontainer.ConvertPodStatusToRunningPod("", podStatus)
+	gracePeriod := int64(1)
+	err = m.KillPod(pod, p, &gracePeriod)
+	require.NoError(t, err)
+}
+func TestGetPodStatusWithNotFoundError(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		{
+			Name:            "foo2",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	// Set fake sandbox and faked containers to fakeRuntime.
+	makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeRuntime.InjectError("ContainerStatus", status.Error(codes.NotFound, "No such container"))
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	require.NoError(t, err)
+	require.Equal(t, pod.UID, podStatus.ID)
+	require.Equal(t, pod.Name, podStatus.Name)
+	require.Equal(t, pod.Namespace, podStatus.Namespace)
+	require.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
 }
 
 func TestGetPods(t *testing.T) {
