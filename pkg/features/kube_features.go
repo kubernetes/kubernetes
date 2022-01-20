@@ -396,6 +396,7 @@ const (
 	// kep: http://kep.k8s.io/563
 	// alpha: v1.15
 	// beta: v1.21
+	// ga: v1.23
 	//
 	// Enables ipv6 dual stack
 	IPv6DualStack featuregate.Feature = "IPv6DualStack"
