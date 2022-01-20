@@ -62,6 +62,15 @@ endif
 # This controls the verbosity of the build.  Higher numbers mean more output.
 KUBE_VERBOSE ?= 1
 
+# Having symlinks in the CWD confuses Go.  The Go team hopes to fix this, but
+# a trivial fix turned out to be insufficient.
+#     https://github.com/golang/go/issues/50807
+ifneq ($(shell pwd),$(shell pwd -P))
+    $(warning The current directory appears to have symlinks, which confuses Go.  Try:)
+    $(warning `    cd $(shell pwd -P)  # cd $$(pwd -P))
+    $(error Aborting)
+endif
+
 define ALL_HELP_INFO
 # Build code.
 #
