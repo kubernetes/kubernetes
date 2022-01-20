@@ -31,8 +31,13 @@ import (
 
 const contentionLockFile = "/var/run/kubelet.lock"
 
-var _ = SIGDescribe("Lock contention [Slow] [Disruptive] [Serial] [NodeFeature:LockContention]", func() {
+// Kubelet Lock contention tests the lock contention feature.
+// Disruptive because the kubelet is restarted in the test.
+// NodeSpecialFeature:LockContention because we don't want the test to be picked up by any other
+// test suite, hence the unique name "LockContention".
+var _ = SIGDescribe("Lock contention [Slow] [Disruptive] [NodeSpecialFeature:LockContention]", func() {
 
+	// Requires `--lock-file` & `--exit-on-lock-contention` flags to be set on the Kubelet.
 	ginkgo.It("Kubelet should stop when the test acquires the lock on lock file and restart once the lock is released", func() {
 
 		ginkgo.By("perform kubelet health check to check if kubelet is healthy and running.")
@@ -45,9 +50,9 @@ var _ = SIGDescribe("Lock contention [Slow] [Disruptive] [Serial] [NodeFeature:L
 		// it is expected that the running kubelet must terminate and wait until the lock on the
 		// lock file is released.
 		// Kubelet uses the same approach to acquire the lock on lock file as shown here:
-		// https://github.com/kubernetes/kubernetes/blob/master/cmd/kubelet/app/server.go#L530-#L546
+		// https://github.com/kubernetes/kubernetes/blob/9d2b361ebc7ef28f7cb75596ef40b7c239732d37/cmd/kubelet/app/server.go#L512-#L523
 		// and the function definition of Acquire is here:
-		// https://github.com/kubernetes/kubernetes/blob/master/pkg/util/flock/flock_unix.go#L25
+		// https://github.com/kubernetes/kubernetes/blob/9d2b361ebc7ef28f7cb75596ef40b7c239732d37/pkg/util/flock/flock_unix.go#L26
 		fd, err := unix.Open(contentionLockFile, unix.O_CREAT|unix.O_RDWR|unix.O_CLOEXEC, 0600)
 		framework.ExpectNoError(err)
 		// Defer the lock release in case test fails and we don't reach the step of the release
@@ -67,14 +72,14 @@ var _ = SIGDescribe("Lock contention [Slow] [Disruptive] [Serial] [NodeFeature:L
 			return kubeletHealthCheck(kubeletHealthCheckURL)
 		}, 10*time.Second, time.Second).Should(gomega.BeFalse())
 
-		ginkgo.By("releasing the lock on lock file i.e /var/run/kubelet.lock")
+		ginkgo.By("releasing the lock on lock file i.e /var/run/kubelet.lock, triggering kubelet restart.")
 		// Release the lock.
 		err = unix.Flock(fd, unix.LOCK_UN)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("verifying the kubelet is healthy again after the lock was released.")
 		// Releasing the lock triggers kubelet to re-acquire the lock and restart.
-		// Hence the kubelet should report healthy state.
+		ginkgo.By("verifying the kubelet is healthy after restart.")
+		// Kubelet should report healthy state.
 		gomega.Eventually(func() bool {
 			return kubeletHealthCheck(kubeletHealthCheckURL)
 		}, 10*time.Second, time.Second).Should(gomega.BeTrue())
