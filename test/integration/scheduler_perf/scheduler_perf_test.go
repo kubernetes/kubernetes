@@ -537,7 +537,7 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		})
 	}
 	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
-		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
+		klog.Fatalf("%v: unable to write measured data %+v: %v", b.Name(), dataItems, err)
 	}
 }
 
