@@ -34,6 +34,8 @@ import (
 	"sync"
 	"time"
 
+	crierror "k8s.io/cri-api/pkg/errors"
+
 	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/armon/circbuf"
@@ -502,10 +504,17 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 		return nil, err
 	}
 
-	statuses := make([]*kubecontainer.Status, len(containers))
+	statuses := []*kubecontainer.Status{}
 	// TODO: optimization: set maximum number of containers per container name to examine.
-	for i, c := range containers {
+	for _, c := range containers {
 		status, err := m.runtimeService.ContainerStatus(c.Id)
+		// Between List (ListContainers) and check (ContainerStatus) another thread might remove a container, and that is normal.
+		// The previous call (ListContainers) never fails due to a pod container not existing.
+		// Therefore, this method should not either, but instead act as if the previous call failed,
+		// which means the error should be ignored.
+		if crierror.IsNotFound(err) {
+			continue
+		}
 		if err != nil {
 			// Merely log this here; GetPodStatus will actually report the error out.
 			klog.V(4).InfoS("ContainerStatus return error", "containerID", c.Id, "err", err)
@@ -538,7 +547,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.Message += tMessage
 			}
 		}
-		statuses[i] = cStatus
+		statuses = append(statuses, cStatus)
 	}
 
 	sort.Sort(containerStatusByCreated(statuses))
@@ -715,15 +724,15 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 
 	err := m.runtimeService.StopContainer(containerID.ID, gracePeriod)
-	if err != nil {
+	if err != nil && !crierror.IsNotFound(err) {
 		klog.ErrorS(err, "Container termination failed with gracePeriod", "pod", klog.KObj(pod), "podUID", pod.UID,
 			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
-	} else {
-		klog.V(3).InfoS("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
-			"containerName", containerName, "containerID", containerID.String())
+		return err
 	}
+	klog.V(3).InfoS("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
+		"containerName", containerName, "containerID", containerID.String())
 
-	return err
+	return nil
 }
 
 // killContainersWithSyncResult kills all pod's containers with sync results.
