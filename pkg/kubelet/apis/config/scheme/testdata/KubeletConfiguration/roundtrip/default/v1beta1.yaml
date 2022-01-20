@@ -81,6 +81,7 @@ seccompDefault: false
 serializeImagePulls: true
 shutdownGracePeriod: 0s
 shutdownGracePeriodCriticalPods: 0s
+skipCadvisorProcessMetrics: false
 streamingConnectionIdleTimeout: 4h0m0s
 syncFrequency: 1m0s
 topologyManagerPolicy: none

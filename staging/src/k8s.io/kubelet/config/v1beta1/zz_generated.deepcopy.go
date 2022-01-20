@@ -362,6 +362,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SkipCadvisorProcessMetrics != nil {
+		in, out := &in.SkipCadvisorProcessMetrics, &out.SkipCadvisorProcessMetrics
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

@@ -94,12 +94,13 @@ const (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	auth                 AuthInterface
-	host                 HostInterface
-	restfulCont          containerInterface
-	metricsBuckets       sets.String
-	metricsMethodBuckets sets.String
-	resourceAnalyzer     stats.ResourceAnalyzer
+	auth                       AuthInterface
+	host                       HostInterface
+	restfulCont                containerInterface
+	metricsBuckets             sets.String
+	metricsMethodBuckets       sets.String
+	resourceAnalyzer           stats.ResourceAnalyzer
+	skipCadvisorProcessMetrics bool
 }
 
 // TLSOptions holds the TLS options.
@@ -241,12 +242,13 @@ func NewServer(
 	auth AuthInterface,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 	server := Server{
-		host:                 host,
-		resourceAnalyzer:     resourceAnalyzer,
-		auth:                 auth,
-		restfulCont:          &filteringContainer{Container: restful.NewContainer()},
-		metricsBuckets:       sets.NewString(),
-		metricsMethodBuckets: sets.NewString("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
+		host:                       host,
+		resourceAnalyzer:           resourceAnalyzer,
+		auth:                       auth,
+		restfulCont:                &filteringContainer{Container: restful.NewContainer()},
+		metricsBuckets:             sets.NewString(),
+		metricsMethodBuckets:       sets.NewString("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
+		skipCadvisorProcessMetrics: kubeCfg.SkipCadvisorProcessMetrics,
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
@@ -366,7 +368,9 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.DiskUsageMetrics:    struct{}{},
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:          struct{}{},
-		cadvisormetrics.ProcessMetrics:      struct{}{},
+	}
+	if !s.skipCadvisorProcessMetrics {
+		includedMetrics[cadvisormetrics.ProcessMetrics] = struct{}{}
 	}
 
 	// Only add the Accelerator metrics if the feature is inactive

@@ -1072,6 +1072,10 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	RegisterNode *bool `json:"registerNode,omitempty"`
+	// SkipCadvisorProcessMetrics provide a way to skip the cadvisormetrics.ProcessMetrics
+	// Default: false
+	// +optional
+	SkipCadvisorProcessMetrics *bool `json:"skipCadvisorProcessMetrics,omitempty"`
 }
 
 type KubeletAuthorizationMode string

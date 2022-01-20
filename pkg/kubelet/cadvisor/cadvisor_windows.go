@@ -34,7 +34,7 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, skipCadvisorProcessMetrics bool) (Interface, error) {
 	client, err := winstats.NewPerfCounterClient()
 	return &cadvisorClient{
 		rootPath:       rootPath,

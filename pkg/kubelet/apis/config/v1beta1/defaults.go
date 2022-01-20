@@ -264,4 +264,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = utilpointer.BoolPtr(true)
 	}
+	if obj.SkipCadvisorProcessMetrics == nil {
+		obj.SkipCadvisorProcessMetrics = utilpointer.BoolPtr(false)
+	}
 }

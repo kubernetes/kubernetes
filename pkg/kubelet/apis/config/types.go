@@ -444,6 +444,10 @@ type KubeletConfiguration struct {
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+
+	// SkipCadvisorProcessMetrics provide a way to skip the cadvisormetrics.ProcessMetrics
+	// +optional
+	SkipCadvisorProcessMetrics bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
