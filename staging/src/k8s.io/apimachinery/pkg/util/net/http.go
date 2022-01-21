@@ -149,7 +149,7 @@ func readIdleTimeoutSeconds() int {
 	if s := os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"); len(s) > 0 {
 		i, err := strconv.Atoi(s)
 		if err != nil {
-			klog.InfoS("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS and default value is used", "HTTP2_READ_IDLE_TIMEOUT_SECONDS", s, "defaultTimeoutSeconds", ret, "err", err)
+			klog.InfoS("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS and default value is used", "HTTP2_READ_IDLE_TIMEOUT_SECONDS_test", s, "defaultTimeoutSeconds", ret, "err", err)
 			return ret
 		}
 		ret = i
