@@ -570,6 +570,7 @@ const (
 	// kep: http://kep.k8s.io/1864
 	// alpha: v1.20
 	// beta: v1.22
+	// ga: v1.24
 	//
 	// Allows control if NodePorts shall be created for services with "type: LoadBalancer" by defining the spec.AllocateLoadBalancerNodePorts field (bool)
 	ServiceLBNodePortControl featuregate.Feature = "ServiceLBNodePortControl"
