@@ -225,15 +225,19 @@ func TestCheckpointStateRestore(t *testing.T) {
 			}
 
 			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
-			if err != nil {
-				if strings.TrimSpace(tc.expectedError) != "" {
-					if strings.Contains(err.Error(), "could not restore state from checkpoint") &&
-						strings.Contains(err.Error(), tc.expectedError) {
-						t.Logf("got expected error: %v", err)
-						return
-					}
+			if strings.TrimSpace(tc.expectedError) == "" {
+				if err != nil {
+					t.Fatalf("unexpected error while creating checkpointState: %v", err)
 				}
-				t.Fatalf("unexpected error while creatng checkpointState: %v", err)
+			} else {
+				if err == nil {
+					t.Fatalf("expected error: %s, got nil", tc.expectedError)
+				}
+				if strings.Contains(err.Error(), "could not restore state from checkpoint") &&
+					strings.Contains(err.Error(), tc.expectedError) {
+					t.Logf("got expected error: %v", err)
+					return
+				}
 			}
 
 			// compare state after restoration with the one expected
