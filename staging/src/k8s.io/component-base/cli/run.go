@@ -34,7 +34,58 @@ import (
 // flags get added to the command line if not added already. Flags get normalized
 // so that help texts show them with hyphens. Underscores are accepted
 // as alternative for the command parameters.
+//
+// Run tries to be smart about how to print errors that are returned by the
+// command: before logging is known to be set up, it prints them as plain text
+// to stderr. This covers command line flag parse errors and unknown commands.
+// Afterwards it logs them. This covers runtime errors.
+//
+// Commands like kubectl where logging is not normally part of the runtime output
+// should use RunNoErrOutput instead and deal with the returned error themselves.
 func Run(cmd *cobra.Command) int {
+	if logsInitialized, err := run(cmd); err != nil {
+		// If the error is about flag parsing, then printing that error
+		// with the decoration that klog would add ("E0923
+		// 23:02:03.219216 4168816 run.go:61] unknown shorthand flag")
+		// is less readable. Using klog.Fatal is even worse because it
+		// dumps a stack trace that isn't about the error.
+		//
+		// But if it is some other error encountered at runtime, then
+		// we want to log it as error, at least in most commands because
+		// their output is a log event stream.
+		//
+		// We can distinguish these two cases depending on whether
+		// we got to logs.InitLogs() above.
+		//
+		// This heuristic might be problematic for command line
+		// tools like kubectl where the output is carefully controlled
+		// and not a log by default. They should use RunNoErrOutput
+		// instead.
+		//
+		// The usage of klog is problematic also because we don't know
+		// whether the command has managed to configure it. This cannot
+		// be checked right now, but may become possible when the early
+		// logging proposal from
+		// https://github.com/kubernetes/enhancements/pull/3078
+		// ("contextual logging") is implemented.
+		if !logsInitialized {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		} else {
+			klog.ErrorS(err, "command failed")
+		}
+		return 1
+	}
+	return 0
+}
+
+// RunNoErrOutput is a version of Run which returns the cobra command error
+// instead of printing it.
+func RunNoErrOutput(cmd *cobra.Command) error {
+	_, err := run(cmd)
+	return err
+}
+
+func run(cmd *cobra.Command) (logsInitialized bool, err error) {
 	rand.Seed(time.Now().UnixNano())
 	defer logs.FlushLogs()
 
@@ -51,24 +102,11 @@ func Run(cmd *cobra.Command) int {
 	// execution fails for other reasons than parsing. We detect this via
 	// the FlagParseError callback.
 	//
-	// A variable is used instead of wrapping the error with a special
-	// error type because the variable is simpler and less fragile: the
-	// original FlagErrorFunc might replace the wrapped error.
-	parsingFailed := false
-	if cmd.SilenceUsage {
-		// Some commands, like kubectl, already deal with this themselves.
-		// We don't change the behavior for those and just track whether
-		// parsing failed for the error output below.
-		flagErrorFunc := cmd.FlagErrorFunc()
-		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-			parsingFailed = true
-			return flagErrorFunc(c, err)
-		})
-	} else {
+	// Some commands, like kubectl, already deal with this themselves.
+	// We don't change the behavior for those.
+	if !cmd.SilenceUsage {
 		cmd.SilenceUsage = true
 		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-			parsingFailed = true
-
 			// Re-enable usage printing.
 			c.SilenceUsage = false
 			return err
@@ -88,38 +126,23 @@ func Run(cmd *cobra.Command) int {
 		pre := cmd.PersistentPreRun
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
+			logsInitialized = true
 			pre(cmd, args)
 		}
 	case cmd.PersistentPreRunE != nil:
 		pre := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			logs.InitLogs()
+			logsInitialized = true
 			return pre(cmd, args)
 		}
 	default:
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
+			logsInitialized = true
 		}
 	}
 
-	if err := cmd.Execute(); err != nil {
-		// If the error is about flag parsing, then printing that error
-		// with the decoration that klog would add ("E0923
-		// 23:02:03.219216 4168816 run.go:61] unknown shorthand flag")
-		// is less readable. Using klog.Fatal is even worse because it
-		// dumps a stack trace that isn't about the error.
-		//
-		// But if it is some other error encountered at runtime, then
-		// we want to log it as error.
-		//
-		// We can distinguish these two cases depending on whether
-		// our FlagErrorFunc above was called.
-		if parsingFailed {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		} else {
-			klog.ErrorS(err, "command failed")
-		}
-		return 1
-	}
-	return 0
+	err = cmd.Execute()
+	return
 }

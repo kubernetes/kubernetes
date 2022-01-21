@@ -370,8 +370,8 @@ type TransformFunc func(interface{}) (interface{}, error)
 // the returned Store for Get/List operations; Add/Modify/Deletes will cause
 // the event notifications to be faulty.
 // The given transform function will be called on all objects before they will
-// put put into the Store and corresponding Add/Modify/Delete handlers will
-// be invokved for them.
+// put into the Store and corresponding Add/Modify/Delete handlers will
+// be invoked for them.
 func NewTransformingInformer(
 	lw ListerWatcher,
 	objType runtime.Object,

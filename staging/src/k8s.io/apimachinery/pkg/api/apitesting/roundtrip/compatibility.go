@@ -18,6 +18,7 @@ package roundtrip
 
 import (
 	"bytes"
+	gojson "encoding/json"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -336,8 +337,14 @@ func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schem
 		t.Fatal(err)
 	}
 	{
+		// compact before decoding since embedded RawExtension fields retain indenting
+		compacted := &bytes.Buffer{}
+		if err := gojson.Compact(compacted, actualJSON); err != nil {
+			t.Error(err)
+		}
+
 		jsonDecoded := emptyObj.DeepCopyObject()
-		jsonDecoded, _, err = c.JSON.Decode(actualJSON, &gvk, jsonDecoded)
+		jsonDecoded, _, err = c.JSON.Decode(compacted.Bytes(), &gvk, jsonDecoded)
 		if err != nil {
 			t.Error(err)
 		} else if !apiequality.Semantic.DeepEqual(expectedObject, jsonDecoded) {
@@ -420,8 +427,14 @@ func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk sche
 		t.Fatal(err)
 	}
 
+	// compact before decoding since embedded RawExtension fields retain indenting
+	compacted := &bytes.Buffer{}
+	if err := gojson.Compact(compacted, jsonBeforeRoundTrip); err != nil {
+		t.Fatal(err)
+	}
+
 	jsonDecoded := emptyObj.DeepCopyObject()
-	jsonDecoded, _, err = c.JSON.Decode(jsonBeforeRoundTrip, &gvk, jsonDecoded)
+	jsonDecoded, _, err = c.JSON.Decode(compacted.Bytes(), &gvk, jsonDecoded)
 	if err != nil {
 		t.Fatal(err)
 	}

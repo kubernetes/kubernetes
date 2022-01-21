@@ -21,15 +21,30 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	admissionv1 "k8s.io/api/admission/v1"
 )
 
 func TestMain(m *testing.M) {
-	sharedCopy := sharedAllowedResponse().DeepCopy()
+	sharedResponses := map[string]*admissionv1.AdmissionResponse{
+		"sharedAllowedResponse":                        sharedAllowedResponse,
+		"sharedAllowedPrivilegedResponse":              sharedAllowedPrivilegedResponse,
+		"sharedAllowedByUserExemptionResponse":         sharedAllowedByUserExemptionResponse,
+		"sharedAllowedByNamespaceExemptionResponse":    sharedAllowedByNamespaceExemptionResponse,
+		"sharedAllowedByRuntimeClassExemptionResponse": sharedAllowedByRuntimeClassExemptionResponse,
+	}
+	sharedResponseCopies := map[string]*admissionv1.AdmissionResponse{}
+	for name, response := range sharedResponses {
+		sharedResponseCopies[name] = response.DeepCopy()
+	}
+
 	rc := m.Run()
 
-	if !reflect.DeepEqual(sharedCopy, sharedAllowedResponse()) {
-		fmt.Println("sharedAllowedReponse mutated")
-		rc = 1
+	for name := range sharedResponses {
+		if !reflect.DeepEqual(sharedResponseCopies[name], sharedResponses[name]) {
+			fmt.Fprintf(os.Stderr, "%s mutated\n", name)
+			rc = 1
+		}
 	}
 
 	os.Exit(rc)

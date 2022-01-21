@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -159,10 +160,10 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
-		natChains:             bytes.NewBuffer(nil),
-		natRules:              bytes.NewBuffer(nil),
-		filterChains:          bytes.NewBuffer(nil),
-		filterRules:           bytes.NewBuffer(nil),
+		natChains:             utilproxy.LineBuffer{},
+		natRules:              utilproxy.LineBuffer{},
+		filterChains:          utilproxy.LineBuffer{},
+		filterRules:           utilproxy.LineBuffer{},
 		netlinkHandle:         netlinktest.NewFakeNetlinkHandle(),
 		ipsetList:             ipsetList,
 		nodePortAddresses:     make([]string, 0),
@@ -384,6 +385,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 
 func TestGetNodeIPs(t *testing.T) {
 	testCases := []struct {
+		isIPv6       bool
 		devAddresses map[string][]string
 		expectIPs    []string
 	}{
@@ -404,22 +406,22 @@ func TestGetNodeIPs(t *testing.T) {
 		},
 		// case 3
 		{
-			devAddresses: map[string][]string{"encap0": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "docker0": {"172.17.0.1"}},
+			devAddresses: map[string][]string{"encap0": {"10.20.30.40", "fe80::200:ff:fe01:1"}, "lo": {"127.0.0.1", "::1"}, "docker0": {"172.17.0.1"}},
 			expectIPs:    []string{"10.20.30.40", "172.17.0.1"},
 		},
 		// case 4
 		{
-			devAddresses: map[string][]string{"encaps9": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			devAddresses: map[string][]string{"encaps9": {"10.20.30.40"}, "lo": {"127.0.0.1", "::1"}, "encap7": {"1000::", "10.20.30.31"}},
 			expectIPs:    []string{"10.20.30.40", "10.20.30.31"},
 		},
 		// case 5
 		{
-			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			devAddresses: map[string][]string{"kube-ipvs0": {"2000::", "1.2.3.4"}, "lo": {"127.0.0.1", "::1"}, "encap7": {"1000::", "10.20.30.31"}},
 			expectIPs:    []string{"10.20.30.31"},
 		},
 		// case 6
 		{
-			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "lo": {"127.0.0.1"}},
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "lo": {"127.0.0.1", "::1"}},
 			expectIPs:    []string{},
 		},
 		// case 7
@@ -429,18 +431,31 @@ func TestGetNodeIPs(t *testing.T) {
 		},
 		// case 8
 		{
-			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "eth5": {"3.4.5.6"}, "lo": {"127.0.0.1"}},
+			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "eth5": {"3.4.5.6"}, "lo": {"127.0.0.1", "::1"}},
 			expectIPs:    []string{"3.4.5.6"},
 		},
 		// case 9
 		{
-			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
+			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1", "::1"}, "encap7": {"10.20.30.31"}},
 			expectIPs:    []string{"10.20.30.31", "1.2.3.4"},
+		},
+		// case 10
+		{
+			isIPv6:       true,
+			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4", "1000::"}, "lo": {"127.0.0.1", "::1"}, "encap7": {"10.20.30.31", "2000::", "fe80::200:ff:fe01:1"}},
+			expectIPs:    []string{"1000::", "2000::"},
+		},
+		// case 11
+		{
+			isIPv6:       true,
+			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4", "1000::"}, "lo": {"127.0.0.1", "::1"}, "encap7": {"10.20.30.31", "2000::", "fe80::200:ff:fe01:1"}, "kube-ipvs0": {"1.2.3.4", "2.3.4.5", "2000::"}},
+			expectIPs:    []string{"1000::"},
 		},
 	}
 
 	for i := range testCases {
 		fake := netlinktest.NewFakeNetlinkHandle()
+		fake.IsIPv6 = testCases[i].isIPv6
 		for dev, addresses := range testCases[i].devAddresses {
 			fake.SetLocalAddresses(dev, addresses...)
 		}
@@ -4650,8 +4665,8 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 	expectedFilterChains := `:KUBE-FORWARD - [0:0]
 :KUBE-NODE-PORT - [0:0]
 `
-	assert.Equal(t, expectedNATChains, fp.natChains.String())
-	assert.Equal(t, expectedFilterChains, fp.filterChains.String())
+	assert.Equal(t, expectedNATChains, string(fp.natChains.Bytes()))
+	assert.Equal(t, expectedFilterChains, string(fp.filterChains.Bytes()))
 }
 
 // This test ensures that the iptables proxier supports translating Endpoints to
@@ -5352,4 +5367,95 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *te
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
 	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+}
+
+func TestIpIsValidForSet(t *testing.T) {
+	testCases := []struct {
+		isIPv6 bool
+		ip     string
+		res    bool
+	}{
+		{
+			false,
+			"127.0.0.1",
+			false,
+		},
+		{
+			false,
+			"127.0.0.0",
+			false,
+		},
+		{
+			false,
+			"127.6.7.8",
+			false,
+		},
+		{
+			false,
+			"8.8.8.8",
+			true,
+		},
+		{
+			false,
+			"192.168.0.1",
+			true,
+		},
+		{
+			false,
+			"169.254.0.0",
+			true,
+		},
+		{
+			false,
+			"::ffff:169.254.0.0", // IPv6 mapped IPv4
+			true,
+		},
+		{
+			false,
+			"1000::",
+			false,
+		},
+		// IPv6
+		{
+			true,
+			"::1",
+			false,
+		},
+		{
+			true,
+			"1000::",
+			true,
+		},
+		{
+			true,
+			"fe80::200:ff:fe01:1",
+			false,
+		},
+		{
+			true,
+			"8.8.8.8",
+			false,
+		},
+		{
+			true,
+			"::ffff:8.8.8.8",
+			false,
+		},
+	}
+
+	for _, tc := range testCases {
+		v := &netlinkHandle{}
+		v.isIPv6 = tc.isIPv6
+		ip := netutils.ParseIPSloppy(tc.ip)
+		if ip == nil {
+			t.Errorf("Parse error: %s", tc.ip)
+		}
+		if v.isValidForSet(ip) != tc.res {
+			if tc.isIPv6 {
+				t.Errorf("IPv6: %s", tc.ip)
+			} else {
+				t.Errorf("IPv4: %s", tc.ip)
+			}
+		}
+	}
 }

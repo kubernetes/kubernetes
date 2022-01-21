@@ -192,6 +192,26 @@ func NewUpgradeAwareHandler(location *url.URL, transport http.RoundTripper, wrap
 	}
 }
 
+func proxyRedirectsforRootPath(path string, w http.ResponseWriter, req *http.Request) bool {
+	redirect := false
+	method := req.Method
+
+	// From pkg/genericapiserver/endpoints/handlers/proxy.go#ServeHTTP:
+	// Redirect requests with an empty path to a location that ends with a '/'
+	// This is essentially a hack for http://issue.k8s.io/4958.
+	// Note: Keep this code after tryUpgrade to not break that flow.
+	if len(path) == 0 && (method == http.MethodGet || method == http.MethodHead) {
+		var queryPart string
+		if len(req.URL.RawQuery) > 0 {
+			queryPart = "?" + req.URL.RawQuery
+		}
+		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
+		w.WriteHeader(http.StatusMovedPermanently)
+		redirect = true
+	}
+	return redirect
+}
+
 // ServeHTTP handles the proxy request
 func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if h.tryUpgrade(w, req) {
@@ -211,17 +231,8 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		loc.Path += "/"
 	}
 
-	// From pkg/genericapiserver/endpoints/handlers/proxy.go#ServeHTTP:
-	// Redirect requests with an empty path to a location that ends with a '/'
-	// This is essentially a hack for http://issue.k8s.io/4958.
-	// Note: Keep this code after tryUpgrade to not break that flow.
-	if len(loc.Path) == 0 {
-		var queryPart string
-		if len(req.URL.RawQuery) > 0 {
-			queryPart = "?" + req.URL.RawQuery
-		}
-		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
-		w.WriteHeader(http.StatusMovedPermanently)
+	proxyRedirect := proxyRedirectsforRootPath(loc.Path, w, req)
+	if proxyRedirect {
 		return
 	}
 

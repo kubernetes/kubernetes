@@ -41,17 +41,17 @@ func validateReservedMemoryConfiguration(kc *kubeletconfig.KubeletConfiguration)
 
 		for resourceName, q := range reservedMemory.Limits {
 			if !reservedMemorySupportedLimit(resourceName) {
-				errors = append(errors, fmt.Errorf("the limit type %q for NUMA node %d is not supported, only %v is accepted", resourceName, numaNode, []v1.ResourceName{v1.ResourceMemory, v1.ResourceHugePagesPrefix + "<HugePageSize>"}))
+				errors = append(errors, fmt.Errorf("invalid configuration: the limit type %q for NUMA node %d is not supported, only %v is accepted", resourceName, numaNode, []v1.ResourceName{v1.ResourceMemory, v1.ResourceHugePagesPrefix + "<HugePageSize>"}))
 			}
 
 			// validates that the limit has non-zero value
 			if q.IsZero() {
-				errors = append(errors, fmt.Errorf("reserved memory may not be zero for NUMA node %d and resource %q", numaNode, resourceName))
+				errors = append(errors, fmt.Errorf("invalid configuration: reserved memory may not be zero for NUMA node %d and resource %q", numaNode, resourceName))
 			}
 
 			// validates that no duplication for NUMA node and limit type occurred
 			if _, ok := numaTypeDuplicates[numaNode][resourceName]; ok {
-				errors = append(errors, fmt.Errorf("the reserved memory has a duplicate value for NUMA node %d and resource %q", numaNode, resourceName))
+				errors = append(errors, fmt.Errorf("invalid configuration: the reserved memory has a duplicate value for NUMA node %d and resource %q", numaNode, resourceName))
 			}
 			numaTypeDuplicates[numaNode][resourceName] = true
 		}

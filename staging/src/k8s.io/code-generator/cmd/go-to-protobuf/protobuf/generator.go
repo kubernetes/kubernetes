@@ -573,7 +573,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 	switch parts[0] {
 	case "varint", "fixed32", "fixed64", "bytes", "group":
 	default:
-		name := types.Name{}
+		var name types.Name
 		if last := strings.LastIndex(parts[0], "."); last != -1 {
 			prefix := parts[0][:last]
 			name = types.Name{

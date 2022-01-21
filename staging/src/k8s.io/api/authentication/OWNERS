@@ -1,8 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- sig-auth-authenticators-approvers
-- sig-auth-authenticators-reviewers
+  - sig-auth-authenticators-approvers
+  - sig-auth-authenticators-reviewers
 labels:
-- sig/auth
-
+  - sig/auth

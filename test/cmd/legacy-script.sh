@@ -50,6 +50,7 @@ source "${KUBE_ROOT}/test/cmd/plugins.sh"
 source "${KUBE_ROOT}/test/cmd/proxy.sh"
 source "${KUBE_ROOT}/test/cmd/rbac.sh"
 source "${KUBE_ROOT}/test/cmd/request-timeout.sh"
+source "${KUBE_ROOT}/test/cmd/results.sh"
 source "${KUBE_ROOT}/test/cmd/run.sh"
 source "${KUBE_ROOT}/test/cmd/save-config.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
@@ -377,7 +378,7 @@ runTests() {
   export container_name_field="(index .spec.template.spec.containers 0).name"
   export hpa_min_field=".spec.minReplicas"
   export hpa_max_field=".spec.maxReplicas"
-  export hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
+  export hpa_cpu_field="(index .spec.metrics 0).resource.target.averageUtilization"
   export template_labels=".spec.template.metadata.labels.name"
   export statefulset_replicas_field=".spec.replicas"
   export statefulset_observed_generation=".status.observedGeneration"
@@ -435,6 +436,12 @@ runTests() {
   #########################
 
   record_command run_kubectl_version_tests
+
+  ############################
+  # Kubectl result reporting #
+  ############################
+
+  record_command run_kubectl_results_tests
 
   #######################
   # kubectl config set #

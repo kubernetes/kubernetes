@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -71,7 +72,7 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 		}
 		c.eventRecorder = &record.FakeRecorder{}
 
-		c.scaleDownOldReplicaSetsForRecreate(oldRSs, test.d)
+		c.scaleDownOldReplicaSetsForRecreate(context.TODO(), oldRSs, test.d)
 		for j := range oldRSs {
 			rs := oldRSs[j]
 

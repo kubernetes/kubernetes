@@ -44,18 +44,15 @@ var (
 )
 
 func init() {
-	//lint:ignore SA1019 - replacement function still calls prometheus.NewProcessCollector().
+	//nolint:staticcheck // SA1019 - replacement function still calls prometheus.NewProcessCollector().
 	RawMustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	//lint:ignore SA1019 - replacement function still calls prometheus.NewGoCollector().
+	//nolint:staticcheck // SA1019 - replacement function still calls prometheus.NewGoCollector().
 	RawMustRegister(prometheus.NewGoCollector())
 }
 
 // Handler returns an HTTP handler for the DefaultGatherer. It is
 // already instrumented with InstrumentHandler (using "prometheus" as handler
 // name).
-//
-// Deprecated: Please note the issues described in the doc comment of
-// InstrumentHandler. You might want to consider using promhttp.Handler instead.
 func Handler() http.Handler {
 	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }

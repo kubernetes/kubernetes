@@ -1141,7 +1141,7 @@ func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, add
 	}
 
 	if destIP != nil {
-		args = append(args, "-d", utilproxy.ToCIDR(destIP))
+		args = append(args, "-d", destIP.String())
 	}
 
 	if addPhysicalInterfaceMatch {

@@ -51,6 +51,9 @@ run_impersonation_tests() {
   output_message=$(! kubectl get pods "${kube_flags_with_token[@]:?}" --as-group=foo 2>&1)
   kube::test::if_has_string "${output_message}" 'without impersonating a user'
 
+  output_message=$(! kubectl get pods "${kube_flags_with_token[@]:?}" --as-uid=abc123 2>&1)
+  kube::test::if_has_string "${output_message}" 'without impersonating a user'
+
   if kube::test::if_supports_resource "${csr:?}" ; then
     # --as
     kubectl create -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}" --as=user1
@@ -63,6 +66,13 @@ run_impersonation_tests() {
     kube::test::get_object_assert 'csr/foo' '{{len .spec.groups}}' '4'
     kube::test::get_object_assert 'csr/foo' '{{range .spec.groups}}{{.}} {{end}}' 'group2 group1 ,,,chameleon system:authenticated '
     kubectl delete -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}"
+
+    # --as-uid
+    kubectl create -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}" --as=user1 --as-uid=abc123
+    kube::test::get_object_assert 'csr/foo' '{{.spec.username}}' 'user1'
+    kube::test::get_object_assert 'csr/foo' '{{.spec.uid}}' 'abc123'
+    kubectl delete -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}"
+
   fi
 
   set +o nounset

@@ -19,7 +19,7 @@ package testing
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -285,6 +285,17 @@ func (p *PodWrapper) HostPort(port int32) *PodWrapper {
 	return p
 }
 
+// PVC creates a Volume with a PVC and injects into the inner pod.
+func (p *PodWrapper) PVC(name string) *PodWrapper {
+	p.Spec.Volumes = append(p.Spec.Volumes, v1.Volume{
+		Name: name,
+		VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: name},
+		},
+	})
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
@@ -420,6 +431,7 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 		Image: imageutils.GetPauseImageName(),
 		Resources: v1.ResourceRequirements{
 			Requests: res,
+			Limits:   res,
 		},
 	})
 	return p

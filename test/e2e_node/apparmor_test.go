@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -57,7 +58,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 
 			ginkgo.It("should reject an unloaded profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
-				expectSoftRejection(status)
+				gomega.Expect(status.ContainerStatuses[0].State.Waiting.Message).To(gomega.ContainSubstring("apparmor"))
 			})
 			ginkgo.It("should enforce a profile blocking writes", func() {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
@@ -188,6 +189,10 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 			switch t := e.Object.(type) {
 			case *v1.Pod:
 				if t.Status.Reason == "AppArmor" {
+					return true, nil
+				}
+				// Loading a profile not available on disk should return a container creation error
+				if len(t.Status.ContainerStatuses) > 0 && t.Status.ContainerStatuses[0].State.Waiting.Reason == kuberuntime.ErrCreateContainer.Error() {
 					return true, nil
 				}
 			}

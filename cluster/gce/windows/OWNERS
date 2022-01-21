@@ -13,4 +13,4 @@ approvers:
   - yujuhong
   - yliaog
 labels:
-- area/provider/gcp
+  - area/provider/gcp

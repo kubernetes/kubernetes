@@ -72,7 +72,7 @@ type DeploymentController struct {
 	eventRecorder record.EventRecorder
 
 	// To allow injection of syncDeployment for testing.
-	syncHandler func(dKey string) error
+	syncHandler func(ctx context.Context, dKey string) error
 	// used for unit testing
 	enqueueDeployment func(deployment *apps.Deployment)
 
@@ -146,22 +146,22 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 }
 
 // Run begins watching and syncing.
-func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
+func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer dc.queue.ShutDown()
 
 	klog.InfoS("Starting controller", "controller", "deployment")
 	defer klog.InfoS("Shutting down controller", "controller", "deployment")
 
-	if !cache.WaitForNamedCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	if !cache.WaitForNamedCacheSync("deployment", ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(dc.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, dc.worker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (dc *DeploymentController) addDeployment(obj interface{}) {
@@ -457,19 +457,19 @@ func (dc *DeploymentController) resolveControllerRef(namespace string, controlle
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (dc *DeploymentController) worker() {
-	for dc.processNextWorkItem() {
+func (dc *DeploymentController) worker(ctx context.Context) {
+	for dc.processNextWorkItem(ctx) {
 	}
 }
 
-func (dc *DeploymentController) processNextWorkItem() bool {
+func (dc *DeploymentController) processNextWorkItem(ctx context.Context) bool {
 	key, quit := dc.queue.Get()
 	if quit {
 		return false
 	}
 	defer dc.queue.Done(key)
 
-	err := dc.syncHandler(key.(string))
+	err := dc.syncHandler(ctx, key.(string))
 	dc.handleErr(err, key)
 
 	return true
@@ -500,7 +500,7 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 // getReplicaSetsForDeployment uses ControllerRefManager to reconcile
 // ControllerRef by adopting and orphaning.
 // It returns the list of ReplicaSets that this Deployment should manage.
-func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) ([]*apps.ReplicaSet, error) {
+func (dc *DeploymentController) getReplicaSetsForDeployment(ctx context.Context, d *apps.Deployment) ([]*apps.ReplicaSet, error) {
 	// List all ReplicaSets to find those we own but that no longer match our
 	// selector. They will be orphaned by ClaimReplicaSets().
 	rsList, err := dc.rsLister.ReplicaSets(d.Namespace).List(labels.Everything())
@@ -513,8 +513,8 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) 
 	}
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing ReplicaSets (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dc.client.AppsV1().Deployments(d.Namespace).Get(context.TODO(), d.Name, metav1.GetOptions{})
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
+		fresh, err := dc.client.AppsV1().Deployments(d.Namespace).Get(ctx, d.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -524,7 +524,7 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) 
 		return fresh, nil
 	})
 	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, d, deploymentSelector, controllerKind, canAdoptFunc)
-	return cm.ClaimReplicaSets(rsList)
+	return cm.ClaimReplicaSets(ctx, rsList)
 }
 
 // getPodMapForDeployment returns the Pods managed by a Deployment.
@@ -565,7 +565,7 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 
 // syncDeployment will sync the deployment with the given key.
 // This function is not meant to be invoked concurrently with the same key.
-func (dc *DeploymentController) syncDeployment(key string) error {
+func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) error {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		klog.ErrorS(err, "Failed to split meta namespace cache key", "cacheKey", key)
@@ -596,14 +596,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
 		if d.Status.ObservedGeneration < d.Generation {
 			d.Status.ObservedGeneration = d.Generation
-			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 		}
 		return nil
 	}
 
 	// List ReplicaSets owned by this Deployment, while reconciling ControllerRef
 	// through adoption/orphaning.
-	rsList, err := dc.getReplicaSetsForDeployment(d)
+	rsList, err := dc.getReplicaSetsForDeployment(ctx, d)
 	if err != nil {
 		return err
 	}
@@ -618,40 +618,40 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if d.DeletionTimestamp != nil {
-		return dc.syncStatusOnly(d, rsList)
+		return dc.syncStatusOnly(ctx, d, rsList)
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
 	// a deployment. In this way, we can be sure that we won't timeout when a user
 	// resumes a Deployment with a set progressDeadlineSeconds.
-	if err = dc.checkPausedConditions(d); err != nil {
+	if err = dc.checkPausedConditions(ctx, d); err != nil {
 		return err
 	}
 
 	if d.Spec.Paused {
-		return dc.sync(d, rsList)
+		return dc.sync(ctx, d, rsList)
 	}
 
 	// rollback is not re-entrant in case the underlying replica sets are updated with a new
 	// revision so we should ensure that we won't proceed to update replica sets until we
 	// make sure that the deployment has cleaned up its rollback spec in subsequent enqueues.
 	if getRollbackTo(d) != nil {
-		return dc.rollback(d, rsList)
+		return dc.rollback(ctx, d, rsList)
 	}
 
-	scalingEvent, err := dc.isScalingEvent(d, rsList)
+	scalingEvent, err := dc.isScalingEvent(ctx, d, rsList)
 	if err != nil {
 		return err
 	}
 	if scalingEvent {
-		return dc.sync(d, rsList)
+		return dc.sync(ctx, d, rsList)
 	}
 
 	switch d.Spec.Strategy.Type {
 	case apps.RecreateDeploymentStrategyType:
-		return dc.rolloutRecreate(d, rsList, podMap)
+		return dc.rolloutRecreate(ctx, d, rsList, podMap)
 	case apps.RollingUpdateDeploymentStrategyType:
-		return dc.rolloutRolling(d, rsList)
+		return dc.rolloutRolling(ctx, d, rsList)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }

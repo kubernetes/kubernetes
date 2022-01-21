@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 )
 
 // Pod returns a string representing a pod in a consistent human readable format,
@@ -53,15 +52,4 @@ func PodWithDeletionTimestamp(pod *v1.Pod) string {
 		deletionTimestamp = ":DeletionTimestamp=" + pod.DeletionTimestamp.UTC().Format(time.RFC3339)
 	}
 	return Pod(pod) + deletionTimestamp
-}
-
-// Pods returns a list of pods as ObjectRef
-func Pods(pods []*v1.Pod) []klog.ObjectRef {
-	podKObjs := make([]klog.ObjectRef, 0, len(pods))
-	for _, p := range pods {
-		if p != nil {
-			podKObjs = append(podKObjs, klog.KObj(p))
-		}
-	}
-	return podKObjs
 }

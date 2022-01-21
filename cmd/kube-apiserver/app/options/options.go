@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/pflag"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -38,10 +37,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
-
-// InsecurePortFlags are dummy flags, they are kept only for compatibility and will be removed in v1.24.
-// TODO: remove these flags in v1.24.
-var InsecurePortFlags = []string{"insecure-port", "port"}
 
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
@@ -145,33 +140,12 @@ func NewServerRunOptions() *ServerRunOptions {
 	return &s
 }
 
-// TODO: remove these insecure flags in v1.24
-func addDummyInsecureFlags(fs *pflag.FlagSet) {
-	var (
-		bindAddr = net.IPv4(127, 0, 0, 1)
-		bindPort int
-	)
-
-	for _, name := range []string{"insecure-bind-address", "address"} {
-		fs.IPVar(&bindAddr, name, bindAddr, ""+
-			"The IP address on which to serve the insecure port (set to 0.0.0.0 or :: for listening in all interfaces and IP families).")
-		fs.MarkDeprecated(name, "This flag has no effect now and will be removed in v1.24.")
-	}
-
-	for _, name := range InsecurePortFlags {
-		fs.IntVar(&bindPort, name, bindPort, ""+
-			"The port on which to serve unsecured, unauthenticated access.")
-		fs.MarkDeprecated(name, "This flag has no effect now and will be removed in v1.24.")
-	}
-}
-
 // Flags returns flags for a specific APIServer by section name
 func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet("generic"))
 	s.Etcd.AddFlags(fss.FlagSet("etcd"))
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	addDummyInsecureFlags(fss.FlagSet("insecure serving"))
 	s.Audit.AddFlags(fss.FlagSet("auditing"))
 	s.Features.AddFlags(fss.FlagSet("features"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))

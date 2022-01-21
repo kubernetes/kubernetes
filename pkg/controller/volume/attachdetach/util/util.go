@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/features"
@@ -46,8 +47,9 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 		claimName = pvcSource.ClaimName
 		readOnly = pvcSource.ReadOnly
 	}
-	if ephemeralSource := podVolume.VolumeSource.Ephemeral; ephemeralSource != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
-		claimName = pod.Name + "-" + podVolume.Name
+	isEphemeral := podVolume.VolumeSource.Ephemeral != nil
+	if isEphemeral {
+		claimName = ephemeral.VolumeClaimName(pod, &podVolume)
 	}
 	if claimName != "" {
 		klog.V(10).Infof(
@@ -56,8 +58,7 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 			claimName)
 
 		// If podVolume is a PVC, fetch the real PV behind the claim
-		pvName, pvcUID, err := getPVCFromCacheExtractPV(
-			pod.Namespace, claimName, pvcLister)
+		pvc, err := getPVCFromCache(pod.Namespace, claimName, pvcLister)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"error processing PVC %q/%q: %v",
@@ -65,7 +66,13 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 				claimName,
 				err)
 		}
+		if isEphemeral {
+			if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+				return nil, err
+			}
+		}
 
+		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
 		klog.V(10).Infof(
 			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
 			pod.Namespace,
@@ -119,20 +126,19 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 	return spec, nil
 }
 
-// getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
-// name from the shared internal PVC store extracts the name of the PV it is
-// pointing to and returns it.
+// getPVCFromCache fetches the PVC object with the given namespace and
+// name from the shared internal PVC store.
 // This method returns an error if a PVC object does not exist in the cache
 // with the given namespace/name.
 // This method returns an error if the PVC object's phase is not "Bound".
-func getPVCFromCacheExtractPV(namespace string, name string, pvcLister corelisters.PersistentVolumeClaimLister) (string, types.UID, error) {
+func getPVCFromCache(namespace string, name string, pvcLister corelisters.PersistentVolumeClaimLister) (*v1.PersistentVolumeClaim, error) {
 	pvc, err := pvcLister.PersistentVolumeClaims(namespace).Get(name)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to find PVC %s/%s in PVCInformer cache: %v", namespace, name, err)
+		return nil, fmt.Errorf("failed to find PVC %s/%s in PVCInformer cache: %v", namespace, name, err)
 	}
 
 	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
-		return "", "", fmt.Errorf(
+		return nil, fmt.Errorf(
 			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
 			namespace,
 			name,
@@ -140,7 +146,7 @@ func getPVCFromCacheExtractPV(namespace string, name string, pvcLister coreliste
 			pvc.Spec.VolumeName)
 	}
 
-	return pvc.Spec.VolumeName, pvc.UID, nil
+	return pvc, nil
 }
 
 // getPVSpecFromCache fetches the PV object with the given name from the shared

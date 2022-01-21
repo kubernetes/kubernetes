@@ -90,7 +90,6 @@ func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object)
 			}
 			// must read the rest of the frame (until we stop getting ErrShortBuffer)
 			d.resetRead = true
-			base = 0
 			return nil, nil, ErrObjectTooLarge
 		}
 		if err != nil {

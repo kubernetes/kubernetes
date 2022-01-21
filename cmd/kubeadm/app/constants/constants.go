@@ -245,7 +245,7 @@ const (
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
 
 	// UnknownCRISocket defines the undetected or unknown CRI socket
-	UnknownCRISocket = "/var/run/unknown.sock"
+	UnknownCRISocket = "unix:///var/run/unknown.sock"
 
 	// KubeadmConfigConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	KubeadmConfigConfigMap = "kubeadm-config"
@@ -260,13 +260,23 @@ const (
 	KubeProxyConfigMapKey = "config.conf"
 
 	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
+	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
 	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
+
+	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
+	KubeletBaseConfigurationConfigMap = "kubelet-config"
 
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
 	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
 	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
+
+	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
 
 	// KubeletRunDirectory specifies the directory where the kubelet runtime information is stored.
 	KubeletRunDirectory = "/var/lib/kubelet"
@@ -291,7 +301,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.0-0"
+	DefaultEtcdVersion = "3.5.1-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -330,7 +340,7 @@ const (
 	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "v1.8.4"
+	CoreDNSVersion = "v1.8.6"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -472,8 +482,8 @@ var (
 		19: "3.4.13-0",
 		20: "3.4.13-0",
 		21: "3.4.13-0",
-		22: "3.5.0-0",
-		23: "3.5.0-0",
+		22: "3.5.1-0",
+		23: "3.5.1-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
@@ -672,6 +682,11 @@ func GetAPIServerVirtualIP(svcSubnetList string) (net.IP, error) {
 }
 
 // GetKubeletConfigMapName returns the right ConfigMap name for the right branch of k8s
-func GetKubeletConfigMapName(k8sVersion *version.Version) string {
+// TODO: Remove the legacy arg once UnversionedKubeletConfigMap graduates to GA:
+// https://github.com/kubernetes/kubeadm/issues/1582
+func GetKubeletConfigMapName(k8sVersion *version.Version, legacy bool) string {
+	if !legacy {
+		return KubeletBaseConfigurationConfigMap
+	}
 	return fmt.Sprintf("%s%d.%d", KubeletBaseConfigurationConfigMapPrefix, k8sVersion.Major(), k8sVersion.Minor())
 }

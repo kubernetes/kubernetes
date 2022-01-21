@@ -113,7 +113,7 @@ func (c *FakeFlowSchemas) UpdateStatus(ctx context.Context, flowSchema *v1beta2.
 // Delete takes name of the flowSchema and deletes it. Returns an error if one occurs.
 func (c *FakeFlowSchemas) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(flowschemasResource, name), &v1beta2.FlowSchema{})
+		Invokes(testing.NewRootDeleteActionWithOptions(flowschemasResource, name, opts), &v1beta2.FlowSchema{})
 	return err
 }
 

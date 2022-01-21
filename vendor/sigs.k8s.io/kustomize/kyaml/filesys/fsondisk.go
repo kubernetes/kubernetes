@@ -88,7 +88,17 @@ func (fsOnDisk) Exists(name string) bool {
 
 // Glob returns the list of matching files
 func (fsOnDisk) Glob(pattern string) ([]string, error) {
-	return filepath.Glob(pattern)
+	var result []string
+	allFilePaths, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, err
+	}
+	if IsHiddenFilePath(pattern) {
+		result = allFilePaths
+	} else {
+		result = RemoveHiddenFiles(allFilePaths)
+	}
+	return result, nil
 }
 
 // IsDir delegates to os.Stat and FileInfo.IsDir

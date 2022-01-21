@@ -18,7 +18,7 @@ package gci
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -40,7 +40,7 @@ func init() {
 }
 
 func TestCreateMasterAuditPolicy(t *testing.T) {
-	baseDir, err := ioutil.TempDir("", "configure-helper-test") // cleaned up by c.tearDown()
+	baseDir, err := os.MkdirTemp("", "configure-helper-test") // cleaned up by c.tearDown()
 	require.NoError(t, err, "Failed to create temp directory")
 
 	policyFile := filepath.Join(baseDir, "audit_policy.yaml")
@@ -231,10 +231,10 @@ func (t *auditTester) expectLevel(expected audit.Level, attrs authorizer.Attribu
 	name := fmt.Sprintf("%s.%s.%s", attrs.GetUser().GetName(), attrs.GetVerb(), obj)
 	evaluator := t.evaluator
 	t.Run(name, func(t *testing.T) {
-		level, stages := evaluator.LevelAndStages(attrs)
-		assert.Equal(t, expected, level)
-		if level != audit.LevelNone {
-			assert.ElementsMatch(t, stages, []audit.Stage{audit.StageRequestReceived})
+		auditConfig := evaluator.EvaluatePolicyRule(attrs)
+		assert.Equal(t, expected, auditConfig.Level)
+		if auditConfig.Level != audit.LevelNone {
+			assert.ElementsMatch(t, auditConfig.OmitStages, []audit.Stage{audit.StageRequestReceived})
 		}
 	})
 }

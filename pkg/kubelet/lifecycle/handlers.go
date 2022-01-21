@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -56,7 +56,7 @@ func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontain
 	}
 }
 
-func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
 	switch {
 	case handler.Exec != nil:
 		var msg string
@@ -105,7 +105,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
@@ -172,143 +172,4 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 		Reason:  "AppArmor",
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
 	}
-}
-
-// NewNoNewPrivsAdmitHandler returns a PodAdmitHandler which is used to evaluate
-// if a pod can be admitted from the perspective of NoNewPrivs.
-func NewNoNewPrivsAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
-	return &noNewPrivsAdmitHandler{
-		Runtime: runtime,
-	}
-}
-
-type noNewPrivsAdmitHandler struct {
-	kubecontainer.Runtime
-}
-
-func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
-	// If the pod is already running or terminated, no need to recheck NoNewPrivs.
-	if attrs.Pod.Status.Phase != v1.PodPending {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// If the containers in a pod do not require no-new-privs, admit it.
-	if !noNewPrivsRequired(attrs.Pod) {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// Always admit runtimes except docker.
-	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// Make sure docker api version is valid.
-	rversion, err := a.Runtime.APIVersion()
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "NoNewPrivs",
-			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
-		}
-	}
-	v, err := rversion.Compare("1.23.0")
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "NoNewPrivs",
-			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
-		}
-	}
-	// If the version is less than 1.23 it will return -1 above.
-	if v == -1 {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "NoNewPrivs",
-			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: docker runtime API version %q must be greater than or equal to 1.23", rversion.String()),
-		}
-	}
-
-	return PodAdmitResult{Admit: true}
-}
-
-func noNewPrivsRequired(pod *v1.Pod) bool {
-	// Iterate over pod containers and check if we added no-new-privs.
-	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext != nil && c.SecurityContext.AllowPrivilegeEscalation != nil && !*c.SecurityContext.AllowPrivilegeEscalation {
-			return true
-		}
-	}
-	return false
-}
-
-// NewProcMountAdmitHandler returns a PodAdmitHandler which is used to evaluate
-// if a pod can be admitted from the perspective of ProcMount.
-func NewProcMountAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
-	return &procMountAdmitHandler{
-		Runtime: runtime,
-	}
-}
-
-type procMountAdmitHandler struct {
-	kubecontainer.Runtime
-}
-
-func (a *procMountAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
-	// If the pod is already running or terminated, no need to recheck NoNewPrivs.
-	if attrs.Pod.Status.Phase != v1.PodPending {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// If the containers in a pod only need the default ProcMountType, admit it.
-	if procMountIsDefault(attrs.Pod) {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// Always admit runtimes except docker.
-	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
-		return PodAdmitResult{Admit: true}
-	}
-
-	// Make sure docker api version is valid.
-	// Merged in https://github.com/moby/moby/pull/36644
-	rversion, err := a.Runtime.APIVersion()
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "ProcMount",
-			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
-		}
-	}
-	v, err := rversion.Compare("1.38.0")
-	if err != nil {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "ProcMount",
-			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
-		}
-	}
-	// If the version is less than 1.38 it will return -1 above.
-	if v == -1 {
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "ProcMount",
-			Message: fmt.Sprintf("Cannot enforce ProcMount: docker runtime API version %q must be greater than or equal to 1.38", rversion.String()),
-		}
-	}
-
-	return PodAdmitResult{Admit: true}
-}
-
-func procMountIsDefault(pod *v1.Pod) bool {
-	// Iterate over pod containers and check if we are using the DefaultProcMountType
-	// for all containers.
-	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext != nil {
-			if c.SecurityContext.ProcMount != nil && *c.SecurityContext.ProcMount != v1.DefaultProcMount {
-				return false
-			}
-		}
-	}
-
-	return true
 }

@@ -577,13 +577,11 @@ func TestGetExtraParameters(t *testing.T) {
 				"admission-control": "NamespaceLifecycle,LimitRanger",
 			},
 			defaults: map[string]string{
-				"admission-control":     "NamespaceLifecycle",
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
+				"admission-control": "NamespaceLifecycle",
+				"allow-privileged":  "true",
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 		},
@@ -593,12 +591,10 @@ func TestGetExtraParameters(t *testing.T) {
 				"admission-control": "NamespaceLifecycle,LimitRanger",
 			},
 			defaults: map[string]string{
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
+				"allow-privileged": "true",
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 		},

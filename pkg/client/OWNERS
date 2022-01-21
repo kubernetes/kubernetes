@@ -1,38 +1,32 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- caesarxuchao
-- deads2k
-- krousey
-- lavalamp
-- liggitt
-- smarterclayton
+  - caesarxuchao
+  - deads2k
+  - lavalamp
+  - liggitt
+  - smarterclayton
 reviewers:
-- thockin
-- lavalamp
-- smarterclayton
-- wojtek-t
-- deads2k
-- yujuhong
-- derekwaynecarr
-- caesarxuchao
-- vishh
-- mikedanese
-- liggitt
-- davidopp
-- pmorie
-- sttts
-- dchen1107
-- saad-ali
-- luxas
-- janetkuo
-- justinsb
-- ncdc
-- yifan-gu
-- mwielgus
-- timothysc
-- feiskyer
-- jlowdermilk
-- soltysh
-- piosz
-- jsafrane
+  - thockin
+  - lavalamp
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - yujuhong
+  - derekwaynecarr
+  - caesarxuchao
+  - mikedanese
+  - liggitt
+  - sttts
+  - dchen1107
+  - saad-ali
+  - luxas
+  - janetkuo
+  - justinsb
+  - ncdc
+  - mwielgus
+  - feiskyer
+  - soltysh
+  - jsafrane
+emeritus_approvers:
+  - krousey

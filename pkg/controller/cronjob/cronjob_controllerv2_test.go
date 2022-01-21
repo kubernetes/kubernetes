@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
@@ -30,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
@@ -39,8 +41,108 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+var (
+	shortDead  int64 = 10
+	mediumDead int64 = 2 * 60 * 60
+	longDead   int64 = 1000000
+	noDead     int64 = -12345
+
+	errorSchedule = "obvious error schedule"
+	// schedule is hourly on the hour
+	onTheHour = "0 * * * ?"
+
+	A = batchv1.AllowConcurrent
+	f = batchv1.ForbidConcurrent
+	R = batchv1.ReplaceConcurrent
+	T = true
+	F = false
+)
+
+// returns a cronJob with some fields filled in.
+func cronJob() batchv1.CronJob {
+	return batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "mycronjob",
+			Namespace:         "snazzycats",
+			UID:               types.UID("1a2b3c"),
+			CreationTimestamp: metav1.Time{Time: justBeforeTheHour()},
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:          "* * * * ?",
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"a": "b"},
+					Annotations: map[string]string{"x": "y"},
+				},
+				Spec: jobSpec(),
+			},
+		},
+	}
+}
+
+func jobSpec() batchv1.JobSpec {
+	one := int32(1)
+	return batchv1.JobSpec{
+		Parallelism: &one,
+		Completions: &one,
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Image: "foo/bar"},
+				},
+			},
+		},
+	}
+}
+
 func justASecondBeforeTheHour() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:59:59Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func justAfterThePriorHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:01:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func justBeforeThePriorHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T08:59:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func justAfterTheHour() *time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:01:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return &T1
+}
+
+func justBeforeTheHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:59:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func weekAfterTheHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-26T10:00:00Z")
 	if err != nil {
 		panic("test setup error")
 	}
@@ -221,7 +323,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					return tc.now
 				},
 			}
-			cjCopy, requeueAfter, err := jm.syncCronJob(&cj, js)
+			cjCopy, requeueAfter, err := jm.syncCronJob(context.TODO(), &cj, js)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}

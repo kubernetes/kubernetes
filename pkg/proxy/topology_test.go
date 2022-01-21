@@ -31,6 +31,7 @@ func TestFilterEndpoints(t *testing.T) {
 	type endpoint struct {
 		ip        string
 		zoneHints sets.String
+		unready   bool
 	}
 	testCases := []struct {
 		name              string
@@ -138,12 +139,12 @@ func TestFilterEndpoints(t *testing.T) {
 
 			endpoints := []Endpoint{}
 			for _, ep := range tc.endpoints {
-				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			expectedEndpoints := []Endpoint{}
 			for _, ep := range tc.expectedEndpoints {
-				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			filteredEndpoints := FilterEndpoints(endpoints, tc.serviceInfo, tc.nodeLabels)
@@ -161,6 +162,7 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 	type endpoint struct {
 		ip        string
 		zoneHints sets.String
+		unready   bool
 	}
 	testCases := []struct {
 		name              string
@@ -199,6 +201,35 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		expectedEndpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:            "unready endpoint",
+		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
+		hintsAnnotation: "auto",
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a"), unready: true},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:            "only unready endpoints in same zone (should not filter)",
+		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
+		hintsAnnotation: "auto",
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a"), unready: true},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a"), unready: true},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a"), unready: true},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a"), unready: true},
 		},
 	}, {
 		name:            "normal endpoint filtering, Auto annotation",
@@ -291,12 +322,12 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			endpoints := []Endpoint{}
 			for _, ep := range tc.endpoints {
-				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				endpoints = append(endpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			expectedEndpoints := []Endpoint{}
 			for _, ep := range tc.expectedEndpoints {
-				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints})
+				expectedEndpoints = append(expectedEndpoints, &BaseEndpointInfo{Endpoint: ep.ip, ZoneHints: ep.zoneHints, Ready: !ep.unready})
 			}
 
 			filteredEndpoints := filterEndpointsWithHints(endpoints, tc.hintsAnnotation, tc.nodeLabels)

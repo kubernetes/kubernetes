@@ -764,3 +764,30 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.d.Dec = nil
 	q.i = int64Amount{value: value, scale: scale}
 }
+
+// QuantityValue makes it possible to use a Quantity as value for a command
+// line parameter.
+//
+// +protobuf=true
+// +protobuf.embed=string
+// +protobuf.options.marshal=false
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:deepcopy-gen=true
+type QuantityValue struct {
+	Quantity
+}
+
+// Set implements pflag.Value.Set and Go flag.Value.Set.
+func (q *QuantityValue) Set(s string) error {
+	quantity, err := ParseQuantity(s)
+	if err != nil {
+		return err
+	}
+	q.Quantity = quantity
+	return nil
+}
+
+// Type implements pflag.Value.Type.
+func (q QuantityValue) Type() string {
+	return "quantity"
+}

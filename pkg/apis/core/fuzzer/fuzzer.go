@@ -538,5 +538,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				e.Series.LastObservedTime = metav1.MicroTime{Time: time.Unix(3, 3000)}
 			}
 		},
+		func(j *core.GRPCAction, c fuzz.Continue) {
+			empty := ""
+			if j.Service == nil {
+				j.Service = &empty
+			}
+		},
 	}
 }

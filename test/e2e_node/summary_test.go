@@ -19,7 +19,6 @@ package e2enode
 import (
 	"fmt"
 	"io/ioutil"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -115,9 +114,13 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UserDefinedMetrics": gomega.BeEmpty(),
 				})
 			}
-			expectedMajorPageFaultsUpperBound := 10
+			expectedPageFaultsUpperBound := 1000000
+			expectedMajorPageFaultsUpperBound := 15
 			if IsCgroup2UnifiedMode() {
-				expectedMajorPageFaultsUpperBound = 1000
+				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
+				// above for the container.
+				expectedPageFaultsUpperBound = 1e9
+				expectedMajorPageFaultsUpperBound = 100000
 			}
 
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -128,33 +131,10 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				"UsageBytes":      bounded(10*e2evolume.Kb, memoryLimit),
 				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
-				"PageFaults":      bounded(0, 1000000),
+				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
-			if systemdutil.IsRunningSystemd() && framework.TestContext.ContainerRuntime == "docker" {
-				// Some Linux distributions still ship a docker.service that is missing
-				// a `Delegate=yes` setting (or equivalent CPUAccounting= and MemoryAccounting=)
-				// that allows us to monitor the container runtime resource usage through
-				// the "cpu" and "memory" cgroups.
-				//
-				// Make an exception here for those distros, only for Docker, so that they
-				// can pass the full node e2e tests even in that case.
-				//
-				// For newer container runtimes (using CRI) and even distros that still
-				// ship Docker, we should encourage them to always set `Delegate=yes` in
-				// order to make monitoring of the runtime possible.
-				stdout, err := exec.Command("systemctl", "show", "-p", "Delegate", "docker.service").CombinedOutput()
-				if err == nil && strings.TrimSpace(string(stdout)) == "Delegate=no" {
-					// Only make these optional if we can successfully confirm that
-					// Delegate is set to "no" (in other words, unset.) If we fail
-					// to check that, default to requiring it, which might cause
-					// false positives, but that should be the safer approach.
-					ginkgo.By("Making runtime container expectations optional, since systemd was not configured to Delegate=yes the cgroups")
-					runtimeContExpectations.Fields["Memory"] = gomega.Or(gomega.BeNil(), runtimeContExpectations.Fields["Memory"])
-					runtimeContExpectations.Fields["CPU"] = gomega.Or(gomega.BeNil(), runtimeContExpectations.Fields["CPU"])
-				}
-			}
 			systemContainers := gstruct.Elements{
 				"kubelet": sysContExpectations(),
 				"runtime": runtimeContExpectations,
@@ -196,8 +176,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-							"PageFaults":      bounded(100, 1000000),
-							"MajorPageFaults": bounded(0, 10),
+							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
+							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
 						"Accelerators": gomega.BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
@@ -243,8 +223,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-					"PageFaults":      bounded(0, 1000000),
-					"MajorPageFaults": bounded(0, 10),
+					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
+					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{

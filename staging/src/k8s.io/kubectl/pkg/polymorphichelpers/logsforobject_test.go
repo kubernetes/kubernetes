@@ -119,9 +119,20 @@ func TestLogsForObject(t *testing.T) {
 			},
 		},
 		{
-			name:        "pod logs: error - must provide container name",
-			obj:         testPodWithTwoContainers(),
-			expectedErr: "a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]",
+			name: "pod logs: default to first container",
+			obj:  testPodWithTwoContainers(),
+			actions: []testclient.Action{
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-c1"}),
+			},
+			expectedSources: []corev1.ObjectReference{
+				{
+					Kind:       testPodWithTwoContainers().Kind,
+					APIVersion: testPodWithTwoContainers().APIVersion,
+					Name:       testPodWithTwoContainers().Name,
+					Namespace:  testPodWithTwoContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithTwoContainers().Spec.Containers[0].Name),
+				},
+			},
 		},
 		{
 			name: "pods list logs",
@@ -248,11 +259,22 @@ func TestLogsForObject(t *testing.T) {
 			},
 		},
 		{
-			name: "pods list logs: error - must provide container name",
+			name: "pods list logs: default to first container",
 			obj: &corev1.PodList{
 				Items: []corev1.Pod{*testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers()},
 			},
-			expectedErr: "a container name must be specified for pod foo-two-containers-and-two-init-containers, choose one of: [foo-2-and-2-and-1-c1 foo-2-and-2-and-1-c2] or one of the init containers: [foo-2-and-2-and-1-initc1 foo-2-and-2-and-1-initc2] or one of the ephemeral containers: [foo-2-and-2-and-1-e1]",
+			actions: []testclient.Action{
+				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c1"}),
+			},
+			expectedSources: []corev1.ObjectReference{
+				{
+					Kind:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Kind,
+					APIVersion: testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().APIVersion,
+					Name:       testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Name,
+					Namespace:  testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Namespace,
+					FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers().Spec.Containers[0].Name),
+				},
+			},
 		},
 		{
 			name: "replication controller logs",
@@ -485,10 +507,10 @@ func TestLogsForObjectWithClient(t *testing.T) {
 		expectedError     string
 	}{
 		{
-			name:          "two container pod without default container selected",
-			podFn:         testPodWithTwoContainers,
-			podLogOptions: &corev1.PodLogOptions{},
-			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+			name:              "two container pod without default container selected should default to the first one",
+			podFn:             testPodWithTwoContainers,
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c1}`,
 		},
 		{
 			name: "two container pod with default container selected",
@@ -513,14 +535,14 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			expectedFieldPath: `spec.containers{foo-2-c2}`,
 		},
 		{
-			name: "two container pod with non-existing default container selected",
+			name: "two container pod with non-existing default container selected should default to the first container",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
 				pod.Annotations = map[string]string{podcmd.DefaultContainerAnnotationName: "non-existing"}
 				return pod
 			},
-			podLogOptions: &corev1.PodLogOptions{},
-			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c1}`,
 		},
 		{
 			name: "two container pod with default container set, but allContainers also set",

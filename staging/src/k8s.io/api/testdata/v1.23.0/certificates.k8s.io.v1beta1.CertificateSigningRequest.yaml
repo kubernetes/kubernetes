@@ -1,0 +1,54 @@
+apiVersion: certificates.k8s.io/v1beta1
+kind: CertificateSigningRequest
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: "2061-09-19T18:13:36Z"
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fieldsType: "18"
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "11042405498087606203"
+  selfLink: "5"
+  uid: "7"
+spec:
+  expirationSeconds: 1305381319
+  extra:
+    "24":
+    - "25"
+  groups:
+  - "23"
+  request: OA==
+  signerName: "20"
+  uid: "22"
+  usages:
+  - 鯹)晿<
+  username: "21"
+status:
+  certificate: fQ==
+  conditions:
+  - lastTransitionTime: "2214-12-23T19:22:14Z"
+    lastUpdateTime: "2762-08-27T06:50:32Z"
+    message: "27"
+    reason: "26"
+    status: Č扷5ƗǸƢ6/ʕVŚ(ĿȊ甞谐颋ǅS
+    type: .蘯6ċV夸

@@ -108,7 +108,7 @@ func (c *FakeLeases) Update(ctx context.Context, lease *coordinationv1.Lease, op
 // Delete takes name of the lease and deletes it. Returns an error if one occurs.
 func (c *FakeLeases) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(leasesResource, c.ns, name), &coordinationv1.Lease{})
+		Invokes(testing.NewDeleteActionWithOptions(leasesResource, c.ns, name, opts), &coordinationv1.Lease{})
 
 	return err
 }

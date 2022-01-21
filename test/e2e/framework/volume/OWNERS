@@ -1,11 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-storage-approvers
-- rootfs
-- jingxu97
+  - sig-storage-approvers
+  - jingxu97
 reviewers:
-- sig-storage-reviewers
-- jeffvance
-- copejon
-- davidz627
+  - sig-storage-reviewers
+emeritus_approvers:
+  - rootfs

@@ -7,11 +7,10 @@
 options:
   no_parent_owners: true
 approvers:
-- api-approvers
+  - api-approvers
 reviewers:
-- api-reviewers
-
+  - api-reviewers
 labels:
-- kind/api-change
-- sig/api-machinery
-- sig/cluster-lifecycle
+  - kind/api-change
+  - sig/api-machinery
+  - sig/cluster-lifecycle

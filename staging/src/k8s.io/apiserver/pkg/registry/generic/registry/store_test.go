@@ -473,6 +473,7 @@ func TestNewDeleteOptionsFromUpdateOptions(t *testing.T) {
 
 		// DeleteOptions does not have these fields.
 		delete(inMap, "fieldManager")
+		delete(inMap, "fieldValidation")
 
 		// UpdateOptions does not have these fields.
 		delete(outMap, "gracePeriodSeconds")
@@ -2121,6 +2122,37 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 		if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 			t.Errorf("Unexpected error: %v", err)
 		}
+	}
+}
+
+func TestStoreDeleteCollectionWorkDistributorExited(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	for i := 0; i < 100; i++ {
+		if _, err := registry.Create(
+			testContext,
+			&example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("foo-%d", i),
+				},
+			},
+			rest.ValidateAllObjectFunc,
+			&metav1.CreateOptions{},
+		); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	expectErr := fmt.Errorf("validate object failed")
+
+	_, err := registry.DeleteCollection(testContext, func(ctx context.Context, obj runtime.Object) error {
+		return expectErr
+	}, nil, &metainternalversion.ListOptions{})
+	if err != expectErr {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 

@@ -20,9 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path"
 	"reflect"
 	"regexp"
 	"sort"
@@ -861,12 +858,12 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			framework.Unschedulable,
 			fmt.Sprintf("Insufficient %v", v1.ResourceCPU),
 			fmt.Sprintf("Insufficient %v", v1.ResourceMemory),
-		).WithFailedPlugin(noderesources.FitName)
+		).WithFailedPlugin(noderesources.Name)
 	}
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		st.RegisterPluginAsExtensions(noderesources.FitName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit), "Filter", "PreFilter"),
+		st.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit), "Filter", "PreFilter"),
 	}
 	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, fns...)
 
@@ -882,7 +879,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			NumAllNodes: len(nodes),
 			Diagnosis: framework.Diagnosis{
 				NodeToStatusMap:      failedNodeStatues,
-				UnschedulablePlugins: sets.NewString(noderesources.FitName),
+				UnschedulablePlugins: sets.NewString(noderesources.Name),
 			},
 		}
 		if len(fmt.Sprint(expectErr)) > 150 {
@@ -1136,83 +1133,6 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 	}
 }
 
-func TestInitPolicyFromFile(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "policy")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	for i, test := range []struct {
-		policy             string
-		expectedPredicates sets.String
-	}{
-		// Test json format policy file
-		{
-			policy: `{
-				"kind" : "Policy",
-				"apiVersion" : "v1",
-				"predicates" : [
-					{"name" : "PredicateOne"},
-					{"name" : "PredicateTwo"}
-				],
-				"priorities" : [
-					{"name" : "PriorityOne", "weight" : 1},
-					{"name" : "PriorityTwo", "weight" : 5}
-				]
-			}`,
-			expectedPredicates: sets.NewString(
-				"PredicateOne",
-				"PredicateTwo",
-			),
-		},
-		// Test yaml format policy file
-		{
-			policy: `apiVersion: v1
-kind: Policy
-predicates:
-- name: PredicateOne
-- name: PredicateTwo
-priorities:
-- name: PriorityOne
-  weight: 1
-- name: PriorityTwo
-  weight: 5
-`,
-			expectedPredicates: sets.NewString(
-				"PredicateOne",
-				"PredicateTwo",
-			),
-		},
-	} {
-		file := fmt.Sprintf("scheduler-policy-config-file-%d", i)
-		fullPath := path.Join(dir, file)
-
-		if err := ioutil.WriteFile(fullPath, []byte(test.policy), 0644); err != nil {
-			t.Fatalf("Failed writing a policy config file: %v", err)
-		}
-
-		policy := &schedulerapi.Policy{}
-
-		if err := initPolicyFromFile(fullPath, policy); err != nil {
-			t.Fatalf("Failed writing a policy config file: %v", err)
-		}
-
-		// Verify that the policy is initialized correctly.
-		schedPredicates := sets.NewString()
-		for _, p := range policy.Predicates {
-			schedPredicates.Insert(p.Name)
-		}
-		schedPrioritizers := sets.NewString()
-		for _, p := range policy.Priorities {
-			schedPrioritizers.Insert(p.Name)
-		}
-		if !schedPredicates.Equal(test.expectedPredicates) {
-			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
-		}
-	}
-}
-
 func TestSchedulerBinding(t *testing.T) {
 	table := []struct {
 		podName      string
@@ -1311,7 +1231,7 @@ func TestUpdatePod(t *testing.T) {
 		currentPodConditions     []v1.PodCondition
 		newPodCondition          *v1.PodCondition
 		currentNominatedNodeName string
-		newNominatedNodeName     string
+		newNominatingInfo        *framework.NominatingInfo
 		expectedPatchRequests    int
 		expectedPatchDataPattern string
 	}{
@@ -1441,7 +1361,7 @@ func TestUpdatePod(t *testing.T) {
 				Reason:             "currentReason",
 				Message:            "currentMessage",
 			},
-			newNominatedNodeName:     "node1",
+			newNominatingInfo:        &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"},
 			expectedPatchRequests:    1,
 			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
 		},
@@ -1468,7 +1388,7 @@ func TestUpdatePod(t *testing.T) {
 				},
 			}
 
-			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatedNodeName); err != nil {
+			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
 				t.Fatalf("Error calling update: %v", err)
 			}
 

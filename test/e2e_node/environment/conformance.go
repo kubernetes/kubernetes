@@ -29,8 +29,6 @@ import (
 
 	"errors"
 	"os"
-
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
 const success = "\033[0;32mSUCESS\033[0m"
@@ -66,12 +64,9 @@ func check(options ...string) []error {
 		switch c {
 		case "all":
 			errs = appendNotNil(errs, kernel())
-			errs = appendNotNil(errs, containerRuntime())
 			errs = appendNotNil(errs, daemons())
 			errs = appendNotNil(errs, firewall())
 			errs = appendNotNil(errs, dns())
-		case "containerruntime":
-			errs = appendNotNil(errs, containerRuntime())
 		case "daemons":
 			errs = appendNotNil(errs, daemons())
 		case "dns":
@@ -86,37 +81,6 @@ func check(options ...string) []error {
 		}
 	}
 	return errs
-}
-
-const dockerVersionRegex = `1\.[7-9]\.[0-9]+`
-
-// containerRuntime checks that a suitable container runtime is installed and recognized by cadvisor: docker 1.7-1.9
-func containerRuntime() error {
-	dockerRegex, err := regexp.Compile(dockerVersionRegex)
-	if err != nil {
-		// This should never happen and can only be fixed by changing the code
-		panic(err)
-	}
-
-	// Setup cadvisor to check the container environment
-	c, err := cadvisor.New(cadvisor.NewImageFsInfoProvider("docker", ""), "/var/lib/kubelet", []string{"/"}, false)
-	if err != nil {
-		return printError("Container Runtime Check: %s Could not start cadvisor %v", failed, err)
-	}
-
-	vi, err := c.VersionInfo()
-	if err != nil {
-		return printError("Container Runtime Check: %s Could not get VersionInfo %v", failed, err)
-	}
-
-	d := vi.DockerVersion
-	if !dockerRegex.Match([]byte(d)) {
-		return printError(
-			"Container Runtime Check: %s Docker version %s does not matching %s.  You may need to run as root or the "+
-				"user the kubelet will run under.", failed, d, dockerVersionRegex)
-	}
-
-	return printSuccess("Container Runtime Check: %s", success)
 }
 
 const kubeletClusterDNSRegexStr = `\/kubelet.*--cluster-dns=(\S+) `

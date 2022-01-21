@@ -61,7 +61,6 @@ func TestAdmit(t *testing.T) {
 		resource       schema.GroupVersionResource
 		object         runtime.Object
 		expectedObject runtime.Object
-		featureEnabled bool
 		namespace      string
 	}{
 		{
@@ -69,7 +68,6 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claim,
 			claimWithFinalizer,
-			true,
 			claim.Namespace,
 		},
 		{
@@ -77,23 +75,13 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claimWithFinalizer,
 			claimWithFinalizer,
-			true,
 			claimWithFinalizer.Namespace,
-		},
-		{
-			"disabled feature -> no finalizer",
-			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-			claim,
-			claim,
-			false,
-			claim.Namespace,
 		},
 		{
 			"create -> add finalizer",
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pv,
 			pvWithFinalizer,
-			true,
 			pv.Namespace,
 		},
 		{
@@ -101,23 +89,13 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pvWithFinalizer,
 			pvWithFinalizer,
-			true,
 			pvWithFinalizer.Namespace,
-		},
-		{
-			"disabled feature -> no finalizer",
-			api.SchemeGroupVersion.WithResource("persistentvolumes"),
-			pv,
-			pv,
-			false,
-			pv.Namespace,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := newPlugin()
-			ctrl.storageObjectInUseProtection = test.featureEnabled
 
 			obj := test.object.DeepCopyObject()
 			attrs := admission.NewAttributesRecord(

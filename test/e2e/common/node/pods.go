@@ -22,11 +22,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"k8s.io/client-go/util/retry"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/util/retry"
 
 	"golang.org/x/net/websocket"
 
@@ -771,8 +772,7 @@ var _ = SIGDescribe("Pods", func() {
 		}
 	})
 
-	// TODO(freehan): label the test to be [NodeConformance] after tests are proven to be stable.
-	ginkgo.It("should support pod readiness gates [NodeFeature:PodReadinessGate]", func() {
+	ginkgo.It("should support pod readiness gates [NodeConformance]", func() {
 		podName := "pod-ready"
 		readinessGate1 := "k8s.io/test-condition1"
 		readinessGate2 := "k8s.io/test-condition2"
@@ -866,6 +866,8 @@ var _ = SIGDescribe("Pods", func() {
 				}}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 			framework.Logf("created %v", podTestName)
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podTestName, f.Namespace.Name))
+			framework.Logf("running and ready %v", podTestName)
 		}
 
 		// wait as required for all 3 pods to be found

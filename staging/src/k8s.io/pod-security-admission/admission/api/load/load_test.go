@@ -98,6 +98,29 @@ func TestLoadFromFile(t *testing.T) {
 		}
 	}
 
+	// valid file
+	{
+		input := `{
+			"apiVersion":"pod-security.admission.config.k8s.io/v1beta1",
+			"kind":"PodSecurityConfiguration",
+			"defaults":{"enforce":"baseline"}}`
+		expect := &api.PodSecurityConfiguration{
+			Defaults: api.PodSecurityDefaults{
+				Enforce: "baseline", EnforceVersion: "latest",
+				Warn: "privileged", WarnVersion: "latest",
+				Audit: "privileged", AuditVersion: "latest",
+			},
+		}
+
+		config, err := LoadFromFile(writeTempFile(t, input))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if !reflect.DeepEqual(config, expect) {
+			t.Fatalf("unexpected config:\n%s", cmp.Diff(expect, config))
+		}
+	}
+
 	// missing file
 	{
 		_, err := LoadFromFile(`bogus-missing-pod-security-policy-config-file`)
@@ -153,6 +176,29 @@ func TestLoadFromReader(t *testing.T) {
 	{
 		input := `{
 			"apiVersion":"pod-security.admission.config.k8s.io/v1alpha1",
+			"kind":"PodSecurityConfiguration",
+			"defaults":{"enforce":"baseline"}}`
+		expect := &api.PodSecurityConfiguration{
+			Defaults: api.PodSecurityDefaults{
+				Enforce: "baseline", EnforceVersion: "latest",
+				Warn: "privileged", WarnVersion: "latest",
+				Audit: "privileged", AuditVersion: "latest",
+			},
+		}
+
+		config, err := LoadFromReader(bytes.NewBufferString(input))
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if !reflect.DeepEqual(config, expect) {
+			t.Fatalf("unexpected config:\n%s", cmp.Diff(expect, config))
+		}
+	}
+
+	// valid reader
+	{
+		input := `{
+			"apiVersion":"pod-security.admission.config.k8s.io/v1beta1",
 			"kind":"PodSecurityConfiguration",
 			"defaults":{"enforce":"baseline"}}`
 		expect := &api.PodSecurityConfiguration{
@@ -247,6 +293,46 @@ exemptions:
 			},
 		},
 		{
+			name: "v1beta1 - json",
+			data: []byte(`{
+"apiVersion":"pod-security.admission.config.k8s.io/v1beta1",
+"kind":"PodSecurityConfiguration",
+"defaults":{"enforce":"baseline"}}`),
+			expectConfig: &api.PodSecurityConfiguration{
+				Defaults: api.PodSecurityDefaults{
+					Enforce: "baseline", EnforceVersion: "latest",
+					Warn: "privileged", WarnVersion: "latest",
+					Audit: "privileged", AuditVersion: "latest",
+				},
+			},
+		},
+		{
+			name: "v1beta1 - yaml",
+			data: []byte(`
+apiVersion: pod-security.admission.config.k8s.io/v1beta1
+kind: PodSecurityConfiguration
+defaults:
+  enforce: baseline
+  enforce-version: v1.7
+exemptions:
+  usernames: ["alice","bob"]
+  namespaces: ["kube-system"]
+  runtimeClasses: ["special"]
+`),
+			expectConfig: &api.PodSecurityConfiguration{
+				Defaults: api.PodSecurityDefaults{
+					Enforce: "baseline", EnforceVersion: "v1.7",
+					Warn: "privileged", WarnVersion: "latest",
+					Audit: "privileged", AuditVersion: "latest",
+				},
+				Exemptions: api.PodSecurityExemptions{
+					Usernames:      []string{"alice", "bob"},
+					Namespaces:     []string{"kube-system"},
+					RuntimeClasses: []string{"special"},
+				},
+			},
+		},
+		{
 			name:      "missing apiVersion",
 			data:      []byte(`{"kind":"PodSecurityConfiguration"}`),
 			expectErr: `'apiVersion' is missing`,
@@ -277,7 +363,7 @@ exemptions:
 "apiVersion":"pod-security.admission.config.k8s.io/v1alpha1",
 "kind":"PodSecurityConfiguration",
 "deflaults":{"enforce":"baseline"}}`),
-			expectErr: `unknown field: deflaults`,
+			expectErr: `unknown field "deflaults"`,
 		},
 	}
 

@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -257,18 +255,18 @@ func TestSetScheduling(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Handler:    "bar",
 				Scheduling: &nodev1.Scheduling{
-					Tolerations: []v1.Toleration{
+					Tolerations: []corev1.Toleration{
 						{
 							Key:      "foo",
-							Operator: v1.TolerationOpEqual,
+							Operator: corev1.TolerationOpEqual,
 							Value:    "bar",
-							Effect:   v1.TaintEffectNoSchedule,
+							Effect:   corev1.TaintEffectNoSchedule,
 						},
 						{
 							Key:      "fizz",
-							Operator: v1.TolerationOpEqual,
+							Operator: corev1.TolerationOpEqual,
 							Value:    "buzz",
-							Effect:   v1.TaintEffectNoSchedule,
+							Effect:   corev1.TaintEffectNoSchedule,
 						},
 					},
 				},
@@ -407,19 +405,19 @@ func TestAdmit(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: runtimeClassName},
 	}
 
-	pod := api.Pod{
+	pod := core.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "podname"},
-		Spec: api.PodSpec{
+		Spec: core.PodSpec{
 			RuntimeClassName: &runtimeClassName,
 		},
 	}
 
 	attributes := admission.NewAttributesRecord(&pod,
 		nil,
-		api.Kind("kind").WithVersion("version"),
+		core.Kind("kind").WithVersion("version"),
 		"",
 		"",
-		api.Resource("pods").WithVersion("version"),
+		core.Resource("pods").WithVersion("version"),
 		"",
 		admission.Create,
 		nil,

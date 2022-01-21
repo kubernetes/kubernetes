@@ -76,7 +76,7 @@ func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interf
 	return client
 }
 
-// DiscoveryClientOrDie returns a discovery.DiscoveryInterface built from the ClientBuilder
+// DiscoveryClient returns a discovery.DiscoveryInterface built from the ClientBuilder
 // Discovery is special because it will artificially pump the burst quite high to handle the many discovery requests.
 func (b SimpleControllerClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
 	clientConfig, err := b.Config(name)

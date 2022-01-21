@@ -778,3 +778,18 @@ func TestSetImageRemoteWithSpecificContainers(t *testing.T) {
 		})
 	}
 }
+
+func TestSetImageResolver(t *testing.T) {
+	f := func(in string) (string, error) {
+		return "custom", nil
+	}
+
+	ImageResolver = f
+
+	out, err := ImageResolver("my-image")
+	if err != nil {
+		t.Errorf("unexpected error from ImageResolver: %v", err)
+	} else if out != "custom" {
+		t.Errorf("expected: %s, found: %s", "custom", out)
+	}
+}

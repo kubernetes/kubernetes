@@ -28,92 +28,14 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
 )
-
-func addListRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
-	fakeClient.AddReactor("list", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, obj, nil
-	})
-	return fakeClient
-}
-
-func addListPodsReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
-	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, obj, nil
-	})
-	return fakeClient
-}
-
-func addGetRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
-	rsList, ok := obj.(*apps.ReplicaSetList)
-	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		name := action.(core.GetAction).GetName()
-		if ok {
-			for _, rs := range rsList.Items {
-				if rs.Name == name {
-					return true, &rs, nil
-				}
-			}
-		}
-		return false, nil, fmt.Errorf("could not find the requested replica set: %s", name)
-
-	})
-	return fakeClient
-}
-
-func addUpdateRSReactor(fakeClient *fake.Clientset) *fake.Clientset {
-	fakeClient.AddReactor("update", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := action.(core.UpdateAction).GetObject().(*apps.ReplicaSet)
-		return true, obj, nil
-	})
-	return fakeClient
-}
-
-func addUpdatePodsReactor(fakeClient *fake.Clientset) *fake.Clientset {
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := action.(core.UpdateAction).GetObject().(*v1.Pod)
-		return true, obj, nil
-	})
-	return fakeClient
-}
-
-func generateRSWithLabel(labels map[string]string, image string) apps.ReplicaSet {
-	return apps.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   names.SimpleNameGenerator.GenerateName("replicaset"),
-			Labels: labels,
-		},
-		Spec: apps.ReplicaSetSpec{
-			Replicas: func(i int32) *int32 { return &i }(1),
-			Selector: &metav1.LabelSelector{MatchLabels: labels},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:                   image,
-							Image:                  image,
-							ImagePullPolicy:        v1.PullAlways,
-							TerminationMessagePath: v1.TerminationMessagePathDefault,
-						},
-					},
-				},
-			},
-		},
-	}
-}
 
 func newDControllerRef(d *apps.Deployment) *metav1.OwnerReference {
 	isController := true
@@ -182,144 +104,6 @@ func generateDeployment(image string) apps.Deployment {
 				},
 			},
 		},
-	}
-}
-
-func TestGetNewRS(t *testing.T) {
-	newDeployment := generateDeployment("nginx")
-	newRC := generateRS(newDeployment)
-
-	tests := []struct {
-		Name     string
-		objs     []runtime.Object
-		expected *apps.ReplicaSet
-	}{
-		{
-			"No new ReplicaSet",
-			[]runtime.Object{
-				&v1.PodList{},
-				&apps.ReplicaSetList{
-					Items: []apps.ReplicaSet{
-						generateRS(generateDeployment("foo")),
-						generateRS(generateDeployment("bar")),
-					},
-				},
-			},
-			nil,
-		},
-		{
-			"Has new ReplicaSet",
-			[]runtime.Object{
-				&v1.PodList{},
-				&apps.ReplicaSetList{
-					Items: []apps.ReplicaSet{
-						generateRS(generateDeployment("foo")),
-						generateRS(generateDeployment("bar")),
-						generateRS(generateDeployment("abc")),
-						newRC,
-						generateRS(generateDeployment("xyz")),
-					},
-				},
-			},
-			&newRC,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			fakeClient := &fake.Clientset{}
-			fakeClient = addListPodsReactor(fakeClient, test.objs[0])
-			fakeClient = addListRSReactor(fakeClient, test.objs[1])
-			fakeClient = addUpdatePodsReactor(fakeClient)
-			fakeClient = addUpdateRSReactor(fakeClient)
-			rs, err := GetNewReplicaSet(&newDeployment, fakeClient.AppsV1())
-			if err != nil {
-				t.Errorf("In test case %s, got unexpected error %v", test.Name, err)
-			}
-			if !apiequality.Semantic.DeepEqual(rs, test.expected) {
-				t.Errorf("In test case %s, expected %#v, got %#v", test.Name, test.expected, rs)
-			}
-		})
-	}
-}
-
-func TestGetOldRSs(t *testing.T) {
-	newDeployment := generateDeployment("nginx")
-	newRS := generateRS(newDeployment)
-	newRS.Status.FullyLabeledReplicas = *(newRS.Spec.Replicas)
-
-	// create 2 old deployments and related replica sets/pods, with the same labels but different template
-	oldDeployment := generateDeployment("nginx")
-	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
-	oldRS := generateRS(oldDeployment)
-	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
-	oldDeployment2 := generateDeployment("nginx")
-	oldDeployment2.Spec.Template.Spec.Containers[0].Name = "nginx-old-2"
-	oldRS2 := generateRS(oldDeployment2)
-	oldRS2.Status.FullyLabeledReplicas = *(oldRS2.Spec.Replicas)
-
-	// create 1 ReplicaSet that existed before the deployment,
-	// with the same labels as the deployment, but no ControllerRef.
-	existedRS := generateRSWithLabel(newDeployment.Spec.Template.Labels, "foo")
-	existedRS.Status.FullyLabeledReplicas = *(existedRS.Spec.Replicas)
-
-	tests := []struct {
-		Name     string
-		objs     []runtime.Object
-		expected []*apps.ReplicaSet
-	}{
-		{
-			"No old ReplicaSets",
-			[]runtime.Object{
-				&apps.ReplicaSetList{
-					Items: []apps.ReplicaSet{
-						generateRS(generateDeployment("foo")),
-						newRS,
-						generateRS(generateDeployment("bar")),
-					},
-				},
-			},
-			nil,
-		},
-		{
-			"Has old ReplicaSet",
-			[]runtime.Object{
-				&apps.ReplicaSetList{
-					Items: []apps.ReplicaSet{
-						oldRS2,
-						oldRS,
-						existedRS,
-						newRS,
-						generateRSWithLabel(map[string]string{"name": "xyz"}, "xyz"),
-						generateRSWithLabel(map[string]string{"name": "bar"}, "bar"),
-					},
-				},
-			},
-			[]*apps.ReplicaSet{&oldRS, &oldRS2},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			fakeClient := &fake.Clientset{}
-			fakeClient = addListRSReactor(fakeClient, test.objs[0])
-			fakeClient = addGetRSReactor(fakeClient, test.objs[0])
-			fakeClient = addUpdateRSReactor(fakeClient)
-			_, rss, err := GetOldReplicaSets(&newDeployment, fakeClient.AppsV1())
-			if err != nil {
-				t.Errorf("In test case %s, got unexpected error %v", test.Name, err)
-			}
-			if !equal(rss, test.expected) {
-				t.Errorf("In test case %q, expected:", test.Name)
-				for _, rs := range test.expected {
-					t.Errorf("rs = %#v", rs)
-				}
-				t.Errorf("In test case %q, got:", test.Name)
-				for _, rs := range rss {
-					t.Errorf("rs = %#v", rs)
-				}
-			}
-		})
 	}
 }
 
@@ -554,26 +338,6 @@ func TestFindOldReplicaSets(t *testing.T) {
 			}
 		})
 	}
-}
-
-// equal compares the equality of two ReplicaSet slices regardless of their ordering
-func equal(rss1, rss2 []*apps.ReplicaSet) bool {
-	if reflect.DeepEqual(rss1, rss2) {
-		return true
-	}
-	if rss1 == nil || rss2 == nil || len(rss1) != len(rss2) {
-		return false
-	}
-	count := 0
-	for _, rs1 := range rss1 {
-		for _, rs2 := range rss2 {
-			if reflect.DeepEqual(rs1, rs2) {
-				count++
-				break
-			}
-		}
-	}
-	return count == len(rss1)
 }
 
 func TestGetReplicaCountForReplicaSets(t *testing.T) {

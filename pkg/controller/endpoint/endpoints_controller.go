@@ -186,19 +186,19 @@ type Controller struct {
 
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
-func (e *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (e *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer e.queue.ShutDown()
 
 	klog.Infof("Starting endpoint controller")
 	defer klog.Infof("Shutting down endpoint controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
+	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(e.worker, e.workerLoopPeriod, stopCh)
+		go wait.UntilWithContext(ctx, e.worker, e.workerLoopPeriod)
 	}
 
 	go func() {
@@ -206,7 +206,7 @@ func (e *Controller) Run(workers int, stopCh <-chan struct{}) {
 		e.checkLeftoverEndpoints()
 	}()
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // When a pod is added, figure out what services it will be a member of and
@@ -335,19 +335,19 @@ func (e *Controller) onEndpointsDelete(obj interface{}) {
 // marks them done. You may run as many of these in parallel as you wish; the
 // workqueue guarantees that they will not end up processing the same service
 // at the same time.
-func (e *Controller) worker() {
-	for e.processNextWorkItem() {
+func (e *Controller) worker(ctx context.Context) {
+	for e.processNextWorkItem(ctx) {
 	}
 }
 
-func (e *Controller) processNextWorkItem() bool {
+func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	eKey, quit := e.queue.Get()
 	if quit {
 		return false
 	}
 	defer e.queue.Done(eKey)
 
-	err := e.syncService(eKey.(string))
+	err := e.syncService(ctx, eKey.(string))
 	e.handleErr(err, eKey)
 
 	return true
@@ -375,7 +375,7 @@ func (e *Controller) handleErr(err error, key interface{}) {
 	utilruntime.HandleError(err)
 }
 
-func (e *Controller) syncService(key string) error {
+func (e *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
@@ -396,7 +396,7 @@ func (e *Controller) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		err = e.client.CoreV1().Endpoints(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+		err = e.client.CoreV1().Endpoints(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -553,10 +553,10 @@ func (e *Controller) syncService(key string) error {
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{})
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(ctx, newEndpoints, metav1.CreateOptions{})
 	} else {
 		// Pre-existing
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(context.TODO(), newEndpoints, metav1.UpdateOptions{})
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(ctx, newEndpoints, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {

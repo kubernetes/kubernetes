@@ -120,7 +120,7 @@ func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *v1beta2.
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *FakeDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(deploymentsResource, c.ns, name), &v1beta2.Deployment{})
+		Invokes(testing.NewDeleteActionWithOptions(deploymentsResource, c.ns, name, opts), &v1beta2.Deployment{})
 
 	return err
 }

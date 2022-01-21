@@ -29,33 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
-type objectForDeleteOwnerRefStrategicMergePatch struct {
-	Metadata objectMetaForMergePatch `json:"metadata"`
-}
-
-type objectMetaForMergePatch struct {
-	UID             types.UID           `json:"uid"`
-	OwnerReferences []map[string]string `json:"ownerReferences"`
-}
-
-func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...types.UID) []byte {
-	var pieces []map[string]string
-	for _, ownerUID := range ownerUIDs {
-		pieces = append(pieces, map[string]string{"$patch": "delete", "uid": string(ownerUID)})
-	}
-	patch := objectForDeleteOwnerRefStrategicMergePatch{
-		Metadata: objectMetaForMergePatch{
-			UID:             dependentUID,
-			OwnerReferences: pieces,
-		},
-	}
-	patchBytes, err := json.Marshal(&patch)
-	if err != nil {
-		return []byte{}
-	}
-	return patchBytes
-}
-
 // getMetadata tries getting object metadata from local cache, and sends GET request to apiserver when
 // local cache is not available or not latest.
 func (gc *GarbageCollector) getMetadata(apiVersion, kind, namespace, name string) (metav1.Object, error) {

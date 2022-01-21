@@ -17,6 +17,7 @@ limitations under the License.
 package ttl
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -78,7 +79,7 @@ func TestPatchNode(t *testing.T) {
 		ttlController := &Controller{
 			kubeClient: fakeClient,
 		}
-		err := ttlController.patchNodeWithAnnotation(testCase.node, v1.ObjectTTLAnnotationKey, testCase.ttlSeconds)
+		err := ttlController.patchNodeWithAnnotation(context.TODO(), testCase.node, v1.ObjectTTLAnnotationKey, testCase.ttlSeconds)
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
@@ -137,7 +138,7 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 			nodeStore:         listers.NewNodeLister(nodeStore),
 			desiredTTLSeconds: testCase.desiredTTL,
 		}
-		if err := ttlController.updateNodeIfNeeded(testCase.node.Name); err != nil {
+		if err := ttlController.updateNodeIfNeeded(context.TODO(), testCase.node.Name); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}

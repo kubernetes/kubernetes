@@ -93,12 +93,16 @@ func (md MD) Copy() MD {
 }
 
 // Get obtains the values for a given key.
+//
+// k is converted to lowercase before searching in md.
 func (md MD) Get(k string) []string {
 	k = strings.ToLower(k)
 	return md[k]
 }
 
 // Set sets the value of a given key with a slice of values.
+//
+// k is converted to lowercase before storing in md.
 func (md MD) Set(k string, vals ...string) {
 	if len(vals) == 0 {
 		return
@@ -107,7 +111,10 @@ func (md MD) Set(k string, vals ...string) {
 	md[k] = vals
 }
 
-// Append adds the values to key k, not overwriting what was already stored at that key.
+// Append adds the values to key k, not overwriting what was already stored at
+// that key.
+//
+// k is converted to lowercase before storing in md.
 func (md MD) Append(k string, vals ...string) {
 	if len(vals) == 0 {
 		return
@@ -116,9 +123,17 @@ func (md MD) Append(k string, vals ...string) {
 	md[k] = append(md[k], vals...)
 }
 
+// Delete removes the values for a given key k which is converted to lowercase
+// before removing it from md.
+func (md MD) Delete(k string) {
+	k = strings.ToLower(k)
+	delete(md, k)
+}
+
 // Join joins any number of mds into a single MD.
-// The order of values for each key is determined by the order in which
-// the mds containing those values are presented to Join.
+//
+// The order of values for each key is determined by the order in which the mds
+// containing those values are presented to Join.
 func Join(mds ...MD) MD {
 	out := MD{}
 	for _, md := range mds {
@@ -145,8 +160,8 @@ func NewOutgoingContext(ctx context.Context, md MD) context.Context {
 }
 
 // AppendToOutgoingContext returns a new context with the provided kv merged
-// with any existing metadata in the context. Please refer to the
-// documentation of Pairs for a description of kv.
+// with any existing metadata in the context. Please refer to the documentation
+// of Pairs for a description of kv.
 func AppendToOutgoingContext(ctx context.Context, kv ...string) context.Context {
 	if len(kv)%2 == 1 {
 		panic(fmt.Sprintf("metadata: AppendToOutgoingContext got an odd number of input pairs for metadata: %d", len(kv)))
@@ -159,20 +174,34 @@ func AppendToOutgoingContext(ctx context.Context, kv ...string) context.Context 
 	return context.WithValue(ctx, mdOutgoingKey{}, rawMD{md: md.md, added: added})
 }
 
-// FromIncomingContext returns the incoming metadata in ctx if it exists.  The
-// returned MD should not be modified. Writing to it may cause races.
-// Modification should be made to copies of the returned MD.
-func FromIncomingContext(ctx context.Context) (md MD, ok bool) {
-	md, ok = ctx.Value(mdIncomingKey{}).(MD)
-	return
+// FromIncomingContext returns the incoming metadata in ctx if it exists.
+//
+// All keys in the returned MD are lowercase.
+func FromIncomingContext(ctx context.Context) (MD, bool) {
+	md, ok := ctx.Value(mdIncomingKey{}).(MD)
+	if !ok {
+		return nil, false
+	}
+	out := MD{}
+	for k, v := range md {
+		// We need to manually convert all keys to lower case, because MD is a
+		// map, and there's no guarantee that the MD attached to the context is
+		// created using our helper functions.
+		key := strings.ToLower(k)
+		out[key] = v
+	}
+	return out, true
 }
 
-// FromOutgoingContextRaw returns the un-merged, intermediary contents
-// of rawMD. Remember to perform strings.ToLower on the keys. The returned
-// MD should not be modified. Writing to it may cause races. Modification
-// should be made to copies of the returned MD.
+// FromOutgoingContextRaw returns the un-merged, intermediary contents of rawMD.
 //
-// This is intended for gRPC-internal use ONLY.
+// Remember to perform strings.ToLower on the keys, for both the returned MD (MD
+// is a map, there's no guarantee it's created using our helper functions) and
+// the extra kv pairs (AppendToOutgoingContext doesn't turn them into
+// lowercase).
+//
+// This is intended for gRPC-internal use ONLY. Users should use
+// FromOutgoingContext instead.
 func FromOutgoingContextRaw(ctx context.Context) (MD, [][]string, bool) {
 	raw, ok := ctx.Value(mdOutgoingKey{}).(rawMD)
 	if !ok {
@@ -182,16 +211,23 @@ func FromOutgoingContextRaw(ctx context.Context) (MD, [][]string, bool) {
 	return raw.md, raw.added, true
 }
 
-// FromOutgoingContext returns the outgoing metadata in ctx if it exists.  The
-// returned MD should not be modified. Writing to it may cause races.
-// Modification should be made to copies of the returned MD.
+// FromOutgoingContext returns the outgoing metadata in ctx if it exists.
+//
+// All keys in the returned MD are lowercase.
 func FromOutgoingContext(ctx context.Context) (MD, bool) {
 	raw, ok := ctx.Value(mdOutgoingKey{}).(rawMD)
 	if !ok {
 		return nil, false
 	}
 
-	out := raw.md.Copy()
+	out := MD{}
+	for k, v := range raw.md {
+		// We need to manually convert all keys to lower case, because MD is a
+		// map, and there's no guarantee that the MD attached to the context is
+		// created using our helper functions.
+		key := strings.ToLower(k)
+		out[key] = v
+	}
 	for _, added := range raw.added {
 		if len(added)%2 == 1 {
 			panic(fmt.Sprintf("metadata: FromOutgoingContext got an odd number of input pairs for metadata: %d", len(added)))

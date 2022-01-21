@@ -47,6 +47,12 @@ There are 3 different containers instances that are run from this image.  The fi
 
 All Docker names are suffixed with a hash derived from the file path (to allow concurrent usage on things like CI machines) and a version number.  When the version number changes all state is cleared and clean build is started.  This allows the build infrastructure to be changed and signal to CI systems that old artifacts need to be deleted.
 
+## Build artifacts
+The build system output all its products to a top level directory in the source repository named `_output`.
+These include the binary compiled packages (e.g. kubectl, kube-scheduler etc.) and archived Docker images.
+If you intend to run a component with a docker image you will need to import it from this directory with
+the appropriate command (e.g. `docker import _output/release-images/amd64/kube-scheduler.tar k8s.io/kube-scheduler:$(git describe)`).
+
 ## Releasing
 
 The [`build/release.sh`](release.sh) script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images.

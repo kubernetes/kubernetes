@@ -104,10 +104,13 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		r.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Update(context.TODO(), r.Vscontent, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("recording the volume handle and snapshotHandle")
+		ginkgo.By("recording properties of the preprovisioned snapshot")
 		snapshotHandle := r.Vscontent.Object["status"].(map[string]interface{})["snapshotHandle"].(string)
-		framework.Logf("Recording snapshot handle: %s", snapshotHandle)
+		framework.Logf("Recording snapshot content handle: %s", snapshotHandle)
+		snapshotContentAnnotations := r.Vscontent.GetAnnotations()
+		framework.Logf("Recording snapshot content annotations: %v", snapshotContentAnnotations)
 		csiDriverName := r.Vsclass.Object["driver"].(string)
+		framework.Logf("Recording snapshot driver: %s", csiDriverName)
 
 		// If the deletion policy is retain on vscontent:
 		// when vs is deleted vscontent will not be deleted
@@ -140,7 +143,7 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		snapName := getPreProvisionedSnapshotName(uuid)
 		snapcontentName := getPreProvisionedSnapshotContentName(uuid)
 
-		r.Vscontent = getPreProvisionedSnapshotContent(snapcontentName, snapName, pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
+		r.Vscontent = getPreProvisionedSnapshotContent(snapcontentName, snapshotContentAnnotations, snapName, pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
 		r.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Create(context.TODO(), r.Vscontent, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -299,13 +302,14 @@ func getPreProvisionedSnapshot(snapName, ns, snapshotContentName string) *unstru
 
 	return snapshot
 }
-func getPreProvisionedSnapshotContent(snapcontentName, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
+func getPreProvisionedSnapshotContent(snapcontentName string, snapshotContentAnnotations map[string]string, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
 	snapshotContent := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "VolumeSnapshotContent",
 			"apiVersion": utils.SnapshotAPIVersion,
 			"metadata": map[string]interface{}{
-				"name": snapcontentName,
+				"name":        snapcontentName,
+				"annotations": snapshotContentAnnotations,
 			},
 			"spec": map[string]interface{}{
 				"source": map[string]interface{}{

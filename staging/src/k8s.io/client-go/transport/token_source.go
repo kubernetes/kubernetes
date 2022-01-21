@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/klog/v2"
 )
 
@@ -95,6 +96,8 @@ type tokenSourceTransport struct {
 	src  ResettableTokenSource
 }
 
+var _ utilnet.RoundTripperWrapper = &tokenSourceTransport{}
+
 func (tst *tokenSourceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// This is to allow --token to override other bearer token providers.
 	if req.Header.Get("Authorization") != "" {
@@ -118,6 +121,8 @@ func (tst *tokenSourceTransport) CancelRequest(req *http.Request) {
 	}
 	tryCancelRequest(tst.ort, req)
 }
+
+func (tst *tokenSourceTransport) WrappedRoundTripper() http.RoundTripper { return tst.base }
 
 type fileTokenSource struct {
 	path   string

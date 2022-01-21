@@ -40,7 +40,7 @@ const (
 	JobTimeout = 15 * time.Minute
 )
 
-var _ = SIGDescribe("[Feature:TTLAfterFinished]", func() {
+var _ = SIGDescribe("TTLAfterFinished", func() {
 	f := framework.NewDefaultFramework("ttlafterfinished")
 
 	ginkgo.It("job should be deleted once it finishes after TTL seconds", func() {

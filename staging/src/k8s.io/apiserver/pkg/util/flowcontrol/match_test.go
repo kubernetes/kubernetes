@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
-	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 func TestMatching(t *testing.T) {
@@ -102,8 +101,7 @@ func TestLiterals(t *testing.T) {
 			Name:              "eman",
 			Parts:             []string{"goodrscs", "eman"},
 		},
-		User:         ui,
-		WorkEstimate: fcrequest.WorkEstimate{InitialSeats: 1},
+		User: ui,
 	}
 	reqRU := RequestDigest{
 		RequestInfo: &request.RequestInfo{
@@ -118,8 +116,7 @@ func TestLiterals(t *testing.T) {
 			Name:              "eman",
 			Parts:             []string{"goodrscs", "eman"},
 		},
-		User:         ui,
-		WorkEstimate: fcrequest.WorkEstimate{InitialSeats: 1},
+		User: ui,
 	}
 	reqN := RequestDigest{
 		RequestInfo: &request.RequestInfo{
@@ -127,8 +124,7 @@ func TestLiterals(t *testing.T) {
 			Path:              "/openapi/v2",
 			Verb:              "goodverb",
 		},
-		User:         ui,
-		WorkEstimate: fcrequest.WorkEstimate{InitialSeats: 1},
+		User: ui,
 	}
 	checkRules(t, true, reqRN, []flowcontrol.PolicyRulesWithSubjects{{
 		Subjects: []flowcontrol.Subject{{Kind: flowcontrol.SubjectKindUser,

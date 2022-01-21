@@ -32,13 +32,15 @@ kube::etcd::install
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 SPECROOT="${KUBE_ROOT}/api/openapi-spec"
+SPECV3PATH="${SPECROOT}/v3"
 TMP_SPECROOT="${KUBE_ROOT}/_tmp/openapi-spec"
 _tmp="${KUBE_ROOT}/_tmp"
 
 mkdir -p "${_tmp}"
 cp -a "${SPECROOT}" "${TMP_SPECROOT}"
 trap 'cp -a ${TMP_SPECROOT} ${SPECROOT}/..; rm -rf ${_tmp}' EXIT SIGINT
-rm "${SPECROOT}"/*
+rm -r "${SPECROOT:?}"/*
+mkdir -p "${SPECV3PATH}"
 cp "${TMP_SPECROOT}/README.md" "${SPECROOT}/README.md"
 
 "${KUBE_ROOT}/hack/update-openapi-spec.sh"

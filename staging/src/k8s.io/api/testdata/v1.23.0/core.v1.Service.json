@@ -1,0 +1,115 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "2",
+    "generateName": "3",
+    "namespace": "4",
+    "selfLink": "5",
+    "uid": "7",
+    "resourceVersion": "11042405498087606203",
+    "generation": 8071137005907523419,
+    "creationTimestamp": "2061-09-19T18:13:36Z",
+    "deletionGracePeriodSeconds": -4955867275792137171,
+    "labels": {
+      "7": "8"
+    },
+    "annotations": {
+      "9": "10"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "11",
+        "kind": "12",
+        "name": "13",
+        "uid": "Dz廔ȇ{sŊƏp",
+        "controller": false,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "14"
+    ],
+    "clusterName": "15",
+    "managedFields": [
+      {
+        "manager": "16",
+        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
+        "apiVersion": "17",
+        "fieldsType": "18",
+        "subresource": "19"
+      }
+    ]
+  },
+  "spec": {
+    "ports": [
+      {
+        "name": "20",
+        "protocol": "@Hr鯹)晿",
+        "appProtocol": "21",
+        "port": 202283346,
+        "targetPort": "22",
+        "nodePort": -474380055
+      }
+    ],
+    "selector": {
+      "23": "24"
+    },
+    "clusterIP": "25",
+    "clusterIPs": [
+      "26"
+    ],
+    "type": "鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ",
+    "externalIPs": [
+      "27"
+    ],
+    "sessionAffinity": "甞谐颋ǅS",
+    "loadBalancerIP": "28",
+    "loadBalancerSourceRanges": [
+      "29"
+    ],
+    "externalName": "30",
+    "externalTrafficPolicy": "ƏS$+½H牗洝尿",
+    "healthCheckNodePort": -1965738697,
+    "publishNotReadyAddresses": true,
+    "sessionAffinityConfig": {
+      "clientIP": {
+        "timeoutSeconds": 2072604405
+      }
+    },
+    "ipFamilies": [
+      "x"
+    ],
+    "ipFamilyPolicy": "%a鯿rŎǀ朲^苣f",
+    "allocateLoadBalancerNodePorts": true,
+    "loadBalancerClass": "31",
+    "internalTrafficPolicy": "hDrȮO励鹗"
+  },
+  "status": {
+    "loadBalancer": {
+      "ingress": [
+        {
+          "ip": "32",
+          "hostname": "33",
+          "ports": [
+            {
+              "port": 165528693,
+              "protocol": "UɦOŖ",
+              "error": "34"
+            }
+          ]
+        }
+      ]
+    },
+    "conditions": [
+      {
+        "type": "35",
+        "status": "尷ȸd賑",
+        "observedGeneration": 3519145202439908029,
+        "lastTransitionTime": "2256-09-10T15:38:25Z",
+        "reason": "36",
+        "message": "37"
+      }
+    ]
+  }
+}

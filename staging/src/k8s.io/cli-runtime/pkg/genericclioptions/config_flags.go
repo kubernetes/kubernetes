@@ -48,6 +48,7 @@ const (
 	flagCAFile           = "certificate-authority"
 	flagBearerToken      = "token"
 	flagImpersonate      = "as"
+	flagImpersonateUID   = "as-uid"
 	flagImpersonateGroup = "as-group"
 	flagUsername         = "username"
 	flagPassword         = "password"
@@ -94,6 +95,7 @@ type ConfigFlags struct {
 	CAFile           *string
 	BearerToken      *string
 	Impersonate      *string
+	ImpersonateUID   *string
 	ImpersonateGroup *[]string
 	Username         *string
 	Password         *string
@@ -118,6 +120,9 @@ type ConfigFlags struct {
 	// Allows increasing burst used for discovery, this is useful
 	// in clusters with many registered resources
 	discoveryBurst int
+	// Allows increasing qps used for discovery, this is useful
+	// in clusters with many registered resources
+	discoveryQPS float32
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -170,6 +175,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate
+	}
+	if f.ImpersonateUID != nil {
+		overrides.AuthInfo.ImpersonateUID = *f.ImpersonateUID
 	}
 	if f.ImpersonateGroup != nil {
 		overrides.AuthInfo.ImpersonateGroups = *f.ImpersonateGroup
@@ -263,10 +271,8 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 		return nil, err
 	}
 
-	// The more groups you have, the more discovery requests you need to make.
-	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = f.discoveryBurst
+	config.QPS = f.discoveryQPS
 
 	cacheDir := defaultCacheDir
 
@@ -336,6 +342,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Impersonate != nil {
 		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation. User could be a regular user or a service account in a namespace.")
 	}
+	if f.ImpersonateUID != nil {
+		flags.StringVar(f.ImpersonateUID, flagImpersonateUID, *f.ImpersonateUID, "UID to impersonate for the operation.")
+	}
 	if f.ImpersonateGroup != nil {
 		flags.StringArrayVar(f.ImpersonateGroup, flagImpersonateGroup, *f.ImpersonateGroup, "Group to impersonate for the operation, this flag can be repeated to specify multiple groups.")
 	}
@@ -388,6 +397,18 @@ func (f *ConfigFlags) WithDiscoveryBurst(discoveryBurst int) *ConfigFlags {
 	return f
 }
 
+// WithDiscoveryBurst sets the RESTClient burst for discovery.
+func (f *ConfigFlags) WithDiscoveryQPS(discoveryQPS float32) *ConfigFlags {
+	f.discoveryQPS = discoveryQPS
+	return f
+}
+
+// WithWrapConfigFn allows providing a wrapper function for the client Config.
+func (f *ConfigFlags) WithWrapConfigFn(wrapConfigFn func(*rest.Config) *rest.Config) *ConfigFlags {
+	f.WrapConfigFn = wrapConfigFn
+	return f
+}
+
 // NewConfigFlags returns ConfigFlags with default values set
 func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
@@ -410,6 +431,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		CAFile:           stringptr(""),
 		BearerToken:      stringptr(""),
 		Impersonate:      stringptr(""),
+		ImpersonateUID:   stringptr(""),
 		ImpersonateGroup: &impersonateGroup,
 
 		usePersistentConfig: usePersistentConfig,

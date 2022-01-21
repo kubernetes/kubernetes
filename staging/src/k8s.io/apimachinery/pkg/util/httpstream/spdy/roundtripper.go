@@ -173,20 +173,22 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		Host:   targetHost,
 	}
 
+	proxyReq = *proxyReq.WithContext(req.Context())
+
 	if pa := s.proxyAuth(proxyURL); pa != "" {
 		proxyReq.Header = http.Header{}
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
-	proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
+	proxyDialConn, err := s.dialWithoutProxy(proxyReq.Context(), proxyURL)
 	if err != nil {
 		return nil, err
 	}
 
-	//lint:ignore SA1019 ignore deprecated httputil.NewProxyClientConn
+	//nolint:staticcheck // SA1019 ignore deprecated httputil.NewProxyClientConn
 	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
 	_, err = proxyClientConn.Do(&proxyReq)
-	//lint:ignore SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
+	//nolint:staticcheck // SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
 	// returned from the invocation of proxyClientConn.Do
 	if err != nil && err != httputil.ErrPersistEOF {
 		return nil, err

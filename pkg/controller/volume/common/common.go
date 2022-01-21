@@ -20,9 +20,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/component-helpers/storage/ephemeral"
 )
 
 const (
@@ -31,9 +30,9 @@ const (
 )
 
 // PodPVCIndexFunc creates an index function that returns PVC keys (=
-// namespace/name) for given pod.  If enabled, this includes the PVCs
+// namespace/name) for given pod.  This includes the PVCs
 // that might be created for generic ephemeral volumes.
-func PodPVCIndexFunc(genericEphemeralVolumeFeatureEnabled bool) func(obj interface{}) ([]string, error) {
+func PodPVCIndexFunc() func(obj interface{}) ([]string, error) {
 	return func(obj interface{}) ([]string, error) {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
@@ -44,9 +43,8 @@ func PodPVCIndexFunc(genericEphemeralVolumeFeatureEnabled bool) func(obj interfa
 			claimName := ""
 			if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
 				claimName = pvcSource.ClaimName
-			}
-			if ephemeralSource := podVolume.VolumeSource.Ephemeral; genericEphemeralVolumeFeatureEnabled && ephemeralSource != nil {
-				claimName = pod.Name + "-" + podVolume.Name
+			} else if podVolume.VolumeSource.Ephemeral != nil {
+				claimName = ephemeral.VolumeClaimName(pod, &podVolume)
 			}
 			if claimName != "" {
 				keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, claimName))
@@ -56,10 +54,9 @@ func PodPVCIndexFunc(genericEphemeralVolumeFeatureEnabled bool) func(obj interfa
 	}
 }
 
-// AddPodPVCIndexerIfNotPresent adds the PodPVCIndexFunc with the current global setting for GenericEphemeralVolume.
+// AddPodPVCIndexerIfNotPresent adds the PodPVCIndexFunc.
 func AddPodPVCIndexerIfNotPresent(indexer cache.Indexer) error {
-	return AddIndexerIfNotPresent(indexer, PodPVCIndex,
-		PodPVCIndexFunc(utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume)))
+	return AddIndexerIfNotPresent(indexer, PodPVCIndex, PodPVCIndexFunc())
 }
 
 // AddIndexerIfNotPresent adds the index function with the name into the cache indexer if not present

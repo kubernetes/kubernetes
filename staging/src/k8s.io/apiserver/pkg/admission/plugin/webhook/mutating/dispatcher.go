@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	utiltrace "k8s.io/utils/trace"
@@ -60,8 +62,6 @@ const (
 	// failed or returned an internal server error.
 	MutationAuditAnnotationFailedOpenKeyPrefix string = "failed-open." + MutationAuditAnnotationPrefix
 )
-
-var encodingjson = json.CaseSensitiveJSONIterator()
 
 type mutatingDispatcher struct {
 	cm     *webhookutil.ClientManager
@@ -178,7 +178,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-
+				admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "admit")
 				annotator.addFailedOpenAnnotation()
 
 				utilruntime.HandleError(callErr)
@@ -264,7 +264,13 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		}
 	}
 
-	if err := r.Do(ctx).Into(response); err != nil {
+	do := func() { err = r.Do(ctx).Into(response) }
+	if wd, ok := endpointsrequest.WebhookDurationFrom(ctx); ok {
+		tmp := do
+		do = func() { wd.AdmitTracker.Track(tmp) }
+	}
+	do()
+	if err != nil {
 		var status *apierrors.StatusError
 		if se, ok := err.(*apierrors.StatusError); ok {
 			status = se
@@ -444,7 +450,7 @@ func mutationAnnotationValue(configuration, webhook string, mutated bool) (strin
 		Webhook:       webhook,
 		Mutated:       mutated,
 	}
-	bytes, err := encodingjson.Marshal(m)
+	bytes, err := utiljson.Marshal(m)
 	return string(bytes), err
 }
 
@@ -455,6 +461,6 @@ func jsonPatchAnnotationValue(configuration, webhook string, patch interface{}) 
 		Patch:         patch,
 		PatchType:     string(admissionv1.PatchTypeJSONPatch),
 	}
-	bytes, err := encodingjson.Marshal(p)
+	bytes, err := utiljson.Marshal(p)
 	return string(bytes), err
 }

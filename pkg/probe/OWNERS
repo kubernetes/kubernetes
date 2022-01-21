@@ -4,6 +4,5 @@ approvers:
   - sig-node-approvers
 reviewers:
   - sig-node-reviewers
-
 labels:
-- sig/node
+  - sig/node

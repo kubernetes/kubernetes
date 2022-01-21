@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/util/validation"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
@@ -143,10 +142,10 @@ func validateStorageVersionCondition(conditions []apiserverinternal.StorageVersi
 				fmt.Sprintf("the type of the condition is not unique, it also appears in conditions[%d]", ii)))
 		}
 		seenType[condition.Type] = i
-		for _, msg := range validation.IsQualifiedName(string(condition.Type)) {
+		for _, msg := range utilvalidation.IsQualifiedName(string(condition.Type)) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("type"), string(condition.Type), msg))
 		}
-		for _, msg := range validation.IsQualifiedName(string(condition.Status)) {
+		for _, msg := range utilvalidation.IsQualifiedName(string(condition.Status)) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("status"), string(condition.Type), msg))
 		}
 		if condition.Reason == "" {

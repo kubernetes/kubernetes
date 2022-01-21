@@ -125,7 +125,8 @@ func (f ReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*appsv1.ReplicaS
 		}
 		selector, err = metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
-			return
+			// This object has an invalid selector, it does not match the pod
+			continue
 		}
 
 		if selector.Matches(labels.Set(pod.Labels)) {
@@ -164,7 +165,8 @@ func (f StatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*appsv1.Statef
 		}
 		selector, err = metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 		if err != nil {
-			return
+			// This object has an invalid selector, it does not match the pod
+			continue
 		}
 		if selector.Matches(labels.Set(pod.Labels)) {
 			sss = append(sss, ss)

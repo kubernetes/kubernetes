@@ -1,17 +1,14 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- chakri-nelluri
-- saad-ali
+  - saad-ali
 emeritus_approvers:
-- MikaelCluseau
+  - MikaelCluseau
+  - chakri-nelluri
 reviewers:
-- ivan4th
-- rata
-- sjenning
-- saad-ali
-- jsafrane
-- rootfs
-- jingxu97
-- msau42
-- chakri-nelluri
+  - rata
+  - sjenning
+  - saad-ali
+  - jsafrane
+  - jingxu97
+  - msau42

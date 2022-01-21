@@ -251,6 +251,7 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 		}
 		select {
 		case <-stopCh:
+			return
 		case <-time.After(scrapeTimeout):
 		}
 	}

@@ -135,9 +135,9 @@ func (o *Options) Run() error {
 				fmt.Fprintf(o.Out, "Server Version: %s\n", serverVersion.GitVersion)
 			}
 		} else {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
+			fmt.Fprintf(o.Out, "Client Version: %#v\n", clientVersion)
 			if serverVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
+				fmt.Fprintf(o.Out, "Server Version: %#v\n", *serverVersion)
 			}
 		}
 	case "yaml":

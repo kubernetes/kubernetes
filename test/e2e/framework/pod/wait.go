@@ -565,3 +565,8 @@ func WaitForPodFailedReason(c clientset.Interface, pod *v1.Pod, reason string, t
 	}
 	return nil
 }
+
+// WaitForContainerRunning waits for the given Pod container to have a state of running
+func WaitForContainerRunning(c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	return wait.PollImmediate(poll, timeout, isContainerRunning(c, namespace, podName, containerName))
+}

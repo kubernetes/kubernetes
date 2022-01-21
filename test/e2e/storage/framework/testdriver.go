@@ -151,6 +151,7 @@ const (
 	CapPersistence        Capability = "persistence"        // data is persisted across pod restarts
 	CapBlock              Capability = "block"              // raw block mode
 	CapFsGroup            Capability = "fsGroup"            // volume ownership via fsGroup
+	CapVolumeMountGroup   Capability = "volumeMountGroup"   // Driver has the VolumeMountGroup CSI node capability. Because this is a FSGroup feature, the fsGroup capability must also be set to true.
 	CapExec               Capability = "exec"               // exec a file in the volume
 	CapSnapshotDataSource Capability = "snapshotDataSource" // support populate data from snapshot
 	CapPVCDataSource      Capability = "pvcDataSource"      // support populate data from pvc

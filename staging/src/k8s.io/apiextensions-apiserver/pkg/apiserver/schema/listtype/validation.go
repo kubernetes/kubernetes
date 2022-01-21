@@ -75,6 +75,7 @@ func validateListSetsAndMapsArray(fldPath *field.Path, s *schema.Structural, obj
 		case "map":
 			errs = append(errs, validateListMap(fldPath, s, obj)...)
 		}
+		// if a case is ever added here then one should also be added to pkg/apiserver/schema/cel/values.go
 	}
 
 	if s.Items != nil {

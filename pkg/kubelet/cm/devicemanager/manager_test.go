@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -562,6 +563,7 @@ func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.Cont
 func TestCheckpoint(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	resourceName2 := "domain2.com/resource2"
+	resourceName3 := "domain2.com/resource3"
 	as := assert.New(t)
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
@@ -594,6 +596,10 @@ func TestCheckpoint(t *testing.T) {
 		constructDevices([]string{"dev4"}),
 		constructAllocResp(map[string]string{"/dev/r1dev4": "/dev/r1dev4"},
 			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+	testManager.podDevices.insert("pod3", "con3", resourceName3,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
+			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
 
 	testManager.healthyDevices[resourceName1] = sets.NewString()
 	testManager.healthyDevices[resourceName1].Insert("dev1")
@@ -604,6 +610,8 @@ func TestCheckpoint(t *testing.T) {
 	testManager.healthyDevices[resourceName2] = sets.NewString()
 	testManager.healthyDevices[resourceName2].Insert("dev1")
 	testManager.healthyDevices[resourceName2].Insert("dev2")
+	testManager.healthyDevices[resourceName3] = sets.NewString()
+	testManager.healthyDevices[resourceName3].Insert("dev5")
 
 	expectedPodDevices := testManager.podDevices
 	expectedAllocatedDevices := testManager.podDevices.devices()
@@ -810,6 +818,9 @@ func TestFilterByAffinity(t *testing.T) {
 						},
 					},
 				},
+			},
+			"devwithouttopology": {
+				ID: "dev5",
 			},
 		},
 	}
@@ -1277,4 +1288,26 @@ func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]p
 		}
 	}
 	return res
+}
+
+const deviceManagerCheckpointFilename = "kubelet_internal_checkpoint"
+
+var oldCheckpoint string = `{"Data":{"PodDeviceEntries":[{"PodUID":"13ac2284-0d19-44b7-b94f-055b032dba9b","ContainerName":"centos","ResourceName":"example.com/deviceA","DeviceIDs":["DevA3"],"AllocResp":"CiIKHUVYQU1QTEVDT01ERVZJQ0VBX0RFVkEzX1RUWTEwEgEwGhwKCi9kZXYvdHR5MTASCi9kZXYvdHR5MTAaAnJ3"},{"PodUID":"86b9a017-c9ca-4069-815f-46ca3e53c1e4","ContainerName":"centos","ResourceName":"example.com/deviceA","DeviceIDs":["DevA4"],"AllocResp":"CiIKHUVYQU1QTEVDT01ERVZJQ0VBX0RFVkE0X1RUWTExEgEwGhwKCi9kZXYvdHR5MTESCi9kZXYvdHR5MTEaAnJ3"}],"RegisteredDevices":{"example.com/deviceA":["DevA1","DevA2","DevA3","DevA4"]}},"Checksum":405612085}`
+
+func TestReadPreNUMACheckpoint(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	defer os.RemoveAll(socketDir)
+
+	err = ioutil.WriteFile(filepath.Join(socketDir, deviceManagerCheckpointFilename), []byte(oldCheckpoint), 0644)
+	require.NoError(t, err)
+
+	topologyStore := topologymanager.NewFakeManager()
+	nodes := []cadvisorapi.Node{{Id: 0}}
+	m, err := newManagerImpl(socketName, nodes, topologyStore)
+	require.NoError(t, err)
+
+	// TODO: we should not calling private methods, but among the existing tests we do anyway
+	err = m.readCheckpoint()
+	require.NoError(t, err)
 }

@@ -1,12 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- bowei
-- caseydavenport
-- fasaxc
+  - bowei
+  - caseydavenport
+  #- fasaxc
 emeritus_approvers:
-- dnardo
+  - dnardo
 reviewers:
-- bowei
-- caseydavenport
-- fasaxc
+  - bowei
+  - caseydavenport
+  #- fasaxc

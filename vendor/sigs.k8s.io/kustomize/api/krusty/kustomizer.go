@@ -26,7 +26,7 @@ import (
 // used instead of performing an exec to a kustomize CLI subprocess.
 // To use, load a filesystem with kustomization files (any
 // number of overlays and bases), then make a Kustomizer
-// injected with the given fileystem, then call Run.
+// injected with the given filesystem, then call Run.
 type Kustomizer struct {
 	options     *Options
 	depProvider *provider.DepProvider

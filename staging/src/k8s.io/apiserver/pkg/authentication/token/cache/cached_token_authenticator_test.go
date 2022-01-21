@@ -36,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -309,7 +308,9 @@ func TestCachedAuditAnnotations(t *testing.T) {
 				if randomChoice {
 					ctx = audit.WithAuditAnnotations(ctx)
 				} else {
-					ctx = request.WithAuditEvent(ctx, &auditinternal.Event{Level: auditinternal.LevelMetadata})
+					ctx = audit.WithAuditContext(ctx, &audit.AuditContext{
+						Event: &auditinternal.Event{Level: auditinternal.LevelMetadata},
+					})
 				}
 
 				_, _, _ = a.AuthenticateToken(ctx, "token")
@@ -317,7 +318,7 @@ func TestCachedAuditAnnotations(t *testing.T) {
 				if randomChoice {
 					allAnnotations <- extractAnnotations(ctx)
 				} else {
-					allAnnotations <- request.AuditEventFrom(ctx).Annotations
+					allAnnotations <- audit.AuditEventFrom(ctx).Annotations
 				}
 			}()
 		}

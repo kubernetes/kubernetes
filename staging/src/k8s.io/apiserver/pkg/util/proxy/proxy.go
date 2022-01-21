@@ -45,16 +45,16 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.Endpo
 		return nil, err
 	}
 
-	svcPort, err := findServicePort(svc, port)
-	if err != nil {
-		return nil, err
-	}
-
 	switch {
 	case svc.Spec.Type == v1.ServiceTypeClusterIP, svc.Spec.Type == v1.ServiceTypeLoadBalancer, svc.Spec.Type == v1.ServiceTypeNodePort:
 		// these are fine
 	default:
 		return nil, fmt.Errorf("unsupported service type %q", svc.Spec.Type)
+	}
+
+	svcPort, err := findServicePort(svc, port)
+	if err != nil {
+		return nil, err
 	}
 
 	eps, err := endpoints.Endpoints(namespace).Get(svc.Name)

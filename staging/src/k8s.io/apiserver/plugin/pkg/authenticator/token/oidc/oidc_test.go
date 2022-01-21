@@ -28,14 +28,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"text/template"
 	"time"
 
-	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2"
+
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
@@ -130,13 +130,14 @@ var (
 type claimsTest struct {
 	name               string
 	options            Options
+	optsFunc           func(*Options)
 	signingKey         *jose.JSONWebKey
 	pubKeys            []*jose.JSONWebKey
 	claims             string
 	want               *user.DefaultInfo
 	wantSkip           bool
-	wantErr            bool
-	wantInitErr        bool
+	wantErr            string
+	wantInitErr        string
 	claimToResponseMap map[string]string
 	openIDConfig       string
 }
@@ -203,25 +204,6 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 	return ts
 }
 
-// writeTempCert writes out the supplied certificate into a temporary file in
-// PEM-encoded format.  Returns the name of the temporary file used.  The caller
-// is responsible for cleaning the file up.
-func writeTempCert(t *testing.T, cert []byte) string {
-	tempFile, err := ioutil.TempFile("", "ca.crt")
-	if err != nil {
-		t.Fatalf("could not open temp file: %v", err)
-	}
-	block := &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert,
-	}
-	if err := pem.Encode(tempFile, block); err != nil {
-		t.Fatalf("could not write to temp file %v: %v", tempFile.Name(), err)
-	}
-	tempFile.Close()
-	return tempFile.Name()
-}
-
 func toKeySet(keys []*jose.JSONWebKey) jose.JSONWebKeySet {
 	ret := jose.JSONWebKeySet{}
 	for _, k := range keys {
@@ -251,10 +233,11 @@ func (c *claimsTest) run(t *testing.T) {
 	defer ts.Close()
 
 	// Make the certificate of the helper server available to the authenticator
-	// by writing its root CA certificate into a temporary file.
-	tempFileName := writeTempCert(t, ts.TLS.Certificates[0].Certificate[0])
-	defer os.Remove(tempFileName)
-	caContent, err := dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", tempFileName)
+	caBundle := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: ts.Certificate().Raw,
+	})
+	caContent, err := dynamiccertificates.NewStaticCAContent("oidc-authenticator", caBundle)
 	if err != nil {
 		t.Fatalf("initialize ca: %v", err)
 	}
@@ -262,27 +245,45 @@ func (c *claimsTest) run(t *testing.T) {
 
 	// Allow claims to refer to the serving URL of the test server.  For this,
 	// substitute all references to {{.URL}} in appropriate places.
-	v := struct{ URL string }{URL: ts.URL}
+	// Use {{.Expired}} to handle the token expiry date string with correct timezone handling.
+	v := struct {
+		URL     string
+		Expired string
+	}{
+		URL:     ts.URL,
+		Expired: fmt.Sprintf("%v", time.Unix(expired.Unix(), 0)),
+	}
 	c.claims = replace(c.claims, &v)
 	c.openIDConfig = replace(c.openIDConfig, &v)
 	c.options.IssuerURL = replace(c.options.IssuerURL, &v)
 	for claim, response := range c.claimToResponseMap {
 		c.claimToResponseMap[claim] = replace(response, &v)
 	}
+	c.wantErr = replace(c.wantErr, &v)
+	c.wantInitErr = replace(c.wantInitErr, &v)
 
 	// Set the verifier to use the public key set instead of reading from a remote.
 	c.options.KeySet = &staticKeySet{keys: c.pubKeys}
 
+	if c.optsFunc != nil {
+		c.optsFunc(&c.options)
+	}
+
+	expectInitErr := len(c.wantInitErr) > 0
+
 	// Initialize the authenticator.
 	a, err := New(c.options)
 	if err != nil {
-		if !c.wantInitErr {
+		if !expectInitErr {
 			t.Fatalf("initialize authenticator: %v", err)
+		}
+		if got := err.Error(); c.wantInitErr != got {
+			t.Fatalf("expected initialization error %q but got %q", c.wantInitErr, got)
 		}
 		return
 	}
-	if c.wantInitErr {
-		t.Fatalf("wanted initialization error")
+	if expectInitErr {
+		t.Fatalf("wanted initialization error %q but got none", c.wantInitErr)
 	}
 
 	// Sign and serialize the claims in a JWT.
@@ -297,15 +298,20 @@ func (c *claimsTest) run(t *testing.T) {
 
 	got, ok, err := a.AuthenticateToken(context.Background(), token)
 
+	expectErr := len(c.wantErr) > 0
+
 	if err != nil {
-		if !c.wantErr {
+		if !expectErr {
 			t.Fatalf("authenticate token: %v", err)
+		}
+		if got := err.Error(); c.wantErr != got {
+			t.Fatalf("expected error %q when authenticating token but got %q", c.wantErr, got)
 		}
 		return
 	}
 
-	if c.wantErr {
-		t.Fatalf("expected error authenticating token")
+	if expectErr {
+		t.Fatalf("expected error %q when authenticating token but got none", c.wantErr)
 	}
 	if !ok {
 		if !c.wantSkip {
@@ -366,7 +372,7 @@ func TestToken(t *testing.T) {
 				"aud": "my-client",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: `oidc: parse username claims "username": claim not present`,
 		},
 		{
 			name: "email",
@@ -410,7 +416,7 @@ func TestToken(t *testing.T) {
 				"email_verified": false,
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: "oidc: email not verified",
 		},
 		{
 			// If "email_verified" isn't present, assume true
@@ -455,7 +461,7 @@ func TestToken(t *testing.T) {
 				"email_verified": "false",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: "oidc: parse 'email_verified' claim: json: cannot unmarshal string into Go value of type bool",
 		},
 		{
 			name: "groups",
@@ -528,6 +534,52 @@ func TestToken(t *testing.T) {
 			},
 		},
 		{
+			name: "groups-distributed invalid client",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				Client:        &http.Client{Transport: errTransport("some unexpected oidc error")}, // return an error that we can assert against
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": ["team1", "team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			optsFunc: func(opts *Options) {
+				opts.CAContentProvider = nil // unset CA automatically set by the test to allow us to use a custom client
+			},
+			wantErr: `oidc: could not expand distributed claims: while getting distributed claim "groups": Get "{{.URL}}/groups": some unexpected oidc error`,
+		},
+		{
 			name: "groups-distributed-malformed-claim-names",
 			options: Options{
 				IssuerURL:     "{{.URL}}",
@@ -567,7 +619,7 @@ func TestToken(t *testing.T) {
 					"issuer": "{{.URL}}",
 					"jwks_uri": "{{.URL}}/.testing/keys"
 			}`,
-			wantErr: true,
+			wantErr: "oidc: verify token: oidc: source does not exist",
 		},
 		{
 			name: "groups-distributed-malformed-names-and-sources",
@@ -603,7 +655,7 @@ func TestToken(t *testing.T) {
 					"issuer": "{{.URL}}",
 					"jwks_uri": "{{.URL}}/.testing/keys"
 			}`,
-			wantErr: true,
+			wantErr: "oidc: verify token: oidc: source does not exist",
 		},
 		{
 			name: "groups-distributed-malformed-distributed-claim",
@@ -645,7 +697,7 @@ func TestToken(t *testing.T) {
 					"issuer": "{{.URL}}",
 					"jwks_uri": "{{.URL}}/.testing/keys"
 			}`,
-			wantErr: true,
+			wantErr: `oidc: could not expand distributed claims: jwt returned by distributed claim endpoint "{{.URL}}/groups" did not contain claim: groups`,
 		},
 		{
 			name: "groups-distributed-unusual-name",
@@ -733,11 +785,10 @@ func TestToken(t *testing.T) {
 					"issuer": "{{.URL}}",
 					"jwks_uri": "{{.URL}}/.testing/keys"
 			}`,
-			// "aud" was "your-client", not "my-client"
-			wantErr: true,
+			wantErr: `oidc: could not expand distributed claims: verify distributed claim token: oidc: expected audience "my-client" got ["your-client"]`,
 		},
 		{
-			name: "groups-distributed-wrong-audience",
+			name: "groups-distributed-expired-token",
 			options: Options{
 				IssuerURL:     "{{.URL}}",
 				ClientID:      "my-client",
@@ -777,8 +828,7 @@ func TestToken(t *testing.T) {
 					"issuer": "{{.URL}}",
 					"jwks_uri": "{{.URL}}/.testing/keys"
 			}`,
-			// The distributed token is expired.
-			wantErr: true,
+			wantErr: "oidc: could not expand distributed claims: verify distributed claim token: oidc: token is expired (Token Expiry: {{.Expired}})",
 		},
 		{
 			// Specs are unclear about this behavior.  We adopt a behavior where
@@ -976,7 +1026,7 @@ func TestToken(t *testing.T) {
 				"groups": 42,
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: `oidc: parse groups claim "groups": json: cannot unmarshal number into Go value of type string`,
 		},
 		{
 			name: "required-claim",
@@ -1029,7 +1079,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: "oidc: required claim hd not present in ID token",
 		},
 		{
 			name: "invalid-required-claim",
@@ -1054,7 +1104,7 @@ func TestToken(t *testing.T) {
 				"hd": "example.org",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: "oidc: required claim hd value does not match. Got = example.org, want = example.com",
 		},
 		{
 			name: "invalid-signature",
@@ -1074,7 +1124,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: "oidc: verify token: failed to verify signature: no keys matches jwk keyid",
 		},
 		{
 			name: "expired",
@@ -1094,7 +1144,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, expired.Unix()),
-			wantErr: true,
+			wantErr: `oidc: verify token: oidc: token is expired (Token Expiry: {{.Expired}})`,
 		},
 		{
 			name: "invalid-aud",
@@ -1114,7 +1164,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: `oidc: verify token: oidc: expected audience "my-client" got ["not-my-client"]`,
 		},
 		{
 			// ID tokens may contain multiple audiences:
@@ -1277,7 +1327,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: `oidc: verify token: oidc: id token signed with unsupported algorithm, expected ["RS256"] got "PS256"`,
 		},
 		{
 			name: "ps256",
@@ -1337,7 +1387,7 @@ func TestToken(t *testing.T) {
 			pubKeys: []*jose.JSONWebKey{
 				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
 			},
-			wantInitErr: true,
+			wantInitErr: `'oidc-issuer-url' ("http://auth.example.com") has invalid scheme ("http"), require 'https'`,
 		},
 		{
 			name: "no-username-claim",
@@ -1349,7 +1399,7 @@ func TestToken(t *testing.T) {
 			pubKeys: []*jose.JSONWebKey{
 				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
 			},
-			wantInitErr: true,
+			wantInitErr: "no username claim provided",
 		},
 		{
 			name: "invalid-sig-alg",
@@ -1363,7 +1413,22 @@ func TestToken(t *testing.T) {
 			pubKeys: []*jose.JSONWebKey{
 				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
 			},
-			wantInitErr: true,
+			wantInitErr: `oidc: unsupported signing alg: "HS256"`,
+		},
+		{
+			name: "client and ca mutually exclusive",
+			options: Options{
+				IssuerURL:            "https://auth.example.com",
+				ClientID:             "my-client",
+				UsernameClaim:        "username",
+				SupportedSigningAlgs: []string{"RS256"},
+				now:                  func() time.Time { return now },
+				Client:               http.DefaultClient, // test automatically sets CAContentProvider
+			},
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			wantInitErr: "oidc: Client and CAContentProvider are mutually exclusive",
 		},
 		{
 			name: "accounts.google.com issuer",
@@ -1405,7 +1470,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: true,
+			wantErr: `oidc: verify token: oidc: expected audience "my-client" got ["my-wrong-client"]`,
 		},
 	}
 	for _, test := range tests {
@@ -1509,4 +1574,10 @@ func TestUnmarshalClaim(t *testing.T) {
 			}
 		})
 	}
+}
+
+type errTransport string
+
+func (e errTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("%s", e)
 }

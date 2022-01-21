@@ -173,6 +173,12 @@ func (dm *DefaultGVKNNMatcher) IsSameResource(node1, node2 *yaml.RNode) bool {
 	if node1 == nil || node2 == nil {
 		return false
 	}
+	if err := kioutil.CopyLegacyAnnotations(node1); err != nil {
+		return false
+	}
+	if err := kioutil.CopyLegacyAnnotations(node2); err != nil {
+		return false
+	}
 
 	meta1, err := node1.GetMeta()
 	if err != nil {

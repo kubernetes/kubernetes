@@ -87,6 +87,15 @@ func (s Byte) HasAny(items ...byte) bool {
 	return false
 }
 
+// Clone returns a new set which is a copy of the current set.
+func (s Byte) Clone() Byte {
+	result := make(Byte, len(s))
+	for key := range s {
+		result.Insert(key)
+	}
+	return result
+}
+
 // Difference returns a set of objects that are not in s2
 // For example:
 // s1 = {a1, a2, a3}
@@ -110,10 +119,7 @@ func (s Byte) Difference(s2 Byte) Byte {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 Byte) Union(s2 Byte) Byte {
-	result := NewByte()
-	for key := range s1 {
-		result.Insert(key)
-	}
+	result := s1.Clone()
 	for key := range s2 {
 		result.Insert(key)
 	}

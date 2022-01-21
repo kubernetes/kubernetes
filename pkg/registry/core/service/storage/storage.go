@@ -242,6 +242,17 @@ func (r *REST) defaultOnReadService(service *api.Service) {
 
 	// Set ipFamilies and ipFamilyPolicy if needed.
 	r.defaultOnReadIPFamilies(service)
+
+	// We unintentionally defaulted internalTrafficPolicy when it's not needed
+	// for the ExternalName type. It's too late to change the field in storage,
+	// but we can drop the field when read.
+	defaultOnReadInternalTrafficPolicy(service)
+}
+
+func defaultOnReadInternalTrafficPolicy(service *api.Service) {
+	if service.Spec.Type == api.ServiceTypeExternalName {
+		service.Spec.InternalTrafficPolicy = nil
+	}
 }
 
 func (r *REST) defaultOnReadIPFamilies(service *api.Service) {

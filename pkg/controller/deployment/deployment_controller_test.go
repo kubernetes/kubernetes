@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -221,7 +222,7 @@ func (f *fixture) run_(deploymentName string, startInformers bool, expectError b
 		informers.Start(stopCh)
 	}
 
-	err = c.syncDeployment(deploymentName)
+	err = c.syncDeployment(context.TODO(), deploymentName)
 	if !expectError && err != nil {
 		f.t.Errorf("error syncing deployment: %v", err)
 	} else if expectError && err == nil {
@@ -529,7 +530,7 @@ func TestGetReplicaSetsForDeployment(t *testing.T) {
 	defer close(stopCh)
 	informers.Start(stopCh)
 
-	rsList, err := c.getReplicaSetsForDeployment(d1)
+	rsList, err := c.getReplicaSetsForDeployment(context.TODO(), d1)
 	if err != nil {
 		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
 	}
@@ -541,7 +542,7 @@ func TestGetReplicaSetsForDeployment(t *testing.T) {
 		t.Errorf("getReplicaSetsForDeployment() = %v, want [%v]", rsNames, rs1.Name)
 	}
 
-	rsList, err = c.getReplicaSetsForDeployment(d2)
+	rsList, err = c.getReplicaSetsForDeployment(context.TODO(), d2)
 	if err != nil {
 		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
 	}
@@ -579,7 +580,7 @@ func TestGetReplicaSetsForDeploymentAdoptRelease(t *testing.T) {
 	defer close(stopCh)
 	informers.Start(stopCh)
 
-	rsList, err := c.getReplicaSetsForDeployment(d)
+	rsList, err := c.getReplicaSetsForDeployment(context.TODO(), d)
 	if err != nil {
 		t.Fatalf("getReplicaSetsForDeployment() error: %v", err)
 	}

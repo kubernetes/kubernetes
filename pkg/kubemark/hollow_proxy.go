@@ -25,7 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
-	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -118,22 +118,24 @@ func NewHollowProxyOrDie(
 	}
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Client:           client,
-			EventClient:      eventClient,
-			IptInterface:     iptInterface,
-			Proxier:          proxier,
-			Broadcaster:      broadcaster,
-			Recorder:         recorder,
-			ProxyMode:        "fake",
-			NodeRef:          nodeRef,
-			OOMScoreAdj:      utilpointer.Int32Ptr(0),
-			ConfigSyncPeriod: 30 * time.Second,
+			Client:            client,
+			EventClient:       eventClient,
+			IptInterface:      iptInterface,
+			Proxier:           proxier,
+			Broadcaster:       broadcaster,
+			Recorder:          recorder,
+			ProxyMode:         "fake",
+			NodeRef:           nodeRef,
+			UseEndpointSlices: true,
+			OOMScoreAdj:       utilpointer.Int32Ptr(0),
+			ConfigSyncPeriod:  30 * time.Second,
 		},
 	}, nil
 }
 
-func (hp *HollowProxy) Run() {
+func (hp *HollowProxy) Run() error {
 	if err := hp.ProxyServer.Run(); err != nil {
-		klog.Fatalf("Error while running proxy: %v\n", err)
+		return fmt.Errorf("Error while running proxy: %w", err)
 	}
+	return nil
 }

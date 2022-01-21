@@ -52,7 +52,6 @@ BASH_TARGETS="
 	update-generated-docs
 	update-generated-swagger-docs
 	update-openapi-spec
-	update-bazel
 	update-gofmt"
 
 for t in ${BASH_TARGETS}; do

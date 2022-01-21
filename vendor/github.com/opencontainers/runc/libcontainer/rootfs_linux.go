@@ -22,7 +22,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/devices"
 	"github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/opencontainers/runc/libcontainer/utils"
-	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/sirupsen/logrus"
@@ -42,7 +41,7 @@ type mountConfig struct {
 // needsSetupDev returns true if /dev needs to be set up.
 func needsSetupDev(config *configs.Config) bool {
 	for _, m := range config.Mounts {
-		if m.Device == "bind" && libcontainerUtils.CleanPath(m.Destination) == "/dev" {
+		if m.Device == "bind" && utils.CleanPath(m.Destination) == "/dev" {
 			return false
 		}
 	}
@@ -154,15 +153,16 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 // finalizeRootfs sets anything to ro if necessary. You must call
 // prepareRootfs first.
 func finalizeRootfs(config *configs.Config) (err error) {
-	// remount dev as ro if specified
+	// All tmpfs mounts and /dev were previously mounted as rw
+	// by mountPropagate. Remount them read-only as requested.
 	for _, m := range config.Mounts {
-		if libcontainerUtils.CleanPath(m.Destination) == "/dev" {
-			if m.Flags&unix.MS_RDONLY == unix.MS_RDONLY {
-				if err := remountReadonly(m); err != nil {
-					return newSystemErrorWithCausef(err, "remounting %q as readonly", m.Destination)
-				}
+		if m.Flags&unix.MS_RDONLY != unix.MS_RDONLY {
+			continue
+		}
+		if m.Device == "tmpfs" || utils.CleanPath(m.Destination) == "/dev" {
+			if err := remountReadonly(m); err != nil {
+				return newSystemErrorWithCausef(err, "remounting %q as readonly", m.Destination)
 			}
-			break
 		}
 	}
 
@@ -429,12 +429,6 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 		}
 		if stat != nil {
 			if err = os.Chmod(dest, stat.Mode()); err != nil {
-				return err
-			}
-		}
-		// Initially mounted rw in mountPropagate, remount to ro if flag set.
-		if m.Flags&unix.MS_RDONLY != 0 {
-			if err := remount(m, rootfs); err != nil {
 				return err
 			}
 		}
@@ -1035,7 +1029,22 @@ func writeSystemProperty(key, value string) error {
 
 func remount(m *configs.Mount, rootfs string) error {
 	return utils.WithProcfd(rootfs, m.Destination, func(procfd string) error {
-		return unix.Mount(m.Source, procfd, m.Device, uintptr(m.Flags|unix.MS_REMOUNT), "")
+		flags := uintptr(m.Flags | unix.MS_REMOUNT)
+		err := unix.Mount(m.Source, procfd, m.Device, flags, "")
+		if err == nil {
+			return nil
+		}
+		// Check if the source has ro flag...
+		var s unix.Statfs_t
+		if err := unix.Statfs(m.Source, &s); err != nil {
+			return &os.PathError{Op: "statfs", Path: m.Source, Err: err}
+		}
+		if s.Flags&unix.MS_RDONLY != unix.MS_RDONLY {
+			return err
+		}
+		// ... and retry the mount with ro flag set.
+		flags |= unix.MS_RDONLY
+		return unix.Mount(m.Source, procfd, m.Device, flags, "")
 	})
 }
 
@@ -1047,10 +1056,10 @@ func mountPropagate(m *configs.Mount, rootfs string, mountLabel string) error {
 		flags = m.Flags
 	)
 	// Delay mounting the filesystem read-only if we need to do further
-	// operations on it. We need to set up files in "/dev" and tmpfs mounts may
-	// need to be chmod-ed after mounting. The mount will be remounted ro later
-	// in finalizeRootfs() if necessary.
-	if libcontainerUtils.CleanPath(m.Destination) == "/dev" || m.Device == "tmpfs" {
+	// operations on it. We need to set up files in "/dev", and other tmpfs
+	// mounts may need to be chmod-ed after mounting. These mounts will be
+	// remounted ro later in finalizeRootfs(), if necessary.
+	if m.Device == "tmpfs" || utils.CleanPath(m.Destination) == "/dev" {
 		flags &= ^unix.MS_RDONLY
 	}
 

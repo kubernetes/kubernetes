@@ -17,6 +17,7 @@ limitations under the License.
 package schema
 
 import (
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -127,6 +128,9 @@ type Extensions struct {
 	//      Atomic maps will be entirely replaced when updated.
 	// +optional
 	XMapType *string
+
+	// x-kubernetes-validations describes a list of validation rules for expression validation.
+	XValidations apiextensions.ValidationRules
 }
 
 // +k8s:deepcopy-gen=true

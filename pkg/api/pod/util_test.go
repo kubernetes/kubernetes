@@ -36,6 +36,7 @@ import (
 )
 
 func TestVisitContainers(t *testing.T) {
+	setAllFeatureEnabledContainersDuringTest := ContainerType(0)
 	testCases := []struct {
 		desc                       string
 		spec                       *api.PodSpec
@@ -142,7 +143,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"i1", "i2", "c1", "c2"},
-			mask:           AllFeatureEnabledContainers(),
+			mask:           setAllFeatureEnabledContainersDuringTest,
 		},
 		{
 			desc: "all feature enabled container types with ephemeral containers enabled",
@@ -161,7 +162,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers:             []string{"i1", "i2", "c1", "c2", "e1", "e2"},
-			mask:                       AllFeatureEnabledContainers(),
+			mask:                       setAllFeatureEnabledContainersDuringTest,
 			ephemeralContainersEnabled: true,
 		},
 		{
@@ -187,8 +188,9 @@ func TestVisitContainers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			if tc.ephemeralContainersEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+
+			if tc.mask == setAllFeatureEnabledContainersDuringTest {
 				tc.mask = AllFeatureEnabledContainers()
 			}
 
@@ -560,56 +562,24 @@ func TestDropFSGroupFields(t *testing.T) {
 	}
 	podInfos := []struct {
 		description                  string
-		featureEnabled               bool
 		newPodHasFSGroupChangePolicy bool
 		pod                          func() *api.Pod
 		expectPolicyInPod            bool
 	}{
 		{
 			description:                  "oldPod.FSGroupChangePolicy=nil, feature=true, newPod.FSGroupChangePolicy=true",
-			featureEnabled:               true,
 			pod:                          nofsGroupPod,
 			newPodHasFSGroupChangePolicy: true,
 			expectPolicyInPod:            true,
-		},
-		{
-			description:                  "oldPod=nil, feature=false, newPod.FSGroupChangePolicy=true",
-			featureEnabled:               false,
-			pod:                          func() *api.Pod { return nil },
-			newPodHasFSGroupChangePolicy: true,
-			expectPolicyInPod:            false,
 		},
 		{
 			description:                  "oldPod=nil, feature=true, newPod.FSGroupChangePolicy=true",
-			featureEnabled:               true,
 			pod:                          func() *api.Pod { return nil },
 			newPodHasFSGroupChangePolicy: true,
 			expectPolicyInPod:            true,
 		},
 		{
-			description:                  "oldPod.FSGroupChangePolicy=nil, feature=false, newPod.FSGroupChangePolicy=true",
-			featureEnabled:               false,
-			pod:                          nofsGroupPod,
-			newPodHasFSGroupChangePolicy: true,
-			expectPolicyInPod:            false,
-		},
-		{
-			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=true",
-			featureEnabled:               false,
-			pod:                          fsGroupPod,
-			newPodHasFSGroupChangePolicy: true,
-			expectPolicyInPod:            true,
-		},
-		{
-			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=false",
-			featureEnabled:               false,
-			pod:                          fsGroupPod,
-			newPodHasFSGroupChangePolicy: false,
-			expectPolicyInPod:            false,
-		},
-		{
 			description:                  "oldPod.FSGroupChangePolicy=true, feature=true, newPod.FSGroupChangePolicy=false",
-			featureEnabled:               true,
 			pod:                          fsGroupPod,
 			newPodHasFSGroupChangePolicy: false,
 			expectPolicyInPod:            false,
@@ -617,7 +587,6 @@ func TestDropFSGroupFields(t *testing.T) {
 	}
 	for _, podInfo := range podInfos {
 		t.Run(podInfo.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, podInfo.featureEnabled)()
 			oldPod := podInfo.pod()
 			newPod := oldPod.DeepCopy()
 			if oldPod == nil && podInfo.newPodHasFSGroupChangePolicy {
@@ -1704,5 +1673,87 @@ func TestDropDisabledPodAffinityTermFields(t *testing.T) {
 				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestDropOSField(t *testing.T) {
+	podWithOSField := func() *api.Pod {
+		osField := api.PodOS{Name: "linux"}
+		return &api.Pod{
+			Spec: api.PodSpec{
+				OS: &osField,
+			},
+		}
+	}
+	podWithoutOSField := func() *api.Pod { return &api.Pod{} }
+	podInfo := []struct {
+		description   string
+		hasPodOSField bool
+		pod           func() *api.Pod
+	}{
+		{
+			description:   "has PodOS field",
+			hasPodOSField: true,
+			pod:           podWithOSField,
+		},
+		{
+			description:   "does not have PodOS field",
+			hasPodOSField: false,
+			pod:           podWithoutOSField,
+		},
+		{
+			description:   "is nil",
+			hasPodOSField: false,
+			pod:           func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasOsField, oldPod := oldPodInfo.hasPodOSField, oldPodInfo.pod()
+				newPodHasOSField, newPod := newPodInfo.hasPodOSField, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasOsField:
+						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasOSField:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have OSfield
+						if !reflect.DeepEqual(newPod, podWithoutOSField()) {
+							t.Errorf("new pod has OS field: %v", cmp.Diff(newPod, podWithoutOSField()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
 	}
 }

@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"reflect"
+	goruntime "runtime"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -263,6 +264,92 @@ func TestGeneralPredicates(t *testing.T) {
 			}
 			if fits != test.fits {
 				t.Errorf("expected: %v got %v", test.fits, fits)
+			}
+		})
+	}
+}
+
+func TestRejectPodAdmissionBasedOnOSSelector(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		node            *v1.Node
+		expectRejection bool
+	}{
+		{
+			name:            "OS label match",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
+			expectRejection: false,
+		},
+		{
+			name:            "dummyOS label, but the underlying OS matches",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: false,
+		},
+		{
+			name:            "dummyOS label, but the underlying OS doesn't match",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "dummyOS label, but the underlying OS doesn't match",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "OS field mismatch, OS label on node object would be reset to correct value",
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "No label selector on the pod, should be admitted",
+			pod:             &v1.Pod{},
+			node:            &v1.Node{Spec: v1.NodeSpec{}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS"}}},
+			expectRejection: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualResult := rejectPodAdmissionBasedOnOSSelector(test.pod, test.node)
+			if test.expectRejection != actualResult {
+				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
+			}
+		})
+	}
+}
+
+func TestRejectPodAdmissionBasedOnOSField(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		expectRejection bool
+	}{
+		{
+			name:            "OS field match",
+			pod:             &v1.Pod{Spec: v1.PodSpec{OS: &v1.PodOS{Name: v1.OSName(goruntime.GOOS)}}},
+			expectRejection: false,
+		},
+		{
+			name:            "OS field mismatch",
+			pod:             &v1.Pod{Spec: v1.PodSpec{OS: &v1.PodOS{Name: "dummyOS"}}},
+			expectRejection: true,
+		},
+		{
+			name:            "no OS field",
+			pod:             &v1.Pod{Spec: v1.PodSpec{}},
+			expectRejection: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualResult := rejectPodAdmissionBasedOnOSField(test.pod)
+			if test.expectRejection != actualResult {
+				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
 			}
 		})
 	}

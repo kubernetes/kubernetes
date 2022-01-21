@@ -19,6 +19,7 @@ package componentconfigs
 import (
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -76,8 +77,25 @@ func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, cluster
 		return nil, err
 	}
 
-	configMapName := constants.GetKubeletConfigMapName(k8sVersion)
-	return h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
+	// TODO: https://github.com/kubernetes/kubeadm/issues/1582
+	// During the first "kubeadm upgrade apply" when the feature gate goes "true" by default and
+	// a preferred user value is missing in the ClusterConfiguration, "kubeadm upgrade apply" will try
+	// to fetch using the new format and that CM will not exist yet.
+	// Tollerate both the old a new format until UnversionedKubeletConfigMap goes GA and is locked.
+	// This makes it easier for the users and the code base (avoids changes in /cmd/upgrade/common.go#enforceRequirements).
+	configMapNameLegacy := constants.GetKubeletConfigMapName(k8sVersion, true)
+	configMapName := constants.GetKubeletConfigMapName(k8sVersion, false)
+	klog.V(1).Infof("attempting to download the KubeletConfiguration from the new format location (UnversionedKubeletConfigMap=true)")
+	cm, err := h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
+	if err != nil {
+		klog.V(1).Infof("attempting to download the KubeletConfiguration from the DEPRECATED location (UnversionedKubeletConfigMap=false)")
+		cm, err = h.fromConfigMap(clientset, configMapNameLegacy, constants.KubeletBaseConfigurationConfigMapKey, true)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not download the kubelet configuration from ConfigMap %q or %q",
+				configMapName, configMapNameLegacy)
+		}
+	}
+	return cm, nil
 }
 
 // kubeletConfig implements the kubeadmapi.ComponentConfig interface for kubelet

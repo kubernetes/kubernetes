@@ -33,7 +33,7 @@ _tmpdir="$(kube::realpath "$(mktemp -d -t verify-generated-files.XXXXXX)")"
 _tmp_gopath="${_tmpdir}/go"
 _tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
 mkdir -p "${_tmp_kuberoot}/.."
-git worktree add "${_tmp_kuberoot}"
+git worktree add "${_tmp_kuberoot}" HEAD
 kube::util::trap_add "git worktree remove -f ${_tmp_kuberoot} && rm -rf ${_tmpdir}" EXIT
 cd "${_tmp_kuberoot}"
 

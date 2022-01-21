@@ -155,18 +155,18 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 }
 
 // Run runs controller loops and returns when they are done
-func (e *Signer) Run(stopCh <-chan struct{}) {
+func (e *Signer) Run(ctx context.Context) {
 	// Shut down queues
 	defer utilruntime.HandleCrash()
 	defer e.syncQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("bootstrap_signer", stopCh, e.configMapSynced, e.secretSynced) {
+	if !cache.WaitForNamedCacheSync("bootstrap_signer", ctx.Done(), e.configMapSynced, e.secretSynced) {
 		return
 	}
 
 	klog.V(5).Infof("Starting workers")
-	go wait.Until(e.serviceConfigMapQueue, 0, stopCh)
-	<-stopCh
+	go wait.UntilWithContext(ctx, e.serviceConfigMapQueue, 0)
+	<-ctx.Done()
 	klog.V(1).Infof("Shutting down")
 }
 
@@ -174,19 +174,19 @@ func (e *Signer) pokeConfigMapSync() {
 	e.syncQueue.Add(e.configMapKey)
 }
 
-func (e *Signer) serviceConfigMapQueue() {
+func (e *Signer) serviceConfigMapQueue(ctx context.Context) {
 	key, quit := e.syncQueue.Get()
 	if quit {
 		return
 	}
 	defer e.syncQueue.Done(key)
 
-	e.signConfigMap()
+	e.signConfigMap(ctx)
 }
 
 // signConfigMap computes the signatures on our latest cached objects and writes
 // back if necessary.
-func (e *Signer) signConfigMap() {
+func (e *Signer) signConfigMap(ctx context.Context) {
 	origCM := e.getConfigMap()
 
 	if origCM == nil {
@@ -239,12 +239,12 @@ func (e *Signer) signConfigMap() {
 	}
 
 	if needUpdate {
-		e.updateConfigMap(newCM)
+		e.updateConfigMap(ctx, newCM)
 	}
 }
 
-func (e *Signer) updateConfigMap(cm *v1.ConfigMap) {
-	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+func (e *Signer) updateConfigMap(ctx context.Context, cm *v1.ConfigMap) {
+	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, metav1.UpdateOptions{})
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 		klog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}

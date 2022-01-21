@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/klog/v2"
 )
 
@@ -200,6 +201,52 @@ func TestTimeout(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatalf("expected to see a handler panic, but didn't")
 	}
+}
+
+func TestTimeoutHeaders(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+
+	ts := httptest.NewServer(
+		withDeadline(
+			WithTimeout(
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					h := w.Header()
+					// trigger the timeout
+					cancel()
+					// mutate response Headers
+					for j := 0; j < 1000; j++ {
+						h.Set("Test", "post")
+					}
+				}),
+				func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+					return req, false, func() {}, apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
+				},
+			),
+		),
+	)
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	res.Body.Close()
 }
 
 func captureStdErr() (func() string, func(), error) {
@@ -365,6 +412,17 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	_, err = client.Do(newServerRequest(tr))
 	if err == nil {
 		t.Fatal("expected to receive an error")
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &baseTimeoutWriter{
+		w: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.w {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
 

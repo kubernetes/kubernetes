@@ -31,7 +31,7 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
@@ -113,7 +113,7 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		},
 	})
 	conn.SetIdleTimeout(idleTimeout)
-	_, streams, err := conn.Open(httplog.Unlogged(req, w), req)
+	_, streams, err := conn.Open(responsewriter.GetOriginal(w), req)
 	if err != nil {
 		err = fmt.Errorf("unable to upgrade websocket connection: %v", err)
 		return err

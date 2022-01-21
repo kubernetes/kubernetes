@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -58,6 +59,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	netutils "k8s.io/utils/net"
+)
+
+const (
+	UnprivilegedUserToken = "unprivileged-user"
 )
 
 // Config is a struct of configuration directives for NewControlPlaneComponents.
@@ -79,11 +84,16 @@ func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.A
 	return authorizer.DecisionAllow, "always allow", nil
 }
 
-// alwaysEmpty simulates "no authentication" for old tests
-func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
+// unsecuredUser simulates requests to the unsecured endpoint for old tests
+func unsecuredUser(req *http.Request) (*authauthenticator.Response, bool, error) {
+	auth := req.Header.Get("Authorization")
+	if len(auth) != 0 {
+		return nil, false, nil
+	}
 	return &authauthenticator.Response{
 		User: &user.DefaultInfo{
-			Name: "",
+			Name:   "system:unsecured",
+			Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
 		},
 	}, true, nil
 }
@@ -119,7 +129,7 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 			Description: "Default Response.",
 		},
 	}
-	openAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
 
 	return openAPIConfig
 }
@@ -170,12 +180,17 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,
 		UID:    uuid.New().String(),
-		Groups: []string{user.SystemPrivilegedGroup},
+		Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
+	}
+	tokens[UnprivilegedUserToken] = &user.DefaultInfo{
+		Name:   "unprivileged",
+		UID:    uuid.New().String(),
+		Groups: []string{user.AllAuthenticated},
 	}
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, controlPlaneConfig.GenericConfig.Authentication.APIAudiences)
 	if controlPlaneConfig.GenericConfig.Authentication.Authenticator == nil {
-		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(unsecuredUser))
 	} else {
 		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, controlPlaneConfig.GenericConfig.Authentication.Authenticator)
 	}
@@ -324,7 +339,8 @@ func NewControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlp
 
 	// TODO: get rid of these tests or port them to secure serving
 	genericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
-
+	// if using endpoint reconciler the service subnet IP family must match the Public address
+	genericConfig.PublicAddress = netutils.ParseIPSloppy("10.1.1.1")
 	err = etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
 	if err != nil {
 		panic(err)

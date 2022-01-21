@@ -75,7 +75,7 @@ func getTestPod() *v1.Pod {
 
 func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
 	// All tests rely on the fake exec prober.
-	probeSpec.Handler = v1.Handler{
+	probeSpec.ProbeHandler = v1.ProbeHandler{
 		Exec: &v1.ExecAction{},
 	}
 

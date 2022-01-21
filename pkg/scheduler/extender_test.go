@@ -22,15 +22,17 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -384,6 +386,139 @@ func TestIsInterested(t *testing.T) {
 		t.Run(tc.label, func(t *testing.T) {
 			if got := tc.extender.IsInterested(tc.pod); got != tc.want {
 				t.Fatalf("IsInterested(%v) = %v, wanted %v", tc.pod, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestConvertToMetaVictims(t *testing.T) {
+	tests := []struct {
+		name              string
+		nodeNameToVictims map[string]*extenderv1.Victims
+		want              map[string]*extenderv1.MetaVictims
+	}{
+		{
+			name: "test NumPDBViolations is transferred from nodeNameToVictims to nodeNameToMetaVictims",
+			nodeNameToVictims: map[string]*extenderv1.Victims{
+				"node1": {
+					Pods: []*v1.Pod{
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
+					},
+					NumPDBViolations: 1,
+				},
+				"node2": {
+					Pods: []*v1.Pod{
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+					},
+					NumPDBViolations: 2,
+				},
+			},
+			want: map[string]*extenderv1.MetaVictims{
+				"node1": {
+					Pods: []*extenderv1.MetaPod{
+						{UID: "uid1"},
+						{UID: "uid3"},
+					},
+					NumPDBViolations: 1,
+				},
+				"node2": {
+					Pods: []*extenderv1.MetaPod{
+						{UID: "uid2"},
+						{UID: "uid4"},
+					},
+					NumPDBViolations: 2,
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := convertToMetaVictims(tt.nodeNameToVictims); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("convertToMetaVictims() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConvertToVictims(t *testing.T) {
+	tests := []struct {
+		name                  string
+		httpExtender          *HTTPExtender
+		nodeNameToMetaVictims map[string]*extenderv1.MetaVictims
+		nodeNames             []string
+		podsInNodeList        []*v1.Pod
+		nodeInfos             framework.NodeInfoLister
+		want                  map[string]*extenderv1.Victims
+		wantErr               bool
+	}{
+		{
+			name:         "test NumPDBViolations is transferred from NodeNameToMetaVictims to newNodeNameToVictims",
+			httpExtender: &HTTPExtender{},
+			nodeNameToMetaVictims: map[string]*extenderv1.MetaVictims{
+				"node1": {
+					Pods: []*extenderv1.MetaPod{
+						{UID: "uid1"},
+						{UID: "uid3"},
+					},
+					NumPDBViolations: 1,
+				},
+				"node2": {
+					Pods: []*extenderv1.MetaPod{
+						{UID: "uid2"},
+						{UID: "uid4"},
+					},
+					NumPDBViolations: 2,
+				},
+			},
+			nodeNames: []string{"node1", "node2"},
+			podsInNodeList: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+			},
+			nodeInfos: nil,
+			want: map[string]*extenderv1.Victims{
+				"node1": {
+					Pods: []*v1.Pod{
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
+					},
+					NumPDBViolations: 1,
+				},
+				"node2": {
+					Pods: []*v1.Pod{
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+					},
+					NumPDBViolations: 2,
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// nodeInfos instantiations
+			nodeInfoList := make([]*framework.NodeInfo, 0, len(tt.nodeNames))
+			for i, nm := range tt.nodeNames {
+				nodeInfo := framework.NewNodeInfo()
+				node := createNode(nm)
+				nodeInfo.SetNode(node)
+				nodeInfo.AddPod(tt.podsInNodeList[i])
+				nodeInfo.AddPod(tt.podsInNodeList[i+2])
+				nodeInfoList = append(nodeInfoList, nodeInfo)
+			}
+			tt.nodeInfos = fake.NodeInfoLister(nodeInfoList)
+
+			got, err := tt.httpExtender.convertToVictims(tt.nodeNameToMetaVictims, tt.nodeInfos)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convertToVictims() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("convertToVictims() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

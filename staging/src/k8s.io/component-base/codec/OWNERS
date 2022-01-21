@@ -4,8 +4,8 @@
 # decoding KRM style manifests.
 
 approvers:
-- sig-api-machinery-api-approvers
+  - sig-api-machinery-api-approvers
 reviewers:
-- sig-api-machinery-api-reviewers
+  - sig-api-machinery-api-reviewers
 labels:
-- sig/api-machinery
+  - sig/api-machinery

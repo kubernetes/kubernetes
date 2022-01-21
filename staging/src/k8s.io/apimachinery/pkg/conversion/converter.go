@@ -179,7 +179,7 @@ func (c *Converter) RegisterGeneratedUntypedConversionFunc(a, b interface{}, fn 
 func (c *Converter) RegisterIgnoredConversion(from, to interface{}) error {
 	typeFrom := reflect.TypeOf(from)
 	typeTo := reflect.TypeOf(to)
-	if reflect.TypeOf(from).Kind() != reflect.Ptr {
+	if typeFrom.Kind() != reflect.Ptr {
 		return fmt.Errorf("expected pointer arg for 'from' param 0, got: %v", typeFrom)
 	}
 	if typeTo.Kind() != reflect.Ptr {

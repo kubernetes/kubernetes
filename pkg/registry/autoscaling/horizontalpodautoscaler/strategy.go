@@ -52,6 +52,9 @@ func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 		"autoscaling/v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"autoscaling/v2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 		"autoscaling/v2beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
@@ -149,6 +152,9 @@ var StatusStrategy = autoscalerStatusStrategy{Strategy}
 func (autoscalerStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"autoscaling/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"autoscaling/v2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"autoscaling/v2beta1": fieldpath.NewSet(

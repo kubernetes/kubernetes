@@ -4,7 +4,6 @@ approvers:
   - build-image-approvers
 reviewers:
   - build-image-reviewers
-
 labels:
   - sig/release
   - area/release-eng

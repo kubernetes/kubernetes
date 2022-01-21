@@ -32,6 +32,7 @@ import (
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
@@ -139,7 +140,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-
+					admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "validating")
 					key := fmt.Sprintf("%sround_0_index_%d", ValidatingAuditAnnotationFailedOpenKeyPrefix, idx)
 					value := hook.Name
 					if err := versionedAttr.Attributes.AddAnnotation(key, value); err != nil {
@@ -230,7 +231,13 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 		}
 	}
 
-	if err := r.Do(ctx).Into(response); err != nil {
+	do := func() { err = r.Do(ctx).Into(response) }
+	if wd, ok := endpointsrequest.WebhookDurationFrom(ctx); ok {
+		tmp := do
+		do = func() { wd.ValidateTracker.Track(tmp) }
+	}
+	do()
+	if err != nil {
 		var status *apierrors.StatusError
 		if se, ok := err.(*apierrors.StatusError); ok {
 			status = se

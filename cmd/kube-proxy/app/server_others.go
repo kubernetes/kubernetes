@@ -48,7 +48,7 @@ import (
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
-	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -108,7 +108,7 @@ func newProxyServer(
 	}
 
 	if canUseIPVS {
-		ipvsInterface = utilipvs.New(execer)
+		ipvsInterface = utilipvs.New()
 	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
@@ -341,6 +341,7 @@ func newProxyServer(
 		proxymetrics.RegisterMetrics()
 	} else {
 		klog.V(0).InfoS("Using userspace Proxier")
+		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'iptables' or 'ipvs' instead")
 
 		// TODO this has side effects that should only happen when Run() is invoked.
 		proxier, err = userspace.NewProxier(

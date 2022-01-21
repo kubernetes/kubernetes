@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 func TestCleanVerb(t *testing.T) {
@@ -48,6 +49,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST should be transformed to WATCH if we have the right query param on the request",
 			initialVerb: "LIST",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "watch=true",
 				},
@@ -58,6 +60,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST isn't transformed to WATCH if we have query params that do not include watch",
 			initialVerb: "LIST",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "blah=asdf&something=else",
 				},
@@ -65,10 +68,25 @@ func TestCleanVerb(t *testing.T) {
 			expectedVerb: "LIST",
 		},
 		{
+			// The above may seem counter-intuitive, but it actually is needed for cases like
+			// watching a single item, e.g.:
+			//  /api/v1/namespaces/foo/pods/bar?fieldSelector=metadata.name=baz&watch=true
+			desc:        "GET is transformed to WATCH if we have the right query param on the request",
+			initialVerb: "GET",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "watch=true",
+				},
+			},
+			expectedVerb: "WATCH",
+		},
+		{
 			desc:          "LIST is transformed to WATCH for the old pattern watch",
 			initialVerb:   "LIST",
 			suggestedVerb: "WATCH",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "/api/v1/watch/pods",
 				},
@@ -80,6 +98,7 @@ func TestCleanVerb(t *testing.T) {
 			initialVerb:   "LIST",
 			suggestedVerb: "WATCHLIST",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "/api/v1/watch/pods",
 				},
@@ -179,5 +198,16 @@ func TestCleanScope(t *testing.T) {
 				t.Errorf("failed to clean scope: %v", test.requestInfo)
 			}
 		})
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &ResponseWriterDelegator{
+		ResponseWriter: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.ResponseWriter {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }

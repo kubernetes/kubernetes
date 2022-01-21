@@ -104,7 +104,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 	// If client.Discovery().RESTClient() is nil, the fake client is used.
 	// Return early because the kubeadm dryrun dynamic client only handles the core/v1 GroupVersion.
 	if client.Discovery().RESTClient() == nil {
-		fmt.Printf("[dryrun] Would create the Job %q in namespace %q and wait until it completes\n", jobName, ns)
+		fmt.Printf("[upgrade/health] Would create the Job %q in namespace %q and wait until it completes\n", jobName, ns)
 		return nil
 	}
 

@@ -24,13 +24,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/container"
-	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/utils"
 	"github.com/karrick/godirwalk"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
+
+	"github.com/google/cadvisor/container"
+	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/utils"
 
 	"k8s.io/klog/v2"
 )
@@ -104,7 +105,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	}
 
 	// CPU.
-	cpuRoot, ok := cgroupPaths["cpu"]
+	cpuRoot, ok := getControllerPath(cgroupPaths, "cpu", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(cpuRoot) {
 			if cgroup2UnifiedMode {
@@ -151,7 +152,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 
 	// Cpu Mask.
 	// This will fail for non-unified hierarchies. We'll return the whole machine mask in that case.
-	cpusetRoot, ok := cgroupPaths["cpuset"]
+	cpusetRoot, ok := getControllerPath(cgroupPaths, "cpuset", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(cpusetRoot) {
 			spec.HasCpu = true
@@ -166,7 +167,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	}
 
 	// Memory
-	memoryRoot, ok := cgroupPaths["memory"]
+	memoryRoot, ok := getControllerPath(cgroupPaths, "memory", cgroup2UnifiedMode)
 	if ok {
 		if cgroup2UnifiedMode {
 			if utils.FileExists(path.Join(memoryRoot, "memory.max")) {
@@ -194,7 +195,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	}
 
 	// Processes, read it's value from pids path directly
-	pidsRoot, ok := cgroupPaths["pids"]
+	pidsRoot, ok := getControllerPath(cgroupPaths, "pids", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(pidsRoot) {
 			spec.HasProcesses = true
@@ -214,6 +215,19 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	}
 
 	return spec, nil
+}
+
+func getControllerPath(cgroupPaths map[string]string, controllerName string, cgroup2UnifiedMode bool) (string, bool) {
+
+	ok := false
+	path := ""
+
+	if cgroup2UnifiedMode {
+		path, ok = cgroupPaths[""]
+	} else {
+		path, ok = cgroupPaths[controllerName]
+	}
+	return path, ok
 }
 
 func readString(dirpath string, file string) string {

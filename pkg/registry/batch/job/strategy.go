@@ -93,10 +93,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-		job.Spec.TTLSecondsAfterFinished = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) {
 		job.Spec.CompletionMode = nil
 	}
@@ -140,10 +136,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
-		newJob.Spec.TTLSecondsAfterFinished = nil
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == nil {
 		newJob.Spec.CompletionMode = nil
@@ -199,7 +191,16 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) validation.JobValidation
 		// existing jobs, we allow the annotation only if the Job already had it,
 		// regardless of the feature gate.
 		opts.AllowTrackingAnnotation = hasJobTrackingAnnotation(oldJob)
+
+		// Updating node affinity, node selector and tolerations is allowed
+		// only for suspended jobs that never started before.
+		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
+		notStarted := oldJob.Status.StartTime == nil
+		opts.AllowMutableSchedulingDirectives = utilfeature.DefaultFeatureGate.Enabled(features.JobMutableNodeSchedulingDirectives) &&
+			suspended && notStarted
+
 	}
+
 	return opts
 }
 
@@ -279,7 +280,7 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 
 	opts := validationOptionsForJob(job, oldJob)
 	validationErrorList := validation.ValidateJob(job, opts)
-	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts.PodValidationOptions)
+	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts)
 	return append(validationErrorList, updateErrorList...)
 }
 

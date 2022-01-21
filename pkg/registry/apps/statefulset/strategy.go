@@ -18,18 +18,18 @@ package statefulset
 
 import (
 	"context"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -74,6 +74,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	statefulSet.Status = apps.StatefulSetStatus{}
 
 	statefulSet.Generation = 1
+
 	dropStatefulSetDisabledFields(statefulSet, nil)
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
@@ -106,6 +107,12 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
 		if !minReadySecondsFieldsInUse(oldSS) {
 			newSS.Spec.MinReadySeconds = int32(0)
+		}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
 		}
 	}
 }

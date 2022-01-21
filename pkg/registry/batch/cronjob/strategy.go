@@ -18,6 +18,8 @@ package cronjob
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -114,7 +116,11 @@ func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	newCronJob := obj.(*batch.CronJob)
-	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)
+	warnings := pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)
+	if strings.Contains(newCronJob.Spec.Schedule, "TZ") {
+		warnings = append(warnings, fmt.Sprintf("CRON_TZ or TZ used in %s is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", field.NewPath("spec", "spec", "schedule")))
+	}
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -146,6 +152,9 @@ func (cronJobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Ob
 	oldCronJob := old.(*batch.CronJob)
 	if newCronJob.Generation != oldCronJob.Generation {
 		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	}
+	if strings.Contains(newCronJob.Spec.Schedule, "TZ") {
+		warnings = append(warnings, fmt.Sprintf("CRON_TZ or TZ used in %s is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", field.NewPath("spec", "spec", "schedule")))
 	}
 	return warnings
 }

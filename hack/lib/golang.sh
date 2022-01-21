@@ -52,6 +52,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   darwin/arm64
   windows/amd64
   windows/386
+  windows/arm64
 )
 
 # Which platforms we should compile test targets for.
@@ -65,6 +66,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   darwin/amd64
   darwin/arm64
   windows/amd64
+  windows/arm64
 )
 
 # The set of server targets that we are only building for Linux
@@ -77,6 +79,7 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubeadm
     cmd/kube-scheduler
+    vendor/k8s.io/component-base/logs/kube-log-runner
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
@@ -126,6 +129,7 @@ kube::golang::node_targets() {
     cmd/kube-proxy
     cmd/kubeadm
     cmd/kubelet
+    vendor/k8s.io/component-base/logs/kube-log-runner
   )
   echo "${targets[@]}"
 }
@@ -209,8 +213,8 @@ kube::golang::setup_platforms() {
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
     host_arch=$(kube::util::host_arch)
-    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" ]]; then
-      # on any platform other than amd64 and arm64, we just default to amd64
+    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" ]]; then
+      # on any platform other than amd64, arm64 and ppc64le, we just default to amd64
       host_arch="amd64"
     fi
     KUBE_SERVER_PLATFORMS=("linux/${host_arch}")
@@ -332,8 +336,10 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-controller-manager
   kube-scheduler
   kube-proxy
+  kube-log-runner
   kubeadm
   kubectl
+  kubemark
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.

@@ -339,7 +339,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		}}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating CR")
 		v, found, err := unstructured.NestedFieldNoCopy(u2.Object, "a")
-		framework.ExpectEqual(found, true, "\"a\" is defaulted")
+		if !found {
+			framework.Failf("field `a` should have been defaulted in %+v", u2.Object)
+		}
 		framework.ExpectEqual(v, "A", "\"a\" is defaulted to \"A\"")
 
 		// Deleting default for a, adding default "B" for b and waiting for the CR to get defaulted on read for b

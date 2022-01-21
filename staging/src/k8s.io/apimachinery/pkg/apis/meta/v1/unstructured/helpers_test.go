@@ -165,3 +165,63 @@ func TestNestedFieldCopy(t *testing.T) {
 func TestCacheableObject(t *testing.T) {
 	runtimetesting.CacheableObjectTest(t, UnstructuredJSONScheme)
 }
+
+func TestSetNestedStringSlice(t *testing.T) {
+	obj := map[string]interface{}{
+		"x": map[string]interface{}{
+			"y": 1,
+			"a": "foo",
+		},
+	}
+
+	err := SetNestedStringSlice(obj, []string{"bar"}, "x", "z")
+	assert.NoError(t, err)
+	assert.Len(t, obj["x"], 3)
+	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
+	assert.Equal(t, obj["x"].(map[string]interface{})["z"].([]interface{})[0], "bar")
+}
+
+func TestSetNestedSlice(t *testing.T) {
+	obj := map[string]interface{}{
+		"x": map[string]interface{}{
+			"y": 1,
+			"a": "foo",
+		},
+	}
+
+	err := SetNestedSlice(obj, []interface{}{"bar"}, "x", "z")
+	assert.NoError(t, err)
+	assert.Len(t, obj["x"], 3)
+	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
+	assert.Equal(t, obj["x"].(map[string]interface{})["z"].([]interface{})[0], "bar")
+}
+
+func TestSetNestedStringMap(t *testing.T) {
+	obj := map[string]interface{}{
+		"x": map[string]interface{}{
+			"y": 1,
+			"a": "foo",
+		},
+	}
+
+	err := SetNestedStringMap(obj, map[string]string{"b": "bar"}, "x", "z")
+	assert.NoError(t, err)
+	assert.Len(t, obj["x"], 3)
+	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
+	assert.Equal(t, obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"], "bar")
+}
+
+func TestSetNestedMap(t *testing.T) {
+	obj := map[string]interface{}{
+		"x": map[string]interface{}{
+			"y": 1,
+			"a": "foo",
+		},
+	}
+
+	err := SetNestedMap(obj, map[string]interface{}{"b": "bar"}, "x", "z")
+	assert.NoError(t, err)
+	assert.Len(t, obj["x"], 3)
+	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
+	assert.Equal(t, obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"], "bar")
+}

@@ -87,7 +87,7 @@ go build -o sample-controller .
 ./sample-controller -kubeconfig=$HOME/.kube/config
 
 # create a CustomResourceDefinition
-kubectl create -f artifacts/examples/crd.yaml
+kubectl create -f artifacts/examples/crd-status-subresource.yaml
 
 # create a custom resource of type Foo
 kubectl create -f artifacts/examples/example-foo.yaml
@@ -174,3 +174,4 @@ k8s.io/client-go.
 https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/sample-controller.
 Code changes are made in that location, merged into k8s.io/kubernetes and
 later synced here.
+

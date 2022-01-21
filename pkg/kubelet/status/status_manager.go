@@ -157,8 +157,10 @@ func (m *manager) Start() {
 	}
 
 	klog.InfoS("Starting to sync pod status with apiserver")
-	//lint:ignore SA1015 Ticker can link since this is only called once and doesn't handle termination.
-	syncTicker := time.Tick(syncPeriod)
+
+	//nolint:staticcheck // SA1015 Ticker can leak since this is only called once and doesn't handle termination.
+	syncTicker := time.NewTicker(syncPeriod).C
+
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
 		for {
@@ -334,7 +336,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 	}
 	status := *oldStatus.DeepCopy()
 	for i := range status.ContainerStatuses {
-		if status.ContainerStatuses[i].State.Terminated != nil || status.ContainerStatuses[i].State.Waiting != nil {
+		if status.ContainerStatuses[i].State.Terminated != nil {
 			continue
 		}
 		status.ContainerStatuses[i].State = v1.ContainerState{
@@ -346,7 +348,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 		}
 	}
 	for i := range status.InitContainerStatuses {
-		if status.InitContainerStatuses[i].State.Terminated != nil || status.InitContainerStatuses[i].State.Waiting != nil {
+		if status.InitContainerStatuses[i].State.Terminated != nil {
 			continue
 		}
 		status.InitContainerStatuses[i].State = v1.ContainerState{
@@ -437,7 +439,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	// Perform some more extensive logging of container termination state to assist in
 	// debugging production races (generally not needed).
-	if klog.V(5).Enabled() {
+	if klogV := klog.V(5); klogV.Enabled() {
 		var containers []string
 		for _, s := range append(append([]v1.ContainerStatus(nil), status.InitContainerStatuses...), status.ContainerStatuses...) {
 			var current, previous string
@@ -464,7 +466,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 			containers = append(containers, fmt.Sprintf("(%s state=%s previous=%s)", s.Name, current, previous))
 		}
 		sort.Strings(containers)
-		klog.InfoS("updateStatusInternal", "version", cachedStatus.version+1, "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
+		klogV.InfoS("updateStatusInternal", "version", cachedStatus.version+1, "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
 	}
 
 	// The intent here is to prevent concurrent updates to a pod's status from

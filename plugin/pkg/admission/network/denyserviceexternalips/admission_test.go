@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func makeSvc(externalIPs ...string) *core.Service {
@@ -98,7 +97,7 @@ func TestAdmission(t *testing.T) {
 			attrs := admission.NewAttributesRecord(
 				tc.newSvc, // new object
 				tc.oldSvc, // old object
-				api.Kind("Service").WithVersion("version"),
+				core.Kind("Service").WithVersion("version"),
 				tc.newSvc.Namespace,
 				tc.newSvc.Name,
 				corev1.Resource("services").WithVersion("version"),

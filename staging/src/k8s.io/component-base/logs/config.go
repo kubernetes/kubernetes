@@ -26,6 +26,7 @@ import (
 
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs/registry"
 	"k8s.io/klog/v2"
 )
 
@@ -35,16 +36,13 @@ const (
 	JSONLogFormat    = "json"
 )
 
-// LogRegistry is new init LogFormatRegistry struct
-var LogRegistry = NewLogFormatRegistry()
-
 // loggingFlags captures the state of the logging flags, in particular their default value
 // before flag parsing. It is used by UnsupportedLoggingFlags.
 var loggingFlags pflag.FlagSet
 
 func init() {
 	// Text format is default klog format
-	LogRegistry.Register(DefaultLogFormat, nil)
+	registry.LogRegistry.Register(DefaultLogFormat, nil)
 
 	var fs flag.FlagSet
 	klog.InitFlags(&fs)
@@ -54,21 +52,32 @@ func init() {
 // List of logs (k8s.io/klog + k8s.io/component-base/logs) flags supported by all logging formats
 var supportedLogsFlags = map[string]struct{}{
 	"v": {},
-	// TODO: support vmodule after 1.19 Alpha
 }
 
-// BindLoggingFlags binds the Options struct fields to a flagset
+// BindLoggingFlags binds the Options struct fields to a flagset.
+//
+// Programs using LoggingConfiguration must use SkipLoggingConfigurationFlags
+// when calling AddFlags to avoid the duplicate registration of flags.
 func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 	// The help text is generated assuming that flags will eventually use
 	// hyphens, even if currently no normalization function is set for the
 	// flag set yet.
 	unsupportedFlags := strings.Join(unsupportedLoggingFlagNames(cliflag.WordSepNormalizeFunc), ", ")
-	formats := fmt.Sprintf(`"%s"`, strings.Join(LogRegistry.List(), `", "`))
+	formats := fmt.Sprintf(`"%s"`, strings.Join(registry.LogRegistry.List(), `", "`))
 	fs.StringVar(&c.Format, "logging-format", c.Format, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
 	// No new log formats should be added after generation is of flag options
-	LogRegistry.Freeze()
-	fs.BoolVar(&c.Sanitization, "experimental-logging-sanitization", c.Sanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
+	registry.LogRegistry.Freeze()
+
+	fs.DurationVar(&c.FlushFrequency, logFlushFreqFlagName, logFlushFreq, "Maximum number of seconds between log flushes")
+	fs.VarP(&c.Verbosity, "v", "v", "number for the log level verbosity")
+	fs.Var(&c.VModule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
+
+	// JSON options. We only register them if "json" is a valid format. The
+	// config file API however always has them.
+	if _, err := registry.LogRegistry.Get("json"); err == nil {
+		fs.BoolVar(&c.Options.JSON.SplitStream, "log-json-split-stream", false, "[Experimental] In JSON format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout.")
+		fs.Var(&c.Options.JSON.InfoBufferSize, "log-json-info-buffer-size", "[Experimental] In JSON format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi).")
+	}
 }
 
 // UnsupportedLoggingFlags lists unsupported logging flags. The normalize

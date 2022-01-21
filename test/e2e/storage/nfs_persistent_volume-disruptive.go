@@ -161,7 +161,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 				PVSource:   *pvSource1,
 				Prebind:    nil,
 			}
-			pv1, pvc1, err = e2epv.CreatePVPVC(c, pvConfig1, pvcConfig, ns, false)
+			pv1, pvc1, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig1, pvcConfig, ns, false)
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv1, pvc1))
 
@@ -174,7 +174,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 				PVSource:   *pvSource2,
 				Prebind:    nil,
 			}
-			pv2, pvc2, err = e2epv.CreatePVPVC(c, pvConfig2, pvcConfig, ns, false)
+			pv2, pvc2, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig2, pvcConfig, ns, false)
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv2, pvc2))
 
@@ -293,7 +293,7 @@ func createGCEVolume() (*v1.PersistentVolumeSource, string) {
 // initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed
 // by the test.
 func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.PersistentVolumeConfig, pvcConfig e2epv.PersistentVolumeClaimConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
-	pv, pvc, err := e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+	pv, pvc, err := e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 	defer func() {
 		if err != nil {
 			e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns)

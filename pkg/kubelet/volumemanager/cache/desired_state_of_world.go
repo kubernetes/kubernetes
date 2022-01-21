@@ -23,6 +23,7 @@ package cache
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -207,6 +208,8 @@ type podToMount struct {
 	// volume claim, this contains the volume.Spec.Name() of the persistent
 	// volume claim
 	outerVolumeSpecName string
+	// mountRequestTime stores time at which mount was requested
+	mountRequestTime time.Time
 }
 
 const (
@@ -281,6 +284,11 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			desiredSizeLimit:        sizeLimit,
 		}
 	}
+	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
+	mountRequestTime := time.Now()
+	if ok && !volumePlugin.RequiresRemount(volumeSpec) {
+		mountRequestTime = oldPodMount.mountRequestTime
+	}
 
 	// Create new podToMount object. If it already exists, it is refreshed with
 	// updated values (this is required for volumes that require remounting on
@@ -290,6 +298,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		pod:                 pod,
 		volumeSpec:          volumeSpec,
 		outerVolumeSpecName: outerVolumeSpecName,
+		mountRequestTime:    mountRequestTime,
 	}
 	return volumeName, nil
 }
@@ -407,6 +416,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
 						VolumeGidValue:          volumeObj.volumeGidValue,
 						ReportedInUse:           volumeObj.reportedInUse,
+						MountRequestTime:        podObj.mountRequestTime,
 						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
 		}
 	}

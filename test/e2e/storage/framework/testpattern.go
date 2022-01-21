@@ -297,6 +297,13 @@ var (
 		SnapshotType:           DynamicCreatedSnapshot,
 		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
+	// BlockVolModeGenericEphemeralVolume is for generic ephemeral inline volumes in raw block mode.
+	BlockVolModeGenericEphemeralVolume = TestPattern{
+		Name:        "Generic Ephemeral-volume (block volmode) (late-binding)",
+		VolType:     GenericEphemeralVolume,
+		VolMode:     v1.PersistentVolumeBlock,
+		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+	}
 
 	// Definitions for snapshot case
 
@@ -314,6 +321,14 @@ var (
 		SnapshotDeletionPolicy: DeleteSnapshot,
 		VolType:                DynamicPV,
 	}
+	// EphemeralSnapshotDelete is TestPattern for snapshotting of a generic ephemeral volume
+	// where snapshots are deleted.
+	EphemeralSnapshotDelete = TestPattern{
+		Name:                   "Ephemeral Snapshot (delete policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+		VolType:                GenericEphemeralVolume,
+	}
 	// DynamicSnapshotRetain is TestPattern for "Dynamic snapshot"
 	DynamicSnapshotRetain = TestPattern{
 		Name:                   "Dynamic Snapshot (retain policy)",
@@ -327,6 +342,14 @@ var (
 		SnapshotType:           PreprovisionedCreatedSnapshot,
 		SnapshotDeletionPolicy: RetainSnapshot,
 		VolType:                DynamicPV,
+	}
+	// EphemeralSnapshotDelete is TestPattern for snapshotting of a generic ephemeral volume
+	// where snapshots are preserved.
+	EphemeralSnapshotRetain = TestPattern{
+		Name:                   "Ephemeral Snapshot (retain policy)",
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: RetainSnapshot,
+		VolType:                GenericEphemeralVolume,
 	}
 
 	// Definitions for volume expansion case

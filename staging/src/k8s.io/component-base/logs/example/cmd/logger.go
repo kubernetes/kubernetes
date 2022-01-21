@@ -40,12 +40,10 @@ func NewLoggerCommand() *cobra.Command {
 	o := logs.NewOptions()
 	cmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
-			errs := o.Validate()
-			if len(errs) != 0 {
-				fmt.Fprintf(os.Stderr, "%v\n", errs)
+			if err := o.ValidateAndApply(); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
-			o.Apply()
 			runLogger()
 		},
 	}
@@ -54,6 +52,8 @@ func NewLoggerCommand() *cobra.Command {
 }
 
 func runLogger() {
+	fmt.Println("This is normal output via stdout.")
+	fmt.Fprintln(os.Stderr, "This is other output via stderr.")
 	klog.Infof("Log using Infof, key: %s", "value")
 	klog.InfoS("Log using InfoS", "key", "value")
 	err := errors.New("fail")
@@ -61,6 +61,7 @@ func runLogger() {
 	klog.ErrorS(err, "Log using ErrorS")
 	data := SensitiveData{Key: "secret"}
 	klog.Infof("Log with sensitive key, data: %q", data)
+	klog.V(1).Info("Log less important message")
 }
 
 type SensitiveData struct {

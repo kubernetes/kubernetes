@@ -162,12 +162,6 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 //         newSvc.Spec.MyFeature = nil
 //     }
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
-	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
-		if !allocateLoadBalancerNodePortsInUse(oldSvc) {
-			newSvc.Spec.AllocateLoadBalancerNodePorts = nil
-		}
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
 		if !serviceConditionsInUse(oldSvc) {
@@ -193,14 +187,6 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 			newSvc.Spec.InternalTrafficPolicy = nil
 		}
 	}
-}
-
-// returns true if svc.Spec.AllocateLoadBalancerNodePorts field is in use
-func allocateLoadBalancerNodePortsInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	return svc.Spec.AllocateLoadBalancerNodePorts != nil
 }
 
 // returns true when the svc.Status.Conditions field is in use.

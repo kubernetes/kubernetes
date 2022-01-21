@@ -669,6 +669,57 @@ mergingList:
 			ExpectedError: "does not contain declared merge key",
 		},
 	},
+	{
+		Description: "$deleteFromPrimitiveList of nonexistent item in primitive list should not add the item to the list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList on empty primitive list should not add the item to the list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList on nonexistent primitive list should not add the primitive list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+foo:
+  - bar
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+foo:
+  - bar
+`),
+		},
+	},
 }
 
 func TestCustomStrategicMergePatch(t *testing.T) {

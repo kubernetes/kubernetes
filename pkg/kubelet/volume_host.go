@@ -270,6 +270,20 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	return node.Labels, nil
 }
 
+func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+	node, err := kvh.kubelet.GetNode()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving node: %v", err)
+	}
+	attachedVolumes := node.Status.VolumesAttached
+	result := map[v1.UniqueVolumeName]string{}
+	for i := range attachedVolumes {
+		attachedVolume := attachedVolumes[i]
+		result[attachedVolume.Name] = attachedVolume.DevicePath
+	}
+	return result, nil
+}
+
 func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 	return kvh.kubelet.nodeName
 }

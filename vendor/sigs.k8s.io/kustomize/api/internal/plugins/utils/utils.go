@@ -231,10 +231,10 @@ func UpdateResourceOptions(rm resmap.ResMap) (resmap.ResMap, error) {
 		if err := r.SetAnnotations(annotations); err != nil {
 			return nil, err
 		}
-		r.SetOptions(types.NewGenArgs(
-			&types.GeneratorArgs{
-				Behavior: behavior,
-				Options:  &types.GeneratorOptions{DisableNameSuffixHash: !needsHash}}))
+		if needsHash {
+			r.EnableHashSuffix()
+		}
+		r.SetBehavior(types.NewGenerationBehavior(behavior))
 	}
 	return rm, nil
 }

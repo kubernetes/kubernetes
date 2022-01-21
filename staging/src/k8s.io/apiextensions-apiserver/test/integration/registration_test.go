@@ -360,7 +360,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "noxus.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "",
 				},
 			},
 		},
@@ -372,7 +371,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "foo",
 					Namespace: "the-cruel-default",
-					SelfLink:  "", // TODO double check: empty?
 				},
 			},
 		},
@@ -385,7 +383,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "curlets.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "",
 				},
 			},
 		},
@@ -398,7 +395,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "bar",
 					Namespace: "",
-					SelfLink:  "", // TODO double check: empty?
 				},
 			},
 		},
@@ -452,5 +448,4 @@ type metaObject struct {
 type Metadata struct {
 	Name      string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
-	SelfLink  string `json:"selfLink,omitempty" protobuf:"bytes,3,opt,name=selfLink"`
 }

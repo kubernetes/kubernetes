@@ -1,6 +1,5 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- wojtek-t
-- krousey
-- jayunit100
+  - wojtek-t
+  - jayunit100

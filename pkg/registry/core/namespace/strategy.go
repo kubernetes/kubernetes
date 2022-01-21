@@ -28,11 +28,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -125,12 +123,10 @@ func (namespaceStrategy) Canonicalize(obj runtime.Object) {
 	// GET:
 	// Only defaulting will be applied.
 	ns := obj.(*api.Namespace)
-	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-		if ns.Labels == nil {
-			ns.Labels = map[string]string{}
-		}
-		ns.Labels[v1.LabelMetadataName] = ns.Name
+	if ns.Labels == nil {
+		ns.Labels = map[string]string{}
 	}
+	ns.Labels[v1.LabelMetadataName] = ns.Name
 }
 
 // AllowCreateOnUpdate is false for namespaces.

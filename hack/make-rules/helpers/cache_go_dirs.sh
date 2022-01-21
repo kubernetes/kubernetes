@@ -38,8 +38,8 @@ trap 'rm -f "${CACHE}"' HUP INT TERM ERR
 function kfind() {
     # We want to include the "special" vendor directories which are actually
     # part of the Kubernetes source tree (./staging/*) but we need them to be
-    # named as their ./vendor/* equivalents.  Also, we  do not want all of
-    # ./vendor , ./hack/tools/vendor or even all of ./vendor/k8s.io.
+    # named as their ./vendor/* equivalents.  Also, we do not want all of
+    # ./vendor nor ./hack/tools/vendor nor even all of ./vendor/k8s.io.
     find -H .                      \
         \(                         \
         -not \(                    \
@@ -48,6 +48,10 @@ function kfind() {
                 -name '.[^.]*' -o  \
                 \(                 \
                   -name 'vendor'   \
+                  -type d          \
+                \) -o              \
+                \(                 \
+                  -name 'testdata' \
                   -type d          \
                 \)                 \
             \) -prune              \

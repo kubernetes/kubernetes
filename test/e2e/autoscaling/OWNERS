@@ -8,4 +8,4 @@ emeritus_approvers:
   - jszczepkowski
   - wasylkowski
 labels:
-- sig/autoscaling
+  - sig/autoscaling

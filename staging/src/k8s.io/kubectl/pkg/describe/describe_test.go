@@ -236,19 +236,88 @@ func TestDescribeSecret(t *testing.T) {
 }
 
 func TestDescribeNamespace(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "myns",
+	exampleNamespaceName := "example"
+
+	testCases := []struct {
+		name      string
+		namespace *corev1.Namespace
+		expect    []string
+	}{
+		{
+			name: "no quotas or limit ranges",
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: exampleNamespaceName,
+				},
+				Status: corev1.NamespaceStatus{
+					Phase: corev1.NamespaceActive,
+				},
+			},
+			expect: []string{
+				"Name",
+				exampleNamespaceName,
+				"Status",
+				string(corev1.NamespaceActive),
+				"No resource quota",
+				"No LimitRange resource.",
+			},
 		},
-	})
-	c := &describeClient{T: t, Namespace: "", Interface: fake}
-	d := NamespaceDescriber{c}
-	out, err := d.Describe("", "myns", DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		{
+			name: "has conditions",
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: exampleNamespaceName,
+				},
+				Status: corev1.NamespaceStatus{
+					Phase: corev1.NamespaceTerminating,
+					Conditions: []corev1.NamespaceCondition{
+						{
+							LastTransitionTime: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+							Message:            "example message",
+							Reason:             "example reason",
+							Status:             corev1.ConditionTrue,
+							Type:               corev1.NamespaceDeletionContentFailure,
+						},
+					},
+				},
+			},
+			expect: []string{
+				"Name",
+				exampleNamespaceName,
+				"Status",
+				string(corev1.NamespaceTerminating),
+				"Conditions",
+				"Type",
+				string(corev1.NamespaceDeletionContentFailure),
+				"Status",
+				string(corev1.ConditionTrue),
+				"Reason",
+				"example reason",
+				"Message",
+				"example message",
+				"No resource quota",
+				"No LimitRange resource.",
+			},
+		},
 	}
-	if !strings.Contains(out, "myns") {
-		t.Errorf("unexpected out: %s", out)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.namespace)
+			c := &describeClient{T: t, Namespace: "", Interface: fake}
+			d := NamespaceDescriber{c}
+
+			out, err := d.Describe("", testCase.namespace.Name, DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
 	}
 }
 

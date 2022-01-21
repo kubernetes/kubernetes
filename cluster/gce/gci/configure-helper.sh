@@ -179,7 +179,7 @@ function config-ip-firewall {
   # node because we don't expect the daemonset to run on this node.
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
-    ip addr add dev lo 169.254.169.252/32
+    ip addr add dev lo 169.254.169.252/32 scope host
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 169.254.169.252:988
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 8080 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 169.254.169.252:987
   fi
@@ -484,7 +484,7 @@ function ensure-local-ssds-ephemeral-storage() {
   safe-format-and-mount "${device}" "${ephemeral_mountpoint}"
 
   # mount container runtime root dir on SSD
-  local container_runtime="${CONTAINER_RUNTIME:-docker}"
+  local container_runtime="${CONTAINER_RUNTIME:-containerd}"
   systemctl stop "$container_runtime"
   # Some images remount the container runtime root dir.
   umount "/var/lib/${container_runtime}" || true
@@ -657,6 +657,16 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
+
+  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    mkdir -p "${pki_dir}/konnectivity-agent"
+    KONNECTIVITY_AGENT_CA_CERT_PATH="${pki_dir}/konnectivity-agent/ca.crt"
+    KONNECTIVITY_AGENT_CLIENT_KEY_PATH="${pki_dir}/konnectivity-agent/client.key"
+    KONNECTIVITY_AGENT_CLIENT_CERT_PATH="${pki_dir}/konnectivity-agent/client.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_CERT}" "${KONNECTIVITY_AGENT_CA_CERT_PATH}"
+    write-pki-data "${KONNECTIVITY_AGENT_CLIENT_KEY}" "${KONNECTIVITY_AGENT_CLIENT_KEY_PATH}"
+    write-pki-data "${KONNECTIVITY_AGENT_CLIENT_CERT}" "${KONNECTIVITY_AGENT_CLIENT_CERT_PATH}"
+  fi
 }
 
 function create-master-pki {
@@ -723,6 +733,39 @@ function create-master-pki {
 
     PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
     write-pki-data "${PROXY_CLIENT_CERT}" "${PROXY_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ -n "${KONNECTIVITY_SERVER_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/konnectivity-server
+    KONNECTIVITY_SERVER_CA_CERT_PATH="${pki_dir}/konnectivity-server/ca.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CA_CERT}" "${KONNECTIVITY_SERVER_CA_CERT_PATH}"
+
+    KONNECTIVITY_SERVER_KEY_PATH="${pki_dir}/konnectivity-server/server.key"
+    write-pki-data "${KONNECTIVITY_SERVER_KEY}" "${KONNECTIVITY_SERVER_KEY_PATH}"
+
+    KONNECTIVITY_SERVER_CERT_PATH="${pki_dir}/konnectivity-server/server.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CERT}" "${KONNECTIVITY_SERVER_CERT_PATH}"
+
+    KONNECTIVITY_SERVER_CLIENT_KEY_PATH="${pki_dir}/konnectivity-server/client.key"
+    write-pki-data "${KONNECTIVITY_SERVER_CLIENT_KEY}" "${KONNECTIVITY_SERVER_CLIENT_KEY_PATH}"
+
+    KONNECTIVITY_SERVER_CLIENT_CERT_PATH="${pki_dir}/konnectivity-server/client.crt"
+    write-pki-data "${KONNECTIVITY_SERVER_CLIENT_CERT}" "${KONNECTIVITY_SERVER_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ -n "${KONNECTIVITY_AGENT_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/konnectivity-agent
+    KONNECTIVITY_AGENT_CA_KEY_PATH="${pki_dir}/konnectivity-agent/ca.key"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_KEY}" "${KONNECTIVITY_AGENT_CA_KEY_PATH}"
+
+    KONNECTIVITY_AGENT_CA_CERT_PATH="${pki_dir}/konnectivity-agent/ca.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CA_CERT}" "${KONNECTIVITY_AGENT_CA_CERT_PATH}"
+
+    KONNECTIVITY_AGENT_KEY_PATH="${pki_dir}/konnectivity-agent/server.key"
+    write-pki-data "${KONNECTIVITY_AGENT_KEY}" "${KONNECTIVITY_AGENT_KEY_PATH}"
+
+    KONNECTIVITY_AGENT_CERT_PATH="${pki_dir}/konnectivity-agent/server.crt"
+    write-pki-data "${KONNECTIVITY_AGENT_CERT}" "${KONNECTIVITY_AGENT_CERT_PATH}"
   fi
 }
 
@@ -953,8 +996,12 @@ egressSelections:
   connection:
     proxyProtocol: HTTPConnect
     transport:
-      uds:
-        udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
+      tcp:
+        url: https://127.0.0.1:8131
+        tlsConfig:
+          caBundle: /etc/srv/kubernetes/pki/konnectivity-server/ca.crt
+          clientKey: /etc/srv/kubernetes/pki/konnectivity-server/client.key
+          clientCert: /etc/srv/kubernetes/pki/konnectivity-server/client.crt
 - name: controlplane
   connection:
     proxyProtocol: Direct
@@ -1461,7 +1508,6 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
-
 function docker-installed {
     if systemctl cat docker.service &> /dev/null ; then
         return 0
@@ -1491,7 +1537,7 @@ EOF
 
 function disable_aufs() {
   # disable aufs module if aufs is loaded
-  if lsmod | grep "aufs" &> /dev/null ; then 
+  if lsmod | grep "aufs" &> /dev/null ; then
     sudo modprobe -r aufs
   fi
 }
@@ -1555,7 +1601,7 @@ addockeropt "\"pidfile\": \"/var/run/docker.pid\",
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
       docker_opts+="--registry-mirror=${DOCKER_REGISTRY_MIRROR_URL} "
   fi
-  
+
   disable_aufs
   set_docker_options_non_ubuntu
 
@@ -1944,26 +1990,44 @@ function prepare-konnectivity-server-manifest {
   params+=("--log-file=/var/log/konnectivity-server.log")
   params+=("--logtostderr=false")
   params+=("--log-file-max-size=0")
-  params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
+  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
+    params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
+  elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    # HTTP-CONNECT can work with either UDS or mTLS.
+    # Linking them here to make sure we get good coverage with two test configurations.
+    params+=("--server-ca-cert=${KONNECTIVITY_SERVER_CA_CERT_PATH}")
+    params+=("--server-cert=${KONNECTIVITY_SERVER_CERT_PATH}")
+    params+=("--server-key=${KONNECTIVITY_SERVER_KEY_PATH}")
+    params+=("--cluster-ca-cert=${KONNECTIVITY_AGENT_CA_CERT_PATH}")
+  fi
   params+=("--cluster-cert=/etc/srv/kubernetes/pki/apiserver.crt")
   params+=("--cluster-key=/etc/srv/kubernetes/pki/apiserver.key")
   if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
     params+=("--mode=grpc")
+    params+=("--server-port=0")
+    params+=("--agent-namespace=kube-system")
+    params+=("--agent-service-account=konnectivity-agent")
+    params+=("--authentication-audience=system:konnectivity-server")
+    params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
+    params+=("--proxy-strategies=default")
   elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    # GRPC can work with either UDS or mTLS.
     params+=("--mode=http-connect")
+    params+=("--server-port=8131")
+    params+=("--agent-namespace=")
+    params+=("--agent-service-account=")
+    params+=("--authentication-audience=")
+    # Need to fix ANP code to allow kubeconfig to be set with mtls.
+    params+=("--kubeconfig=")
+    params+=("--proxy-strategies=destHost,default")
   else
     echo "KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE must be set to either grpc or http-connect"
     exit 1
   fi
 
-  params+=("--server-port=0")
   params+=("--agent-port=$1")
   params+=("--health-port=$2")
   params+=("--admin-port=$3")
-  params+=("--agent-namespace=kube-system")
-  params+=("--agent-service-account=konnectivity-agent")
-  params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
-  params+=("--authentication-audience=system:konnectivity-server")
   params+=("--kubeconfig-qps=75")
   params+=("--kubeconfig-burst=150")
   params+=("--keepalive-time=60s")
@@ -2486,9 +2550,9 @@ function start-volumesnapshot-crd-and-controller {
 # endpoint.
 function update-container-runtime {
   local -r file="$1"
-  local -r container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}"
+  local -r container_runtime_endpoint="${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/containerd/containerd.sock}"
   sed -i \
-    -e "s@{{ *fluentd_container_runtime_service *}}@${FLUENTD_CONTAINER_RUNTIME_SERVICE:-${CONTAINER_RUNTIME_NAME:-docker}}@g" \
+    -e "s@{{ *fluentd_container_runtime_service *}}@${FLUENTD_CONTAINER_RUNTIME_SERVICE:-${CONTAINER_RUNTIME_NAME:-containerd}}@g" \
     -e "s@{{ *container_runtime_endpoint *}}@${container_runtime_endpoint#unix://}@g" \
     "${file}"
 }
@@ -2752,9 +2816,9 @@ EOF
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "fluentd-elasticsearch"
-    local -r fluentd_es_configmap_yaml="${dst_dir}/fluentd-elasticsearch/fluentd-es-configmap.yaml"
-    update-container-runtime ${fluentd_es_configmap_yaml}
+    echo "fluentd-elasticsearch addon is no longer included here. Terminate cluster initialization."
+    echo "The addon can be installed from https://github.com/kubernetes-sigs/instrumentation-addons"
+    exit 1
   fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
@@ -2834,6 +2898,15 @@ EOF
 function setup-konnectivity-agent-manifest {
     local -r manifest="/etc/kubernetes/addons/konnectivity-agent/konnectivity-agent-ds.yaml"
     sed -i "s|__APISERVER_IP__|${KUBERNETES_MASTER_NAME}|g" "${manifest}"
+    if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+      sed -i "s|__EXTRA_PARAMS__|\t\t\"--agent-cert=/etc/srv/kubernetes/pki/konnectivity-agent/client.crt\",\n\t\t\"--agent-key=/etc/srv/kubernetes/pki/konnectivity-agent/client.key\",|g" "${manifest}"
+      sed -i "s|__EXTRA_VOL_MNTS__|            - name: pki\n              mountPath: /etc/srv/kubernetes/pki/konnectivity-agent|g" "${manifest}"
+      sed -i "s|__EXTRA_VOLS__|        - name: pki\n          hostPath:\n            path: /etc/srv/kubernetes/pki/konnectivity-agent|g" "${manifest}"
+    else
+      sed -i "s|__EXTRA_PARAMS__||g" "${manifest}"
+      sed -i "s|__EXTRA_VOL_MNTS__||g" "${manifest}"
+      sed -i "s|__EXTRA_VOLS__||g" "${manifest}"
+    fi
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
@@ -2920,7 +2993,7 @@ You can find documentation for Kubernetes at:
 The source for this release can be found at:
   /home/kubernetes/kubernetes-src.tar.gz
 Or you can download it at:
-  https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
+  https://storage.googleapis.com/gke-release/kubernetes/release/${version}/kubernetes-src.tar.gz
 
 It is based on the Kubernetes source at:
   https://github.com/kubernetes/kubernetes/tree/${gitref}
@@ -2961,7 +3034,7 @@ function override-pv-recycler {
   PV_RECYCLER_VOLUME="{\"name\": \"pv-recycler-mount\",\"hostPath\": {\"path\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"type\": \"FileOrCreate\"}},"
   PV_RECYCLER_MOUNT="{\"name\": \"pv-recycler-mount\",\"mountPath\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"readOnly\": true},"
 
-  cat > "${PV_RECYCLER_OVERRIDE_TEMPLATE}" <<EOF
+  cat > "${PV_RECYCLER_OVERRIDE_TEMPLATE}" <<\EOF
 version: v1
 kind: Pod
 metadata:
@@ -3373,7 +3446,7 @@ function main() {
   fi
 
   log-wrap 'OverrideKubectl' override-kubectl
-  container_runtime="${CONTAINER_RUNTIME:-docker}"
+  container_runtime="${CONTAINER_RUNTIME:-containerd}"
   # Run the containerized mounter once to pre-cache the container image.
   if [[ "${container_runtime}" == "docker" ]]; then
     log-wrap 'AssembleDockerFlags' assemble-docker-flags

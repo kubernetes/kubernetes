@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.22.0'
-$CRICTL_SHA256 = '8f32d09d56716ab47ede3410c0aa91921668510a457b878f4442edcd2ef7bc10'
+$CRICTL_VERSION = 'v1.23.0'
+$CRICTL_SHA256 = '9c5a270f1c23878f247fb9846b8046cb3fd3cd55066ea767d68dfc9c30a7871c'
 
 Import-Module -Force C:\common.psm1
 
@@ -295,6 +295,7 @@ function Set-EnvironmentVars {
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
     "WINDOWS_ENABLE_PIGZ" = ${kube_env}['WINDOWS_ENABLE_PIGZ']
+    "WINDOWS_ENABLE_HYPERV" = ${kube_env}['WINDOWS_ENABLE_HYPERV']
     "ENABLE_NODE_PROBLEM_DETECTOR" = ${kube_env}['ENABLE_NODE_PROBLEM_DETECTOR']
     "NODEPROBLEMDETECTOR_KUBECONFIG_FILE" = ${kube_env}['WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE']
 
@@ -1255,7 +1256,7 @@ function Start-WorkerServices {
         "A kubelet process is already running, don't know what to do"
   }
   Log-Output "Creating kubelet service"
-  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
+  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kubelet.log ${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
   & sc.exe failure kubelet reset= 0 actions= restart/10000
   Log-Output "Starting kubelet service"
   & sc.exe start kubelet
@@ -1269,7 +1270,7 @@ function Start-WorkerServices {
         "A kube-proxy process is already running, don't know what to do"
   }
   Log-Output "Creating kube-proxy service"
-  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
+  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kube-proxy.log ${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
   & sc.exe failure kube-proxy reset= 0 actions= restart/10000
   Log-Output "Starting kube-proxy service"
   & sc.exe start kube-proxy
@@ -1384,6 +1385,24 @@ function Test-ContainersFeatureInstalled {
 function Install-ContainersFeature {
   Log-Output "Installing Windows 'Containers' feature"
   Install-WindowsFeature Containers
+}
+
+# Verifies if Hyper-V should be enabled in the node
+function Test-ShouldEnableHyperVFeature {
+  return "${env:WINDOWS_ENABLE_HYPERV}" -eq "true"
+}
+
+# Check if Hyper-V feature is enabled
+function Test-HyperVFeatureEnabled {
+  return ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled')
+}
+
+# After this function returns, the computer must be restarted to complete
+# the installation!
+function Enable-HyperVFeature {
+  Log-Output "Enabling Windows 'HyperV' feature"
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Management-PowerShell -All -NoRestart
 }
 
 function Test-DockerIsInstalled {
@@ -1705,9 +1724,9 @@ function Install-Pigz {
 
 # Node Problem Detector Resources
 $NPD_SERVICE = "node-problem-detector"
-$DEFAULT_NPD_VERSION = '0.8.9'
-$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/kubernetes-release'
-$DEFAULT_NPD_HASH = 'f87a01d344e16d16511c5160d7d0f3b8a694e00452f50ffbb550deb10460a1ffa7e170233401ae11df5d58cf070e746feea3bd0407af95ba00d6362630da620c'
+$DEFAULT_NPD_VERSION = '0.8.10-gke0.1'
+$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/gke-release/winnode'
+$DEFAULT_NPD_HASH = '97ddfe3544da9e02a1cfb55d24f329eb29d606fca7fbbf800415d5de9dbc29a00563f8e0d1919595c8e316fd989d45b09b13c07be528841fc5fd37e21d016a2d'
 
 # Install Node Problem Detector (NPD).
 # NPD analyzes the host for problems that can disrupt workloads.
@@ -2256,7 +2275,6 @@ $PARSERS_CONFIG = @'
 # This section would be deprecated soon
 #
 
-$STACKDRIVER_VERSION = 'v1-11'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
 # Restarts the Stackdriver logging agent, or starts it if it is not currently

@@ -120,7 +120,7 @@ func (c *FakeDaemonSets) UpdateStatus(ctx context.Context, daemonSet *appsv1.Dae
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
 func (c *FakeDaemonSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(daemonsetsResource, c.ns, name), &appsv1.DaemonSet{})
+		Invokes(testing.NewDeleteActionWithOptions(daemonsetsResource, c.ns, name, opts), &appsv1.DaemonSet{})
 
 	return err
 }

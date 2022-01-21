@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+
 	// s390/s390x changes
 	"runtime"
 	"strconv"
@@ -43,6 +44,7 @@ var (
 	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|CPU MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 	swapCapacityRegexp   = regexp.MustCompile(`SwapTotal:\s*([0-9]+) kB`)
+	vendorIDRegexp       = regexp.MustCompile(`vendor_id\s*:\s*(\w+)`)
 
 	cpuBusPath         = "/sys/bus/cpu/devices/"
 	isMemoryController = regexp.MustCompile("mc[0-9]+")
@@ -53,6 +55,21 @@ var (
 
 const memTypeFileName = "dimm_mem_type"
 const sizeFileName = "size"
+
+// GetCPUVendorID returns "vendor_id" reading /proc/cpuinfo file.
+func GetCPUVendorID(procInfo []byte) string {
+	vendorID := ""
+
+	matches := vendorIDRegexp.FindSubmatch(procInfo)
+	if len(matches) != 2 {
+		klog.Warning("Cannot read vendor id correctly, set empty.")
+		return vendorID
+	}
+
+	vendorID = string(matches[1])
+
+	return vendorID
+}
 
 // GetPhysicalCores returns number of CPU cores reading /proc/cpuinfo file or if needed information from sysfs cpu path
 func GetPhysicalCores(procInfo []byte) int {

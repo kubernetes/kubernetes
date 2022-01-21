@@ -61,13 +61,38 @@ type policyRuleEvaluator struct {
 	audit.Policy
 }
 
-func (p *policyRuleEvaluator) LevelAndStages(attrs authorizer.Attributes) (audit.Level, []audit.Stage) {
+func (p *policyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) auditinternal.RequestAuditConfigWithLevel {
 	for _, rule := range p.Rules {
 		if ruleMatches(&rule, attrs) {
-			return rule.Level, rule.OmitStages
+			return auditinternal.RequestAuditConfigWithLevel{
+				Level: rule.Level,
+				RequestAuditConfig: auditinternal.RequestAuditConfig{
+					OmitStages:        rule.OmitStages,
+					OmitManagedFields: isOmitManagedFields(&rule, p.OmitManagedFields),
+				},
+			}
 		}
 	}
-	return DefaultAuditLevel, p.OmitStages
+
+	return auditinternal.RequestAuditConfigWithLevel{
+		Level: DefaultAuditLevel,
+		RequestAuditConfig: auditinternal.RequestAuditConfig{
+			OmitStages:        p.OmitStages,
+			OmitManagedFields: p.OmitManagedFields,
+		},
+	}
+}
+
+// isOmitManagedFields returns whether to omit managed fields from the request
+// and response bodies from being written to the API audit log.
+// If a user specifies OmitManagedFields inside a policy rule, that overrides
+// the global policy default in Policy.OmitManagedFields.
+func isOmitManagedFields(policyRule *audit.PolicyRule, policyDefault bool) bool {
+	if policyRule.OmitManagedFields == nil {
+		return policyDefault
+	}
+
+	return *policyRule.OmitManagedFields
 }
 
 // Check whether the rule matches the request attrs.
@@ -210,6 +235,11 @@ type fakePolicyRuleEvaluator struct {
 	stage []audit.Stage
 }
 
-func (f *fakePolicyRuleEvaluator) LevelAndStages(_ authorizer.Attributes) (audit.Level, []audit.Stage) {
-	return f.level, f.stage
+func (f *fakePolicyRuleEvaluator) EvaluatePolicyRule(_ authorizer.Attributes) auditinternal.RequestAuditConfigWithLevel {
+	return auditinternal.RequestAuditConfigWithLevel{
+		Level: f.level,
+		RequestAuditConfig: auditinternal.RequestAuditConfig{
+			OmitStages: f.stage,
+		},
+	}
 }

@@ -78,16 +78,16 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 	go podautoscaler.NewHorizontalController(
 		hpaClient.CoreV1(),
 		scaleClient,
-		hpaClient.AutoscalingV1(),
+		hpaClient.AutoscalingV2(),
 		controllerContext.RESTMapper,
 		metricsClient,
-		controllerContext.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
+		controllerContext.InformerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
-	).Run(ctx.Done())
+	).Run(ctx)
 	return nil, true, nil
 }

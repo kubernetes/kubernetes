@@ -18,10 +18,10 @@ package config
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -115,6 +115,13 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 			return err
 		}
 		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
+	} else {
+		if !strings.HasPrefix(cfg.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme) {
+			klog.Warningf("Usage of CRI endpoints without URL scheme is deprecated and can cause kubelet errors "+
+				"in the future. Automatically prepending scheme %q to the \"criSocket\" with value %q. "+
+				"Please update your configuration!", kubeadmapiv1.DefaultContainerRuntimeURLScheme, cfg.CRISocket)
+			cfg.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + cfg.CRISocket
+		}
 	}
 
 	return nil
@@ -188,7 +195,7 @@ func DefaultedStaticInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 		BootstrapTokens:  []bootstraptokenv1.BootstrapToken{PlaceholderToken},
 		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: kubeadmconstants.DefaultDockerCRISocket, // avoid CRI detection
+			CRISocket: kubeadmconstants.DefaultCRISocket, // avoid CRI detection
 			Name:      "node",
 		},
 	}
@@ -320,7 +327,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 
 		// If the group is neither a kubeadm core type or of a supported component config group, we dump a warning about it being ignored
 		if !componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
-			fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
 		}
 	}
 

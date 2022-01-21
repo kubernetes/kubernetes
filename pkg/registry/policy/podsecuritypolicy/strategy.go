@@ -23,12 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	psputil "k8s.io/kubernetes/pkg/api/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/policy/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for PodSecurityPolicy objects
@@ -74,39 +72,17 @@ func (strategy) Canonicalize(obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	opts := validation.PodSecurityPolicyValidationOptions{
-		// Only allowed if the feature is enabled.
-		AllowEphemeralVolumeType: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
-	}
-	return validation.ValidatePodSecurityPolicy(obj.(*policy.PodSecurityPolicy), opts)
+	return validation.ValidatePodSecurityPolicy(obj.(*policy.PodSecurityPolicy))
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	opts := validation.PodSecurityPolicyValidationOptions{
-		// Allowed if the feature is enabled or the old policy already had it.
-		// A policy that had the type set when that was valid must remain valid.
-		AllowEphemeralVolumeType: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) ||
-			volumeInUse(old.(*policy.PodSecurityPolicy), policy.Ephemeral),
-	}
-	return validation.ValidatePodSecurityPolicyUpdate(old.(*policy.PodSecurityPolicy), obj.(*policy.PodSecurityPolicy), opts)
+	return validation.ValidatePodSecurityPolicyUpdate(old.(*policy.PodSecurityPolicy), obj.(*policy.PodSecurityPolicy))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
 func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-func volumeInUse(oldPSP *policy.PodSecurityPolicy, volume policy.FSType) bool {
-	if oldPSP == nil {
-		return false
-	}
-	for _, v := range oldPSP.Spec.Volumes {
-		if v == volume {
-			return true
-		}
-	}
-	return false
 }

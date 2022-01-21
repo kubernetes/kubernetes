@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/probe"
 )
@@ -122,6 +123,8 @@ func TestExec(t *testing.T) {
 		{probe.Unknown, true, "", "", fmt.Errorf("test error")},
 		// Unhealthy
 		{probe.Failure, false, "Fail", "", &fakeExitError{true, 1}},
+		// Timeout
+		{probe.Failure, false, "", "command testcmd timed out", NewTimeoutError(fmt.Errorf("command testcmd timed out"), time.Second)},
 	}
 	for i, test := range tests {
 		fake := FakeCmd{

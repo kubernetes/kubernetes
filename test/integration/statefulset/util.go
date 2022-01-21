@@ -185,7 +185,7 @@ func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.
 func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) chan struct{} {
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
-	go sc.Run(5, stopCh)
+	go sc.Run(context.TODO(), 5)
 	return stopCh
 }
 

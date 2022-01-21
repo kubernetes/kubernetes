@@ -25,7 +25,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
-	"k8s.io/component-helpers/node/utils/sysctl"
+	"k8s.io/component-helpers/node/util/sysctl"
 )
 
 // Conntracker is an interface to the global sysctl. Descriptions of the various

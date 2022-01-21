@@ -20,11 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 )
-
-// hold a single instance of the case-sensitive decoder
-var caseSensitiveJsonIterator = json.CaseSensitiveJSONIterator()
 
 // metadataValidatingDecoder wraps a decoder and additionally ensures metadata schema fields decode before returning an unstructured object
 type metadataValidatingDecoder struct {
@@ -47,7 +44,7 @@ func (m *metadataValidatingDecoder) Decode(data []byte, defaults *schema.GroupVe
 	// make sure the data can decode into ObjectMeta before we return,
 	// so we don't silently truncate schema errors in metadata later with accesser get/set calls
 	v := &metadataOnlyObject{}
-	if typedErr := caseSensitiveJsonIterator.Unmarshal(data, v); typedErr != nil {
+	if typedErr := utiljson.Unmarshal(data, v); typedErr != nil {
 		return obj, gvk, typedErr
 	}
 	return obj, gvk, err

@@ -43,7 +43,6 @@ package descriptorpb
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
@@ -829,15 +828,6 @@ func (*ExtensionRangeOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{3}
 }
 
-var extRange_ExtensionRangeOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use ExtensionRangeOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*ExtensionRangeOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_ExtensionRangeOptions
-}
-
 func (x *ExtensionRangeOptions) GetUninterpretedOption() []*UninterpretedOption {
 	if x != nil {
 		return x.UninterpretedOption
@@ -1520,15 +1510,6 @@ func (*FileOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{10}
 }
 
-var extRange_FileOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use FileOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*FileOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_FileOptions
-}
-
 func (x *FileOptions) GetJavaPackage() string {
 	if x != nil && x.JavaPackage != nil {
 		return *x.JavaPackage
@@ -1776,15 +1757,6 @@ func (*MessageOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{11}
 }
 
-var extRange_MessageOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use MessageOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*MessageOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_MessageOptions
-}
-
 func (x *MessageOptions) GetMessageSetWireFormat() bool {
 	if x != nil && x.MessageSetWireFormat != nil {
 		return *x.MessageSetWireFormat
@@ -1930,15 +1902,6 @@ func (*FieldOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{12}
 }
 
-var extRange_FieldOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use FieldOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*FieldOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_FieldOptions
-}
-
 func (x *FieldOptions) GetCtype() FieldOptions_CType {
 	if x != nil && x.Ctype != nil {
 		return *x.Ctype
@@ -2030,15 +1993,6 @@ func (*OneofOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{13}
 }
 
-var extRange_OneofOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use OneofOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*OneofOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_OneofOptions
-}
-
 func (x *OneofOptions) GetUninterpretedOption() []*UninterpretedOption {
 	if x != nil {
 		return x.UninterpretedOption
@@ -2099,15 +2053,6 @@ func (x *EnumOptions) ProtoReflect() protoreflect.Message {
 // Deprecated: Use EnumOptions.ProtoReflect.Descriptor instead.
 func (*EnumOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{14}
-}
-
-var extRange_EnumOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use EnumOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*EnumOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_EnumOptions
 }
 
 func (x *EnumOptions) GetAllowAlias() bool {
@@ -2183,15 +2128,6 @@ func (*EnumValueOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{15}
 }
 
-var extRange_EnumValueOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use EnumValueOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*EnumValueOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_EnumValueOptions
-}
-
 func (x *EnumValueOptions) GetDeprecated() bool {
 	if x != nil && x.Deprecated != nil {
 		return *x.Deprecated
@@ -2256,15 +2192,6 @@ func (x *ServiceOptions) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ServiceOptions.ProtoReflect.Descriptor instead.
 func (*ServiceOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{16}
-}
-
-var extRange_ServiceOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use ServiceOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*ServiceOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_ServiceOptions
 }
 
 func (x *ServiceOptions) GetDeprecated() bool {
@@ -2333,15 +2260,6 @@ func (x *MethodOptions) ProtoReflect() protoreflect.Message {
 // Deprecated: Use MethodOptions.ProtoReflect.Descriptor instead.
 func (*MethodOptions) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_descriptor_proto_rawDescGZIP(), []int{17}
-}
-
-var extRange_MethodOptions = []protoiface.ExtensionRangeV1{
-	{Start: 1000, End: 536870911},
-}
-
-// Deprecated: Use MethodOptions.ProtoReflect.Descriptor.ExtensionRanges instead.
-func (*MethodOptions) ExtensionRangeArray() []protoiface.ExtensionRangeV1 {
-	return extRange_MethodOptions
 }
 
 func (x *MethodOptions) GetDeprecated() bool {

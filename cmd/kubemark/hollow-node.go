@@ -41,17 +41,16 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	fakesysctl "k8s.io/component-helpers/node/utils/sysctl/testing"
+	fakesysctl "k8s.io/component-helpers/node/util/sysctl/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
-	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
@@ -67,7 +66,7 @@ type hollowNodeConfig struct {
 	ProxierSyncPeriod    time.Duration
 	ProxierMinSyncPeriod time.Duration
 	NodeLabels           map[string]string
-	RegisterWithTaints   []core.Taint
+	RegisterWithTaints   []v1.Taint
 	MaxPods              int
 	ExtendedResources    map[string]string
 	UseHostImageService  bool
@@ -95,7 +94,7 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
 	bindableNodeLabels := cliflag.ConfigurationMap(c.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "Additional node labels")
-	fs.Var(utiltaints.NewTaintsVar(&c.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
+	fs.Var(utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
 	fs.IntVar(&c.MaxPods, "max-pods", maxPods, "Number of pods that can run on this Kubelet.")
 	bindableExtendedResources := cliflag.ConfigurationMap(c.ExtendedResources)
 	fs.Var(&bindableExtendedResources, "extended-resources", "Register the node with extended resources (comma separated \"<name>=<quantity>\")")
@@ -145,9 +144,9 @@ func newHollowNodeCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:  "kubemark",
 		Long: "kubemark",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
-			run(cmd, s)
+			return run(cmd, s)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -166,27 +165,28 @@ func newHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(cmd *cobra.Command, config *hollowNodeConfig) {
+func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 	// To help debugging, immediately log version and print flags.
 	klog.Infof("Version: %+v", version.Get())
 	cliflag.PrintFlags(cmd.Flags())
 
 	if !knownMorphs.Has(config.Morph) {
-		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+		return fmt.Errorf("Unknown morph: %v. allowed values: %v", config.Morph, knownMorphs.List())
 	}
 
 	// create a client to communicate with API server.
 	clientConfig, err := config.createClientConfigFromFile()
 	if err != nil {
-		klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
-	}
-
-	client, err := clientset.NewForConfig(clientConfig)
-	if err != nil {
-		klog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
+		return fmt.Errorf("Failed to create a ClientConfig, error: %w. Exiting", err)
 	}
 
 	if config.Morph == "kubelet" {
+		clientConfig.UserAgent = "hollow-kubelet"
+		client, err := clientset.NewForConfig(clientConfig)
+		if err != nil {
+			return fmt.Errorf("Failed to create a ClientSet, error: %w. Exiting", err)
+		}
+
 		f, c := kubemark.GetHollowKubeletConfig(config.createHollowKubeletOptions())
 
 		heartbeatClientConfig := *clientConfig
@@ -200,7 +200,7 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 		heartbeatClientConfig.QPS = float32(-1)
 		heartbeatClient, err := clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
-			klog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
+			return fmt.Errorf("Failed to create a ClientSet, error: %w. Exiting", err)
 		}
 
 		cadvisorInterface := &cadvisortest.Fake{
@@ -221,23 +221,23 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 
 		endpoint, err := fakeremote.GenerateEndpoint()
 		if err != nil {
-			klog.Fatalf("Failed to generate fake endpoint %v.", err)
+			return fmt.Errorf("Failed to generate fake endpoint, error: %w", err)
 		}
 		fakeRemoteRuntime := fakeremote.NewFakeRemoteRuntime()
 		if err = fakeRemoteRuntime.Start(endpoint); err != nil {
-			klog.Fatalf("Failed to start fake runtime %v.", err)
+			return fmt.Errorf("Failed to start fake runtime, error: %w", err)
 		}
 		defer fakeRemoteRuntime.Stop()
 		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second)
 		if err != nil {
-			klog.Fatalf("Failed to init runtime service %v.", err)
+			return fmt.Errorf("Failed to init runtime service, error: %w", err)
 		}
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
 			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
 			if err != nil {
-				klog.Fatalf("Failed to init image service %v.", err)
+				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}
 		}
 
@@ -254,9 +254,11 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 	}
 
 	if config.Morph == "proxy" {
+		clientConfig.UserAgent = "hollow-proxy"
+
 		client, err := clientset.NewForConfig(clientConfig)
 		if err != nil {
-			klog.Fatalf("Failed to create API Server client: %v", err)
+			return fmt.Errorf("Failed to create API Server client, error: %w", err)
 		}
 		iptInterface := fakeiptables.NewFake()
 		sysctl := fakesysctl.NewFake()
@@ -280,8 +282,10 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 			config.ProxierMinSyncPeriod,
 		)
 		if err != nil {
-			klog.Fatalf("Failed to create hollowProxy instance: %v", err)
+			return fmt.Errorf("Failed to create hollowProxy instance, error: %w", err)
 		}
-		hollowProxy.Run()
+		return hollowProxy.Run()
 	}
+
+	return nil
 }

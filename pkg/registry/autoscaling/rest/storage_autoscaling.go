@@ -25,6 +25,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	autoscalingapiv2beta2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2"
 	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 )
@@ -41,6 +42,13 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 			return genericapiserver.APIGroupInfo{}, false, err
 		} else {
 			apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2beta2.SchemeGroupVersion.Version] = storageMap
+		}
+	}
+	if apiResourceConfigSource.VersionEnabled(autoscalingapiv2.SchemeGroupVersion) {
+		if storageMap, err := p.v2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2.SchemeGroupVersion.Version] = storageMap
 		}
 	}
 	if apiResourceConfigSource.VersionEnabled(autoscalingapiv2beta1.SchemeGroupVersion) {
@@ -88,6 +96,19 @@ func (p RESTStorageProvider) v2beta1Storage(apiResourceConfigSource serverstorag
 }
 
 func (p RESTStorageProvider) v2beta2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+	// horizontalpodautoscalers
+	hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["horizontalpodautoscalers"] = hpaStorage
+	storage["horizontalpodautoscalers/status"] = hpaStatusStorage
+
+	return storage, err
+}
+
+func (p RESTStorageProvider) v2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 	// horizontalpodautoscalers
 	hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)

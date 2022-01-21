@@ -1055,6 +1055,77 @@ func TestErrorPropagation(t *testing.T) {
 	}
 }
 
+func TestProxyRedirectsforRootPath(t *testing.T) {
+
+	tests := []struct {
+		name               string
+		method             string
+		requestPath        string
+		expectedHeader     http.Header
+		expectedStatusCode int
+		redirect           bool
+	}{
+		{
+			name:               "root path, simple get",
+			method:             "GET",
+			requestPath:        "",
+			redirect:           true,
+			expectedStatusCode: 301,
+			expectedHeader: http.Header{
+				"Location": []string{"/"},
+			},
+		},
+		{
+			name:               "root path, simple put",
+			method:             "PUT",
+			requestPath:        "",
+			redirect:           false,
+			expectedStatusCode: 200,
+		},
+		{
+			name:               "root path, simple head",
+			method:             "HEAD",
+			requestPath:        "",
+			redirect:           true,
+			expectedStatusCode: 301,
+			expectedHeader: http.Header{
+				"Location": []string{"/"},
+			},
+		},
+		{
+			name:               "root path, simple delete with params",
+			method:             "DELETE",
+			requestPath:        "",
+			redirect:           false,
+			expectedStatusCode: 200,
+		},
+	}
+
+	for _, test := range tests {
+		func() {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(test.method, test.requestPath, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			redirect := proxyRedirectsforRootPath(test.requestPath, w, req)
+			if got, want := redirect, test.redirect; got != want {
+				t.Errorf("Expected redirect state %v; got %v", want, got)
+			}
+
+			res := w.Result()
+			if got, want := res.StatusCode, test.expectedStatusCode; got != want {
+				t.Errorf("Expected status code %d; got %d", want, got)
+			}
+
+			if res.StatusCode == 301 && !reflect.DeepEqual(res.Header, test.expectedHeader) {
+				t.Errorf("Expected location header to be %v, got %v", test.expectedHeader, res.Header)
+			}
+		}()
+	}
+}
+
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
 //    go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var exampleCert = []byte(`-----BEGIN CERTIFICATE-----

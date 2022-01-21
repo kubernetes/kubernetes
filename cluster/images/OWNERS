@@ -2,6 +2,5 @@
 
 reviewers:
   - justaugustus
-
 labels:
-- area/release-eng
+  - area/release-eng

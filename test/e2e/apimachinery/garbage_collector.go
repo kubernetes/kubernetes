@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -67,7 +68,7 @@ func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
 		availablePods += 10
 	}
 	//avoid creating exactly max pods
-	availablePods *= 8 / 10
+	availablePods = int32(float32(availablePods) * 0.5)
 	// bound the top and bottom
 	if availablePods > max {
 		availablePods = max
@@ -126,20 +127,7 @@ func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
 }
 
 func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *appsv1.Deployment {
-	replicas := int32(2)
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: deploymentName,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{MatchLabels: labels},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-			},
-			Template: getPodTemplateSpec(labels),
-		},
-	}
+	return e2edeployment.NewDeployment(deploymentName, 2, labels, "nginx", imageutils.GetE2EImage(imageutils.Nginx), appsv1.RollingUpdateDeploymentStrategyType)
 }
 
 func newOwnerRC(f *framework.Framework, name string, replicas int32, labels map[string]string) *v1.ReplicationController {

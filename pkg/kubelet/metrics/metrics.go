@@ -90,6 +90,10 @@ const (
 	StartedContainersTotalKey       = "started_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
 
+	// Metrics to track HostProcess container usage by this kubelet
+	StartedHostProcessContainersTotalKey       = "started_host_process_containers_total"
+	StartedHostProcessContainersErrorsTotalKey = "started_host_process_containers_errors_total"
+
 	// Metrics to track ephemeral container usage by this kubelet
 	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
 
@@ -132,12 +136,13 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to go from pending to running.
+	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run since it's
+	// first time seen by kubelet.
 	PodStartDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
-			Help:           "Duration in seconds for a single pod to go from pending to running.",
+			Help:           "Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -154,12 +159,12 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	// PodWorkerStartDuration is a Histogram that tracks the duration (in seconds) it takes from seeing a pod to starting a worker.
+	// PodWorkerStartDuration is a Histogram that tracks the duration (in seconds) it takes from kubelet seeing a pod to starting a worker.
 	PodWorkerStartDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodWorkerStartDurationKey,
-			Help:           "Duration in seconds from seeing a pod to starting a worker.",
+			Help:           "Duration in seconds from kubelet seeing a pod to starting a worker.",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -367,7 +372,7 @@ var (
 			Subsystem:         KubeletSubsystem,
 			Name:              AssignedConfigKey,
 			Help:              "The node's understanding of intended config. The count is always 1.",
-			DeprecatedVersion: "1.23.0",
+			DeprecatedVersion: "1.22.0",
 			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
@@ -378,7 +383,7 @@ var (
 			Subsystem:         KubeletSubsystem,
 			Name:              ActiveConfigKey,
 			Help:              "The config source the node is actively using. The count is always 1.",
-			DeprecatedVersion: "1.23.0",
+			DeprecatedVersion: "1.22.0",
 			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
@@ -390,7 +395,7 @@ var (
 			Subsystem:         KubeletSubsystem,
 			Name:              LastKnownGoodConfigKey,
 			Help:              "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
-			DeprecatedVersion: "1.23.0",
+			DeprecatedVersion: "1.22.0",
 			StabilityLevel:    metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
@@ -401,7 +406,7 @@ var (
 			Subsystem:         KubeletSubsystem,
 			Name:              ConfigErrorKey,
 			Help:              "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
-			DeprecatedVersion: "1.23.0",
+			DeprecatedVersion: "1.22.0",
 			StabilityLevel:    metrics.ALPHA,
 		},
 	)
@@ -488,6 +493,26 @@ var (
 		},
 		[]string{"container_type", "code"},
 	)
+	// StartedHostProcessContainersTotal is a counter that tracks the number of hostprocess container creation operations
+	StartedHostProcessContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedHostProcessContainersTotalKey,
+			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type"},
+	)
+	// StartedHostProcessContainersErrorsTotal is a counter that tracks the number of errors creating hostprocess containers
+	StartedHostProcessContainersErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedHostProcessContainersErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "code"},
+	)
 	// ManagedEphemeralContainers is a gauge that indicates how many ephemeral containers are managed by this kubelet.
 	ManagedEphemeralContainers = metrics.NewGauge(
 		&metrics.GaugeOpts{
@@ -530,6 +555,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			legacyregistry.MustRegister(StartedHostProcessContainersTotal)
+			legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
+		}
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {

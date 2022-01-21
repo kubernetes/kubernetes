@@ -27,7 +27,7 @@ import (
 
 // decouple us from k8smanager.go
 type Prober interface {
-	probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int, timeoutSeconds int) (bool, string, error)
+	probeConnectivity(args *probeConnectivityArgs) (bool, string, error)
 }
 
 // ProbeJob packages the data for the input of a pod->pod connectivity probe
@@ -108,7 +108,15 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 		// dnsName := job.PodTo.QualifiedServiceAddress(job.ToPodDNSDomain)
 
 		// TODO make this work on dual-stack clusters...
-		connected, command, err := prober.probeConnectivity(podFrom.Namespace, podFrom.Name, podFrom.Containers[0].Name(), job.PodTo.ServiceIP, job.Protocol, job.ToPort, timeoutSeconds)
+		connected, command, err := prober.probeConnectivity(&probeConnectivityArgs{
+			nsFrom:         podFrom.Namespace,
+			podFrom:        podFrom.Name,
+			containerFrom:  podFrom.Containers[0].Name(),
+			addrTo:         job.PodTo.ServiceIP,
+			protocol:       job.Protocol,
+			toPort:         job.ToPort,
+			timeoutSeconds: timeoutSeconds,
+		})
 		result := &ProbeJobResults{
 			Job:         job,
 			IsConnected: connected,

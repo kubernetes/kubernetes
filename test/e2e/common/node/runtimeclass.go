@@ -76,10 +76,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
 		e2eskipper.SkipUnlessProviderIs("gce")
 
-		// The built-in docker runtime does not support configuring runtime handlers.
-		handler := e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
-
-		rcName := createRuntimeClass(f, "preconfigured-handler", handler)
+		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler)
 		defer deleteRuntimeClass(f, rcName)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
 		expectPodSuccess(f, pod)

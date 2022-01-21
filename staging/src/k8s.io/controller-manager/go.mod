@@ -13,8 +13,8 @@ require (
 	k8s.io/apiserver v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog/v2 v2.20.0
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/klog/v2 v2.40.1
+	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
 )
 
 replace (

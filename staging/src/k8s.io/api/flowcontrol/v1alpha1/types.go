@@ -63,7 +63,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta1,FlowSchema
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,FlowSchema
 
 // FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
@@ -87,7 +87,7 @@ type FlowSchema struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta1,FlowSchemaList
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,FlowSchemaList
 
 // FlowSchemaList is a list of FlowSchema objects.
 type FlowSchemaList struct {
@@ -241,8 +241,10 @@ type ServiceAccountSubject struct {
 // ResourcePolicyRule matches a resource request if and only if: (a)
 // at least one member of verbs matches the request, (b) at least one
 // member of apiGroups matches the request, (c) at least one member of
-// resources matches the request, and (d) least one member of
-// namespaces matches the request.
+// resources matches the request, and (d) either (d1) the request does
+// not specify a namespace (i.e., `Namespace==""`) and clusterScope is
+// true or (d2) the request specifies a namespace and least one member
+// of namespaces matches the request's namespace.
 type ResourcePolicyRule struct {
 	// `verbs` is a list of matching verbs and may not be empty.
 	// "*" matches all verbs and, if present, must be the only entry.
@@ -342,7 +344,7 @@ type FlowSchemaConditionType string
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta1,PriorityLevelConfiguration
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,PriorityLevelConfiguration
 
 // PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfiguration struct {
@@ -365,7 +367,7 @@ type PriorityLevelConfiguration struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 // +k8s:prerelease-lifecycle-gen:deprecated=1.20
 // +k8s:prerelease-lifecycle-gen:removed=1.21
-// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta1,PriorityLevelConfigurationList
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,PriorityLevelConfigurationList
 
 // PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.
 type PriorityLevelConfigurationList struct {

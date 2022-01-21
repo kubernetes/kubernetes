@@ -303,7 +303,7 @@ func TestCreatePods(t *testing.T) {
 	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec, controllerRef)
+	err := podControl.CreatePods(context.TODO(), ns, controllerSpec.Spec.Template, controllerSpec, controllerRef)
 	assert.NoError(t, err, "unexpected error: %v", err)
 
 	expectedPod := v1.Pod{
@@ -342,7 +342,7 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
 	generateName := "hello-"
-	err := podControl.CreatePodsWithGenerateName(ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName)
+	err := podControl.CreatePodsWithGenerateName(context.TODO(), ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName)
 	assert.NoError(t, err, "unexpected error: %v", err)
 
 	expectedPod := v1.Pod{
@@ -371,7 +371,7 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 
 	controllerSpec := newReplicationController(1)
 
-	err := podControl.DeletePod("namespace-name", "podName", controllerSpec)
+	err := podControl.DeletePod(context.TODO(), "namespace-name", "podName", controllerSpec)
 	assert.True(t, apierrors.IsNotFound(err))
 }
 
@@ -815,7 +815,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	}
 	for _, test := range tests {
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
-		err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
+		err := RemoveTaintOffNode(context.TODO(), test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
 		assert.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
 		node, _ = test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
@@ -990,7 +990,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
 		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})

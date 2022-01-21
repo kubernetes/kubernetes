@@ -642,6 +642,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.GRPCAction)(nil), (*core.GRPCAction)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_GRPCAction_To_core_GRPCAction(a.(*v1.GRPCAction), b.(*core.GRPCAction), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.GRPCAction)(nil), (*v1.GRPCAction)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_GRPCAction_To_v1_GRPCAction(a.(*core.GRPCAction), b.(*v1.GRPCAction), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.GitRepoVolumeSource)(nil), (*core.GitRepoVolumeSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_GitRepoVolumeSource_To_core_GitRepoVolumeSource(a.(*v1.GitRepoVolumeSource), b.(*core.GitRepoVolumeSource), scope)
 	}); err != nil {
@@ -689,16 +699,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.HTTPHeader)(nil), (*v1.HTTPHeader)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_HTTPHeader_To_v1_HTTPHeader(a.(*core.HTTPHeader), b.(*v1.HTTPHeader), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.Handler)(nil), (*core.Handler)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Handler_To_core_Handler(a.(*v1.Handler), b.(*core.Handler), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.Handler)(nil), (*v1.Handler)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_Handler_To_v1_Handler(a.(*core.Handler), b.(*v1.Handler), scope)
 	}); err != nil {
 		return err
 	}
@@ -759,6 +759,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.Lifecycle)(nil), (*v1.Lifecycle)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_Lifecycle_To_v1_Lifecycle(a.(*core.Lifecycle), b.(*v1.Lifecycle), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.LifecycleHandler)(nil), (*core.LifecycleHandler)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_LifecycleHandler_To_core_LifecycleHandler(a.(*v1.LifecycleHandler), b.(*core.LifecycleHandler), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.LifecycleHandler)(nil), (*v1.LifecycleHandler)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_LifecycleHandler_To_v1_LifecycleHandler(a.(*core.LifecycleHandler), b.(*v1.LifecycleHandler), scope)
 	}); err != nil {
 		return err
 	}
@@ -1302,6 +1312,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.PodOS)(nil), (*core.PodOS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodOS_To_core_PodOS(a.(*v1.PodOS), b.(*core.PodOS), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.PodOS)(nil), (*v1.PodOS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_PodOS_To_v1_PodOS(a.(*core.PodOS), b.(*v1.PodOS), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.PodPortForwardOptions)(nil), (*core.PodPortForwardOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PodPortForwardOptions_To_core_PodPortForwardOptions(a.(*v1.PodPortForwardOptions), b.(*core.PodPortForwardOptions), scope)
 	}); err != nil {
@@ -1439,6 +1459,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.Probe)(nil), (*v1.Probe)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_Probe_To_v1_Probe(a.(*core.Probe), b.(*v1.Probe), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ProbeHandler)(nil), (*core.ProbeHandler)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ProbeHandler_To_core_ProbeHandler(a.(*v1.ProbeHandler), b.(*core.ProbeHandler), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.ProbeHandler)(nil), (*v1.ProbeHandler)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_ProbeHandler_To_v1_ProbeHandler(a.(*core.ProbeHandler), b.(*v1.ProbeHandler), scope)
 	}); err != nil {
 		return err
 	}
@@ -3807,6 +3837,28 @@ func Convert_core_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSou
 	return autoConvert_core_GCEPersistentDiskVolumeSource_To_v1_GCEPersistentDiskVolumeSource(in, out, s)
 }
 
+func autoConvert_v1_GRPCAction_To_core_GRPCAction(in *v1.GRPCAction, out *core.GRPCAction, s conversion.Scope) error {
+	out.Port = in.Port
+	out.Service = (*string)(unsafe.Pointer(in.Service))
+	return nil
+}
+
+// Convert_v1_GRPCAction_To_core_GRPCAction is an autogenerated conversion function.
+func Convert_v1_GRPCAction_To_core_GRPCAction(in *v1.GRPCAction, out *core.GRPCAction, s conversion.Scope) error {
+	return autoConvert_v1_GRPCAction_To_core_GRPCAction(in, out, s)
+}
+
+func autoConvert_core_GRPCAction_To_v1_GRPCAction(in *core.GRPCAction, out *v1.GRPCAction, s conversion.Scope) error {
+	out.Port = in.Port
+	out.Service = (*string)(unsafe.Pointer(in.Service))
+	return nil
+}
+
+// Convert_core_GRPCAction_To_v1_GRPCAction is an autogenerated conversion function.
+func Convert_core_GRPCAction_To_v1_GRPCAction(in *core.GRPCAction, out *v1.GRPCAction, s conversion.Scope) error {
+	return autoConvert_core_GRPCAction_To_v1_GRPCAction(in, out, s)
+}
+
 func autoConvert_v1_GitRepoVolumeSource_To_core_GitRepoVolumeSource(in *v1.GitRepoVolumeSource, out *core.GitRepoVolumeSource, s conversion.Scope) error {
 	out.Repository = in.Repository
 	out.Revision = in.Revision
@@ -3929,30 +3981,6 @@ func autoConvert_core_HTTPHeader_To_v1_HTTPHeader(in *core.HTTPHeader, out *v1.H
 // Convert_core_HTTPHeader_To_v1_HTTPHeader is an autogenerated conversion function.
 func Convert_core_HTTPHeader_To_v1_HTTPHeader(in *core.HTTPHeader, out *v1.HTTPHeader, s conversion.Scope) error {
 	return autoConvert_core_HTTPHeader_To_v1_HTTPHeader(in, out, s)
-}
-
-func autoConvert_v1_Handler_To_core_Handler(in *v1.Handler, out *core.Handler, s conversion.Scope) error {
-	out.Exec = (*core.ExecAction)(unsafe.Pointer(in.Exec))
-	out.HTTPGet = (*core.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
-	out.TCPSocket = (*core.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
-	return nil
-}
-
-// Convert_v1_Handler_To_core_Handler is an autogenerated conversion function.
-func Convert_v1_Handler_To_core_Handler(in *v1.Handler, out *core.Handler, s conversion.Scope) error {
-	return autoConvert_v1_Handler_To_core_Handler(in, out, s)
-}
-
-func autoConvert_core_Handler_To_v1_Handler(in *core.Handler, out *v1.Handler, s conversion.Scope) error {
-	out.Exec = (*v1.ExecAction)(unsafe.Pointer(in.Exec))
-	out.HTTPGet = (*v1.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
-	out.TCPSocket = (*v1.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
-	return nil
-}
-
-// Convert_core_Handler_To_v1_Handler is an autogenerated conversion function.
-func Convert_core_Handler_To_v1_Handler(in *core.Handler, out *v1.Handler, s conversion.Scope) error {
-	return autoConvert_core_Handler_To_v1_Handler(in, out, s)
 }
 
 func autoConvert_v1_HostAlias_To_core_HostAlias(in *v1.HostAlias, out *core.HostAlias, s conversion.Scope) error {
@@ -4104,8 +4132,8 @@ func Convert_core_KeyToPath_To_v1_KeyToPath(in *core.KeyToPath, out *v1.KeyToPat
 }
 
 func autoConvert_v1_Lifecycle_To_core_Lifecycle(in *v1.Lifecycle, out *core.Lifecycle, s conversion.Scope) error {
-	out.PostStart = (*core.Handler)(unsafe.Pointer(in.PostStart))
-	out.PreStop = (*core.Handler)(unsafe.Pointer(in.PreStop))
+	out.PostStart = (*core.LifecycleHandler)(unsafe.Pointer(in.PostStart))
+	out.PreStop = (*core.LifecycleHandler)(unsafe.Pointer(in.PreStop))
 	return nil
 }
 
@@ -4115,14 +4143,38 @@ func Convert_v1_Lifecycle_To_core_Lifecycle(in *v1.Lifecycle, out *core.Lifecycl
 }
 
 func autoConvert_core_Lifecycle_To_v1_Lifecycle(in *core.Lifecycle, out *v1.Lifecycle, s conversion.Scope) error {
-	out.PostStart = (*v1.Handler)(unsafe.Pointer(in.PostStart))
-	out.PreStop = (*v1.Handler)(unsafe.Pointer(in.PreStop))
+	out.PostStart = (*v1.LifecycleHandler)(unsafe.Pointer(in.PostStart))
+	out.PreStop = (*v1.LifecycleHandler)(unsafe.Pointer(in.PreStop))
 	return nil
 }
 
 // Convert_core_Lifecycle_To_v1_Lifecycle is an autogenerated conversion function.
 func Convert_core_Lifecycle_To_v1_Lifecycle(in *core.Lifecycle, out *v1.Lifecycle, s conversion.Scope) error {
 	return autoConvert_core_Lifecycle_To_v1_Lifecycle(in, out, s)
+}
+
+func autoConvert_v1_LifecycleHandler_To_core_LifecycleHandler(in *v1.LifecycleHandler, out *core.LifecycleHandler, s conversion.Scope) error {
+	out.Exec = (*core.ExecAction)(unsafe.Pointer(in.Exec))
+	out.HTTPGet = (*core.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
+	out.TCPSocket = (*core.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
+	return nil
+}
+
+// Convert_v1_LifecycleHandler_To_core_LifecycleHandler is an autogenerated conversion function.
+func Convert_v1_LifecycleHandler_To_core_LifecycleHandler(in *v1.LifecycleHandler, out *core.LifecycleHandler, s conversion.Scope) error {
+	return autoConvert_v1_LifecycleHandler_To_core_LifecycleHandler(in, out, s)
+}
+
+func autoConvert_core_LifecycleHandler_To_v1_LifecycleHandler(in *core.LifecycleHandler, out *v1.LifecycleHandler, s conversion.Scope) error {
+	out.Exec = (*v1.ExecAction)(unsafe.Pointer(in.Exec))
+	out.HTTPGet = (*v1.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
+	out.TCPSocket = (*v1.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
+	return nil
+}
+
+// Convert_core_LifecycleHandler_To_v1_LifecycleHandler is an autogenerated conversion function.
+func Convert_core_LifecycleHandler_To_v1_LifecycleHandler(in *core.LifecycleHandler, out *v1.LifecycleHandler, s conversion.Scope) error {
+	return autoConvert_core_LifecycleHandler_To_v1_LifecycleHandler(in, out, s)
 }
 
 func autoConvert_v1_LimitRange_To_core_LimitRange(in *v1.LimitRange, out *core.LimitRange, s conversion.Scope) error {
@@ -5151,6 +5203,8 @@ func autoConvert_v1_PersistentVolumeClaimStatus_To_core_PersistentVolumeClaimSta
 	out.AccessModes = *(*[]core.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
 	out.Capacity = *(*core.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Conditions = *(*[]core.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
+	out.AllocatedResources = *(*core.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
+	out.ResizeStatus = (*core.PersistentVolumeClaimResizeStatus)(unsafe.Pointer(in.ResizeStatus))
 	return nil
 }
 
@@ -5164,6 +5218,8 @@ func autoConvert_core_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimSta
 	out.AccessModes = *(*[]v1.PersistentVolumeAccessMode)(unsafe.Pointer(&in.AccessModes))
 	out.Capacity = *(*v1.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Conditions = *(*[]v1.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
+	out.AllocatedResources = *(*v1.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
+	out.ResizeStatus = (*v1.PersistentVolumeClaimResizeStatus)(unsafe.Pointer(in.ResizeStatus))
 	return nil
 }
 
@@ -5895,6 +5951,26 @@ func Convert_url_Values_To_v1_PodLogOptions(in *url.Values, out *v1.PodLogOption
 	return autoConvert_url_Values_To_v1_PodLogOptions(in, out, s)
 }
 
+func autoConvert_v1_PodOS_To_core_PodOS(in *v1.PodOS, out *core.PodOS, s conversion.Scope) error {
+	out.Name = core.OSName(in.Name)
+	return nil
+}
+
+// Convert_v1_PodOS_To_core_PodOS is an autogenerated conversion function.
+func Convert_v1_PodOS_To_core_PodOS(in *v1.PodOS, out *core.PodOS, s conversion.Scope) error {
+	return autoConvert_v1_PodOS_To_core_PodOS(in, out, s)
+}
+
+func autoConvert_core_PodOS_To_v1_PodOS(in *core.PodOS, out *v1.PodOS, s conversion.Scope) error {
+	out.Name = v1.OSName(in.Name)
+	return nil
+}
+
+// Convert_core_PodOS_To_v1_PodOS is an autogenerated conversion function.
+func Convert_core_PodOS_To_v1_PodOS(in *core.PodOS, out *v1.PodOS, s conversion.Scope) error {
+	return autoConvert_core_PodOS_To_v1_PodOS(in, out, s)
+}
+
 func autoConvert_v1_PodPortForwardOptions_To_core_PodPortForwardOptions(in *v1.PodPortForwardOptions, out *core.PodPortForwardOptions, s conversion.Scope) error {
 	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
 	return nil
@@ -6107,6 +6183,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	out.Overhead = *(*core.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.TopologySpreadConstraints = *(*[]core.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	out.SetHostnameAsFQDN = (*bool)(unsafe.Pointer(in.SetHostnameAsFQDN))
+	out.OS = (*core.PodOS)(unsafe.Pointer(in.OS))
 	return nil
 }
 
@@ -6159,6 +6236,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	out.Overhead = *(*v1.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
 	out.TopologySpreadConstraints = *(*[]v1.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
+	out.OS = (*v1.PodOS)(unsafe.Pointer(in.OS))
 	return nil
 }
 
@@ -6430,7 +6508,7 @@ func Convert_core_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm(in *core
 }
 
 func autoConvert_v1_Probe_To_core_Probe(in *v1.Probe, out *core.Probe, s conversion.Scope) error {
-	if err := Convert_v1_Handler_To_core_Handler(&in.Handler, &out.Handler, s); err != nil {
+	if err := Convert_v1_ProbeHandler_To_core_ProbeHandler(&in.ProbeHandler, &out.ProbeHandler, s); err != nil {
 		return err
 	}
 	out.InitialDelaySeconds = in.InitialDelaySeconds
@@ -6448,7 +6526,7 @@ func Convert_v1_Probe_To_core_Probe(in *v1.Probe, out *core.Probe, s conversion.
 }
 
 func autoConvert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s conversion.Scope) error {
-	if err := Convert_core_Handler_To_v1_Handler(&in.Handler, &out.Handler, s); err != nil {
+	if err := Convert_core_ProbeHandler_To_v1_ProbeHandler(&in.ProbeHandler, &out.ProbeHandler, s); err != nil {
 		return err
 	}
 	out.InitialDelaySeconds = in.InitialDelaySeconds
@@ -6463,6 +6541,32 @@ func autoConvert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s convers
 // Convert_core_Probe_To_v1_Probe is an autogenerated conversion function.
 func Convert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s conversion.Scope) error {
 	return autoConvert_core_Probe_To_v1_Probe(in, out, s)
+}
+
+func autoConvert_v1_ProbeHandler_To_core_ProbeHandler(in *v1.ProbeHandler, out *core.ProbeHandler, s conversion.Scope) error {
+	out.Exec = (*core.ExecAction)(unsafe.Pointer(in.Exec))
+	out.HTTPGet = (*core.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
+	out.TCPSocket = (*core.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
+	out.GRPC = (*core.GRPCAction)(unsafe.Pointer(in.GRPC))
+	return nil
+}
+
+// Convert_v1_ProbeHandler_To_core_ProbeHandler is an autogenerated conversion function.
+func Convert_v1_ProbeHandler_To_core_ProbeHandler(in *v1.ProbeHandler, out *core.ProbeHandler, s conversion.Scope) error {
+	return autoConvert_v1_ProbeHandler_To_core_ProbeHandler(in, out, s)
+}
+
+func autoConvert_core_ProbeHandler_To_v1_ProbeHandler(in *core.ProbeHandler, out *v1.ProbeHandler, s conversion.Scope) error {
+	out.Exec = (*v1.ExecAction)(unsafe.Pointer(in.Exec))
+	out.HTTPGet = (*v1.HTTPGetAction)(unsafe.Pointer(in.HTTPGet))
+	out.TCPSocket = (*v1.TCPSocketAction)(unsafe.Pointer(in.TCPSocket))
+	out.GRPC = (*v1.GRPCAction)(unsafe.Pointer(in.GRPC))
+	return nil
+}
+
+// Convert_core_ProbeHandler_To_v1_ProbeHandler is an autogenerated conversion function.
+func Convert_core_ProbeHandler_To_v1_ProbeHandler(in *core.ProbeHandler, out *v1.ProbeHandler, s conversion.Scope) error {
+	return autoConvert_core_ProbeHandler_To_v1_ProbeHandler(in, out, s)
 }
 
 func autoConvert_v1_ProjectedVolumeSource_To_core_ProjectedVolumeSource(in *v1.ProjectedVolumeSource, out *core.ProjectedVolumeSource, s conversion.Scope) error {

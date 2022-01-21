@@ -19,6 +19,7 @@ package admission
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
@@ -27,7 +28,10 @@ import (
 // auditHandler logs annotations set by other admission handlers
 type auditHandler struct {
 	Interface
-	ae *auditinternal.Event
+	// TODO: move the lock near the Annotations field of the audit event so it is always protected from concurrent access.
+	// to protect the 'Annotations' map of the audit event from concurrent writes
+	mutex sync.Mutex
+	ae    *auditinternal.Event
 }
 
 var _ Interface = &auditHandler{}
@@ -42,10 +46,10 @@ func WithAudit(i Interface, ae *auditinternal.Event) Interface {
 	if i == nil {
 		return i
 	}
-	return &auditHandler{i, ae}
+	return &auditHandler{Interface: i, ae: ae}
 }
 
-func (handler auditHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) error {
+func (handler *auditHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) error {
 	if !handler.Interface.Handles(a.GetOperation()) {
 		return nil
 	}
@@ -60,7 +64,7 @@ func (handler auditHandler) Admit(ctx context.Context, a Attributes, o ObjectInt
 	return err
 }
 
-func (handler auditHandler) Validate(ctx context.Context, a Attributes, o ObjectInterfaces) error {
+func (handler *auditHandler) Validate(ctx context.Context, a Attributes, o ObjectInterfaces) error {
 	if !handler.Interface.Handles(a.GetOperation()) {
 		return nil
 	}
@@ -84,10 +88,13 @@ func ensureAnnotationGetter(a Attributes) error {
 	return fmt.Errorf("attributes must be an instance of privateAnnotationsGetter or AnnotationsGetter")
 }
 
-func (handler auditHandler) logAnnotations(a Attributes) {
+func (handler *auditHandler) logAnnotations(a Attributes) {
 	if handler.ae == nil {
 		return
 	}
+	handler.mutex.Lock()
+	defer handler.mutex.Unlock()
+
 	switch a := a.(type) {
 	case privateAnnotationsGetter:
 		for key, value := range a.getAnnotations(handler.ae.Level) {

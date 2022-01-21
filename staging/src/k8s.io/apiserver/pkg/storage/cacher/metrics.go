@@ -21,6 +21,11 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+const (
+	namespace = "apiserver"
+	subsystem = "watch_cache"
+)
+
 /*
  * By default, all the following metrics are defined as falling under
  * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
@@ -33,7 +38,18 @@ var (
 	initCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name:           "apiserver_init_events_total",
-			Help:           "Counter of init events processed in watchcache broken by resource type.",
+			Help:           "Counter of init events processed in watch cache broken by resource type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	eventsCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "events_dispatched_total",
+			Help:           "Counter of events dispatched in watch cache broken by resource type.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource"},
@@ -74,14 +90,27 @@ var (
 		},
 		[]string{"resource"},
 	)
+
+	watchCacheInitializations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watch_cache_initializations_total",
+			Help:           "Counter of watch cache initializations broken by resource type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 func init() {
 	legacyregistry.MustRegister(initCounter)
+	legacyregistry.MustRegister(eventsCounter)
 	legacyregistry.MustRegister(terminatedWatchersCounter)
 	legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 	legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 	legacyregistry.MustRegister(watchCacheCapacity)
+	legacyregistry.MustRegister(watchCacheInitializations)
 }
 
 // recordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.

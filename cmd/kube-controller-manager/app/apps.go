@@ -45,7 +45,7 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating DaemonSets controller: %v", err)
 	}
-	go dsc.Run(int(controllerContext.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs), ctx.Done())
+	go dsc.Run(ctx, int(controllerContext.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs))
 	return nil, true, nil
 }
 
@@ -56,7 +56,7 @@ func startStatefulSetController(ctx context.Context, controllerContext Controlle
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.ClientBuilder.ClientOrDie("statefulset-controller"),
-	).Run(int(controllerContext.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs), ctx.Done())
+	).Run(ctx, int(controllerContext.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs))
 	return nil, true, nil
 }
 
@@ -66,7 +66,7 @@ func startReplicaSetController(ctx context.Context, controllerContext Controller
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-	).Run(int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs), ctx.Done())
+	).Run(ctx, int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs))
 	return nil, true, nil
 }
 
@@ -80,6 +80,6 @@ func startDeploymentController(ctx context.Context, controllerContext Controller
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(int(controllerContext.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), ctx.Done())
+	go dc.Run(ctx, int(controllerContext.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs))
 	return nil, true, nil
 }

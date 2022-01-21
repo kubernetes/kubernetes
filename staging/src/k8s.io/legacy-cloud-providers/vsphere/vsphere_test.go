@@ -206,6 +206,10 @@ func configFromEnvOrSim() (VSphereConfig, func()) {
 	return configFromSim()
 }
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 func TestSecretUpdated(t *testing.T) {
 	datacenter := "0.0.0.0"
 	secretName := "vccreds"
@@ -227,9 +231,7 @@ func TestSecretUpdated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
 	}
-	klog.Flush()
 
-	klog.InitFlags(nil)
 	flag.Set("logtostderr", "false")
 	flag.Set("alsologtostderr", "false")
 	flag.Set("v", "9")

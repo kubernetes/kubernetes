@@ -185,7 +185,7 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 	}
 }
 
-func newDeploymentWithHugePageValue(reousreceName api.ResourceName, value resource.Quantity) *apps.Deployment {
+func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resource.Quantity) *apps.Deployment {
 	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            deploymentName,
@@ -221,11 +221,11 @@ func newDeploymentWithHugePageValue(reousreceName api.ResourceName, value resour
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
-								api.ResourceName(reousreceName):   value,
+								api.ResourceName(resourceName):    value,
 							},
 							Limits: api.ResourceList{
 								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
-								api.ResourceName(reousreceName):   value,
+								api.ResourceName(resourceName):    value,
 							},
 						}},
 					}},

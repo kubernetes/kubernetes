@@ -267,6 +267,23 @@ func TestVolumeBinding(t *testing.T) {
 			},
 		},
 		{
+			name: "pv not found claim lost",
+			pod:  makePod("pod-a").withPVCVolume("pvc-a", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").withPhase(v1.ClaimLost).PersistentVolumeClaim,
+			},
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" bound to non-existent persistentvolume "pv-a"`),
+			wantFilterStatus: []*framework.Status{
+				nil,
+			},
+			wantScores: []int64{
+				0,
+			},
+		},
+		{
 			name: "local volumes with close capacity are preferred",
 			pod:  makePod("pod-a").withPVCVolume("pvc-a", "").Pod,
 			nodes: []*v1.Node{

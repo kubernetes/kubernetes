@@ -38,10 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	netutils "k8s.io/utils/net"
 
 	// TODO: remove this import if
@@ -49,7 +47,6 @@ import (
 	// to "v1"?
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -2596,6 +2593,95 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 		},
 		{
+			name: "terminal phase from previous status must remain terminal, restartAlways",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{},
+			previousStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+				// Reason and message should be preserved
+				Reason:  "Test",
+				Message: "test",
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodSucceeded,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 1)),
+					ready(waitingWithLastTerminationUnknown("containerB", 1)),
+				},
+				Reason:  "Test",
+				Message: "test",
+			},
+		},
+		{
+			name: "terminal phase from previous status must remain terminal, restartNever",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					Containers: []v1.Container{
+						{Name: "containerA"},
+						{Name: "containerB"},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{},
+			previousStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+				ContainerStatuses: []v1.ContainerStatus{
+					succeededState("containerA"),
+					succeededState("containerB"),
+				},
+				// Reason and message should be preserved
+				Reason:  "Test",
+				Message: "test",
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodSucceeded,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(succeededState("containerA")),
+					ready(succeededState("containerB")),
+				},
+				Reason:  "Test",
+				Message: "test",
+			},
+		},
+		{
 			name: "running can revert to pending",
 			pod: &v1.Pod{
 				Spec: desiredState,
@@ -2890,13 +2976,12 @@ func TestGetPortForward(t *testing.T) {
 
 func TestHasHostMountPVC(t *testing.T) {
 	type testcase struct {
-		pvError          error
-		pvcError         error
-		expected         bool
-		podHasPVC        bool
-		pvcIsHostPath    bool
-		podHasEphemeral  bool
-		ephemeralEnabled bool
+		pvError         error
+		pvcError        error
+		expected        bool
+		podHasPVC       bool
+		pvcIsHostPath   bool
+		podHasEphemeral bool
 	}
 	tests := map[string]testcase{
 		"no pvc": {podHasPVC: false, expected: false},
@@ -2916,16 +3001,9 @@ func TestHasHostMountPVC(t *testing.T) {
 			expected:      true,
 		},
 		"enabled ephemeral host path": {
-			podHasEphemeral:  true,
-			pvcIsHostPath:    true,
-			ephemeralEnabled: true,
-			expected:         true,
-		},
-		"disabled ephemeral host path": {
-			podHasEphemeral:  true,
-			pvcIsHostPath:    true,
-			ephemeralEnabled: false,
-			expected:         false,
+			podHasEphemeral: true,
+			pvcIsHostPath:   true,
+			expected:        true,
 		},
 		"non host path pvc": {
 			podHasPVC:     true,
@@ -2935,7 +3013,6 @@ func TestHasHostMountPVC(t *testing.T) {
 	}
 
 	run := func(t *testing.T, v testcase) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, v.ephemeralEnabled)()
 		testKubelet := newTestKubelet(t, false)
 		defer testKubelet.Cleanup()
 		pod := &v1.Pod{

@@ -52,6 +52,17 @@ func WatchInitialized(ctx context.Context) {
 	}
 }
 
+// RequestDelegated informs the priority and fairness dispatcher that
+// a given request has been delegated to an aggregated API
+// server. No-op when priority and fairness is disabled.
+func RequestDelegated(ctx context.Context) {
+	// The watch initialization signal doesn't traverse request
+	// boundaries, so we generously fire it as soon as we know
+	// that the request won't be serviced locally. Safe to call
+	// for non-watch requests.
+	WatchInitialized(ctx)
+}
+
 // InitializationSignal is an interface that allows sending and handling
 // initialization signals.
 type InitializationSignal interface {

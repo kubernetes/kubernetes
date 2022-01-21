@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
@@ -39,7 +39,7 @@ import (
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error)
+	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error)
 }
 
 // RuntimeHelper wraps kubelet to make container runtime
@@ -277,14 +277,6 @@ func SandboxToContainerState(state runtimeapi.PodSandboxState) State {
 	return ContainerStateUnknown
 }
 
-// FormatPod returns a string representing a pod in a human readable format,
-// with pod UID as part of the string.
-func FormatPod(pod *Pod) string {
-	// Use underscore as the delimiter because it is not allowed in pod name
-	// (DNS subdomain format), while allowed in the container name format.
-	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.ID)
-}
-
 // GetContainerSpec gets the container spec by containerName.
 func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 	var containerSpec *v1.Container
@@ -325,7 +317,7 @@ func HasWindowsHostProcessContainer(pod *v1.Pod) bool {
 	return hasHostProcess
 }
 
-// AllContainersAreWindowsHostProcess returns true if all containres in a pod are HostProcess containers.
+// AllContainersAreWindowsHostProcess returns true if all containers in a pod are HostProcess containers.
 func AllContainersAreWindowsHostProcess(pod *v1.Pod) bool {
 	allHostProcess := true
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
@@ -362,7 +354,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 			}
 		}
 
-		var name string = p.Name
+		var name = p.Name
 		if name == "" {
 			name = fmt.Sprintf("%s-%s-%s:%d:%d", family, p.Protocol, p.HostIP, p.ContainerPort, p.HostPort)
 		}

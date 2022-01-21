@@ -278,6 +278,11 @@ func (in *PolicyRule) DeepCopyInto(out *PolicyRule) {
 		*out = make([]Stage, len(*in))
 		copy(*out, *in)
 	}
+	if in.OmitManagedFields != nil {
+		in, out := &in.OmitManagedFields, &out.OmitManagedFields
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

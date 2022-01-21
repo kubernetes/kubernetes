@@ -225,6 +225,7 @@ type openAPITypeWriter struct {
 	*generator.SnippetWriter
 	context                *generator.Context
 	refTypes               map[string]*types.Type
+	enumContext            *enumContext
 	GetDefinitionInterface *types.Type
 }
 
@@ -233,6 +234,7 @@ func newOpenAPITypeWriter(sw *generator.SnippetWriter, c *generator.Context) ope
 		SnippetWriter: sw,
 		context:       c,
 		refTypes:      map[string]*types.Type{},
+		enumContext:   newEnumContext(c),
 	}
 }
 
@@ -625,7 +627,11 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 		return err
 	}
 	g.Do("SchemaProps: spec.SchemaProps{\n", nil)
-	g.generateDescription(m.CommentLines)
+	var extraComments []string
+	if enumType, isEnum := g.enumContext.EnumType(m.Type); isEnum {
+		extraComments = enumType.DescriptionLines()
+	}
+	g.generateDescription(append(m.CommentLines, extraComments...))
 	jsonTags := getJsonTags(m)
 	if len(jsonTags) > 1 && jsonTags[1] == "string" {
 		g.generateSimpleProperty("string", "")
@@ -641,6 +647,10 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	typeString, format := openapi.OpenAPITypeFormat(t.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
+		if enumType, isEnum := g.enumContext.EnumType(m.Type); isEnum {
+			// original type is an enum, add "Enum: " and the values
+			g.Do("Enum: []interface{}{$.$}", strings.Join(enumType.ValueStrings(), ", "))
+		}
 		g.Do("},\n},\n", nil)
 		return nil
 	}

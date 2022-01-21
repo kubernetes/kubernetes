@@ -64,11 +64,11 @@ func TestStorageVersionGarbageCollection(t *testing.T) {
 
 	controller := storageversiongc.NewStorageVersionGC(kubeclient, leaseInformer, storageVersionInformer)
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	go leaseInformer.Informer().Run(stopCh)
-	go storageVersionInformer.Informer().Run(stopCh)
-	go controller.Run(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go leaseInformer.Informer().Run(ctx.Done())
+	go storageVersionInformer.Informer().Run(ctx.Done())
+	go controller.Run(ctx)
 
 	createTestAPIServerIdentityLease(t, kubeclient, idA)
 	createTestAPIServerIdentityLease(t, kubeclient, idB)

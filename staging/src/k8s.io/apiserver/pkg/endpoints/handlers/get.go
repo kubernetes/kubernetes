@@ -76,8 +76,8 @@ func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc
 		}
 
 		trace.Step("About to write a response")
+		defer trace.Step("Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
-		trace.Step("Transformed response object")
 	}
 }
 
@@ -281,8 +281,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			return
 		}
 		trace.Step("Listing from storage done")
-
+		defer trace.Step("Writing http response done", utiltrace.Field{"count", meta.LenList(result)})
 		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
-		trace.Step("Writing http response done", utiltrace.Field{"count", meta.LenList(result)})
 	}
 }

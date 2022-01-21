@@ -17,9 +17,10 @@ package metrics
 import (
 	"strconv"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/klog/v2"
 )
@@ -327,6 +328,14 @@ func getCaches(machineInfo *info.MachineInfo) metricValues {
 			coreID := strconv.Itoa(core.Id)
 
 			for _, cache := range core.Caches {
+				mValues = append(mValues,
+					metricValue{
+						value:     float64(cache.Size),
+						labels:    []string{nodeID, coreID, cache.Type, strconv.Itoa(cache.Level)},
+						timestamp: machineInfo.Timestamp,
+					})
+			}
+			for _, cache := range core.UncoreCaches {
 				mValues = append(mValues,
 					metricValue{
 						value:     float64(cache.Size),

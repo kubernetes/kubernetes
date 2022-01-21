@@ -39,7 +39,7 @@ var (
 func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(name)
 	if err != nil {
-		klog.Errorf("%v", err)
+		klog.ErrorS(err, "Error getting network by name")
 		return nil, err
 	}
 
@@ -84,7 +84,7 @@ func (hns hnsV2) getEndpointByID(id string) (*endpointsInfo, error) {
 func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
-		klog.Errorf("%v", err)
+		klog.ErrorS(err, "Error getting network by name")
 		return nil, err
 	}
 
@@ -178,7 +178,7 @@ func (hns hnsV2) deleteEndpoint(hnsID string) error {
 	}
 	err = hnsendpoint.Delete()
 	if err == nil {
-		klog.V(3).Infof("Remote endpoint resource deleted id %s", hnsID)
+		klog.V(3).InfoS("Remote endpoint resource deleted", "hnsID", hnsID)
 	}
 	return err
 }

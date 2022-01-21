@@ -108,7 +108,7 @@ func (c *FakeRoles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.Upd
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
 func (c *FakeRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1alpha1.Role{})
+		Invokes(testing.NewDeleteActionWithOptions(rolesResource, c.ns, name, opts), &v1alpha1.Role{})
 
 	return err
 }

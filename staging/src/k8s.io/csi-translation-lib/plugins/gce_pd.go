@@ -77,7 +77,7 @@ func generateToplogySelectors(key string, values []string) []v1.TopologySelector
 	}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree GCE storage class parameters to CSI storage class
 func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
 	var generatedTopologies []v1.TopologySelectorTerm
 

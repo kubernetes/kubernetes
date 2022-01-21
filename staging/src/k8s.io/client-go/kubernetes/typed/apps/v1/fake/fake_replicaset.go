@@ -122,7 +122,7 @@ func (c *FakeReplicaSets) UpdateStatus(ctx context.Context, replicaSet *appsv1.R
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
 func (c *FakeReplicaSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(replicasetsResource, c.ns, name), &appsv1.ReplicaSet{})
+		Invokes(testing.NewDeleteActionWithOptions(replicasetsResource, c.ns, name, opts), &appsv1.ReplicaSet{})
 
 	return err
 }

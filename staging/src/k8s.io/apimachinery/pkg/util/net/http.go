@@ -238,6 +238,29 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 	}
 }
 
+// CloseIdleConnectionsFor close idles connections for the Transport.
+// If the Transport is wrapped it iterates over the wrapped round trippers
+// until it finds one that implements the CloseIdleConnections method.
+// If the Transport does not have a CloseIdleConnections method
+// then this function does nothing.
+func CloseIdleConnectionsFor(transport http.RoundTripper) {
+	if transport == nil {
+		return
+	}
+	type closeIdler interface {
+		CloseIdleConnections()
+	}
+
+	switch transport := transport.(type) {
+	case closeIdler:
+		transport.CloseIdleConnections()
+	case RoundTripperWrapper:
+		CloseIdleConnectionsFor(transport.WrappedRoundTripper())
+	default:
+		klog.Warningf("unknown transport type: %T", transport)
+	}
+}
+
 type TLSClientConfigHolder interface {
 	TLSClientConfig() *tls.Config
 }

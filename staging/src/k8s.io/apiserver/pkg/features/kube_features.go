@@ -124,10 +124,12 @@ const (
 	WatchBookmark featuregate.Feature = "WatchBookmark"
 
 	// owner: @MikeSpreitzer @yue9944882
-	// alpha: v1.15
+	// alpha: v1.18
+	// beta: v1.20
 	//
-	//
-	// Enables managing request concurrency with prioritization and fairness at each server
+	// Enables managing request concurrency with prioritization and fairness at each server.
+	// The FeatureGate was introduced in release 1.15 but the feature
+	// was not really implemented before 1.18.
 	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
 
 	// owner: @wojtek-t
@@ -155,6 +157,7 @@ const (
 	// owner: @wojtek-t
 	// alpha: v1.20
 	// beta: v1.21
+	// GA: v1.24
 	//
 	// Allows for updating watchcache resource version with progress notify events.
 	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
@@ -185,6 +188,20 @@ const (
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
+
+	// owner: @jefftree
+	// kep: http://kep.k8s.io/2896
+	// alpha: v1.23
+	//
+	// Enables kubernetes to publish OpenAPI v3
+	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
+
+	// owner: @kevindelgado
+	// kep: http://kep.k8s.io/2885
+	// alpha: v1.23
+	//
+	// Enables server-side field validation.
+	ServerSideFieldValidation featuregate.Feature = "ServerSideFieldValidation"
 )
 
 func init() {
@@ -210,9 +227,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemoveSelfLink:                      {Default: true, PreRelease: featuregate.Beta},
 	SelectorIndex:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	WarningHeaders:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	EfficientWatchResumption:            {Default: true, PreRelease: featuregate.Beta},
+	EfficientWatchResumption:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	APIServerIdentity:                   {Default: false, PreRelease: featuregate.Alpha},
 	APIServerTracing:                    {Default: false, PreRelease: featuregate.Alpha},
 	OpenAPIEnums:                        {Default: false, PreRelease: featuregate.Alpha},
 	CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
+	OpenAPIV3:                           {Default: false, PreRelease: featuregate.Alpha},
+	ServerSideFieldValidation:           {Default: false, PreRelease: featuregate.Alpha},
 }

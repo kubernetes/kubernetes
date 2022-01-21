@@ -140,6 +140,30 @@ func newPod(uid, name string) *v1.Pod {
 	}
 }
 
+func newPodWithPhase(uid, name string, phase v1.PodPhase) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(uid),
+			Name: name,
+		},
+		Status: v1.PodStatus{
+			Phase: phase,
+		},
+	}
+}
+
+func newStaticPod(uid, name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(uid),
+			Name: name,
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource,
+			},
+		},
+	}
+}
+
 // syncPodRecord is a record of a sync pod call
 type syncPodRecord struct {
 	name       string
@@ -270,6 +294,36 @@ func TestUpdatePod(t *testing.T) {
 		if processed[uid][last].name != strconv.Itoa(i) {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, last, processed[uid][last])
 		}
+	}
+}
+
+func TestUpdatePodWithTerminatedPod(t *testing.T) {
+	podWorkers, _ := createPodWorkers()
+	terminatedPod := newPodWithPhase("0000-0000-0000", "done-pod", v1.PodSucceeded)
+	runningPod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "done-pod"}
+	pod := newPod("0000-0000-0002", "running-pod")
+
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        terminatedPod,
+		UpdateType: kubetypes.SyncPodCreate,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        pod,
+		UpdateType: kubetypes.SyncPodCreate,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodKill,
+		RunningPod: runningPod,
+	})
+
+	if podWorkers.IsPodKnownTerminated(pod.UID) == true {
+		t.Errorf("podWorker state should not be terminated")
+	}
+	if podWorkers.IsPodKnownTerminated(terminatedPod.UID) == false {
+		t.Errorf("podWorker state should be terminated")
+	}
+	if podWorkers.IsPodKnownTerminated(runningPod.ID) == true {
+		t.Errorf("podWorker state should not be marked terminated for a running pod")
 	}
 }
 
@@ -638,5 +692,191 @@ func TestKillPodNowFunc(t *testing.T) {
 	}
 	if !syncPodRecords[1].terminated {
 		t.Errorf("Pod terminated %v, but expected %v", syncPodRecords[1].terminated, true)
+	}
+}
+
+func Test_allowPodStart(t *testing.T) {
+	testCases := []struct {
+		desc                               string
+		pod                                *v1.Pod
+		podSyncStatuses                    map[types.UID]*podSyncStatus
+		startedStaticPodsByFullname        map[string]types.UID
+		waitingToStartStaticPodsByFullname map[string][]types.UID
+		allowed                            bool
+	}{
+		{
+			// TBD: Do we want to allow non-static pods with the same full name?
+			// Note that it may disable the force deletion of pods.
+			desc: "non-static pod",
+			pod:  newPod("uid-0", "test"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "test_",
+				},
+				"uid-1": {
+					fullname: "test_",
+				},
+			},
+			allowed: true,
+		},
+		{
+			// TBD: Do we want to allow a non-static pod with the same full name
+			// as the started static pod?
+			desc: "non-static pod when there is a started static pod with the same full name",
+			pod:  newPod("uid-0", "test"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "test_",
+				},
+				"uid-1": {
+					fullname: "test_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"test_": types.UID("uid-1"),
+			},
+			allowed: true,
+		},
+		{
+			// TBD: Do we want to allow a static pod with the same full name as the
+			// started non-static pod?
+			desc: "static pod when there is a started non-static pod with the same full name",
+			pod:  newPod("uid-0", "test"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "test_",
+				},
+				"uid-1": {
+					fullname: "test_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"test_": types.UID("uid-1"),
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod when there are no started static pods with the same full name",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "bar_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"bar_": types.UID("uid-1"),
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod when there is a started static pod with the same full name",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "foo_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-1"),
+			},
+			allowed: false,
+		},
+		{
+			desc: "static pod if the static pod has already started",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod if the static pod is the first pod waiting to start",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-0"),
+				},
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod if the static pod is not the first pod waiting to start",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "foo_",
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-1"),
+					types.UID("uid-0"),
+				},
+			},
+			allowed: false,
+		},
+		{
+			desc: "static pod if the static pod is the first valid pod waiting to start / clean up until picking the first valid pod",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "foo_",
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-2"),
+					types.UID("uid-2"),
+					types.UID("uid-3"),
+					types.UID("uid-0"),
+					types.UID("uid-1"),
+				},
+			},
+			allowed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			podWorkers, _ := createPodWorkers()
+			if tc.podSyncStatuses != nil {
+				podWorkers.podSyncStatuses = tc.podSyncStatuses
+			}
+			if tc.startedStaticPodsByFullname != nil {
+				podWorkers.startedStaticPodsByFullname = tc.startedStaticPodsByFullname
+			}
+			if tc.waitingToStartStaticPodsByFullname != nil {
+				podWorkers.waitingToStartStaticPodsByFullname = tc.waitingToStartStaticPodsByFullname
+			}
+			if podWorkers.allowPodStart(tc.pod) != tc.allowed {
+				if tc.allowed {
+					t.Errorf("Pod should be allowed")
+				} else {
+					t.Errorf("Pod should not be allowed")
+				}
+			}
+		})
 	}
 }

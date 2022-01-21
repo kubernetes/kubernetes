@@ -68,10 +68,26 @@ var (
 		},
 		[]string{"completion_mode", "result"},
 	)
+
+	// JobPodsFinished records the number of finished Pods that the job controller
+	// finished tracking.
+	// It only applies to Jobs that were created while the feature gate
+	// JobTrackingWithFinalizers was enabled.
+	// Possible label values:
+	//   completion_mode: Indexed, NonIndexed
+	//   result:          failed, succeeded
+	JobPodsFinished = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "job_pods_finished_total",
+			Help:      "The number of finished Pods that are fully tracked",
+		},
+		[]string{"completion_mode", "result"})
 )
 
-// Possible values for the "action" label in the above metrics.
 const (
+	// Possible values for the "action" label in the above metrics.
+
 	// JobSyncActionReconciling when the Job's pod creation/deletion expectations
 	// are unsatisfied and the controller is waiting for issued Pod
 	// creation/deletions to complete.
@@ -88,6 +104,11 @@ const (
 	// if a Job is suspended or if the number of active Pods is more than
 	// parallelism.
 	JobSyncActionPodsDeleted = "pods_deleted"
+
+	// Possible values for "result" label in the above metrics.
+
+	Succeeded = "succeeded"
+	Failed    = "failed"
 )
 
 var registerMetrics sync.Once
@@ -98,5 +119,6 @@ func Register() {
 		legacyregistry.MustRegister(JobSyncDurationSeconds)
 		legacyregistry.MustRegister(JobSyncNum)
 		legacyregistry.MustRegister(JobFinishedNum)
+		legacyregistry.MustRegister(JobPodsFinished)
 	})
 }

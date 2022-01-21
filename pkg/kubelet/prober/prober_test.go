@@ -100,7 +100,7 @@ func TestGetURLParts(t *testing.T) {
 		container := v1.Container{
 			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
 			LivenessProbe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: test.probe,
 				},
 			},
@@ -153,7 +153,7 @@ func TestGetTCPAddrParts(t *testing.T) {
 		container := v1.Container{
 			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
 			LivenessProbe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					TCPSocket: test.probe,
 				},
 			},
@@ -204,7 +204,7 @@ func TestProbe(t *testing.T) {
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
 
 	execProbe := &v1.Probe{
-		Handler: v1.Handler{
+		ProbeHandler: v1.ProbeHandler{
 			Exec: &v1.ExecAction{},
 		},
 	}
@@ -255,7 +255,7 @@ func TestProbe(t *testing.T) {
 		},
 		{ // Probe arguments are passed through
 			probe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"/bin/bash", "-c", "some script"},
 					},
@@ -267,7 +267,7 @@ func TestProbe(t *testing.T) {
 		},
 		{ // Probe arguments are passed through
 			probe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"/bin/bash", "-c", "some $(A) $(B)"},
 					},

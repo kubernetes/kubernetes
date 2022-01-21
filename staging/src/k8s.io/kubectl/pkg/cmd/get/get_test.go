@@ -19,7 +19,6 @@ package get
 import (
 	"bytes"
 	"encoding/json"
-	encjson "encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -124,13 +123,13 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	for i, obj := range actual {
 		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
 		expectedMap := map[string]interface{}{}
-		if err := encjson.Unmarshal([]byte(expectedJSON), &expectedMap); err != nil {
+		if err := json.Unmarshal([]byte(expectedJSON), &expectedMap); err != nil {
 			t.Fatal(err)
 		}
 
 		actualJSON := runtime.EncodeOrDie(codec, obj)
 		actualMap := map[string]interface{}{}
-		if err := encjson.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
+		if err := json.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
 			t.Fatal(err)
 		}
 
@@ -879,7 +878,7 @@ func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unstructuredBytes, err := encjson.MarshalIndent(unstructuredMap, "", "  ")
+	unstructuredBytes, err := json.MarshalIndent(unstructuredMap, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}

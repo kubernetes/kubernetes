@@ -253,7 +253,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 			outputFormat: "json",
 			expectedOutput: `{
     "kind": "Images",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
     "images": [
         "k8s.gcr.io/kube-apiserver:{{.KubeVersion}}",
         "k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}",
@@ -272,7 +272,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "yaml",
-			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha2
 images:
 - k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
 - k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
@@ -363,10 +363,10 @@ func TestImagesPull(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultDockerCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}

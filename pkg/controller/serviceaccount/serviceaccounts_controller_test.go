@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -175,9 +176,9 @@ func TestServiceAccountCreation(t *testing.T) {
 		saStore := saInformer.Informer().GetStore()
 		nsStore := nsInformer.Informer().GetStore()
 
-		syncCalls := make(chan struct{})
-		controller.syncHandler = func(key string) error {
-			err := controller.syncNamespace(key)
+		syncCalls := make(chan struct{}, 1)
+		controller.syncHandler = func(ctx context.Context, key string) error {
+			err := controller.syncNamespace(ctx, key)
 			if err != nil {
 				t.Logf("%s: %v", k, err)
 			}
@@ -187,7 +188,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 		stopCh := make(chan struct{})
 		defer close(stopCh)
-		go controller.Run(1, stopCh)
+		go controller.Run(context.TODO(), 1)
 
 		if tc.ExistingNamespace != nil {
 			nsStore.Add(tc.ExistingNamespace)

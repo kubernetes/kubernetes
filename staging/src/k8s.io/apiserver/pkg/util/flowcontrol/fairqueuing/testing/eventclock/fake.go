@@ -44,7 +44,8 @@ type waitGroupCounter struct {
 var _ counter.GoRoutineCounter = (*waitGroupCounter)(nil)
 
 func (wgc *waitGroupCounter) Add(delta int) {
-	if klog.V(7).Enabled() {
+	klogV := klog.V(7)
+	if klogV.Enabled() {
 		var pcs [10]uintptr
 		nCallers := runtime.Callers(2, pcs[:])
 		frames := runtime.CallersFrames(pcs[:nCallers])
@@ -64,7 +65,7 @@ func (wgc *waitGroupCounter) Add(delta int) {
 				break
 			}
 		}
-		klog.InfoS("Add", "counter", fmt.Sprintf("%p", wgc), "delta", delta, "callers", callers)
+		klogV.InfoS("Add", "counter", fmt.Sprintf("%p", wgc), "delta", delta, "callers", callers)
 	}
 	wgc.wg.Add(delta)
 }

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -70,7 +71,7 @@ type nodeConfigTestCase struct {
 }
 
 // This test is marked [Disruptive] because the Kubelet restarts several times during this test.
-var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Serial][Disruptive]", func() {
+var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Deprecated][Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 	var beforeNode *v1.Node
 	var beforeConfigMap *v1.ConfigMap
@@ -83,11 +84,13 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 			// make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to test
 			enabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
+
 			if !enabled {
-				framework.ExpectNoError(fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
+				e2eskipper.Skipf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 					"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet and API server to enable this feature.\n" +
-					"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`."))
+					"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
 			}
+
 			// record before state so we can restore it after the test
 			if beforeNode == nil {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})

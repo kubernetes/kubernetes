@@ -26,9 +26,6 @@ CLEAN_PATTERNS=(
   "doc_tmp"
   "((?!staging\/src\/k8s\.io\/apiextensions-apiserver\/pkg\/generated\/openapi).)*/zz_generated.openapi.go"
   "test/e2e/generated/bindata.go"
-  # TODO(bentheelder): remove this pattern after bazel is not in any supported releases
-  # see: https://github.com/kubernetes/enhancements/issues/2420
-  "bazel-.*"
 )
 
 for pattern in "${CLEAN_PATTERNS[@]}"; do

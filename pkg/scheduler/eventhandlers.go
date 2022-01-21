@@ -108,11 +108,6 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		return
 	}
 	klog.V(3).InfoS("Delete event for node", "node", klog.KObj(node))
-	// NOTE: Updates must be written to scheduler cache before invalidating
-	// equivalence cache, because we could snapshot equivalence cache after the
-	// invalidation and then snapshot the cache itself. If the cache is
-	// snapshotted before updates are written, we would update equivalence
-	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.RemoveNode(node); err != nil {
 		klog.ErrorS(err, "Scheduler cache RemoveNode failed")
 	}
@@ -208,23 +203,10 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		klog.ErrorS(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
+	klog.V(4).InfoS("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 
-	// A Pod delete event followed by an immediate Pod add event may be merged
-	// into a Pod update event. In this case, we should invalidate the old Pod, and
-	// then add the new Pod.
-	if oldPod.UID != newPod.UID {
-		sched.deletePodFromCache(oldObj)
-		sched.addPodToCache(newObj)
-		return
-	}
-
-	// NOTE: Updates must be written to scheduler cache before invalidating
-	// equivalence cache, because we could snapshot equivalence cache after the
-	// invalidation and then snapshot the cache itself. If the cache is
-	// snapshotted before updates are written, we would update equivalence
-	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
-		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "oldPod", klog.KObj(oldPod), "newPod", klog.KObj(newPod))
+		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
 	sched.SchedulingQueue.AssignedPodUpdated(newPod)
@@ -247,11 +229,6 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		return
 	}
 	klog.V(3).InfoS("Delete event for scheduled pod", "pod", klog.KObj(pod))
-	// NOTE: Updates must be written to scheduler cache before invalidating
-	// equivalence cache, because we could snapshot equivalence cache after the
-	// invalidation and then snapshot the cache itself. If the cache is
-	// snapshotted before updates are written, we would update equivalence
-	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.RemovePod(pod); err != nil {
 		klog.ErrorS(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
@@ -285,8 +262,10 @@ func addAllEventHandlers(
 				case *v1.Pod:
 					return assignedPod(t)
 				case cache.DeletedFinalStateUnknown:
-					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return assignedPod(pod)
+					if _, ok := t.Obj.(*v1.Pod); ok {
+						// The carried object may be stale, so we don't use it to check if
+						// it's assigned or not. Attempting to cleanup anyways.
+						return true
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
 					return false
@@ -311,7 +290,9 @@ func addAllEventHandlers(
 					return !assignedPod(t) && responsibleForPod(t, sched.Profiles)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return !assignedPod(pod) && responsibleForPod(pod, sched.Profiles)
+						// The carried object may be stale, so we don't use it to check if
+						// it's assigned or not.
+						return responsibleForPod(pod, sched.Profiles)
 					}
 					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
 					return false
@@ -414,13 +395,6 @@ func addAllEventHandlers(
 					},
 				)
 			}
-		case framework.Service:
-			// ServiceAffinity: affected by the selector of the service is updated.
-			// Also, if new service is added, equivalence cache will also become invalid since
-			// existing pods may be "captured" by this service and change this predicate result.
-			informerFactory.Core().V1().Services().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.Service, "Service"),
-			)
 		default:
 			// Tests may not instantiate dynInformerFactory.
 			if dynInformerFactory == nil {

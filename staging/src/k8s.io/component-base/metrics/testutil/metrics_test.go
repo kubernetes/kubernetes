@@ -20,13 +20,11 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/utils/pointer"
 )
 
@@ -517,7 +515,6 @@ func TestHistogramVec_Validate(t *testing.T) {
 }
 
 func TestGetHistogramVecFromGatherer(t *testing.T) {
-	var registerMetrics sync.Once
 	tests := []struct {
 		name    string
 		lvMap   map[string]string
@@ -576,16 +573,17 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 				Buckets:   buckets,
 			}
 			vec := metrics.NewHistogramVec(HistogramOpts, labels)
-			registerMetrics.Do(func() {
-				legacyregistry.MustRegister(vec)
-			})
+			// Use local registry
+			var registry = metrics.NewKubeRegistry()
+			var gather metrics.Gatherer = registry
+			registry.MustRegister(vec)
 			// Observe two metrics with same value for label1 but different value of label2.
 			vec.WithLabelValues("value1-0", "value2-0").Observe(1.5)
 			vec.WithLabelValues("value1-0", "value2-1").Observe(2.5)
 			vec.WithLabelValues("value1-1", "value2-0").Observe(3.5)
 			vec.WithLabelValues("value1-1", "value2-1").Observe(4.5)
 			metricName := fmt.Sprintf("%s_%s_%s", HistogramOpts.Namespace, HistogramOpts.Subsystem, HistogramOpts.Name)
-			histogramVec, _ := GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metricName, tt.lvMap)
+			histogramVec, _ := GetHistogramVecFromGatherer(gather, metricName, tt.lvMap)
 			if diff := cmp.Diff(tt.wantVec, histogramVec); diff != "" {
 				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
 			}

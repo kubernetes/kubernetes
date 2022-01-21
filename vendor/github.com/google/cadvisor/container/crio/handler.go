@@ -21,12 +21,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
 	containerlibcontainer "github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 type crioContainerHandler struct {
@@ -83,13 +84,13 @@ func newCrioContainerHandler(
 	fsInfo fs.FsInfo,
 	storageDriver storageDriver,
 	storageDir string,
-	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
+	cgroupSubsystems map[string]string,
 	inHostNamespace bool,
-	metadataEnvs []string,
+	metadataEnvAllowList []string,
 	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems, name)
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager, err := containerlibcontainer.NewCgroupManager(name, cgroupPaths)
@@ -186,7 +187,7 @@ func newCrioContainerHandler(
 		handler.fsHandler = common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, storageLogDir, fsInfo)
 	}
 	// TODO for env vars we wanted to show from container.Config.Env from whitelist
-	//for _, exposedEnv := range metadataEnvs {
+	//for _, exposedEnv := range metadataEnvAllowList {
 	//klog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
 	//}
 
@@ -327,7 +328,11 @@ func (h *crioContainerHandler) ListContainers(listType container.ListType) ([]in
 }
 
 func (h *crioContainerHandler) GetCgroupPath(resource string) (string, error) {
-	path, ok := h.cgroupPaths[resource]
+	var res string
+	if !cgroups.IsCgroup2UnifiedMode() {
+		res = resource
+	}
+	path, ok := h.cgroupPaths[res]
 	if !ok {
 		return "", fmt.Errorf("could not find path for resource %q for container %q", resource, h.reference.Name)
 	}

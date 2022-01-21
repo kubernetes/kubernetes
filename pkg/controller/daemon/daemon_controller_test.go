@@ -225,6 +225,19 @@ func addFailedPods(podStore cache.Store, nodeName string, label map[string]strin
 	}
 }
 
+func newControllerRevision(name string, namespace string, label map[string]string,
+	ownerReferences []metav1.OwnerReference) *apps.ControllerRevision {
+	return &apps.ControllerRevision{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Labels:          label,
+			Namespace:       namespace,
+			OwnerReferences: ownerReferences,
+		},
+	}
+}
+
 type fakePodControl struct {
 	sync.Mutex
 	*controller.FakePodControl
@@ -241,10 +254,10 @@ func newFakePodControl() *fakePodControl {
 	}
 }
 
-func (f *fakePodControl) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.FakePodControl.CreatePods(namespace, template, object, controllerRef); err != nil {
+	if err := f.FakePodControl.CreatePods(ctx, namespace, template, object, controllerRef); err != nil {
 		return fmt.Errorf("failed to create pod for DaemonSet")
 	}
 
@@ -269,10 +282,10 @@ func (f *fakePodControl) CreatePods(namespace string, template *v1.PodTemplateSp
 	return nil
 }
 
-func (f *fakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.FakePodControl.DeletePod(namespace, podID, object); err != nil {
+	if err := f.FakePodControl.DeletePod(ctx, namespace, podID, object); err != nil {
 		return fmt.Errorf("failed to delete pod %q", podID)
 	}
 	pod, ok := f.podIDMap[podID]
@@ -383,7 +396,7 @@ func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.
 		t.Fatal("could not get key for daemon")
 	}
 
-	err = manager.syncHandler(key)
+	err = manager.syncHandler(context.TODO(), key)
 	if err != nil {
 		t.Log(err)
 	}
@@ -547,7 +560,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	// create of DS adds to queue, processes
 	waitForQueueLength(1, "created DS")
-	ok := dsc.processNextWorkItem()
+	ok := dsc.processNextWorkItem(context.TODO())
 	if !ok {
 		t.Fatal("queue is shutting down")
 	}
@@ -576,7 +589,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	// process updates DS, update adds to queue
 	waitForQueueLength(1, "updated DS")
-	ok = dsc.processNextWorkItem()
+	ok = dsc.processNextWorkItem(context.TODO())
 	if !ok {
 		t.Fatal("queue is shutting down")
 	}
@@ -624,7 +637,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	waitForQueueLength(1, "recreated DS")
-	ok = dsc.processNextWorkItem()
+	ok = dsc.processNextWorkItem(context.TODO())
 	if !ok {
 		t.Fatal("Queue is shutting down!")
 	}
@@ -2797,7 +2810,7 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 				}
 			}
 
-			nodesToDaemonPods, err := manager.getNodesToDaemonPods(ds)
+			nodesToDaemonPods, err := manager.getNodesToDaemonPods(context.TODO(), ds)
 			if err != nil {
 				t.Fatalf("getNodesToDaemonPods() error: %v", err)
 			}
@@ -3552,7 +3565,7 @@ func TestStoreDaemonSetStatus(t *testing.T) {
 				}
 				return true, ds, nil
 			})
-			if err := storeDaemonSetStatus(fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); err != tt.expectedError {
+			if err := storeDaemonSetStatus(context.TODO(), fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); err != tt.expectedError {
 				t.Errorf("storeDaemonSetStatus() got %v, expected %v", err, tt.expectedError)
 			}
 			if getCalled != tt.expectedGetCalled {

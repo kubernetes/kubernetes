@@ -30,16 +30,16 @@ type SliceInfo struct {
 	Unchanged   []*discovery.EndpointSlice
 }
 
-func (si *SliceInfo) getTotalEndpoints() int {
+func (si *SliceInfo) getTotalReadyEndpoints() int {
 	totalEndpoints := 0
 	for _, slice := range si.ToCreate {
-		totalEndpoints += len(slice.Endpoints)
+		totalEndpoints += numReadyEndpoints(slice.Endpoints)
 	}
 	for _, slice := range si.ToUpdate {
-		totalEndpoints += len(slice.Endpoints)
+		totalEndpoints += numReadyEndpoints(slice.Endpoints)
 	}
 	for _, slice := range si.Unchanged {
-		totalEndpoints += len(slice.Endpoints)
+		totalEndpoints += numReadyEndpoints(slice.Endpoints)
 	}
 	return totalEndpoints
 }

@@ -1,11 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-instrumentation-approvers
-- logicalhan
-- RainbowMango
+  - sig-instrumentation-approvers
+  - logicalhan
+  - RainbowMango
 reviewers:
-- sig-instrumentation-reviewers
-- YoyinZyc
+  - sig-instrumentation-reviewers
+  - YoyinZyc
 labels:
-- sig/instrumentation
+  - sig/instrumentation

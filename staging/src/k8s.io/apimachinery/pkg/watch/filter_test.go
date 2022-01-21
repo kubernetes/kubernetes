@@ -82,3 +82,33 @@ func TestFilterStop(t *testing.T) {
 		t.Errorf("got %v, wanted %v", e, a)
 	}
 }
+
+func TestRecorder(t *testing.T) {
+	events := []Event{
+		{Type: Added, Object: testType("foo")},
+		{Type: Added, Object: testType("bar")},
+		{Type: Added, Object: testType("baz")},
+		{Type: Added, Object: testType("qux")},
+		{Type: Added, Object: testType("zoo")},
+	}
+
+	source := NewFake()
+	go func() {
+		for _, item := range events {
+			source.Action(item.Type, item.Object)
+		}
+		source.Stop()
+	}()
+
+	recorder := NewRecorder(source)
+	for {
+		_, ok := <-recorder.Interface.ResultChan()
+		if !ok {
+			break
+		}
+	}
+	recordedEvents := recorder.Events()
+	if !reflect.DeepEqual(recordedEvents, events) {
+		t.Errorf("got %v, expected %v", recordedEvents, events)
+	}
+}

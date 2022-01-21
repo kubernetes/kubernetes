@@ -87,35 +87,6 @@ func validateHardPodAffinityWeight(path *field.Path, w int32) error {
 	return nil
 }
 
-// ValidateNodeLabelArgs validates that NodeLabelArgs are correct.
-func ValidateNodeLabelArgs(path *field.Path, args *config.NodeLabelArgs) error {
-	var allErrs field.ErrorList
-
-	allErrs = append(allErrs, validateNoConflict(args.PresentLabels, args.AbsentLabels,
-		path.Child("presentLabels"), path.Child("absentLabels"))...)
-	allErrs = append(allErrs, validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference,
-		path.Child("presentLabelsPreference"), path.Child("absentLabelsPreference"))...)
-
-	return allErrs.ToAggregate()
-}
-
-// validateNoConflict validates that presentLabels and absentLabels do not conflict.
-func validateNoConflict(presentLabels, absentLabels []string, presentPath, absentPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	m := make(map[string]int, len(presentLabels)) // label -> index
-	for i, l := range presentLabels {
-		m[l] = i
-	}
-	for i, l := range absentLabels {
-		if j, ok := m[l]; ok {
-			allErrs = append(allErrs, field.Invalid(presentPath.Index(j), l,
-				fmt.Sprintf("conflict with %v", absentPath.Index(i).String())))
-		}
-	}
-	return allErrs
-}
-
 // ValidatePodTopologySpreadArgs validates that PodTopologySpreadArgs are correct.
 // It replicates the validation from pkg/apis/core/validation.validateTopologySpreadConstraints
 // with an additional check for .labelSelector to be nil.
@@ -193,14 +164,6 @@ func validateConstraintNotRepeat(path *field.Path, constraints []v1.TopologySpre
 	return nil
 }
 
-// ValidateRequestedToCapacityRatioArgs validates that RequestedToCapacityRatioArgs are correct.
-func ValidateRequestedToCapacityRatioArgs(path *field.Path, args *config.RequestedToCapacityRatioArgs) error {
-	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
-	allErrs = append(allErrs, validateResourcesNoMax(args.Resources, path.Child("resources"))...)
-	return allErrs.ToAggregate()
-}
-
 func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Path) field.ErrorList {
 	const (
 		minUtilization = 0
@@ -236,28 +199,6 @@ func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Pat
 	}
 
 	return allErrs
-}
-
-// weight of resource is allowed to exceed 100, this is only applicable to `RequestedToCapacityRatio` plugin for backwards compatibility reason.
-func validateResourcesNoMax(resources []config.ResourceSpec, p *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for i, r := range resources {
-		if r.Weight < 1 {
-			allErrs = append(allErrs, field.Invalid(p.Index(i).Child("weight"), r.Weight,
-				fmt.Sprintf("resource weight of %s not in valid range [1, inf)", r.Name)))
-		}
-	}
-	return allErrs
-}
-
-// ValidateNodeResourcesLeastAllocatedArgs validates that NodeResourcesLeastAllocatedArgs are correct.
-func ValidateNodeResourcesLeastAllocatedArgs(path *field.Path, args *config.NodeResourcesLeastAllocatedArgs) error {
-	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
-}
-
-// ValidateNodeResourcesMostAllocatedArgs validates that NodeResourcesMostAllocatedArgs are correct.
-func ValidateNodeResourcesMostAllocatedArgs(path *field.Path, args *config.NodeResourcesMostAllocatedArgs) error {
-	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
 }
 
 func validateResources(resources []config.ResourceSpec, p *field.Path) field.ErrorList {
@@ -365,7 +306,7 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 
 	if args.ScoringStrategy != nil {
 		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, path.Child("resources"))...)
-		if args.ScoringStrategy.RequestedToCapacityRatio != nil && len(args.ScoringStrategy.RequestedToCapacityRatio.Shape) > 0 {
+		if args.ScoringStrategy.RequestedToCapacityRatio != nil {
 			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, path.Child("shape"))...)
 		}
 	}

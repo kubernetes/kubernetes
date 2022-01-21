@@ -62,6 +62,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	resttransport "k8s.io/client-go/transport"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -555,11 +556,9 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
-
 	ns := framework.CreateTestingNamespace("auth-always-deny", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	transport := http.DefaultTransport
+	transport := resttransport.NewBearerAuthRoundTripper(framework.UnprivilegedUserToken, http.DefaultTransport)
 
 	for _, r := range getTestRequests(ns.Name) {
 		bodyBytes := bytes.NewReader([]byte(r.body))

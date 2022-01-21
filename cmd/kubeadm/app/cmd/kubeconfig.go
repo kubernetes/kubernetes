@@ -20,6 +20,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/klog/v2"
@@ -78,6 +79,9 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 		Long:    userKubeconfigLongDesc,
 		Example: userKubeconfigExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(cfgPath) == 0 {
+				return errors.New("the kubeadm configuration path cannot be empty")
+			}
 			// This call returns the ready-to-use configuration based on the defaults populated by flags
 			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 			if err != nil {

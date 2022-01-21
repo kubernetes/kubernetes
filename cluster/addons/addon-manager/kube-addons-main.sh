@@ -37,7 +37,7 @@ log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_IN
 # Wait for the default service account to be created in the kube-system namespace.
 token_found=""
 while [ -z "${token_found}" ]; do
-  sleep .5
+  sleep 0.5
   # shellcheck disable=SC2086
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   if ! token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}"); then

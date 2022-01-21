@@ -246,6 +246,7 @@ func autoConvert_v1_Policy_To_audit_Policy(in *Policy, out *audit.Policy, s conv
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]audit.PolicyRule)(unsafe.Pointer(&in.Rules))
 	out.OmitStages = *(*[]audit.Stage)(unsafe.Pointer(&in.OmitStages))
+	out.OmitManagedFields = in.OmitManagedFields
 	return nil
 }
 
@@ -258,6 +259,7 @@ func autoConvert_audit_Policy_To_v1_Policy(in *audit.Policy, out *Policy, s conv
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]PolicyRule)(unsafe.Pointer(&in.Rules))
 	out.OmitStages = *(*[]Stage)(unsafe.Pointer(&in.OmitStages))
+	out.OmitManagedFields = in.OmitManagedFields
 	return nil
 }
 
@@ -297,6 +299,7 @@ func autoConvert_v1_PolicyRule_To_audit_PolicyRule(in *PolicyRule, out *audit.Po
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
 	out.OmitStages = *(*[]audit.Stage)(unsafe.Pointer(&in.OmitStages))
+	out.OmitManagedFields = (*bool)(unsafe.Pointer(in.OmitManagedFields))
 	return nil
 }
 
@@ -314,6 +317,7 @@ func autoConvert_audit_PolicyRule_To_v1_PolicyRule(in *audit.PolicyRule, out *Po
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
 	out.OmitStages = *(*[]Stage)(unsafe.Pointer(&in.OmitStages))
+	out.OmitManagedFields = (*bool)(unsafe.Pointer(in.OmitManagedFields))
 	return nil
 }
 

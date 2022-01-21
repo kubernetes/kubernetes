@@ -30,8 +30,8 @@ DEFAULT_NPD_VERSION='v0.8.9'
 DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
 # TODO (SergeyKanzhelev): fill up for npd 0.8.9+
 DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
-DEFAULT_CRICTL_VERSION='v1.22.0'
-DEFAULT_CRICTL_SHA512='9ff93e9c15942c39c85dd4e8182b3e9cd47fcb15b1315b0fdfd0d73442a84111e6cf8bb74b586e34b1f382a71107eb7e7820544a98d2224ca6b6dee3ee576222'
+DEFAULT_CRICTL_VERSION='v1.23.0'
+DEFAULT_CRICTL_SHA512='f8c40c66c8d9a85e857399506f4977564890815b02658eec591114e04bd8bc6b8ea08bcc159af0088b5eda7bf0dfd16096bf0c174819c204193fb7343ae7d9d5'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
@@ -187,7 +187,7 @@ function download-or-bust {
 
         echo "Getting the scope of service account configured for VM."
         if ! valid-storage-scope ; then
-          canUseCredentials=$?
+          canUseCredentials=1
           # this behavior is preserved for backward compatibility. We want to fail fast if SA is not available
           # and try to download without SA if scope does not exist on SA
           echo "No service account or service account without storage scope. Attempt to download without service account token."
@@ -199,9 +199,8 @@ function download-or-bust {
           if access_token=$(get-credentials); then
             echo "Service account access token is received. Downloading ${url} using this token."
           else
-            local exit_code=$?
             echo "Cannot get a service account token. Exiting."
-            exit ${exit_code}
+            exit 1
           fi
 
           curl_headers=${access_token:+Authorization: Bearer "${access_token}"}
@@ -341,7 +340,7 @@ function install-crictl {
 
   # Create crictl config file.
   cat > /etc/crictl.yaml <<EOF
-runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/containerd/containerd.sock}
 EOF
 
   if is-preloaded "${crictl}" "${crictl_hash}"; then
@@ -354,6 +353,7 @@ EOF
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
+  rm -f "${crictl}"
 }
 
 function install-exec-auth-plugin {
@@ -584,7 +584,7 @@ function install-containerd-ubuntu {
 }
 
 function ensure-container-runtime {
-  container_runtime="${CONTAINER_RUNTIME:-docker}"
+  container_runtime="${CONTAINER_RUNTIME:-containerd}"
   if [[ "${container_runtime}" == "docker" ]]; then
     if ! command -v docker >/dev/null 2>&1; then
       log-wrap "InstallDocker" install-docker

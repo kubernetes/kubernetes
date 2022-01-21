@@ -22,12 +22,13 @@ package ipvs
 import (
 	"fmt"
 	"reflect"
-	"syscall"
 	"testing"
 
 	netutils "k8s.io/utils/net"
 
 	libipvs "github.com/moby/ipvs"
+
+	"golang.org/x/sys/unix"
 )
 
 func Test_toVirtualServer(t *testing.T) {
@@ -55,14 +56,14 @@ func Test_toVirtualServer(t *testing.T) {
 		},
 		{
 			libipvs.Service{
-				Protocol:      syscall.IPPROTO_TCP,
+				Protocol:      unix.IPPROTO_TCP,
 				Port:          80,
 				FWMark:        0,
 				SchedName:     "",
 				Flags:         uint32(FlagPersistent + FlagHashed),
 				Timeout:       0,
 				Netmask:       0xffffffff,
-				AddressFamily: syscall.AF_INET,
+				AddressFamily: unix.AF_INET,
 				Address:       nil,
 				PEName:        "",
 			},
@@ -79,14 +80,14 @@ func Test_toVirtualServer(t *testing.T) {
 		},
 		{
 			libipvs.Service{
-				Protocol:      syscall.IPPROTO_UDP,
+				Protocol:      unix.IPPROTO_UDP,
 				Port:          33434,
 				FWMark:        0,
 				SchedName:     "wlc",
 				Flags:         uint32(0 + FlagHashed),
 				Timeout:       100,
 				Netmask:       128,
-				AddressFamily: syscall.AF_INET6,
+				AddressFamily: unix.AF_INET6,
 				Address:       netutils.ParseIPSloppy("2012::beef"),
 				PEName:        "",
 			},
@@ -110,7 +111,7 @@ func Test_toVirtualServer(t *testing.T) {
 				Flags:         uint32(0 + FlagHashed),
 				Timeout:       0,
 				Netmask:       0xffffffff,
-				AddressFamily: syscall.AF_INET,
+				AddressFamily: unix.AF_INET,
 				Address:       netutils.ParseIPSloppy("1.2.3.4"),
 				PEName:        "",
 			},
@@ -134,7 +135,7 @@ func Test_toVirtualServer(t *testing.T) {
 				Flags:         uint32(FlagPersistent + FlagHashed),
 				Timeout:       0,
 				Netmask:       128,
-				AddressFamily: syscall.AF_INET6,
+				AddressFamily: unix.AF_INET6,
 				Address:       nil,
 				PEName:        "",
 			},
@@ -151,14 +152,14 @@ func Test_toVirtualServer(t *testing.T) {
 		},
 		{
 			libipvs.Service{
-				Protocol:      syscall.IPPROTO_SCTP,
+				Protocol:      unix.IPPROTO_SCTP,
 				Port:          80,
 				FWMark:        0,
 				SchedName:     "",
 				Flags:         uint32(FlagPersistent + FlagHashed),
 				Timeout:       0,
 				Netmask:       0xffffffff,
-				AddressFamily: syscall.AF_INET,
+				AddressFamily: unix.AF_INET,
 				Address:       nil,
 				PEName:        "",
 			},
@@ -198,14 +199,14 @@ func Test_toIPVSService(t *testing.T) {
 	}{
 		{
 			libipvs.Service{
-				Protocol:      syscall.IPPROTO_TCP,
+				Protocol:      unix.IPPROTO_TCP,
 				Port:          80,
 				FWMark:        0,
 				SchedName:     "",
 				Flags:         0,
 				Timeout:       0,
 				Netmask:       0xffffffff,
-				AddressFamily: syscall.AF_INET,
+				AddressFamily: unix.AF_INET,
 				Address:       netutils.ParseIPSloppy("0.0.0.0"),
 				PEName:        "",
 			},
@@ -220,14 +221,14 @@ func Test_toIPVSService(t *testing.T) {
 		},
 		{
 			libipvs.Service{
-				Protocol:      syscall.IPPROTO_UDP,
+				Protocol:      unix.IPPROTO_UDP,
 				Port:          33434,
 				FWMark:        0,
 				SchedName:     "wlc",
 				Flags:         1234,
 				Timeout:       100,
 				Netmask:       128,
-				AddressFamily: syscall.AF_INET6,
+				AddressFamily: unix.AF_INET6,
 				Address:       netutils.ParseIPSloppy("2012::beef"),
 				PEName:        "",
 			},
@@ -249,7 +250,7 @@ func Test_toIPVSService(t *testing.T) {
 				Flags:         0,
 				Timeout:       0,
 				Netmask:       0xffffffff,
-				AddressFamily: syscall.AF_INET,
+				AddressFamily: unix.AF_INET,
 				Address:       netutils.ParseIPSloppy("1.2.3.4"),
 				PEName:        "",
 			},
@@ -271,7 +272,7 @@ func Test_toIPVSService(t *testing.T) {
 				Flags:         0,
 				Timeout:       0,
 				Netmask:       128,
-				AddressFamily: syscall.AF_INET6,
+				AddressFamily: unix.AF_INET6,
 				Address:       netutils.ParseIPSloppy("::0"),
 				PEName:        "",
 			},
@@ -388,7 +389,7 @@ func Test_stringToProtocol(t *testing.T) {
 		"TCP", "UDP", "ICMP", "SCTP",
 	}
 	expected := []uint16{
-		uint16(syscall.IPPROTO_TCP), uint16(syscall.IPPROTO_UDP), uint16(0), uint16(syscall.IPPROTO_SCTP),
+		uint16(unix.IPPROTO_TCP), uint16(unix.IPPROTO_UDP), uint16(0), uint16(unix.IPPROTO_SCTP),
 	}
 	for i := range tests {
 		got := stringToProtocol(tests[i])
@@ -401,7 +402,7 @@ func Test_stringToProtocol(t *testing.T) {
 
 func Test_protocolToString(t *testing.T) {
 	tests := []Protocol{
-		syscall.IPPROTO_TCP, syscall.IPPROTO_UDP, Protocol(0), syscall.IPPROTO_SCTP,
+		unix.IPPROTO_TCP, unix.IPPROTO_UDP, Protocol(0), unix.IPPROTO_SCTP,
 	}
 	expected := []string{
 		"TCP", "UDP", "", "SCTP",

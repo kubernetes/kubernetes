@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
@@ -68,7 +69,7 @@ func (t *KubeProxyUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
-	err = waitForKubeProxyDaemonSetRunning(c)
+	err = waitForKubeProxyDaemonSetRunning(f, c)
 	framework.ExpectNoError(err)
 }
 
@@ -86,7 +87,7 @@ func (KubeProxyDowngradeTest) Name() string { return "[sig-network] kube-proxy-d
 // Setup verifies kube-proxy DaemonSet is running before upgrade.
 func (t *KubeProxyDowngradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
-	err := waitForKubeProxyDaemonSetRunning(f.ClientSet)
+	err := waitForKubeProxyDaemonSetRunning(f, f.ClientSet)
 	framework.ExpectNoError(err)
 }
 
@@ -170,7 +171,7 @@ func waitForKubeProxyStaticPodsDisappear(c clientset.Interface) error {
 	return nil
 }
 
-func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
+func waitForKubeProxyDaemonSetRunning(f *framework.Framework, c clientset.Interface) error {
 	framework.Logf("Waiting up to %v for kube-proxy DaemonSet running", defaultTestTimeout)
 
 	condition := func() (bool, error) {
@@ -185,19 +186,7 @@ func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
 			return false, nil
 		}
 
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
-		if err != nil {
-			framework.Logf("Failed to get nodes: %v", err)
-			return false, nil
-		}
-
-		numberSchedulableNodes := len(nodes.Items)
-		numberkubeProxyPods := int(daemonSets.Items[0].Status.NumberAvailable)
-		if numberkubeProxyPods != numberSchedulableNodes {
-			framework.Logf("Expect %v kube-proxy DaemonSet pods running, got %v", numberSchedulableNodes, numberkubeProxyPods)
-			return false, nil
-		}
-		return true, nil
+		return e2edaemonset.CheckRunningOnAllNodes(f, &daemonSets.Items[0])
 	}
 
 	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {

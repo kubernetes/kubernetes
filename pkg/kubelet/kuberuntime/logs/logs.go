@@ -34,7 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
@@ -361,6 +361,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
+					defer newF.Close()
 					f.Close()
 					if err := watcher.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
 						klog.ErrorS(err, "Failed to remove file watch", "path", f.Name())

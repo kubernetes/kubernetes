@@ -90,6 +90,7 @@ type StorageClassList struct {
 }
 
 // VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
+// +enum
 type VolumeBindingMode string
 
 const (
@@ -353,8 +354,6 @@ type CSIDriverSpec struct {
 	// Defines if the underlying volume supports changing ownership and
 	// permission of the volume before being mounted.
 	// Refer to the specific FSGroupPolicy values for additional details.
-	// This field is beta, and is only honored by servers
-	// that enable the CSIVolumeFSGroupPolicy feature gate.
 	//
 	// This field is immutable.
 	//

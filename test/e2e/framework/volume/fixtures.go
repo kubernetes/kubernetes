@@ -41,6 +41,7 @@ package volume
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -51,6 +52,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -235,6 +237,73 @@ func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod
 	return pod, ip
 }
 
+// GetVolumeAttachmentName returns the hash value of the provisioner, the config ClientNodeSelection name,
+// and the VolumeAttachment name of the PV that is bound to the PVC with the passed in claimName and claimNamespace.
+func GetVolumeAttachmentName(cs clientset.Interface, config TestConfig, provisioner string, claimName string, claimNamespace string) string {
+	var nodeName string
+	// For provisioning tests, ClientNodeSelection is not set so we do not know the NodeName of the VolumeAttachment of the PV that is
+	// bound to the PVC with the passed in claimName and claimNamespace. We need this NodeName because it is used to generate the
+	// attachmentName that is returned, and used to look up a certain VolumeAttachment in WaitForVolumeAttachmentTerminated.
+	// To get the nodeName of the VolumeAttachment, we get all the VolumeAttachments, look for the VolumeAttachment with a
+	// PersistentVolumeName equal to the PV that is bound to the passed in PVC, and then we get the NodeName from that VolumeAttachment.
+	if config.ClientNodeSelection.Name == "" {
+		claim, _ := cs.CoreV1().PersistentVolumeClaims(claimNamespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+		pvName := claim.Spec.VolumeName
+		volumeAttachments, _ := cs.StorageV1().VolumeAttachments().List(context.TODO(), metav1.ListOptions{})
+		for _, volumeAttachment := range volumeAttachments.Items {
+			if *volumeAttachment.Spec.Source.PersistentVolumeName == pvName {
+				nodeName = volumeAttachment.Spec.NodeName
+				break
+			}
+		}
+	} else {
+		nodeName = config.ClientNodeSelection.Name
+	}
+	handle := getVolumeHandle(cs, claimName, claimNamespace)
+	attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, provisioner, nodeName)))
+	return fmt.Sprintf("csi-%x", attachmentHash)
+}
+
+// getVolumeHandle returns the VolumeHandle of the PV that is bound to the PVC with the passed in claimName and claimNamespace.
+func getVolumeHandle(cs clientset.Interface, claimName string, claimNamespace string) string {
+	// re-get the claim to the latest state with bound volume
+	claim, err := cs.CoreV1().PersistentVolumeClaims(claimNamespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+	if err != nil {
+		framework.ExpectNoError(err, "Cannot get PVC")
+		return ""
+	}
+	pvName := claim.Spec.VolumeName
+	pv, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+	if err != nil {
+		framework.ExpectNoError(err, "Cannot get PV")
+		return ""
+	}
+	if pv.Spec.CSI == nil {
+		gomega.Expect(pv.Spec.CSI).NotTo(gomega.BeNil())
+		return ""
+	}
+	return pv.Spec.CSI.VolumeHandle
+}
+
+// WaitForVolumeAttachmentTerminated waits for the VolumeAttachment with the passed in attachmentName to be terminated.
+func WaitForVolumeAttachmentTerminated(attachmentName string, cs clientset.Interface, timeout time.Duration) error {
+	waitErr := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+		_, err := cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+		if err != nil {
+			// if the volumeattachment object is not found, it means it has been terminated.
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting volume attachment %v to terminate: %v", attachmentName, waitErr)
+	}
+	return nil
+}
+
 // startVolumeServer starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
@@ -368,6 +437,16 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 	var gracePeriod int64 = 1
 	var command string
 
+	/**
+	This condition fixes running storage e2e tests in SELinux environment.
+	HostPath Volume Plugin creates a directory within /tmp on host machine, to be mounted as volume.
+	Inject-pod writes content to the volume, and a client-pod tries the read the contents and verify.
+	When SELinux is enabled on the host, client-pod can not read the content, with permission denied.
+	Invoking client-pod as privileged, so that it can access the volume content, even when SELinux is enabled on the host.
+	*/
+	if config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
+		privileged = true
+	}
 	command = "while true ; do sleep 2; done "
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
 	clientPod := &v1.Pod{
@@ -448,14 +527,14 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 	return clientPod, nil
 }
 
-func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
+func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		if test.Mode == v1.PersistentVolumeBlock {
 			// Block: check content
 			deviceName := fmt.Sprintf("/opt/%d", i)
-			commands := generateReadBlockCmd(deviceName, len(test.ExpectedContent))
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
+			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
@@ -464,7 +543,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 			commands := GenerateReadFileCmd(fileName)
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
 			// Check that a directory has been mounted
@@ -475,14 +554,14 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 				// Filesystem: check fsgroup
 				if fsGroup != nil {
 					ginkgo.By("Checking fsGroup is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
+					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
 				}
 
 				// Filesystem: check fsType
 				if fsType != "" {
 					ginkgo.By("Checking fsType is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
 				}
 			}
@@ -521,7 +600,23 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
-	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
+	testVolumeContent(f, clientPod, "", fsGroup, fsType, tests)
+
+	ginkgo.By("Repeating the test on an ephemeral container (if enabled)")
+	ec := &v1.EphemeralContainer{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon(clientPod.Spec.Containers[0]),
+	}
+	ec.Name = "volume-ephemeral-container"
+	err = f.PodClient().AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
+	// The API server will return NotFound for the subresource when the feature is disabled
+	// BEGIN TODO: remove after EphemeralContainers feature gate is retired
+	if apierrors.IsNotFound(err) {
+		framework.Logf("Skipping ephemeral container re-test because feature is disabled (error: %q)", err)
+		return
+	}
+	// END TODO: remove after EphemeralContainers feature gate is retired
+	framework.ExpectNoError(err, "failed to add ephemeral container for re-test")
+	testVolumeContent(f, clientPod, ec.Name, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
@@ -562,7 +657,7 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
-	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
+	testVolumeContent(f, injectorPod, "", fsGroup, fsType, tests)
 }
 
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
@@ -573,7 +668,7 @@ func generateWriteCmd(content, path string) []string {
 }
 
 // generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
-func generateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
+func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	var commands []string
 	commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
 	return commands

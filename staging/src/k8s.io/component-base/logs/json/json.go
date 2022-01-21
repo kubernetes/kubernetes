@@ -17,6 +17,7 @@ limitations under the License.
 package logs
 
 import (
+	"io"
 	"os"
 	"time"
 
@@ -24,42 +25,103 @@ import (
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs/registry"
 )
 
 var (
-	// JSONLogger is global json log format logr
-	JSONLogger logr.Logger
-
 	// timeNow stubbed out for testing
 	timeNow = time.Now
 )
 
-func init() {
-	JSONLogger = NewJSONLogger(zapcore.Lock(os.Stdout))
-}
+// NewJSONLogger creates a new json logr.Logger and its associated
+// flush function. The separate error stream is optional and may be nil.
+// The encoder config is also optional.
+func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, func()) {
+	if encoderConfig == nil {
+		encoderConfig = &zapcore.EncoderConfig{
+			MessageKey:     "msg",
+			CallerKey:      "caller",
+			TimeKey:        "ts",
+			EncodeTime:     epochMillisTimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		}
+	}
 
-// NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.
-func NewJSONLogger(w zapcore.WriteSyncer) logr.Logger {
-	encoder := zapcore.NewJSONEncoder(encoderConfig)
-	// The log level intentionally gets set as low as possible to
-	// ensure that all messages are printed when this logger gets
-	// called by klog. The actual verbosity check happens in klog.
-	core := zapcore.NewCore(encoder, zapcore.AddSync(w), zapcore.Level(-127))
+	encoder := zapcore.NewJSONEncoder(*encoderConfig)
+	var core zapcore.Core
+	if errorStream == nil {
+		core = zapcore.NewCore(encoder, infoStream, zapcore.Level(-127))
+	} else {
+		highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl >= zapcore.ErrorLevel
+		})
+		lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl < zapcore.ErrorLevel
+		})
+		core = zapcore.NewTee(
+			zapcore.NewCore(encoder, errorStream, highPriority),
+			zapcore.NewCore(encoder, infoStream, lowPriority),
+		)
+	}
 	l := zap.New(core, zap.WithCaller(true))
-	return zapr.NewLoggerWithOptions(l, zapr.LogInfoLevel("v"), zapr.ErrorKey("err"))
-}
-
-var encoderConfig = zapcore.EncoderConfig{
-	MessageKey:     "msg",
-	CallerKey:      "caller",
-	TimeKey:        "ts",
-	EncodeTime:     epochMillisTimeEncoder,
-	EncodeDuration: zapcore.StringDurationEncoder,
-	EncodeCaller:   zapcore.ShortCallerEncoder,
+	return zapr.NewLoggerWithOptions(l, zapr.LogInfoLevel("v"), zapr.ErrorKey("err")), func() {
+		l.Sync()
+	}
 }
 
 func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	nanos := timeNow().UnixNano()
 	millis := float64(nanos) / float64(time.Millisecond)
 	enc.AppendFloat64(millis)
+}
+
+// Factory produces JSON logger instances.
+type Factory struct{}
+
+var _ registry.LogFormatFactory = Factory{}
+
+func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
+	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,
+	// therefore we don't need to flush, and calling the underlying fsync
+	// would just slow down writing.
+	//
+	// The assumption is that logging only needs to ensure that data gets
+	// written to the output stream before the process terminates, but
+	// doesn't need to worry about data not being written because of a
+	// system crash or powerloss.
+	stderr := zapcore.Lock(AddNopSync(os.Stderr))
+	if options.JSON.SplitStream {
+		stdout := zapcore.Lock(AddNopSync(os.Stdout))
+		size := options.JSON.InfoBufferSize.Value()
+		if size > 0 {
+			// Prevent integer overflow.
+			if size > 2*1024*1024*1024 {
+				size = 2 * 1024 * 1024 * 1024
+			}
+			stdout = &zapcore.BufferedWriteSyncer{
+				WS:   stdout,
+				Size: int(size),
+			}
+		}
+		// stdout for info messages, stderr for errors.
+		return NewJSONLogger(stdout, stderr, nil)
+	}
+	// Write info messages and errors to stderr to prevent mixing with normal program output.
+	return NewJSONLogger(stderr, nil, nil)
+}
+
+// AddNoSync adds a NOP Sync implementation.
+func AddNopSync(writer io.Writer) zapcore.WriteSyncer {
+	return nopSync{Writer: writer}
+}
+
+type nopSync struct {
+	io.Writer
+}
+
+func (f nopSync) Sync() error {
+	return nil
 }

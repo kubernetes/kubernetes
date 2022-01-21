@@ -40,7 +40,7 @@ type listWorkEstimator struct {
 	countGetterFn objectCountGetterFunc
 }
 
-func (e *listWorkEstimator) estimate(r *http.Request) WorkEstimate {
+func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
 	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())
 	if !ok {
 		// no RequestInfo should never happen, but to be on the safe side

@@ -19,7 +19,7 @@ package cri
 import (
 	"time"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // RuntimeVersioner contains methods for runtime name, version and API version.

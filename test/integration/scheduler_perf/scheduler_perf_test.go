@@ -134,7 +134,63 @@ type workload struct {
 	// Name of the workload.
 	Name string
 	// Values of parameters used in the workloadTemplate.
-	Params map[string]int
+	Params params
+}
+
+type params struct {
+	params map[string]int
+	// isUsed field records whether params is used or not.
+	isUsed map[string]bool
+}
+
+// UnmarshalJSON is a custom unmarshaler for params.
+//
+// from(json):
+// 	{
+// 		"initNodes": 500,
+// 		"initPods": 50
+// 	}
+//
+// to:
+//	params{
+//		params: map[string]int{
+//			"intNodes": 500,
+//			"initPods": 50,
+//		},
+//		isUsed: map[string]bool{}, // empty map
+//	}
+//
+func (p *params) UnmarshalJSON(b []byte) error {
+	aux := map[string]int{}
+
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+
+	p.params = aux
+	p.isUsed = map[string]bool{}
+	return nil
+}
+
+// get returns param.
+func (p params) get(key string) (int, error) {
+	p.isUsed[key] = true
+	param, ok := p.params[key]
+	if ok {
+		return param, nil
+	}
+	return 0, fmt.Errorf("parameter %s is undefined", key)
+}
+
+// unusedParams returns the names of unusedParams
+func (w workload) unusedParams() []string {
+	var ret []string
+	for name := range w.Params.params {
+		if !w.Params.isUsed[name] {
+			ret = append(ret, name)
+		}
+	}
+	return ret
 }
 
 // op is a dummy struct which stores the real op in itself.
@@ -227,9 +283,10 @@ func (*createNodesOp) collectsMetrics() bool {
 
 func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 	if cno.CountParam != "" {
-		var ok bool
-		if cno.Count, ok = w.Params[cno.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cno.CountParam)
+		var err error
+		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cno, (&cno).isValid(false)
@@ -268,9 +325,10 @@ func (*createNamespacesOp) collectsMetrics() bool {
 
 func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
 	if cmo.CountParam != "" {
-		var ok bool
-		if cmo.Count, ok = w.Params[cmo.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cmo.CountParam)
+		var err error
+		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cmo, (&cmo).isValid(false)
@@ -327,9 +385,10 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 
 func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 	if cpo.CountParam != "" {
-		var ok bool
-		if cpo.Count, ok = w.Params[cpo.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cpo.CountParam)
+		var err error
+		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpo, (&cpo).isValid(false)
@@ -368,9 +427,10 @@ func (cpso *createPodSetsOp) collectsMetrics() bool {
 
 func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
 	if cpso.CountParam != "" {
-		var ok bool
-		if cpso.Count, ok = w.Params[cpso.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cpso.CountParam)
+		var err error
+		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpso, (&cpso).isValid(true)
@@ -753,6 +813,13 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
 		}
 	}
+
+	// check unused params and inform users
+	unusedParams := w.unusedParams()
+	if len(unusedParams) != 0 {
+		b.Fatalf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
+	}
+
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return dataItems

@@ -38,12 +38,12 @@ var _ framework.EnqueueExtensions = &Fit{}
 var _ framework.ScorePlugin = &Fit{}
 
 const (
-	// FitName is the name of the plugin used in the plugin registry and configurations.
-	FitName = names.NodeResourcesFit
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = names.NodeResourcesFit
 
 	// preFilterStateKey is the key in CycleState to NodeResourcesFit pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
-	preFilterStateKey = "PreFilter" + FitName
+	preFilterStateKey = "PreFilter" + Name
 )
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
@@ -51,7 +51,7 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
 		return &resourceAllocationScorer{
-			Name:                LeastAllocatedName,
+			Name:                string(config.LeastAllocated),
 			scorer:              leastResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
 		}
@@ -59,7 +59,7 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
 		return &resourceAllocationScorer{
-			Name:                MostAllocatedName,
+			Name:                string(config.MostAllocated),
 			scorer:              mostResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
 		}
@@ -67,7 +67,7 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
 		return &resourceAllocationScorer{
-			Name:                RequestedToCapacityRatioName,
+			Name:                string(config.RequestedToCapacityRatio),
 			scorer:              requestedToCapacityRatioScorer(resToWeightMap, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
 			resourceToWeightMap: resToWeightMap,
 		}
@@ -100,7 +100,7 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
-	return FitName
+	return Name
 }
 
 // NewFit initializes a new plugin and returns it.
@@ -118,8 +118,8 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 	}
 
 	strategy := args.ScoringStrategy.Type
-	scorePlugin, ok := nodeResourceStrategyTypeMap[strategy]
-	if !ok {
+	scorePlugin, exists := nodeResourceStrategyTypeMap[strategy]
+	if !exists {
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
 	}
 
@@ -229,8 +229,8 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))
-		for _, r := range insufficientResources {
-			failureReasons = append(failureReasons, r.Reason)
+		for i := range insufficientResources {
+			failureReasons = append(failureReasons, insufficientResources[i].Reason)
 		}
 		return framework.NewStatus(framework.Unschedulable, failureReasons...)
 	}

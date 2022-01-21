@@ -7,7 +7,7 @@ filename can be absolute or relative to `--repo-root`. The content of
 the file is used to populate a struct that defines how to test the
 driver. For a full definition of the content see:
 - `struct driverDefinition` in [external.go](./external.go)
-- `struct TestDriver` and the `Cap` capability constants in [testdriver.go](../testsuites/testdriver.go)
+- `struct TestDriver` and the `Cap` capability constants in [testdriver.go](../framework/testdriver.go)
 
 Here is a minimal example for the CSI hostpath driver:
 

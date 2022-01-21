@@ -103,10 +103,11 @@ func (m *PathRecorderMux) ListedPaths() []string {
 }
 
 func (m *PathRecorderMux) trackCallers(path string) {
+	stack := string(debug.Stack())
 	if existingStack, ok := m.pathStacks[path]; ok {
-		utilruntime.HandleError(fmt.Errorf("registered %q from %v", path, existingStack))
+		utilruntime.HandleError(fmt.Errorf("duplicate path registration of %q: original registration from %v\n\nnew registration from %v", path, existingStack, stack))
 	}
-	m.pathStacks[path] = string(debug.Stack())
+	m.pathStacks[path] = stack
 }
 
 // refreshMuxLocked creates a new mux and must be called while locked.  Otherwise the view of handlers may

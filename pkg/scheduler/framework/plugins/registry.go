@@ -25,17 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -54,37 +51,30 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableReadWriteOncePod:             feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		EnableVolumeCapacityPriority:       feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
 		EnableCSIStorageCapacity:           feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
-		EnableGenericEphemeralVolume:       feature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	}
 
 	return runtime.Registry{
-		selectorspread.Name:                        selectorspread.New,
-		imagelocality.Name:                         imagelocality.New,
-		tainttoleration.Name:                       tainttoleration.New,
-		nodename.Name:                              nodename.New,
-		nodeports.Name:                             nodeports.New,
-		nodepreferavoidpods.Name:                   nodepreferavoidpods.New,
-		nodeaffinity.Name:                          nodeaffinity.New,
-		podtopologyspread.Name:                     podtopologyspread.New,
-		nodeunschedulable.Name:                     nodeunschedulable.New,
-		noderesources.FitName:                      runtime.FactoryAdapter(fts, noderesources.NewFit),
-		noderesources.BalancedAllocationName:       runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
-		noderesources.MostAllocatedName:            runtime.FactoryAdapter(fts, noderesources.NewMostAllocated),
-		noderesources.LeastAllocatedName:           runtime.FactoryAdapter(fts, noderesources.NewLeastAllocated),
-		noderesources.RequestedToCapacityRatioName: runtime.FactoryAdapter(fts, noderesources.NewRequestedToCapacityRatio),
-		volumebinding.Name:                         runtime.FactoryAdapter(fts, volumebinding.New),
-		volumerestrictions.Name:                    runtime.FactoryAdapter(fts, volumerestrictions.New),
-		volumezone.Name:                            volumezone.New,
-		nodevolumelimits.CSIName:                   runtime.FactoryAdapter(fts, nodevolumelimits.NewCSI),
-		nodevolumelimits.EBSName:                   runtime.FactoryAdapter(fts, nodevolumelimits.NewEBS),
-		nodevolumelimits.GCEPDName:                 runtime.FactoryAdapter(fts, nodevolumelimits.NewGCEPD),
-		nodevolumelimits.AzureDiskName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewAzureDisk),
-		nodevolumelimits.CinderName:                runtime.FactoryAdapter(fts, nodevolumelimits.NewCinder),
-		interpodaffinity.Name:                      runtime.FactoryAdapter(fts, interpodaffinity.New),
-		nodelabel.Name:                             nodelabel.New,
-		serviceaffinity.Name:                       serviceaffinity.New,
-		queuesort.Name:                             queuesort.New,
-		defaultbinder.Name:                         defaultbinder.New,
-		defaultpreemption.Name:                     runtime.FactoryAdapter(fts, defaultpreemption.New),
+		selectorspread.Name:                  selectorspread.New,
+		imagelocality.Name:                   imagelocality.New,
+		tainttoleration.Name:                 tainttoleration.New,
+		nodename.Name:                        nodename.New,
+		nodeports.Name:                       nodeports.New,
+		nodeaffinity.Name:                    nodeaffinity.New,
+		podtopologyspread.Name:               podtopologyspread.New,
+		nodeunschedulable.Name:               nodeunschedulable.New,
+		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
+		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
+		volumebinding.Name:                   runtime.FactoryAdapter(fts, volumebinding.New),
+		volumerestrictions.Name:              runtime.FactoryAdapter(fts, volumerestrictions.New),
+		volumezone.Name:                      volumezone.New,
+		nodevolumelimits.CSIName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewCSI),
+		nodevolumelimits.EBSName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewEBS),
+		nodevolumelimits.GCEPDName:           runtime.FactoryAdapter(fts, nodevolumelimits.NewGCEPD),
+		nodevolumelimits.AzureDiskName:       runtime.FactoryAdapter(fts, nodevolumelimits.NewAzureDisk),
+		nodevolumelimits.CinderName:          runtime.FactoryAdapter(fts, nodevolumelimits.NewCinder),
+		interpodaffinity.Name:                runtime.FactoryAdapter(fts, interpodaffinity.New),
+		queuesort.Name:                       queuesort.New,
+		defaultbinder.Name:                   defaultbinder.New,
+		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
 	}
 }

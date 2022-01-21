@@ -74,7 +74,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
 	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
-	go w.process(context.Background(), initEvents, 0)
+	go w.processEvents(context.Background(), initEvents, 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
 		lock.RLock()
@@ -194,7 +194,7 @@ TestCase:
 		}
 
 		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
-		go w.process(context.Background(), testCase.events, 0)
+		go w.processEvents(context.Background(), testCase.events, 0)
 
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
@@ -306,9 +306,6 @@ func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *
 	return fmt.Errorf("unimplemented")
 }
 func (d *dummyStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
-	return newDummyWatch(), nil
-}
-func (d *dummyStorage) WatchList(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
 	return newDummyWatch(), nil
 }
 func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
@@ -545,7 +542,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, objectType, "")
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
 		ctx, _ := context.WithDeadline(context.Background(), deadline)
-		go w.process(ctx, nil, 0)
+		go w.processEvents(ctx, nil, 0)
 		select {
 		case <-w.ResultChan():
 		case <-time.After(time.Second):

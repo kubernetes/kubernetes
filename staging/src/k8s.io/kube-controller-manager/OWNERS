@@ -1,15 +1,15 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- deads2k
-- luxas
-- mtaufen
-- sttts
-- stewart-yu
+  - deads2k
+  - luxas
+  - mtaufen
+  - sttts
 reviewers:
-- deads2k
-- luxas
-- mtaufen
-- sttts
-- stewart-yu
-- cheftako
+  - deads2k
+  - luxas
+  - mtaufen
+  - sttts
+  - cheftako
+emeritus_approvers:
+  - stewart-yu

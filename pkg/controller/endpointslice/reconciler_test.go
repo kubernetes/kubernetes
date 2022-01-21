@@ -516,7 +516,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	endpointSlices := fetchEndpointSlices(t, client, namespace)
 	for _, endpointSlice := range endpointSlices {
 		for i, endpoint := range endpointSlice.Endpoints {
-			if !*endpoint.Conditions.Ready {
+			if !endpointsliceutil.EndpointReady(endpoint) {
 				t.Errorf("Expected endpoints[%d] to be ready", i)
 			}
 		}

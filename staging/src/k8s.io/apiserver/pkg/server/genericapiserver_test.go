@@ -485,6 +485,39 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	}
 }
 
+func TestMuxAndDiscoveryCompleteSignals(t *testing.T) {
+	// setup
+	cfg, assert := setUp(t)
+
+	// scenario 1: single server with some signals
+	root, err := cfg.Complete(nil).New("rootServer", NewEmptyDelegate())
+	assert.NoError(err)
+	if len(root.MuxAndDiscoveryCompleteSignals()) != 0 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the root server", root.MuxAndDiscoveryCompleteSignals()))
+	}
+	root.RegisterMuxAndDiscoveryCompleteSignal("rootTestSignal", make(chan struct{}))
+	if len(root.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the root server", root.MuxAndDiscoveryCompleteSignals()))
+	}
+
+	// scenario 2: multiple servers with some signals
+	delegate, err := cfg.Complete(nil).New("delegateServer", NewEmptyDelegate())
+	assert.NoError(err)
+	delegate.RegisterMuxAndDiscoveryCompleteSignal("delegateTestSignal", make(chan struct{}))
+	if len(delegate.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the delegate server", delegate.MuxAndDiscoveryCompleteSignals()))
+	}
+	newRoot, err := cfg.Complete(nil).New("newRootServer", delegate)
+	assert.NoError(err)
+	if len(newRoot.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the newRoot server", newRoot.MuxAndDiscoveryCompleteSignals()))
+	}
+	newRoot.RegisterMuxAndDiscoveryCompleteSignal("newRootTestSignal", make(chan struct{}))
+	if len(newRoot.MuxAndDiscoveryCompleteSignals()) != 2 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the newRoot server", newRoot.MuxAndDiscoveryCompleteSignals()))
+	}
+}
+
 type mockAuthorizer struct {
 	lastURI string
 }

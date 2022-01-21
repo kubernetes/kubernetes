@@ -20,7 +20,6 @@ import (
 	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -33,9 +32,6 @@ const (
 
 	// userKey is the context key for the request user.
 	userKey
-
-	// auditKey is the context key for the audit event.
-	auditKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -79,15 +75,4 @@ func WithUser(parent context.Context, user user.Info) context.Context {
 func UserFrom(ctx context.Context) (user.Info, bool) {
 	user, ok := ctx.Value(userKey).(user.Info)
 	return user, ok
-}
-
-// WithAuditEvent returns set audit event struct.
-func WithAuditEvent(parent context.Context, ev *audit.Event) context.Context {
-	return WithValue(parent, auditKey, ev)
-}
-
-// AuditEventFrom returns the audit event struct on the ctx
-func AuditEventFrom(ctx context.Context) *audit.Event {
-	ev, _ := ctx.Value(auditKey).(*audit.Event)
-	return ev
 }

@@ -30,12 +30,23 @@ const (
 	minimumSeats = 1
 
 	// the maximum number of seats a request can occupy
+	//
+	// NOTE: work_estimate_seats_samples metric uses the value of maximumSeats
+	// as the upper bound, so when we change maximumSeats we should also
+	// update the buckets of the metric.
 	maximumSeats = 10
 )
 
+// WorkEstimate carries three of the four parameters that determine the work in a request.
+// The fourth parameter is the duration of the initial phase of execution.
 type WorkEstimate struct {
-	// InitialSeats represents the number of initial seats associated with this request
+	// InitialSeats is the number of seats occupied while the server is
+	// executing this request.
 	InitialSeats uint
+
+	// FinalSeats is the number of seats occupied at the end,
+	// during the AdditionalLatency.
+	FinalSeats uint
 
 	// AdditionalLatency specifies the additional duration the seats allocated
 	// to this request must be reserved after the given request had finished.
@@ -44,16 +55,31 @@ type WorkEstimate struct {
 	AdditionalLatency time.Duration
 }
 
+// MaxSeats returns the maximum number of seats the request occupies over the
+// phases of being served.
+func (we *WorkEstimate) MaxSeats() int {
+	if we.InitialSeats >= we.FinalSeats {
+		return int(we.InitialSeats)
+	}
+
+	return int(we.FinalSeats)
+}
+
 // objectCountGetterFunc represents a function that gets the total
 // number of objects for a given resource.
 type objectCountGetterFunc func(string) (int64, error)
 
+// watchCountGetterFunc represents a function that gets the total
+// number of watchers potentially interested in a given request.
+type watchCountGetterFunc func(*apirequest.RequestInfo) int
+
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
-func NewWorkEstimator(countFn objectCountGetterFunc) WorkEstimatorFunc {
+func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
-		listWorkEstimator: newListWorkEstimator(countFn),
+		listWorkEstimator:     newListWorkEstimator(objectCountFn),
+		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn),
 	}
 	return estimator.estimate
 }
@@ -61,18 +87,20 @@ func NewWorkEstimator(countFn objectCountGetterFunc) WorkEstimatorFunc {
 // WorkEstimatorFunc returns the estimated work of a given request.
 // This function will be used by the Priority & Fairness filter to
 // estimate the work of of incoming requests.
-type WorkEstimatorFunc func(*http.Request) WorkEstimate
+type WorkEstimatorFunc func(request *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate
 
-func (e WorkEstimatorFunc) EstimateWork(r *http.Request) WorkEstimate {
-	return e(r)
+func (e WorkEstimatorFunc) EstimateWork(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
+	return e(r, flowSchemaName, priorityLevelName)
 }
 
 type workEstimator struct {
 	// listWorkEstimator estimates work for list request(s)
 	listWorkEstimator WorkEstimatorFunc
+	// mutatingWorkEstimator calculates the width of mutating request(s)
+	mutatingWorkEstimator WorkEstimatorFunc
 }
 
-func (e *workEstimator) estimate(r *http.Request) WorkEstimate {
+func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
 	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())
 	if !ok {
 		klog.ErrorS(fmt.Errorf("no RequestInfo found in context"), "Failed to estimate work for the request", "URI", r.RequestURI)
@@ -82,7 +110,9 @@ func (e *workEstimator) estimate(r *http.Request) WorkEstimate {
 
 	switch requestInfo.Verb {
 	case "list":
-		return e.listWorkEstimator.EstimateWork(r)
+		return e.listWorkEstimator.EstimateWork(r, flowSchemaName, priorityLevelName)
+	case "create", "update", "patch", "delete":
+		return e.mutatingWorkEstimator.EstimateWork(r, flowSchemaName, priorityLevelName)
 	}
 
 	return WorkEstimate{InitialSeats: minimumSeats}

@@ -263,3 +263,8 @@ func (e *Encoder) Snapshot() encoderState {
 func (e *Encoder) Reset(es encoderState) {
 	e.encoderState = es
 }
+
+// AppendString appends the escaped form of the input string to b.
+func AppendString(b []byte, s string) []byte {
+	return appendString(b, s, false)
+}

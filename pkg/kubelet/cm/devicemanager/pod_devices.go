@@ -344,18 +344,20 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 		devicePluginMap := make(map[string]pluginapi.Device)
 		for numaid, devlist := range allocateInfo.deviceIds {
 			for _, devId := range devlist {
-				NUMANodes := []*pluginapi.NUMANode{{ID: numaid}}
-				if pDev, ok := devicePluginMap[devId]; ok && pDev.Topology != nil {
-					if nodes := pDev.Topology.GetNodes(); nodes != nil {
-						NUMANodes = append(NUMANodes, nodes...)
+				var topology *pluginapi.TopologyInfo
+				if numaid != nodeWithoutTopology {
+					NUMANodes := []*pluginapi.NUMANode{{ID: numaid}}
+					if pDev, ok := devicePluginMap[devId]; ok && pDev.Topology != nil {
+						if nodes := pDev.Topology.GetNodes(); nodes != nil {
+							NUMANodes = append(NUMANodes, nodes...)
+						}
 					}
-				}
 
-				devicePluginMap[devId] = pluginapi.Device{
 					// ID and Healthy are not relevant here.
-					Topology: &pluginapi.TopologyInfo{
-						Nodes: NUMANodes,
-					},
+					topology = &pluginapi.TopologyInfo{Nodes: NUMANodes}
+				}
+				devicePluginMap[devId] = pluginapi.Device{
+					Topology: topology,
 				}
 			}
 		}

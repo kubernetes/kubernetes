@@ -23,8 +23,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var writer = zapcore.AddSync(&writeSyncer{})
+
 func BenchmarkInfoLoggerInfo(b *testing.B) {
-	logger := NewJSONLogger(zapcore.AddSync(&writeSyncer{}))
+	logger, _ := NewJSONLogger(writer, nil, nil)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -53,7 +55,7 @@ func BenchmarkInfoLoggerInfo(b *testing.B) {
 }
 
 func BenchmarkZapLoggerError(b *testing.B) {
-	logger := NewJSONLogger(zapcore.AddSync(&writeSyncer{}))
+	logger, _ := NewJSONLogger(writer, nil, nil)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -83,7 +85,7 @@ func BenchmarkZapLoggerError(b *testing.B) {
 }
 
 func BenchmarkZapLoggerV(b *testing.B) {
-	logger := NewJSONLogger(zapcore.AddSync(&writeSyncer{}))
+	logger, _ := NewJSONLogger(writer, nil, nil)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

@@ -263,7 +263,7 @@ type FsInfo struct {
 }
 
 type RequestOptions struct {
-	// Type of container identifier specified - "name", "dockerid", dockeralias"
+	// Type of container identifier specified - TypeName (default) or TypeDocker
 	IdType string `json:"type"`
 	// Number of stats to return
 	Count int `json:"count"`

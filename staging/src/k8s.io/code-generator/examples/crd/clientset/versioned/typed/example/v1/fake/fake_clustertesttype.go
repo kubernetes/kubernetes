@@ -111,7 +111,7 @@ func (c *FakeClusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType
 // Delete takes name of the clusterTestType and deletes it. Returns an error if one occurs.
 func (c *FakeClusterTestTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clustertesttypesResource, name), &examplev1.ClusterTestType{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clustertesttypesResource, name, opts), &examplev1.ClusterTestType{})
 	return err
 }
 

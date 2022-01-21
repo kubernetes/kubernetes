@@ -217,7 +217,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			kubelet.setCachedMachineInfo(machineInfo)
 
 			expectedNode := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
 				Spec:       v1.NodeSpec{},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -395,7 +395,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubelet.setCachedMachineInfo(machineInfo)
 
 	expectedNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -601,7 +601,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	kubelet.setCachedMachineInfo(machineInfo)
 
 	expectedNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -822,7 +822,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 
 	now := metav1.NewTime(clock.Now()).Rfc3339Copy()
 	expectedNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -1033,13 +1033,13 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 	}{
 		{
 			desc:         "no volumes and no update",
-			existingNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+			existingNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}}},
 		},
 		{
 			desc:            "volumes inuse on node and volumeManager",
 			existingVolumes: []v1.UniqueVolumeName{"vol1"},
 			existingNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
 				Status: v1.NodeStatus{
 					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
 				},
@@ -1054,14 +1054,14 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
 				},
 			},
-			expectedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+			expectedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}}},
 		},
 		{
 			desc:            "volumes inuse in volumeManager but not on node",
 			existingVolumes: []v1.UniqueVolumeName{"vol1"},
 			existingNode:    &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
 			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
 				Status: v1.NodeStatus{
 					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
 				},
@@ -2819,7 +2819,7 @@ func TestUpdateNodeAddresses(t *testing.T) {
 				},
 			}
 			expectedNode := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}},
 				Spec:       v1.NodeSpec{},
 				Status: v1.NodeStatus{
 					Addresses: test.After,

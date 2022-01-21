@@ -108,7 +108,7 @@ func (c *FakeLimitRanges) Update(ctx context.Context, limitRange *corev1.LimitRa
 // Delete takes name of the limitRange and deletes it. Returns an error if one occurs.
 func (c *FakeLimitRanges) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(limitrangesResource, c.ns, name), &corev1.LimitRange{})
+		Invokes(testing.NewDeleteActionWithOptions(limitrangesResource, c.ns, name, opts), &corev1.LimitRange{})
 
 	return err
 }

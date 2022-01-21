@@ -104,7 +104,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 					handler       string
 				)
 				ginkgo.By("Creating a RuntimeClass with Overhead definied", func() {
-					handler = e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
+					handler = e2enode.PreconfiguredRuntimeClassHandler
 					rc := &nodev1.RuntimeClass{
 						ObjectMeta: metav1.ObjectMeta{Name: handler},
 						Handler:    handler,

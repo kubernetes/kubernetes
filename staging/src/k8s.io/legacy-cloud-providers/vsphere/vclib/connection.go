@@ -206,10 +206,11 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 	if err != nil {
 		return nil, err
 	}
-	if klog.V(3).Enabled() {
+	klogV := klog.V(3)
+	if klogV.Enabled() {
 		s, err := session.NewManager(client).UserSession(ctx)
 		if err == nil {
-			klog.Infof("New session ID for '%s' = %s", s.UserName, s.Key)
+			klogV.Infof("New session ID for '%s' = %s", s.UserName, s.Key)
 		}
 	}
 

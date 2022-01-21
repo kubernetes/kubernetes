@@ -54,7 +54,7 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(textCtx.ctx.Done())
+	go ctrl.Run(context.TODO())
 
 	// Start informer factory after all controllers are configured and running.
 	informerFactory.Start(textCtx.ctx.Done())

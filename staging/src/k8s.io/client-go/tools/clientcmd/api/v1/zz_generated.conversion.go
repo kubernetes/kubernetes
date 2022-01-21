@@ -167,6 +167,7 @@ func autoConvert_v1_AuthInfo_To_api_AuthInfo(in *AuthInfo, out *api.AuthInfo, s 
 	out.Token = in.Token
 	out.TokenFile = in.TokenFile
 	out.Impersonate = in.Impersonate
+	out.ImpersonateUID = in.ImpersonateUID
 	out.ImpersonateGroups = *(*[]string)(unsafe.Pointer(&in.ImpersonateGroups))
 	out.ImpersonateUserExtra = *(*map[string][]string)(unsafe.Pointer(&in.ImpersonateUserExtra))
 	out.Username = in.Username
@@ -201,6 +202,7 @@ func autoConvert_api_AuthInfo_To_v1_AuthInfo(in *api.AuthInfo, out *AuthInfo, s 
 	out.Token = in.Token
 	out.TokenFile = in.TokenFile
 	out.Impersonate = in.Impersonate
+	out.ImpersonateUID = in.ImpersonateUID
 	out.ImpersonateGroups = *(*[]string)(unsafe.Pointer(&in.ImpersonateGroups))
 	out.ImpersonateUserExtra = *(*map[string][]string)(unsafe.Pointer(&in.ImpersonateUserExtra))
 	out.Username = in.Username

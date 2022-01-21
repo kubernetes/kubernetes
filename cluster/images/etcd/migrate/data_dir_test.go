@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -156,7 +155,7 @@ func TestBackup(t *testing.T) {
 }
 
 func newTestPath(t *testing.T) string {
-	path, err := ioutil.TempDir("", "etcd-migrate-test-")
+	path, err := os.MkdirTemp("", "etcd-migrate-test-")
 	if err != nil {
 		t.Fatalf("Failed to create tmp dir for test: %v", err)
 	}

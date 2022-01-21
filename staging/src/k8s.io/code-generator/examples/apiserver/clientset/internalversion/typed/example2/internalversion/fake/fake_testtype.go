@@ -110,7 +110,7 @@ func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *example2.Tes
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *FakeTestTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(testtypesResource, name), &example2.TestType{})
+		Invokes(testing.NewRootDeleteActionWithOptions(testtypesResource, name, opts), &example2.TestType{})
 	return err
 }
 

@@ -123,3 +123,21 @@ func InsertPathPart(path string, pos int, part string) string {
 	result[pos] = part
 	return PathJoin(append(result, parts[pos:]...))
 }
+
+func IsHiddenFilePath(pattern string) bool {
+	return strings.HasPrefix(filepath.Base(pattern), ".")
+}
+
+// Removes paths containing hidden files/folders from a list of paths
+func RemoveHiddenFiles(paths []string) []string {
+	if len(paths) == 0 {
+		return paths
+	}
+	var result []string
+	for _, path := range paths {
+		if !IsHiddenFilePath(path) {
+			result = append(result, path)
+		}
+	}
+	return result
+}

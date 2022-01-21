@@ -11,4 +11,4 @@ approvers:
 emeritus_approvers:
   - eparis
 labels:
-- sig/network
+  - sig/network

@@ -23,10 +23,11 @@ import (
 	"path"
 	"strings"
 
+	inotify "k8s.io/utils/inotify"
+
 	"github.com/google/cadvisor/container/common"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/watcher"
-	inotify "k8s.io/utils/inotify"
 
 	"k8s.io/klog/v2"
 )
@@ -34,8 +35,6 @@ import (
 type rawContainerWatcher struct {
 	// Absolute path to the root of the cgroup hierarchies
 	cgroupPaths map[string]string
-
-	cgroupSubsystems *libcontainer.CgroupSubsystems
 
 	// Inotify event watcher.
 	watcher *common.InotifyWatcher
@@ -45,11 +44,11 @@ type rawContainerWatcher struct {
 }
 
 func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
-	cgroupSubsystems, err := libcontainer.GetAllCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
-	if len(cgroupSubsystems.Mounts) == 0 {
+	if len(cgroupSubsystems) == 0 {
 		return nil, fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
@@ -59,10 +58,9 @@ func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
 	}
 
 	rawWatcher := &rawContainerWatcher{
-		cgroupPaths:      common.MakeCgroupPaths(cgroupSubsystems.MountPoints, "/"),
-		cgroupSubsystems: &cgroupSubsystems,
-		watcher:          watcher,
-		stopWatcher:      make(chan error),
+		cgroupPaths: cgroupSubsystems,
+		watcher:     watcher,
+		stopWatcher: make(chan error),
 	}
 
 	return rawWatcher, nil
@@ -195,8 +193,8 @@ func (w *rawContainerWatcher) processEvent(event *inotify.Event, events chan wat
 
 	// Derive the container name from the path name.
 	var containerName string
-	for _, mount := range w.cgroupSubsystems.Mounts {
-		mountLocation := path.Clean(mount.Mountpoint) + "/"
+	for _, mount := range w.cgroupPaths {
+		mountLocation := path.Clean(mount) + "/"
 		if strings.HasPrefix(event.Name, mountLocation) {
 			containerName = event.Name[len(mountLocation)-1:]
 			break

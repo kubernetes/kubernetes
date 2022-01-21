@@ -50,7 +50,7 @@ func StorageWithCacher() generic.StorageDecorator {
 			return s, d, err
 		}
 		if klog.V(5).Enabled() {
-			klog.InfoS("Storage caching is enabled", objectTypeToArgs(newFunc())...)
+			klog.V(5).InfoS("Storage caching is enabled", objectTypeToArgs(newFunc())...)
 		}
 
 		cacherConfig := cacherstorage.Config{

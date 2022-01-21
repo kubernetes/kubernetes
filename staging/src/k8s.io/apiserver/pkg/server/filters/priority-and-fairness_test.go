@@ -70,7 +70,7 @@ const (
 	decisionSkipFilter
 )
 
-var defaultRequestWorkEstimator = func(*http.Request) fcrequest.WorkEstimate {
+var defaultRequestWorkEstimator = func(req *http.Request, fsName, plName string) fcrequest.WorkEstimate {
 	return fcrequest.WorkEstimate{InitialSeats: 1}
 }
 
@@ -88,6 +88,7 @@ func (t fakeApfFilter) MaintainObservations(stopCh <-chan struct{}) {
 func (t fakeApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
 	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	workEstimator func() fcrequest.WorkEstimate,
 	queueNoteFn fq.QueueNoteFn,
 	execFn func(),
 ) {
@@ -391,6 +392,7 @@ func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
 func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
 	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	_ func() fcrequest.WorkEstimate,
 	_ fq.QueueNoteFn,
 	execFn func(),
 ) {
@@ -635,14 +637,18 @@ func TestContextClosesOnRequestProcessed(t *testing.T) {
 type fakeFilterRequestDigest struct {
 	*fakeApfFilter
 	requestDigestGot *utilflowcontrol.RequestDigest
+	workEstimateGot  fcrequest.WorkEstimate
 }
 
 func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	workEstimator func() fcrequest.WorkEstimate,
 	_ fq.QueueNoteFn, _ func(),
 ) {
 	f.requestDigestGot = &requestDigest
+	noteFn(bootstrap.MandatoryFlowSchemaCatchAll, bootstrap.MandatoryPriorityLevelConfigurationCatchAll, "")
+	f.workEstimateGot = workEstimator()
 }
 
 func TestApfWithRequestDigest(t *testing.T) {
@@ -652,15 +658,17 @@ func TestApfWithRequestDigest(t *testing.T) {
 	reqDigestExpected := &utilflowcontrol.RequestDigest{
 		RequestInfo: &apirequest.RequestInfo{Verb: "get"},
 		User:        &user.DefaultInfo{Name: "foo"},
-		WorkEstimate: fcrequest.WorkEstimate{
-			InitialSeats: 5,
-		},
+	}
+	workExpected := fcrequest.WorkEstimate{
+		InitialSeats:      5,
+		FinalSeats:        7,
+		AdditionalLatency: 3 * time.Second,
 	}
 
 	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
 		longRunningFunc,
 		fakeFilter,
-		func(_ *http.Request) fcrequest.WorkEstimate { return reqDigestExpected.WorkEstimate },
+		func(_ *http.Request, _, _ string) fcrequest.WorkEstimate { return workExpected },
 	)
 
 	w := httptest.NewRecorder()
@@ -675,6 +683,9 @@ func TestApfWithRequestDigest(t *testing.T) {
 
 	if !reflect.DeepEqual(reqDigestExpected, fakeFilter.requestDigestGot) {
 		t.Errorf("Expected RequestDigest to match, diff: %s", cmp.Diff(reqDigestExpected, fakeFilter.requestDigestGot))
+	}
+	if !reflect.DeepEqual(workExpected, fakeFilter.workEstimateGot) {
+		t.Errorf("Expected WorkEstimate to match, diff: %s", cmp.Diff(workExpected, fakeFilter.workEstimateGot))
 	}
 }
 

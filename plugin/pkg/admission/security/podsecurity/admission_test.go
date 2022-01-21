@@ -18,16 +18,20 @@ package podsecurity
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -37,6 +41,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
 
@@ -115,7 +120,7 @@ func BenchmarkVerifyPod(b *testing.B) {
 
 	corePod := &core.Pod{}
 	v1Pod := &corev1.Pod{}
-	data, err := ioutil.ReadFile("testdata/pod.yaml")
+	data, err := ioutil.ReadFile("testdata/pod_restricted.yaml")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -181,3 +186,132 @@ func BenchmarkVerifyPod(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkVerifyNamespace(b *testing.B) {
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.PodSecurity, true)()
+
+	p, err := newPlugin(nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	p.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+
+	namespace := "enforce"
+	enforceNamespaceBaselineV1 := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "baseline"}}}
+	enforceNamespaceRestrictedV1 := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace, Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}}
+
+	enforceNamespaceBaselineCore := &core.Namespace{}
+	if err := v1.Convert_v1_Namespace_To_core_Namespace(enforceNamespaceBaselineV1, enforceNamespaceBaselineCore, nil); err != nil {
+		b.Fatal(err)
+	}
+	enforceNamespaceRestrictedCore := &core.Namespace{}
+	if err := v1.Convert_v1_Namespace_To_core_Namespace(enforceNamespaceRestrictedV1, enforceNamespaceRestrictedCore, nil); err != nil {
+		b.Fatal(err)
+	}
+
+	v1Pod := &corev1.Pod{}
+	data, err := ioutil.ReadFile("testdata/pod_baseline.yaml")
+	if err != nil {
+		b.Fatal(err)
+	}
+	if err := yaml.Unmarshal(data, v1Pod); err != nil {
+		b.Fatal(err)
+	}
+
+	// https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md#kubernetes-thresholds
+	ownerA := metav1.OwnerReference{
+		APIVersion: "apps/v1",
+		Kind:       "ReplicaSet",
+		Name:       "myapp-123123",
+		UID:        types.UID("7610a7f4-8f80-4f88-95b5-6cefdd8e9dbd"),
+		Controller: pointer.Bool(true),
+	}
+	ownerB := metav1.OwnerReference{
+		APIVersion: "apps/v1",
+		Kind:       "ReplicaSet",
+		Name:       "myapp-234234",
+		UID:        types.UID("7610a7f4-8f80-4f88-95b5-as765as76f55"),
+		Controller: pointer.Bool(true),
+	}
+
+	// number of warnings printed for the entire namespace
+	namespaceWarningCount := 1
+
+	podCount := 3000
+	objects := make([]runtime.Object, 0, podCount+1)
+	objects = append(objects, enforceNamespaceBaselineV1)
+	for i := 0; i < podCount; i++ {
+		v1PodCopy := v1Pod.DeepCopy()
+		v1PodCopy.Name = fmt.Sprintf("pod%d", i)
+		v1PodCopy.UID = types.UID(fmt.Sprintf("pod%d", i))
+		v1PodCopy.Namespace = namespace
+		switch i % 3 {
+		case 0:
+			v1PodCopy.OwnerReferences = []metav1.OwnerReference{ownerA}
+		case 1:
+			v1PodCopy.OwnerReferences = []metav1.OwnerReference{ownerB}
+		default:
+			// no owner references
+		}
+		objects = append(objects, v1PodCopy)
+	}
+
+	c := fake.NewSimpleClientset(
+		objects...,
+	)
+	p.SetExternalKubeClientSet(c)
+
+	informerFactory := informers.NewSharedInformerFactory(c, 0)
+	p.SetExternalKubeInformerFactory(informerFactory)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
+	informerFactory.WaitForCacheSync(stopCh)
+
+	if err := p.ValidateInitialization(); err != nil {
+		b.Fatal(err)
+	}
+
+	ctx := context.Background()
+	attrs := admission.NewAttributesRecord(
+		enforceNamespaceRestrictedCore.DeepCopy(), enforceNamespaceBaselineCore.DeepCopy(),
+		schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"},
+		namespace, namespace,
+		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"},
+		"",
+		admission.Update, &metav1.UpdateOptions{}, false,
+		&user.DefaultInfo{Name: "myuser"},
+	)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dc := dummyRecorder{agent: "", text: ""}
+		ctxWithRecorder := warning.WithWarningRecorder(ctx, &dc)
+		if err := p.Validate(ctxWithRecorder, attrs, nil); err != nil {
+			b.Fatal(err)
+		}
+		// should either be a single aggregated warning, or a unique warning per pod
+		if dc.count != (1+namespaceWarningCount) && dc.count != (podCount+namespaceWarningCount) {
+			b.Fatalf("expected either %d or %d warnings, got %d", 1+namespaceWarningCount, podCount+namespaceWarningCount, dc.count)
+		}
+		// warning should contain the runAsNonRoot issue
+		if e, a := "runAsNonRoot", dc.text; !strings.Contains(a, e) {
+			b.Fatalf("expected warning containing %q, got %q", e, a)
+		}
+	}
+}
+
+type dummyRecorder struct {
+	count int
+	agent string
+	text  string
+}
+
+func (r *dummyRecorder) AddWarning(agent, text string) {
+	r.count++
+	r.agent = agent
+	r.text = text
+	return
+}
+
+var _ warning.Recorder = &dummyRecorder{}

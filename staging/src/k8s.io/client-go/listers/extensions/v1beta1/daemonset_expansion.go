@@ -61,8 +61,8 @@ func (s *daemonSetLister) GetPodDaemonSets(pod *v1.Pod) ([]*v1beta1.DaemonSet, e
 		}
 		selector, err = metav1.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
-			// this should not happen if the DaemonSet passed validation
-			return nil, err
+			// This object has an invalid selector, it does not match the pod
+			continue
 		}
 
 		// If a daemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
@@ -97,7 +97,8 @@ func (s *daemonSetLister) GetHistoryDaemonSets(history *apps.ControllerRevision)
 	for _, ds := range list {
 		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
+			// This object has an invalid selector, it does not match the history object
+			continue
 		}
 		// If a DaemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(history.Labels)) {

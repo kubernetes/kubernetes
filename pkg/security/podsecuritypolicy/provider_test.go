@@ -1417,7 +1417,6 @@ func moveContainersToEphemeral(in *api.Pod) *api.Pod {
 // the FSTypeAll wildcard.
 func TestValidateAllowedVolumes(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
 
 	val := reflect.ValueOf(api.VolumeSource{})
 

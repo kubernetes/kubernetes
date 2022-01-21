@@ -18,7 +18,6 @@ package openapi
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,12 +44,6 @@ func TestGetDefinitionName(t *testing.T) {
 	// "k8s.io/kubernetes/vendor" prefix.
 	typePkgName := "k8s.io/apiserver/pkg/endpoints/openapi/testing.TestType"
 	typeFriendlyName := "io.k8s.apiserver.pkg.endpoints.openapi.testing.TestType"
-	if strings.HasSuffix(reflect.TypeOf(testType).PkgPath(), "go_default_test") {
-		// the test is running inside bazel where the package name is changed and
-		// "go_default_test" will add to package path.
-		typePkgName = "k8s.io/apiserver/pkg/endpoints/openapi/testing/go_default_test.TestType"
-		typeFriendlyName = "io.k8s.apiserver.pkg.endpoints.openapi.testing.go_default_test.TestType"
-	}
 	s := runtime.NewScheme()
 	s.AddKnownTypeWithName(testType.GroupVersionKind(), &testType)
 	namer := NewDefinitionNamer(s)

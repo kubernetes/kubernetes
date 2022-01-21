@@ -193,3 +193,60 @@ func TestIsInBackOffSinceUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestBackoffWithJitter(t *testing.T) {
+	id := "_idJitter"
+	tc := testingclock.NewFakeClock(time.Now())
+
+	// test setup: we show 11 iterations, series of delays we expect with
+	// a jitter factor of zero each time:
+	// 100ms  200ms  400ms  800ms  1.6s  3.2s  06.4s  12.8s  25.6s  51.2s  1m42s
+	// and with jitter factor of 0.1 (max) each time:
+	// 110ms  231ms  485ms  1.0s   2.1s  4.4s  09.4s  19.8s  41.6s  1m27s  2m6s
+	//
+	// with the following configuration, it is guaranteed that the maximum delay
+	// will be reached even though we are unlucky and get jitter factor of zero.
+	// This ensures that this test covers the code path for checking whether
+	// maximum delay has been reached with jitter enabled.
+	initial := 100 * time.Millisecond
+	maxDuration := time.Minute
+	maxJitterFactor := 0.1
+	attempts := 10
+
+	b := NewFakeBackOffWithJitter(initial, maxDuration, tc, maxJitterFactor)
+
+	assert := func(t *testing.T, factor int, prevDelayGot, curDelayGot time.Duration) {
+		low := time.Duration((float64(prevDelayGot) * float64(factor)))
+		high := low + time.Duration(maxJitterFactor*float64(prevDelayGot))
+		if !((curDelayGot > low && curDelayGot <= high) || curDelayGot == maxDuration) {
+			t.Errorf("jittered delay not within range: (%s - %s], but got %s", low, high, curDelayGot)
+		}
+	}
+
+	delays := make([]time.Duration, 0)
+	next := func() time.Duration {
+		tc.Step(initial)
+		b.Next(id, tc.Now())
+
+		delay := b.Get(id)
+		delays = append(delays, delay)
+		return delay
+	}
+
+	if got := b.Get(id); got != 0 {
+		t.Errorf("expected a zero wait durtion, but got: %s", got)
+	}
+
+	delayGot := next()
+	assert(t, 1, initial, delayGot)
+
+	prevDelayGot := delayGot
+	for i := 0; i < attempts; i++ {
+		delayGot = next()
+		assert(t, 2, prevDelayGot, delayGot)
+
+		prevDelayGot = delayGot
+	}
+
+	t.Logf("exponentially backed off jittered delays: %v", delays)
+}

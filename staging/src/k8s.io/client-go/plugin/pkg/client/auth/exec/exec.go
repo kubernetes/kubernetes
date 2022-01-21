@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/install"
 	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
@@ -316,9 +317,15 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	return nil
 }
 
+var _ utilnet.RoundTripperWrapper = &roundTripper{}
+
 type roundTripper struct {
 	a    *Authenticator
 	base http.RoundTripper
+}
+
+func (r *roundTripper) WrappedRoundTripper() http.RoundTripper {
+	return r.base
 }
 
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {

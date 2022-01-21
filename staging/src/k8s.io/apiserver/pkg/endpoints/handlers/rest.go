@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -63,6 +64,10 @@ const (
 	// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
 	// For PATCH request the API server only dedups after mutating admission.
 	DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat = ".metadata.ownerReferences contains duplicate entries after mutating admission happens; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	// shortPrefix is one possible beginning of yaml unmarshal strict errors.
+	shortPrefix = "yaml: unmarshal errors:\n"
+	// longPrefix is the other possible beginning of yaml unmarshal strict errors.
+	longPrefix = "error converting YAML to JSON: yaml: unmarshal errors:\n"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -187,7 +192,7 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
@@ -454,6 +459,53 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 
 func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
+}
+
+// fieldValidation checks that the field validation feature is enabled
+// and returns a valid directive of either
+// - Ignore (default when feature is disabled)
+// - Warn (default when feature is enabled)
+// - Strict
+func fieldValidation(directive string) string {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
+		return metav1.FieldValidationIgnore
+	}
+	if directive == "" {
+		return metav1.FieldValidationWarn
+	}
+	return directive
+}
+
+// parseYAMLWarnings takes the strict decoding errors from the yaml decoder's output
+// and parses each individual warnings, or leaves the warning as is if
+// it does not look like a yaml strict decoding error.
+func parseYAMLWarnings(errString string) []string {
+	var trimmedString string
+	if trimmedShortString := strings.TrimPrefix(errString, shortPrefix); len(trimmedShortString) < len(errString) {
+		trimmedString = trimmedShortString
+	} else if trimmedLongString := strings.TrimPrefix(errString, longPrefix); len(trimmedLongString) < len(errString) {
+		trimmedString = trimmedLongString
+	} else {
+		// not a yaml error, return as-is
+		return []string{errString}
+	}
+
+	splitStrings := strings.Split(trimmedString, "\n")
+	for i, s := range splitStrings {
+		splitStrings[i] = strings.TrimSpace(s)
+	}
+	return splitStrings
+}
+
+// addStrictDecodingWarnings confirms that the error is a strict decoding error
+// and if so adds a warning for each strict decoding violation.
+func addStrictDecodingWarnings(requestContext context.Context, errs []error) {
+	for _, e := range errs {
+		yamlWarnings := parseYAMLWarnings(e.Error())
+		for _, w := range yamlWarnings {
+			warning.AddWarning(requestContext, "", w)
+		}
+	}
 }
 
 type etcdError interface {

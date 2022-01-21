@@ -17,6 +17,7 @@ limitations under the License.
 package pvprotection
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -24,7 +25,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,30 +112,21 @@ func TestPVProtectionController(t *testing.T) {
 		updatedPV *v1.PersistentVolume
 		// List of expected kubeclient actions that should happen during the
 		// test.
-		expectedActions                     []clienttesting.Action
-		storageObjectInUseProtectionEnabled bool
+		expectedActions []clienttesting.Action
 	}{
 		// PV events
 		//
 		{
-			name:      "StorageObjectInUseProtection Enabled, PV without finalizer -> finalizer is added",
+			name:      "PV without finalizer -> finalizer is added",
 			updatedPV: pv(),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvVer, "", withProtectionFinalizer(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:                                "StorageObjectInUseProtection Disabled, PV without finalizer -> finalizer is added",
-			updatedPV:                           pv(),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: false,
-		},
-		{
-			name:                                "PVC with finalizer -> no action",
-			updatedPV:                           withProtectionFinalizer(pv()),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			name:            "PVC with finalizer -> no action",
+			updatedPV:       withProtectionFinalizer(pv()),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name:      "saving PVC finalizer fails -> controller retries",
@@ -154,23 +146,13 @@ func TestPVProtectionController(t *testing.T) {
 				// This succeeds
 				clienttesting.NewUpdateAction(pvVer, "", withProtectionFinalizer(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:      "StorageObjectInUseProtection Enabled, deleted PV with finalizer -> finalizer is removed",
+			name:      "deleted PV with finalizer -> finalizer is removed",
 			updatedPV: deleted(withProtectionFinalizer(pv())),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
-		},
-		{
-			name:      "StorageObjectInUseProtection Disabled, deleted PV with finalizer -> finalizer is removed",
-			updatedPV: deleted(withProtectionFinalizer(pv())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
-			},
-			storageObjectInUseProtectionEnabled: false,
 		},
 		{
 			name:      "finalizer removal fails -> controller retries",
@@ -190,13 +172,11 @@ func TestPVProtectionController(t *testing.T) {
 				// Succeeds
 				clienttesting.NewUpdateAction(pvVer, "", deleted(pv())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:                                "deleted PVC with finalizer + PV is bound -> finalizer is not removed",
-			updatedPV:                           deleted(withProtectionFinalizer(boundPV())),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			name:            "deleted PVC with finalizer + PV is bound -> finalizer is not removed",
+			updatedPV:       deleted(withProtectionFinalizer(boundPV())),
+			expectedActions: []clienttesting.Action{},
 		},
 	}
 
@@ -230,7 +210,7 @@ func TestPVProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		ctrl := NewPVProtectionController(pvInformer, client, test.storageObjectInUseProtectionEnabled)
+		ctrl := NewPVProtectionController(pvInformer, client)
 
 		// Start the test by simulating an event
 		if test.updatedPV != nil {
@@ -247,7 +227,7 @@ func TestPVProtectionController(t *testing.T) {
 			}
 			if ctrl.queue.Len() > 0 {
 				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
-				ctrl.processNextWorkItem()
+				ctrl.processNextWorkItem(context.TODO())
 			}
 			if ctrl.queue.Len() > 0 {
 				// There is still some work in the queue, process it now

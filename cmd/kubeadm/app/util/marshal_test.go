@@ -119,7 +119,7 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 		},
 		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			Name:      "testNode",
-			CRISocket: "/var/run/cri.sock",
+			CRISocket: "unix:///var/run/cri.sock",
 		},
 		BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 			{

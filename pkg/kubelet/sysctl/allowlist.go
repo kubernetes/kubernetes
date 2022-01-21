@@ -48,13 +48,14 @@ func NewAllowlist(patterns []string) (*patternAllowlist, error) {
 	}
 
 	for _, s := range patterns {
-		if !policyvalidation.IsValidSysctlPattern(s) {
+		if !policyvalidation.IsValidSysctlPattern(s, true) {
 			return nil, fmt.Errorf("sysctl %q must have at most %d characters and match regex %s",
 				s,
 				validation.SysctlMaxLength,
-				policyvalidation.SysctlPatternFmt,
+				policyvalidation.SysctlContainSlashPatternFmt,
 			)
 		}
+		s = convertSysctlVariableToDotsSeparator(s)
 		if strings.HasSuffix(s, "*") {
 			prefix := s[:len(s)-1]
 			ns := NamespacedBy(prefix)
@@ -81,6 +82,7 @@ func NewAllowlist(patterns []string) (*patternAllowlist, error) {
 // respective namespaces with the host. This check is only possible for sysctls on
 // the static default allowlist, not those on the custom allowlist provided by the admin.
 func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
+	sysctl = convertSysctlVariableToDotsSeparator(sysctl)
 	nsErrorFmt := "%q not allowed with host %s enabled"
 	if ns, found := w.sysctls[sysctl]; found {
 		if ns == ipcNamespace && hostIPC {

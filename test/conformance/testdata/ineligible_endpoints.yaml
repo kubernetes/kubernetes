@@ -351,4 +351,70 @@
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 - endpoint: replaceRbacAuthorizationV1NamespacedRoleBinding
   reason: optional feature
-  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/ 
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: createAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV1CollectionNamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV1HorizontalPodAutoscalerForAllNamespaces
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV1NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV1NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV1NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: createAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV2CollectionNamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV2HorizontalPodAutoscalerForAllNamespaces
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756

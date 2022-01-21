@@ -34,7 +34,7 @@ function container_runtime_monitoring {
   # will also fail, and docker will be killed. This is undesirable especially when
   # docker live restore is disabled.
   local healthcheck_command=(docker ps)
-  if [[ "${CONTAINER_RUNTIME:-docker}" != "docker" ]]; then
+  if [[ "${CONTAINER_RUNTIME:-containerd}" != "docker" ]]; then
     healthcheck_command=("${crictl}" pods)
   fi
   # Container runtime startup takes time. Make initial attempts before starting

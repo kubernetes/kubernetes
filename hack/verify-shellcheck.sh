@@ -102,16 +102,18 @@ SHELLCHECK_OPTIONS=(
 )
 
 # tell the user which we've selected and lint all scripts
+# The shellcheck errors are printed to stdout by default, hence they need to be redirected
+# to stderr in order to be well parsed for Junit representation by juLog function
 res=0
 if ${HAVE_SHELLCHECK}; then
   echo "Using host shellcheck ${SHELLCHECK_VERSION} binary."
-  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" || res=$?
+  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" >&2 || res=$?
 else
   echo "Using shellcheck ${SHELLCHECK_VERSION} docker image."
   "${DOCKER}" run \
     --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" \
     "${SHELLCHECK_IMAGE}" \
-  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" || res=$?
+  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" >&2 || res=$?
 fi
 
 # print a message based on the result

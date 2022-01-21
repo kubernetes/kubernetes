@@ -48,7 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -797,7 +797,7 @@ func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) (co
 	containerList, _ := runtimeService.ListContainers(nil)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
-			return nil, fmt.Errorf("no PodsandBox found with Id '%s'", c.PodSandboxId)
+			return nil, fmt.Errorf("no PodsandBox found with Id '%s' for container with ID '%s' and Name '%s'", c.PodSandboxId, c.Id, c.Metadata.Name)
 		}
 		containerMap.Add(podSandboxMap[c.PodSandboxId], c.Metadata.Name, c.Id)
 	}
@@ -1064,7 +1064,7 @@ func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.Conta
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	if cm.cpuManager != nil {
-		return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+		return cm.cpuManager.GetExclusiveCPUs(podUID, containerName).ToSliceNoSortInt64()
 	}
 	return []int64{}
 }

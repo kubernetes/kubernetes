@@ -3049,6 +3049,104 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 			},
 			expectedTopologyHints: nil,
 		},
+		{
+			description: "should not return preferred hints with multiple NUMA nodes for the pod with resources satisfied by a single NUMA node",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         2 * gb,
+						},
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         hugepages2M,
+							Size:         24 * mb,
+						},
+					},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           0,
+							Reserved:       1536 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages2M: {
+							Allocatable:    20 * mb,
+							Free:           0,
+							Reserved:       20 * mb,
+							SystemReserved: 0,
+							TotalMemSize:   20 * mb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 2,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           gb,
+							Reserved:       512 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages2M: {
+							Allocatable:    20 * mb,
+							Free:           16 * mb,
+							Reserved:       4 * mb,
+							SystemReserved: 0,
+							TotalMemSize:   20 * mb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 2,
+				},
+			},
+			pod: getPod("pod2",
+				"container2",
+				&v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1000Mi"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+						hugepages2M:       resource.MustParse("16Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1000Mi"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+						hugepages2M:       resource.MustParse("16Mi"),
+					},
+				},
+			),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+				hugepages2M: {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {

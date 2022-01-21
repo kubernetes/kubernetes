@@ -359,7 +359,7 @@ kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: 192.0.2.1
 nodeRegistration:
-  criSocket: /path/to/dockershim.sock
+  criSocket: "unix:///var/run/containerd/containerd.sock"
 ---
 apiVersion: %[1]s
 kind: ClusterConfiguration

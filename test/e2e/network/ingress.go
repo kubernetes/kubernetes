@@ -668,7 +668,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 
 		ginkgo.By("getting /apis/networking.k8s.io")
@@ -683,7 +685,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected networking API version, got %#v", group.Versions)
+			}
 		}
 
 		ginkgo.By("getting /apis/networking.k8s.io" + ingVersion)
@@ -697,7 +701,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					foundIngress = true
 				}
 			}
-			framework.ExpectEqual(foundIngress, true, fmt.Sprintf("expected ingresses, got %#v", resources.APIResources))
+			if !foundIngress {
+				framework.Failf("expected ingresses, got %#v", resources.APIResources)
+			}
 		}
 
 		// Ingress resource create/read/update/watch verbs
@@ -759,10 +765,14 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-ingWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedIngress, isIngress := evt.Object.(*networkingv1.Ingress)
-				framework.ExpectEqual(isIngress, true, fmt.Sprintf("expected Ingress, got %T", evt.Object))
+				if !isIngress {
+					framework.Failf("expected Ingress, got %T", evt.Object)
+				}
 				if watchedIngress.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -818,7 +828,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		expectFinalizer := func(ing *networkingv1.Ingress, msg string) {
 			framework.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
-			framework.ExpectEqual(len(ing.Finalizers) > 0, true, fmt.Sprintf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing))
+			if len(ing.Finalizers) == 0 {
+				framework.Failf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing)
+			}
 		}
 
 		err = ingClient.Delete(context.TODO(), createdIngress.Name, metav1.DeleteOptions{})
@@ -828,12 +840,16 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		if err == nil {
 			expectFinalizer(ing, "deleting createdIngress")
 		} else {
-			framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %v", err))
+			if !apierrors.IsNotFound(err) {
+				framework.Failf("expected 404, got %v", err)
+			}
 		}
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
-		framework.ExpectEqual(len(ings.Items) <= 3, true, "filtered list should have <= 3 items")
+		if len(ings.Items) > 3 {
+			framework.Fail("filtered list should have <= 3 items")
+		}
 		// Validate finalizer on the deleted ingress
 		for _, ing := range ings.Items {
 			if ing.Namespace == createdIngress.Namespace && ing.Name == createdIngress.Name {
@@ -847,7 +863,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
-		framework.ExpectEqual(len(ings.Items) <= 3, true, "filtered list should have <= 3 items")
+		if len(ings.Items) > 3 {
+			framework.Fail("filtered list should have <= 3 items")
+		}
 		// Validate finalizers
 		for _, ing := range ings.Items {
 			expectFinalizer(&ing, "deleting ingress collection")

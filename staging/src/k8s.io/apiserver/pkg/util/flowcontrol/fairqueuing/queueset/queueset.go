@@ -51,6 +51,7 @@ type queueSetFactory struct {
 // promiseFactory returns a WriteOnce
 // - whose Set method is invoked with the queueSet locked, and
 // - whose Get method is invoked with the queueSet not locked.
+// The parameters are the same as for `promise.NewWriteOnce`.
 type promiseFactory func(initial interface{}, doneCh <-chan struct{}, doneVal interface{}) promise.WriteOnce
 
 // promiseFactoryFactory returns the promiseFactory to use for the given queueSet
@@ -59,11 +60,12 @@ type promiseFactoryFactory func(*queueSet) promiseFactory
 // `*queueSetCompleter` implements QueueSetCompleter.  Exactly one of
 // the fields `factory` and `theSet` is non-nil.
 type queueSetCompleter struct {
-	factory *queueSetFactory
-	obsPair metrics.TimedObserverPair
-	theSet  *queueSet
-	qCfg    fq.QueuingConfig
-	dealer  *shufflesharding.Dealer
+	factory      *queueSetFactory
+	reqsObsPair  metrics.RatioedChangeObserverPair
+	execSeatsObs metrics.RatioedChangeObserver
+	theSet       *queueSet
+	qCfg         fq.QueuingConfig
+	dealer       *shufflesharding.Dealer
 }
 
 // queueSet implements the Fair Queuing for Server Requests technique
@@ -76,9 +78,12 @@ type queueSetCompleter struct {
 // not end in "Locked" either acquires the lock or does not care about
 // locking.
 type queueSet struct {
-	clock                   eventclock.Interface
-	estimatedServiceSeconds float64
-	obsPair                 metrics.TimedObserverPair
+	clock                    eventclock.Interface
+	estimatedServiceDuration time.Duration
+
+	reqsObsPair metrics.RatioedChangeObserverPair // .RequestsExecuting covers regular phase only
+
+	execSeatsObs metrics.RatioedChangeObserver // for all phases of execution
 
 	promiseFactory promiseFactory
 
@@ -94,17 +99,17 @@ type queueSet struct {
 	// the current dispatching configuration.
 	dCfg fq.DispatchingConfig
 
-	// If `config.DesiredNumQueues` is non-zero then dealer is not nil
-	// and is good for `config`.
+	// If `qCfg.DesiredNumQueues` is non-zero then dealer is not nil
+	// and is good for `qCfg`.
 	dealer *shufflesharding.Dealer
 
 	// queues may be longer than the desired number, while the excess
 	// queues are still draining.
 	queues []*queue
 
-	// virtualTime is the amount of seat-seconds allocated per queue since process startup.
+	// currentR is the amount of seat-seconds allocated per queue since process startup.
 	// This is our generalization of the progress meter named R in the original fair queuing work.
-	virtualTime float64
+	currentR fqrequest.SeatSeconds
 
 	// lastRealTime is what `clock.Now()` yielded when `virtualTime` was last updated
 	lastRealTime time.Time
@@ -143,16 +148,17 @@ func newTestableQueueSetFactory(c eventclock.Interface, promiseFactoryFactory pr
 	}
 }
 
-func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, obsPair metrics.TimedObserverPair) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsObsPair metrics.RatioedChangeObserverPair, execSeatsObs metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
 	}
 	return &queueSetCompleter{
-		factory: qsf,
-		obsPair: obsPair,
-		qCfg:    qCfg,
-		dealer:  dealer}, nil
+		factory:      qsf,
+		reqsObsPair:  reqsObsPair,
+		execSeatsObs: execSeatsObs,
+		qCfg:         qCfg,
+		dealer:       dealer}, nil
 }
 
 // checkConfig returns a non-nil Dealer if the config is valid and
@@ -173,16 +179,17 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 	qs := qsc.theSet
 	if qs == nil {
 		qs = &queueSet{
-			clock:                   qsc.factory.clock,
-			estimatedServiceSeconds: 0.003,
-			obsPair:                 qsc.obsPair,
-			qCfg:                    qsc.qCfg,
-			virtualTime:             0,
-			lastRealTime:            qsc.factory.clock.Now(),
+			clock:                    qsc.factory.clock,
+			estimatedServiceDuration: 3 * time.Millisecond,
+			reqsObsPair:              qsc.reqsObsPair,
+			execSeatsObs:             qsc.execSeatsObs,
+			qCfg:                     qsc.qCfg,
+			currentR:                 0,
+			lastRealTime:             qsc.factory.clock.Now(),
 		}
 		qs.promiseFactory = qsc.factory.promiseFactoryFactory(qs)
 	}
-	qs.setConfiguration(qsc.qCfg, qsc.dealer, dCfg)
+	qs.setConfiguration(context.Background(), qsc.qCfg, qsc.dealer, dCfg)
 	return qs
 }
 
@@ -206,12 +213,12 @@ func (qs *queueSet) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetComplet
 		dealer: dealer}, nil
 }
 
-// SetConfiguration is used to set the configuration for a queueSet.
+// setConfiguration is used to set the configuration for a queueSet.
 // Update handling for when fields are updated is handled here as well -
-// eg: if DesiredNum is increased, SetConfiguration reconciles by
+// eg: if DesiredNum is increased, setConfiguration reconciles by
 // adding more queues.
-func (qs *queueSet) setConfiguration(qCfg fq.QueuingConfig, dealer *shufflesharding.Dealer, dCfg fq.DispatchingConfig) {
-	qs.lockAndSyncTime()
+func (qs *queueSet) setConfiguration(ctx context.Context, qCfg fq.QueuingConfig, dealer *shufflesharding.Dealer, dCfg fq.DispatchingConfig) {
+	qs.lockAndSyncTime(ctx)
 	defer qs.lock.Unlock()
 
 	if qCfg.DesiredNumQueues > 0 {
@@ -236,8 +243,9 @@ func (qs *queueSet) setConfiguration(qCfg fq.QueuingConfig, dealer *shuffleshard
 	if qll < 1 {
 		qll = 1
 	}
-	qs.obsPair.RequestsWaiting.SetX1(float64(qll))
-	qs.obsPair.RequestsExecuting.SetX1(float64(dCfg.ConcurrencyLimit))
+	qs.reqsObsPair.RequestsWaiting.SetDenominator(float64(qll))
+	qs.reqsObsPair.RequestsExecuting.SetDenominator(float64(dCfg.ConcurrencyLimit))
+	qs.execSeatsObs.SetDenominator(float64(dCfg.ConcurrencyLimit))
 
 	qs.dispatchAsMuchAsPossibleLocked()
 }
@@ -247,8 +255,13 @@ type requestDecision int
 
 // Values passed through a request's decision
 const (
+	// Serve this one
 	decisionExecute requestDecision = iota
+
+	// Reject this one due to APF queuing considerations
 	decisionReject
+
+	// This one's context timed out / was canceled
 	decisionCancel
 )
 
@@ -257,10 +270,10 @@ const (
 // executing at each point where there is a change in that quantity,
 // because the metrics --- and only the metrics --- track that
 // quantity per FlowSchema.
-// The queueSet's promiseFactory is invoked once if the returns Request is non-nil,
+// The queueSet's promiseFactory is invoked once if the returned Request is non-nil,
 // not invoked if the Request is nil.
 func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (fq.Request, bool) {
-	qs.lockAndSyncTime()
+	qs.lockAndSyncTime(ctx)
 	defer qs.lock.Unlock()
 	var req *request
 
@@ -268,7 +281,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.Wo
 	// Step 0:
 	// Apply only concurrency limit, if zero queues desired
 	if qs.qCfg.DesiredNumQueues < 1 {
-		if !qs.canAccommodateSeatsLocked(int(workEstimate.InitialSeats)) {
+		if !qs.canAccommodateSeatsLocked(workEstimate.MaxSeats()) {
 			klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v because %d seats are asked for, %d seats are in use (%d are executing) and the limit is %d",
 				qs.qCfg.Name, fsName, descr1, descr2, workEstimate, qs.totSeatsInUse, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
 			metrics.AddReject(ctx, qs.qCfg.Name, fsName, "concurrency-limit")
@@ -315,8 +328,13 @@ func ordinaryPromiseFactoryFactory(qs *queueSet) promiseFactory {
 	return promise.NewWriteOnce
 }
 
-// Seats returns the number of seats this request requires.
-func (req *request) Seats() int {
+// MaxSeats returns the maximum number of seats this request requires, it is
+// the maxumum of the two - WorkEstimate.InitialSeats, WorkEstimate.FinalSeats.
+func (req *request) MaxSeats() int {
+	return req.workEstimate.MaxSeats()
+}
+
+func (req *request) InitialSeats() int {
 	return int(req.workEstimate.InitialSeats)
 }
 
@@ -350,7 +368,7 @@ func (req *request) wait() (bool, bool) {
 	// The final step is to wait on a decision from
 	// somewhere and then act on it.
 	decisionAny := req.decision.Get()
-	qs.lockAndSyncTime()
+	qs.lockAndSyncTime(req.ctx)
 	defer qs.lock.Unlock()
 	if req.waitStarted {
 		// This can not happen, because the client is forbidden to
@@ -375,11 +393,13 @@ func (req *request) wait() (bool, bool) {
 	// TODO(aaron-prindle) add metrics for this case
 	klog.V(5).Infof("QS(%s): Ejecting request %#+v %#+v from its queue", qs.qCfg.Name, req.descr1, req.descr2)
 	// remove the request from the queue as it has timed out
-	req.removeFromQueueFn()
-	qs.totRequestsWaiting--
-	metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
-	req.NoteQueued(false)
-	qs.obsPair.RequestsWaiting.Add(-1)
+	if req.removeFromQueueLocked() != nil {
+		qs.totRequestsWaiting--
+		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
+		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+		req.NoteQueued(false)
+		qs.reqsObsPair.RequestsWaiting.Add(-1)
+	}
 	return false, qs.isIdleLocked()
 }
 
@@ -394,23 +414,74 @@ func (qs *queueSet) isIdleLocked() bool {
 }
 
 // lockAndSyncTime acquires the lock and updates the virtual time.
-// Doing them together avoids the mistake of modify some queue state
+// Doing them together avoids the mistake of modifying some queue state
 // before calling syncTimeLocked.
-func (qs *queueSet) lockAndSyncTime() {
+func (qs *queueSet) lockAndSyncTime(ctx context.Context) {
 	qs.lock.Lock()
-	qs.syncTimeLocked()
+	qs.syncTimeLocked(ctx)
 }
 
 // syncTimeLocked updates the virtual time based on the assumption
 // that the current state of the queues has been in effect since
 // `qs.lastRealTime`.  Thus, it should be invoked after acquiring the
 // lock and before modifying the state of any queue.
-func (qs *queueSet) syncTimeLocked() {
+func (qs *queueSet) syncTimeLocked(ctx context.Context) {
 	realNow := qs.clock.Now()
-	timeSinceLast := realNow.Sub(qs.lastRealTime).Seconds()
+	timeSinceLast := realNow.Sub(qs.lastRealTime)
 	qs.lastRealTime = realNow
-	qs.virtualTime += timeSinceLast * qs.getVirtualTimeRatioLocked()
-	metrics.SetCurrentR(qs.qCfg.Name, qs.virtualTime)
+	prevR := qs.currentR
+	incrR := fqrequest.SeatsTimesDuration(qs.getVirtualTimeRatioLocked(), timeSinceLast)
+	qs.currentR = prevR + incrR
+	switch {
+	case prevR > qs.currentR:
+		klog.ErrorS(errors.New("queueset::currentR overflow"), "Overflow", "QS", qs.qCfg.Name, "when", realNow.Format(nsTimeFmt), "prevR", prevR, "incrR", incrR, "currentR", qs.currentR)
+	case qs.currentR >= highR:
+		qs.advanceEpoch(ctx, realNow, incrR)
+	}
+	metrics.SetCurrentR(qs.qCfg.Name, qs.currentR.ToFloat())
+}
+
+// rDecrement is the amount by which the progress meter R is wound backwards
+// when needed to avoid overflow.
+const rDecrement = fqrequest.MaxSeatSeconds / 2
+
+// highR is the threshold that triggers advance of the epoch.
+// That is, decrementing the global progress meter R by rDecrement.
+const highR = rDecrement + rDecrement/2
+
+// advanceEpoch subtracts rDecrement from the global progress meter R
+// and all the readings that have been taked from that meter.
+// The now and incrR parameters are only used to add info to the log messages.
+func (qs *queueSet) advanceEpoch(ctx context.Context, now time.Time, incrR fqrequest.SeatSeconds) {
+	oldR := qs.currentR
+	qs.currentR -= rDecrement
+	klog.InfoS("Advancing epoch", "QS", qs.qCfg.Name, "when", now.Format(nsTimeFmt), "oldR", oldR, "newR", qs.currentR, "incrR", incrR)
+	success := true
+	for qIdx, queue := range qs.queues {
+		if queue.requests.Length() == 0 && queue.requestsExecuting == 0 {
+			// Do not just decrement, the value could be quite outdated.
+			// It is safe to reset to zero in this case, because the next request
+			// will overwrite the zero with `qs.currentR`.
+			queue.nextDispatchR = 0
+			continue
+		}
+		oldNextDispatchR := queue.nextDispatchR
+		queue.nextDispatchR -= rDecrement
+		if queue.nextDispatchR > oldNextDispatchR {
+			klog.ErrorS(errors.New("queue::nextDispatchR underflow"), "Underflow", "QS", qs.qCfg.Name, "queue", qIdx, "oldNextDispatchR", oldNextDispatchR, "newNextDispatchR", queue.nextDispatchR, "incrR", incrR)
+			success = false
+		}
+		queue.requests.Walk(func(req *request) bool {
+			oldArrivalR := req.arrivalR
+			req.arrivalR -= rDecrement
+			if req.arrivalR > oldArrivalR {
+				klog.ErrorS(errors.New("request::arrivalR underflow"), "Underflow", "QS", qs.qCfg.Name, "queue", qIdx, "request", *req, "oldArrivalR", oldArrivalR, "incrR", incrR)
+				success = false
+			}
+			return true
+		})
+	}
+	metrics.AddEpochAdvance(ctx, qs.qCfg.Name, success)
 }
 
 // getVirtualTimeRatio calculates the rate at which virtual time has
@@ -419,7 +490,9 @@ func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 	activeQueues := 0
 	seatsRequested := 0
 	for _, queue := range qs.queues {
-		seatsRequested += (queue.seatsInUse + queue.requests.SeatsSum())
+		// here we want the sum of the maximum width of the requests in this queue since our
+		// goal is to find the maximum rate at which the queue could work.
+		seatsRequested += (queue.seatsInUse + queue.requests.QueueSum().MaxSeatsSum)
 		if queue.requests.Length() > 0 || queue.requestsExecuting > 0 {
 			activeQueues++
 		}
@@ -450,7 +523,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 	// requests that are in the queue longer than the timeout if there are no new requests
 	// We prefer the simplicity over the promptness, at least for now.
 
-	defer qs.boundNextDispatch(queue)
+	defer qs.boundNextDispatchLocked(queue)
 
 	// Create a request and enqueue
 	req := &request{
@@ -460,12 +533,12 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 		ctx:               ctx,
 		decision:          qs.promiseFactory(nil, ctx.Done(), decisionCancel),
 		arrivalTime:       qs.clock.Now(),
-		arrivalR:          qs.virtualTime,
+		arrivalR:          qs.currentR,
 		queue:             queue,
 		descr1:            descr1,
 		descr2:            descr2,
 		queueNoteFn:       queueNoteFn,
-		workEstimate:      *workEstimate,
+		workEstimate:      qs.completeWorkEstimate(workEstimate),
 	}
 	if ok := qs.rejectOrEnqueueLocked(req); !ok {
 		return nil
@@ -485,25 +558,24 @@ func (qs *queueSet) shuffleShardLocked(hashValue uint64, descr1, descr2 interfac
 	offset := qs.enqueues % handSize
 	qs.enqueues++
 	bestQueueIdx := -1
-	bestQueueSeatsSum := int(math.MaxInt32)
+	minQueueSeatSeconds := fqrequest.MaxSeatSeconds
 	for i := 0; i < handSize; i++ {
 		queueIdx := hand[(offset+i)%handSize]
 		queue := qs.queues[queueIdx]
-		waitingSeats := queue.requests.SeatsSum()
-		// TODO: Consider taking into account `additional latency` of requests
-		// in addition to their seats.
-		// Ideally, this should be based on projected completion time in the
-		// virtual world of the youngest request in the queue.
-		thisSeatsSum := waitingSeats + queue.seatsInUse
-		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of %d seats waiting and %d executing, virtualStart=%vss", qs.qCfg.Name, descr1, descr2, queueIdx, waitingSeats, queue.seatsInUse, queue.virtualStart)
-		if thisSeatsSum < bestQueueSeatsSum {
-			bestQueueIdx, bestQueueSeatsSum = queueIdx, thisSeatsSum
-		}
+		queueSum := queue.requests.QueueSum()
 
+		// this is the total amount of work in seat-seconds for requests
+		// waiting in this queue, we will select the queue with the minimum.
+		thisQueueSeatSeconds := queueSum.TotalWorkSum
+		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d with sum: %#v and %d seats in use, nextDispatchR=%v", qs.qCfg.Name, descr1, descr2, queueIdx, queueSum, queue.seatsInUse, queue.nextDispatchR)
+		if thisQueueSeatSeconds < minQueueSeatSeconds {
+			minQueueSeatSeconds = thisQueueSeatSeconds
+			bestQueueIdx = queueIdx
+		}
 	}
 	if klog.V(6).Enabled() {
 		chosenQueue := qs.queues[bestQueueIdx]
-		klog.V(6).Infof("QS(%s) at r=%s v=%.9fss: For request %#+v %#+v chose queue %d, had seatSum %d & %d requests executing & virtualStart=%vss", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, chosenQueue.requests.SeatsSum(), chosenQueue.requestsExecuting, chosenQueue.virtualStart)
+		klog.V(6).Infof("QS(%s) at t=%s R=%v: For request %#+v %#+v chose queue %d, with sum: %#v & %d seats in use & nextDispatchR=%v", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.currentR, descr1, descr2, bestQueueIdx, chosenQueue.requests.QueueSum(), chosenQueue.seatsInUse, chosenQueue.nextDispatchR)
 	}
 	return bestQueueIdx
 }
@@ -518,33 +590,26 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 	// can short circuit loop (break) if oldest requests are not timing out
 	// as newer requests also will not have timed out
 
-	// now - requestWaitLimit = waitLimit
-	waitLimit := now.Add(-qs.qCfg.RequestWaitLimit)
+	// now - requestWaitLimit = arrivalLimit
+	arrivalLimit := now.Add(-qs.qCfg.RequestWaitLimit)
 	reqs.Walk(func(req *request) bool {
-		if waitLimit.After(req.arrivalTime) {
-			req.decision.Set(decisionReject)
-			timeoutCount++
-			metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
-			req.NoteQueued(false)
-
+		if arrivalLimit.After(req.arrivalTime) {
+			if req.decision.Set(decisionReject) && req.removeFromQueueLocked() != nil {
+				timeoutCount++
+				req.NoteQueued(false)
+				metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+			}
 			// we need to check if the next request has timed out.
 			return true
 		}
-
 		// since reqs are sorted oldest -> newest, we are done here.
 		return false
 	})
 
 	// remove timed out requests from queue
 	if timeoutCount > 0 {
-		// The number of requests we have timed out is timeoutCount,
-		// so, let's dequeue the exact number of requests for this queue.
-		for i := 0; i < timeoutCount; i++ {
-			queue.requests.Dequeue()
-		}
-		// decrement the # of requestsEnqueued
 		qs.totRequestsWaiting -= timeoutCount
-		qs.obsPair.RequestsWaiting.Add(float64(-timeoutCount))
+		qs.reqsObsPair.RequestsWaiting.Add(float64(-timeoutCount))
 	}
 }
 
@@ -571,30 +636,22 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	now := qs.clock.Now()
 	if queue.requests.Length() == 0 && queue.requestsExecuting == 0 {
 		// the queue’s start R is set to the virtual time.
-		queue.virtualStart = qs.virtualTime
-		if klog.V(6).Enabled() {
-			klog.Infof("QS(%s) at r=%s v=%.9fss: initialized queue %d start R due to request %#+v %#+v", qs.qCfg.Name, now.Format(nsTimeFmt), queue.virtualStart, queue.index, request.descr1, request.descr2)
+		queue.nextDispatchR = qs.currentR
+		klogV := klog.V(6)
+		if klogV.Enabled() {
+			klogV.Infof("QS(%s) at t=%s R=%v: initialized queue %d start R due to request %#+v %#+v", qs.qCfg.Name, now.Format(nsTimeFmt), queue.nextDispatchR, queue.index, request.descr1, request.descr2)
 		}
 	}
-	queue.Enqueue(request)
+	request.removeFromQueueLocked = queue.requests.Enqueue(request)
 	qs.totRequestsWaiting++
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, 1)
 	request.NoteQueued(true)
-	qs.obsPair.RequestsWaiting.Add(1)
+	qs.reqsObsPair.RequestsWaiting.Add(1)
 }
 
-// dispatchAsMuchAsPossibleLocked runs a loop, as long as there
-// are non-empty queues and the number currently executing is less than the
-// assured concurrency value.  The body of the loop uses the fair queuing
-// technique to pick a queue, dequeue the request at the head of that
-// queue, increment the count of the number executing, and send true
-// to the request's channel.
+// dispatchAsMuchAsPossibleLocked does as many dispatches as possible now.
 func (qs *queueSet) dispatchAsMuchAsPossibleLocked() {
-	for qs.totRequestsWaiting != 0 && qs.totSeatsInUse < qs.dCfg.ConcurrencyLimit {
-		ok := qs.dispatchLocked()
-		if !ok {
-			break
-		}
+	for qs.totRequestsWaiting != 0 && qs.totSeatsInUse < qs.dCfg.ConcurrencyLimit && qs.dispatchLocked() {
 	}
 }
 
@@ -609,34 +666,44 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 		startTime:         now,
 		decision:          qs.promiseFactory(decisionExecute, ctx.Done(), decisionCancel),
 		arrivalTime:       now,
-		arrivalR:          qs.virtualTime,
+		arrivalR:          qs.currentR,
 		descr1:            descr1,
 		descr2:            descr2,
-		workEstimate:      *workEstimate,
+		workEstimate:      qs.completeWorkEstimate(workEstimate),
 	}
 	qs.totRequestsExecuting++
-	qs.totSeatsInUse += req.Seats()
+	qs.totSeatsInUse += req.MaxSeats()
 	metrics.AddRequestsExecuting(ctx, qs.qCfg.Name, fsName, 1)
-	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.Seats())
-	qs.obsPair.RequestsExecuting.Add(1)
-	if klog.V(5).Enabled() {
-		klog.Infof("QS(%s) at r=%s v=%.9fss: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.MaxSeats())
+	qs.reqsObsPair.RequestsExecuting.Add(1)
+	qs.execSeatsObs.Add(float64(req.MaxSeats()))
+	klogV := klog.V(5)
+	if klogV.Enabled() {
+		klogV.Infof("QS(%s) at t=%s R=%v: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, fsName, descr1, descr2, qs.totRequestsExecuting)
 	}
 	return req
 }
 
 // dispatchLocked uses the Fair Queuing for Server Requests method to
 // select a queue and dispatch the oldest request in that queue.  The
-// return value indicates whether a request was dispatched; this will
-// be false when there are no requests waiting in any queue.
+// return value indicates whether a request was dequeued; this will
+// be false when either all queues are empty or the request at the head
+// of the next queue cannot be dispatched.
 func (qs *queueSet) dispatchLocked() bool {
-	queue := qs.findDispatchQueueLocked()
+	queue, request := qs.findDispatchQueueLocked()
 	if queue == nil {
 		return false
 	}
-	request, ok := queue.Dequeue()
-	if !ok { // This should never happen.  But if it does...
+	if request == nil { // This should never happen.  But if it does...
 		return false
+	}
+	qs.totRequestsWaiting--
+	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
+	request.NoteQueued(false)
+	qs.reqsObsPair.RequestsWaiting.Add(-1)
+	defer qs.boundNextDispatchLocked(queue)
+	if !request.decision.Set(decisionExecute) {
+		return true
 	}
 	request.startTime = qs.clock.Now()
 	// At this moment the request leaves its queue and starts
@@ -644,27 +711,23 @@ func (qs *queueSet) dispatchLocked() bool {
 	// "queued" and "executing".  While that means "executing"
 	// includes a little overhead from this package, this is not a
 	// problem because other overhead is also included.
-	qs.totRequestsWaiting--
 	qs.totRequestsExecuting++
-	qs.totSeatsInUse += request.Seats()
+	qs.totSeatsInUse += request.MaxSeats()
 	queue.requestsExecuting++
-	queue.seatsInUse += request.Seats()
-	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
-	request.NoteQueued(false)
+	queue.seatsInUse += request.MaxSeats()
 	metrics.AddRequestsExecuting(request.ctx, qs.qCfg.Name, request.fsName, 1)
-	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.Seats())
-	qs.obsPair.RequestsWaiting.Add(-1)
-	qs.obsPair.RequestsExecuting.Add(1)
-	if klog.V(6).Enabled() {
-		klog.Infof("QS(%s) at r=%s v=%.9fss: dispatching request %#+v %#+v work %v from queue %d with start R %.9fss, queue will have %d waiting & %d requests occupying %d seats, set will have %d seats occupied",
-			qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.virtualTime, request.descr1, request.descr2,
-			request.workEstimate, queue.index, queue.virtualStart, queue.requests.Length(), queue.requestsExecuting, queue.seatsInUse, qs.totSeatsInUse)
+	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.MaxSeats())
+	qs.reqsObsPair.RequestsExecuting.Add(1)
+	qs.execSeatsObs.Add(float64(request.MaxSeats()))
+	klogV := klog.V(6)
+	if klogV.Enabled() {
+		klogV.Infof("QS(%s) at t=%s R=%v: dispatching request %#+v %#+v work %v from queue %d with start R %v, queue will have %d waiting & %d requests occupying %d seats, set will have %d seats occupied",
+			qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.currentR, request.descr1, request.descr2,
+			request.workEstimate, queue.index, queue.nextDispatchR, queue.requests.Length(), queue.requestsExecuting, queue.seatsInUse, qs.totSeatsInUse)
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G * width
-	queue.virtualStart += qs.estimatedServiceSeconds * float64(request.Seats())
-	qs.boundNextDispatch(queue)
-	request.decision.Set(decisionExecute)
-	return ok
+	queue.nextDispatchR += request.totalWork()
+	return true
 }
 
 // canAccommodateSeatsLocked returns true if this queueSet has enough
@@ -692,13 +755,14 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 
 // findDispatchQueueLocked examines the queues in round robin order and
 // returns the first one of those for which the virtual finish time of
-// the oldest waiting request is minimal.
-func (qs *queueSet) findDispatchQueueLocked() *queue {
-	minVirtualFinish := math.Inf(1)
-	sMin := math.Inf(1)
-	dsMin := math.Inf(1)
-	sMax := math.Inf(-1)
-	dsMax := math.Inf(-1)
+// the oldest waiting request is minimal, and also returns that request.
+// Returns nils if the head of the selected queue can not be dispatched now.
+func (qs *queueSet) findDispatchQueueLocked() (*queue, *request) {
+	minVirtualFinish := fqrequest.MaxSeatSeconds
+	sMin := fqrequest.MaxSeatSeconds
+	dsMin := fqrequest.MaxSeatSeconds
+	sMax := fqrequest.MinSeatSeconds
+	dsMax := fqrequest.MinSeatSeconds
 	var minQueue *queue
 	var minIndex int
 	nq := len(qs.queues)
@@ -707,12 +771,12 @@ func (qs *queueSet) findDispatchQueueLocked() *queue {
 		queue := qs.queues[qs.robinIndex]
 		oldestWaiting, _ := queue.requests.Peek()
 		if oldestWaiting != nil {
-			sMin = math.Min(sMin, queue.virtualStart)
-			sMax = math.Max(sMax, queue.virtualStart)
-			estimatedWorkInProgress := qs.estimatedServiceSeconds * float64(queue.seatsInUse)
-			dsMin = math.Min(dsMin, queue.virtualStart-estimatedWorkInProgress)
-			dsMax = math.Max(dsMax, queue.virtualStart-estimatedWorkInProgress)
-			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceSeconds*float64(oldestWaiting.Seats())
+			sMin = ssMin(sMin, queue.nextDispatchR)
+			sMax = ssMax(sMax, queue.nextDispatchR)
+			estimatedWorkInProgress := fqrequest.SeatsTimesDuration(float64(queue.seatsInUse), qs.estimatedServiceDuration)
+			dsMin = ssMin(dsMin, queue.nextDispatchR-estimatedWorkInProgress)
+			dsMax = ssMax(dsMax, queue.nextDispatchR-estimatedWorkInProgress)
+			currentVirtualFinish := queue.nextDispatchR + oldestWaiting.totalWork()
 			klog.V(11).InfoS("Considering queue to dispatch", "queueSet", qs.qCfg.Name, "queue", qs.robinIndex, "finishR", currentVirtualFinish)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
@@ -726,16 +790,29 @@ func (qs *queueSet) findDispatchQueueLocked() *queue {
 	if oldestReqFromMinQueue == nil {
 		// This cannot happen
 		klog.ErrorS(errors.New("selected queue is empty"), "Impossible", "queueSet", qs.qCfg.Name)
-		return nil
+		return nil, nil
 	}
-	if !qs.canAccommodateSeatsLocked(oldestReqFromMinQueue.Seats()) {
+	if !qs.canAccommodateSeatsLocked(oldestReqFromMinQueue.MaxSeats()) {
 		// since we have not picked the queue with the minimum virtual finish
 		// time, we are not going to advance the round robin index here.
-		if klog.V(4).Enabled() {
-			klog.Infof("QS(%s): request %v %v seats %d cannot be dispatched from queue %d, waiting for currently executing requests to complete, %d requests are occupying %d seats and the limit is %d",
-				qs.qCfg.Name, oldestReqFromMinQueue.descr1, oldestReqFromMinQueue.descr2, oldestReqFromMinQueue.Seats(), minQueue.index, qs.totRequestsExecuting, qs.totSeatsInUse, qs.dCfg.ConcurrencyLimit)
+		klogV := klog.V(4)
+		if klogV.Enabled() {
+			klogV.Infof("QS(%s): request %v %v seats %d cannot be dispatched from queue %d, waiting for currently executing requests to complete, %d requests are occupying %d seats and the limit is %d",
+				qs.qCfg.Name, oldestReqFromMinQueue.descr1, oldestReqFromMinQueue.descr2, oldestReqFromMinQueue.MaxSeats(), minQueue.index, qs.totRequestsExecuting, qs.totSeatsInUse, qs.dCfg.ConcurrencyLimit)
 		}
-		return nil
+		metrics.AddDispatchWithNoAccommodation(qs.qCfg.Name, oldestReqFromMinQueue.fsName)
+		return nil, nil
+	}
+	oldestReqFromMinQueue.removeFromQueueLocked()
+
+	// If the requested final seats exceed capacity of that queue,
+	// we reduce them to current capacity and adjust additional latency
+	// to preserve the total amount of work.
+	if oldestReqFromMinQueue.workEstimate.FinalSeats > uint(qs.dCfg.ConcurrencyLimit) {
+		finalSeats := uint(qs.dCfg.ConcurrencyLimit)
+		additionalLatency := oldestReqFromMinQueue.workEstimate.finalWork.DurationPerSeat(float64(finalSeats))
+		oldestReqFromMinQueue.workEstimate.FinalSeats = finalSeats
+		oldestReqFromMinQueue.workEstimate.AdditionalLatency = additionalLatency
 	}
 
 	// we set the round robin indexing to start at the chose queue
@@ -743,11 +820,25 @@ func (qs *queueSet) findDispatchQueueLocked() *queue {
 	// win in the case that the virtual finish times are the same
 	qs.robinIndex = minIndex
 
-	if minQueue.virtualStart < oldestReqFromMinQueue.arrivalR {
-		klog.ErrorS(errors.New("dispatch before arrival"), "Inconceivable!", "QS", qs.qCfg.Name, "queue", minQueue.index, "dispatchR", minQueue.virtualStart, "request", oldestReqFromMinQueue)
+	if minQueue.nextDispatchR < oldestReqFromMinQueue.arrivalR {
+		klog.ErrorS(errors.New("dispatch before arrival"), "Inconceivable!", "QS", qs.qCfg.Name, "queue", minQueue.index, "dispatchR", minQueue.nextDispatchR, "request", oldestReqFromMinQueue)
 	}
-	metrics.SetDispatchMetrics(qs.qCfg.Name, qs.virtualTime, minQueue.virtualStart, sMin, sMax, dsMin, dsMax)
-	return minQueue
+	metrics.SetDispatchMetrics(qs.qCfg.Name, qs.currentR.ToFloat(), minQueue.nextDispatchR.ToFloat(), sMin.ToFloat(), sMax.ToFloat(), dsMin.ToFloat(), dsMax.ToFloat())
+	return minQueue, oldestReqFromMinQueue
+}
+
+func ssMin(a, b fqrequest.SeatSeconds) fqrequest.SeatSeconds {
+	if a > b {
+		return b
+	}
+	return a
+}
+
+func ssMax(a, b fqrequest.SeatSeconds) fqrequest.SeatSeconds {
+	if a < b {
+		return b
+	}
+	return a
 }
 
 // finishRequestAndDispatchAsMuchAsPossible is a convenience method
@@ -756,7 +847,7 @@ func (qs *queueSet) findDispatchQueueLocked() *queue {
 // once a request finishes execution or is canceled.  This returns a bool
 // indicating whether the QueueSet is now idle.
 func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) bool {
-	qs.lockAndSyncTime()
+	qs.lockAndSyncTime(req.ctx)
 	defer qs.lock.Unlock()
 
 	qs.finishRequestLocked(req)
@@ -771,9 +862,9 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	now := qs.clock.Now()
 	qs.totRequestsExecuting--
 	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
-	qs.obsPair.RequestsExecuting.Add(-1)
+	qs.reqsObsPair.RequestsExecuting.Add(-1)
 
-	S := now.Sub(r.startTime).Seconds()
+	actualServiceDuration := now.Sub(r.startTime)
 
 	// TODO: for now we keep the logic localized so it is easier to see
 	//  how the counters are tracked for queueset and queue, in future we
@@ -781,53 +872,55 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	releaseSeatsLocked := func() {
 		defer qs.removeQueueIfEmptyLocked(r)
 
-		qs.totSeatsInUse -= r.Seats()
-		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.Seats())
+		qs.totSeatsInUse -= r.MaxSeats()
+		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.MaxSeats())
+		qs.execSeatsObs.Add(-float64(r.MaxSeats()))
 		if r.queue != nil {
-			r.queue.seatsInUse -= r.Seats()
+			r.queue.seatsInUse -= r.MaxSeats()
 		}
 	}
 
 	defer func() {
+		klogV := klog.V(6)
 		if r.workEstimate.AdditionalLatency <= 0 {
 			// release the seats allocated to this request immediately
 			releaseSeatsLocked()
-			if !klog.V(6).Enabled() {
+			if !klogV.Enabled() {
 			} else if r.queue != nil {
-				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished all use of %d seats, adjusted queue %d start R to %.9fss due to service time %.9fs, queue will have %d requests, %d seats waiting & %d requests occupying %d seats",
-					qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.InitialSeats, r.queue.index,
-					r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requests.SeatsSum(), r.queue.requestsExecuting, r.queue.seatsInUse)
+				klogV.Infof("QS(%s) at t=%s R=%v: request %#+v %#+v finished all use of %d seats, adjusted queue %d start R to %v due to service time %.9fs, queue will have %d requests with %#v waiting & %d requests occupying %d seats",
+					qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, r.descr1, r.descr2, r.workEstimate.MaxSeats(), r.queue.index,
+					r.queue.nextDispatchR, actualServiceDuration.Seconds(), r.queue.requests.Length(), r.queue.requests.QueueSum(), r.queue.requestsExecuting, r.queue.seatsInUse)
 			} else {
-				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished all use of %d seats, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.InitialSeats, qs.totRequestsExecuting, qs.totSeatsInUse)
+				klogV.Infof("QS(%s) at t=%s R=%v: request %#+v %#+v finished all use of %d seats, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, r.descr1, r.descr2, r.workEstimate.InitialSeats, qs.totRequestsExecuting, qs.totSeatsInUse)
 			}
 			return
 		}
 
 		additionalLatency := r.workEstimate.AdditionalLatency
-		if !klog.V(6).Enabled() {
+		if !klogV.Enabled() {
 		} else if r.queue != nil {
-			klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished main use but lingering on %d seats for %v seconds, adjusted queue %d start R to %.9fss due to service time %.9fs, queue will have %d requests waiting & %d executing, still has %d seats waiting & %d executing",
-				qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.InitialSeats, additionalLatency.Seconds(), r.queue.index,
-				r.queue.virtualStart, S, r.queue.requests.Length(), r.queue.requestsExecuting, r.queue.requests.SeatsSum(), r.queue.seatsInUse)
+			klogV.Infof("QS(%s) at t=%s R=%v: request %#+v %#+v finished main use of %d seats but lingering on %d seats for %v seconds, adjusted queue %d start R to %v due to service time %.9fs, queue will have %d requests with %#v waiting & %d requests occupying %d seats",
+				qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, r.descr1, r.descr2, r.workEstimate.InitialSeats, r.workEstimate.FinalSeats, additionalLatency.Seconds(), r.queue.index,
+				r.queue.nextDispatchR, actualServiceDuration.Seconds(), r.queue.requests.Length(), r.queue.requests.QueueSum(), r.queue.requestsExecuting, r.queue.seatsInUse)
 		} else {
-			klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished main use but lingering on %d seats for %v seconds, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.InitialSeats, additionalLatency.Seconds(), qs.totRequestsExecuting, qs.totSeatsInUse)
+			klogV.Infof("QS(%s) at t=%s R=%v: request %#+v %#+v finished main use of %d seats but lingering on %d seats for %v seconds, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, r.descr1, r.descr2, r.workEstimate.InitialSeats, r.workEstimate.FinalSeats, additionalLatency.Seconds(), qs.totRequestsExecuting, qs.totSeatsInUse)
 		}
 		// EventAfterDuration will execute the event func in a new goroutine,
 		// so the seats allocated to this request will be released after
 		// AdditionalLatency elapses, this ensures that the additional
 		// latency has no impact on the user experience.
 		qs.clock.EventAfterDuration(func(_ time.Time) {
-			qs.lockAndSyncTime()
+			qs.lockAndSyncTime(r.ctx)
 			defer qs.lock.Unlock()
 			now := qs.clock.Now()
 			releaseSeatsLocked()
-			if !klog.V(6).Enabled() {
+			if !klogV.Enabled() {
 			} else if r.queue != nil {
-				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished lingering on %d seats, queue %d will have %d requests, %d seats waiting & %d requests occupying %d seats",
-					qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.InitialSeats, r.queue.index,
-					r.queue.requests.Length(), r.queue.requests.SeatsSum(), r.queue.requestsExecuting, r.queue.seatsInUse)
+				klogV.Infof("QS(%s) at t=%s R=%v: request %#+v %#+v finished lingering on %d seats, queue %d will have %d requests with %#v waiting & %d requests occupying %d seats",
+					qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, r.descr1, r.descr2, r.workEstimate.FinalSeats, r.queue.index,
+					r.queue.requests.Length(), r.queue.requests.QueueSum(), r.queue.requestsExecuting, r.queue.seatsInUse)
 			} else {
-				klog.Infof("QS(%s) at r=%s v=%.9fss: request %#+v %#+v finished lingering on %d seats, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.workEstimate.InitialSeats, qs.totRequestsExecuting, qs.totSeatsInUse)
+				klogV.Infof("QS(%s) at t=%s R=%v: request %#+v %#+v finished lingering on %d seats, qs will have %d requests occupying %d seats", qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, r.descr1, r.descr2, r.workEstimate.FinalSeats, qs.totRequestsExecuting, qs.totSeatsInUse)
 			}
 			qs.dispatchAsMuchAsPossibleLocked()
 		}, additionalLatency)
@@ -839,29 +932,29 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 
 		// When a request finishes being served, and the actual service time was S,
 		// the queue’s start R is decremented by (G - S)*width.
-		r.queue.virtualStart -= (qs.estimatedServiceSeconds - S) * float64(r.Seats())
-		qs.boundNextDispatch(r.queue)
+		r.queue.nextDispatchR -= fqrequest.SeatsTimesDuration(float64(r.InitialSeats()), qs.estimatedServiceDuration-actualServiceDuration)
+		qs.boundNextDispatchLocked(r.queue)
 	}
 }
 
-// boundNextDispatch applies the anti-windup hack.
+// boundNextDispatchLocked applies the anti-windup hack.
 // We need a hack because all non-empty queues are allocated the same
 // number of seats.  A queue that can not use all those seats and does
 // not go empty accumulates a progresively earlier `virtualStart` compared
 // to queues that are using more than they are allocated.
 // The following hack addresses the first side of that inequity,
 // by insisting that dispatch in the virtual world not precede arrival.
-func (qs *queueSet) boundNextDispatch(queue *queue) {
+func (qs *queueSet) boundNextDispatchLocked(queue *queue) {
 	oldestReqFromMinQueue, _ := queue.requests.Peek()
 	if oldestReqFromMinQueue == nil {
 		return
 	}
 	var virtualStartBound = oldestReqFromMinQueue.arrivalR
-	if queue.virtualStart < virtualStartBound {
-		if klog.V(4).Enabled() {
-			klog.InfoS("AntiWindup tweaked queue", "QS", qs.qCfg.Name, "queue", queue.index, "time", qs.clock.Now().Format(nsTimeFmt), "requestDescr1", oldestReqFromMinQueue.descr1, "requestDescr2", oldestReqFromMinQueue.descr2, "newVirtualStart", virtualStartBound, "deltaVirtualStart", (virtualStartBound - queue.virtualStart))
+	if queue.nextDispatchR < virtualStartBound {
+		if klogV := klog.V(4); klogV.Enabled() {
+			klogV.InfoS("AntiWindup tweaked queue", "QS", qs.qCfg.Name, "queue", queue.index, "time", qs.clock.Now().Format(nsTimeFmt), "requestDescr1", oldestReqFromMinQueue.descr1, "requestDescr2", oldestReqFromMinQueue.descr2, "newVirtualStart", virtualStartBound, "deltaVirtualStart", (virtualStartBound - queue.nextDispatchR))
 		}
-		queue.virtualStart = virtualStartBound
+		queue.nextDispatchR = virtualStartBound
 	}
 }
 
@@ -896,8 +989,9 @@ func removeQueueAndUpdateIndexes(queues []*queue, index int) []*queue {
 }
 
 func (qs *queueSet) UpdateObservations() {
-	qs.obsPair.RequestsWaiting.Add(0)
-	qs.obsPair.RequestsExecuting.Add(0)
+	qs.reqsObsPair.RequestsWaiting.Add(0)
+	qs.reqsObsPair.RequestsExecuting.Add(0)
+	qs.execSeatsObs.Add(0)
 }
 
 func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
@@ -910,7 +1004,7 @@ func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
 		SeatsInUse: qs.totSeatsInUse,
 	}
 	for i, q := range qs.queues {
-		d.Queues[i] = q.dump(includeRequestDetails)
+		d.Queues[i] = q.dumpLocked(includeRequestDetails)
 	}
 	return d
 }

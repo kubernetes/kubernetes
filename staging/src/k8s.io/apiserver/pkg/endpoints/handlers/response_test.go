@@ -171,3 +171,36 @@ func TestCacheableObject(t *testing.T) {
 		})
 	}
 }
+
+func TestAsPartialObjectMetadataList(t *testing.T) {
+	var remainingItemCount int64 = 10
+	pods := &examplev1.PodList{
+		ListMeta: metav1.ListMeta{
+			SelfLink:           "/test/link",
+			ResourceVersion:    "10",
+			Continue:           "continuetoken",
+			RemainingItemCount: &remainingItemCount,
+		},
+	}
+
+	pomGVs := []schema.GroupVersion{metav1beta1.SchemeGroupVersion, metav1.SchemeGroupVersion}
+	for _, gv := range pomGVs {
+		t.Run(fmt.Sprintf("as %s PartialObjectMetadataList", gv), func(t *testing.T) {
+			list, err := asPartialObjectMetadataList(pods, gv)
+			if err != nil {
+				t.Fatalf("failed to transform object: %v", err)
+			}
+
+			var listMeta metav1.ListMeta
+			switch gv {
+			case metav1beta1.SchemeGroupVersion:
+				listMeta = list.(*metav1beta1.PartialObjectMetadataList).ListMeta
+			case metav1.SchemeGroupVersion:
+				listMeta = list.(*metav1.PartialObjectMetadataList).ListMeta
+			}
+			if !reflect.DeepEqual(pods.ListMeta, listMeta) {
+				t.Errorf("unexpected list metadata: %v, expected: %v", listMeta, pods.ListMeta)
+			}
+		})
+	}
+}

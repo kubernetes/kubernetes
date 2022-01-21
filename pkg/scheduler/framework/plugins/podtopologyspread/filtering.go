@@ -222,11 +222,15 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
 		TpPairToMatchNum:     make(map[topologyPair]*int32, sizeHeuristic(len(allNodes), constraints)),
 	}
+
+	// Nodes that pass nodeAffinity check and carry all required topology keys will be
+	// stored in `filteredNodes`, and be looped later to calculate preFilterState.
+	var filteredNodes []*framework.NodeInfo
 	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(pod)
 	for _, n := range allNodes {
 		node := n.Node()
 		if node == nil {
-			klog.Error("node not found")
+			klog.ErrorS(nil, "Node not found")
 			continue
 		}
 		// In accordance to design, if NodeAffinity or NodeSelector is defined,
@@ -244,10 +248,12 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			s.TpPairToMatchNum[pair] = new(int32)
 		}
+
+		filteredNodes = append(filteredNodes, n)
 	}
 
 	processNode := func(i int) {
-		nodeInfo := allNodes[i]
+		nodeInfo := filteredNodes[i]
 		node := nodeInfo.Node()
 
 		for _, constraint := range constraints {
@@ -260,7 +266,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			atomic.AddInt32(tpCount, int32(count))
 		}
 	}
-	pl.parallelizer.Until(context.Background(), len(allNodes), processNode)
+	pl.parallelizer.Until(context.Background(), len(filteredNodes), processNode)
 
 	// calculate min match for each topology pair
 	for i := 0; i < len(constraints); i++ {
@@ -296,7 +302,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		tpKey := c.TopologyKey
 		tpVal, ok := node.Labels[c.TopologyKey]
 		if !ok {
-			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
+			klog.V(5).InfoS("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
@@ -309,7 +315,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		paths, ok := s.TpKeyToCriticalPaths[tpKey]
 		if !ok {
 			// error which should not happen
-			klog.Errorf("internal error: get paths from key %q of %#v", tpKey, s.TpKeyToCriticalPaths)
+			klog.ErrorS(nil, "Internal error occurred while retrieving paths from topology key", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
 			continue
 		}
 		// judging criteria:
@@ -321,7 +327,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		}
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > c.MaxSkew {
-			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: MatchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, c.MaxSkew)
+			klog.V(5).InfoS("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
 			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
 		}
 	}

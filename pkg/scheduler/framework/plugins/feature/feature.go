@@ -26,5 +26,4 @@ type Features struct {
 	EnableReadWriteOncePod             bool
 	EnableVolumeCapacityPriority       bool
 	EnableCSIStorageCapacity           bool
-	EnableGenericEphemeralVolume       bool
 }

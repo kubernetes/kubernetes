@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -104,26 +105,10 @@ func StackdriverExporterDeployment(name, namespace string, replicas int32, conta
 		podSpec.Containers = append(podSpec.Containers, stackdriverExporterContainerSpec(containerSpec.Name, namespace, containerSpec.MetricName, containerSpec.MetricValue))
 	}
 
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"name": name},
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"name": name,
-					},
-				},
-				Spec: podSpec,
-			},
-			Replicas: &replicas,
-		},
-	}
+	d := e2edeployment.NewDeployment(name, replicas, map[string]string{"name": name}, "", "", appsv1.RollingUpdateDeploymentStrategyType)
+	d.ObjectMeta.Namespace = namespace
+	d.Spec.Template.Spec = podSpec
+	return d
 }
 
 // StackdriverExporterPod is a Pod of simple application that exports a metric of fixed value to
@@ -188,26 +173,10 @@ func stackdriverExporterContainerSpec(name string, namespace string, metricName 
 // one exposing a metric in prometheus format and second a prometheus-to-sd container
 // that scrapes the metric and pushes it to stackdriver.
 func PrometheusExporterDeployment(name, namespace string, replicas int32, metricValue int64) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"name": name},
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"name": name,
-					},
-				},
-				Spec: prometheusExporterPodSpec(CustomMetricName, metricValue, 8080),
-			},
-			Replicas: &replicas,
-		},
-	}
+	d := e2edeployment.NewDeployment(name, replicas, map[string]string{"name": name}, "", "", appsv1.RollingUpdateDeploymentStrategyType)
+	d.ObjectMeta.Namespace = namespace
+	d.Spec.Template.Spec = prometheusExporterPodSpec(CustomMetricName, metricValue, 8080)
+	return d
 }
 
 func prometheusExporterPodSpec(metricName string, metricValue int64, port int32) v1.PodSpec {

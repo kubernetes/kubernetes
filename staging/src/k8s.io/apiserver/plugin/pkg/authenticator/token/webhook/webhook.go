@@ -137,7 +137,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 
 		start := time.Now()
 		result, statusCode, tokenReviewErr = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
-		latency := time.Now().Sub(start)
+		latency := time.Since(start)
 
 		if statusCode != 0 {
 			w.metrics.RecordRequestTotal(ctx, strconv.Itoa(statusCode))

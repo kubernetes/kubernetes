@@ -25,12 +25,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	// This test can be safely deleted when we will not support multiple flag formats
-	root := NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
+	root := NewKubectlCommand(KubectlOptions{IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}})
 
 	if root.Parent() != nil {
 		t.Fatal("We expect the root command to be returned")
@@ -78,6 +77,50 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			name: "test that a plugin does not execute over an existing command by the same name",
 			args: []string{"kubectl", "version"},
 		},
+		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
+		// See https://github.com/kubernetes/kubectl/issues/1116
+		{
+			name: "test that a plugin does not execute over Cobra's help command",
+			args: []string{"kubectl", "help"},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __complete command",
+			args: []string{"kubectl", cobra.ShellCompRequestCmd},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __completeNoDesc command",
+			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd},
+		},
+		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
+		// even when a flag is specified first.  This can happen when using aliases.
+		// See https://github.com/kubernetes/kubectl/issues/1119
+		{
+			name: "test that a flag does not break Cobra's help command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", "help"},
+		},
+		{
+			name: "test that a flag does not break Cobra's __complete command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompRequestCmd},
+		},
+		{
+			name: "test that a flag does not break Cobra's __completeNoDesc command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompNoDescRequestCmd},
+		},
+		// As for the previous tests, an alias could add a flag without using the = form.
+		// We don't support this case as parsing the flags becomes quite complicated (flags
+		// that take a value, versus flags that don't)
+		// {
+		// 	name: "test that a flag with a space does not break Cobra's help command",
+		// 	args: []string{"kubectl", "--kubeconfig", "/path/to/kubeconfig", "help"},
+		// },
+		// {
+		// 	name: "test that a flag with a space does not break Cobra's __complete command",
+		// 	args: []string{"kubectl", "--kubeconfig", "/path/to/kubeconfig", cobra.ShellCompRequestCmd},
+		// },
+		// {
+		// 	name: "test that a flag with a space does not break Cobra's __completeNoDesc command",
+		// 	args: []string{"kubectl", "--kubeconfig", "/path/to/kubeconfig", cobra.ShellCompNoDescRequestCmd},
+		// },
 	}
 
 	for _, test := range tests {
@@ -85,13 +128,9 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			pluginsHandler := &testPluginHandler{
 				pluginsDirectory: "plugin/testdata",
 			}
-			_, in, out, errOut := genericclioptions.NewTestIOStreams()
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 
-			cmdutil.BehaviorOnFatal(func(str string, code int) {
-				errOut.Write([]byte(str))
-			})
-
-			root := NewDefaultKubectlCommandWithArgs(pluginsHandler, test.args, in, out, errOut)
+			root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
 			if err := root.Execute(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

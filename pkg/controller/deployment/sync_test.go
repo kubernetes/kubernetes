@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -297,7 +298,7 @@ func TestScale(t *testing.T) {
 				deploymentutil.SetReplicasAnnotations(rs, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
 			}
 
-			if err := dc.scale(test.deployment, test.newRS, test.oldRSs); err != nil {
+			if err := dc.scale(context.TODO(), test.deployment, test.newRS, test.oldRSs); err != nil {
 				t.Errorf("%s: unexpected error: %v", test.name, err)
 				return
 			}
@@ -433,7 +434,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		t.Logf(" &test.revisionHistoryLimit: %d", test.revisionHistoryLimit)
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
-		controller.cleanupDeployment(test.oldRSs, d)
+		controller.cleanupDeployment(context.TODO(), test.oldRSs, d)
 
 		gotDeletions := 0
 		for _, action := range fake.Actions() {
@@ -565,7 +566,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 		informers.Start(stopCh)
 
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
-		controller.cleanupDeployment(test.oldRSs, d)
+		controller.cleanupDeployment(context.TODO(), test.oldRSs, d)
 
 		deletedRSs := sets.String{}
 		for _, action := range fake.Actions() {

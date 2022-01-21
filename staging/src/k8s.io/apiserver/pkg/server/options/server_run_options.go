@@ -151,11 +151,11 @@ func (s *ServerRunOptions) Validate() []error {
 	}
 
 	if s.JSONPatchMaxCopyBytes < 0 {
-		errors = append(errors, fmt.Errorf("--json-patch-max-copy-bytes can not be negative value"))
+		errors = append(errors, fmt.Errorf("ServerRunOptions.JSONPatchMaxCopyBytes can not be negative value"))
 	}
 
 	if s.MaxRequestBodyBytes < 0 {
-		errors = append(errors, fmt.Errorf("--max-resource-write-bytes can not be negative value"))
+		errors = append(errors, fmt.Errorf("ServerRunOptions.MaxRequestBodyBytes can not be negative value"))
 	}
 
 	if err := validateHSTSDirectives(s.HSTSDirectives); err != nil {

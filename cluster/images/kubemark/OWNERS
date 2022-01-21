@@ -9,4 +9,4 @@ approvers:
 emeritus_approvers:
   - gmarek
 labels:
-- sig/scalability
+  - sig/scalability

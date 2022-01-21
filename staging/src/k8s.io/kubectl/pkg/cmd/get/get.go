@@ -167,8 +167,11 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 			var comps []string
 			if len(args) == 0 {
 				comps = apiresources.CompGetResourceList(f, cmd, toComplete)
-			} else if len(args) == 1 {
+			} else {
 				comps = CompGetResource(f, cmd, args[0], toComplete)
+				if len(args) > 1 {
+					comps = cmdutil.Difference(comps, args[1:])
+				}
 			}
 			return comps, cobra.ShellCompDirectiveNoFileComp
 		},

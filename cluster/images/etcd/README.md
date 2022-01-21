@@ -22,7 +22,8 @@ but can also be used as the etcd target version.
 
 Always run `/usr/local/bin/migrate` (or the
 `/usr/local/bin/migrate-if-needed.sh` wrapper script) before starting the etcd
-server.
+server. On Windows, run `C:\bin\migrate.exe` (or the `C:\bin\migrate-if-needed.bat
+wrapper script`).
 
 `migrate` writes a `version.txt` file to track the "current" version
 of etcd that was used to persist data to disk. A "target" version may also be provided
@@ -48,6 +49,9 @@ directory permissions and 0644 file permissions.
 For `amd64`, official `etcd` and `etcdctl` binaries are downloaded from Github
 to maintain official support.  For other architectures, `etcd` is cross-compiled
 from source. Arch-specific `busybox` images serve as base images.
+
+Windows images can be built on Linux nodes due to `docker buildx`, but they will
+only be created and pushed when using the `all-push` make target.
 
 #### How to release
 

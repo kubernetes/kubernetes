@@ -793,8 +793,7 @@ func TestRunningPodsJSONPathOutput(t *testing.T) {
 				}
 			},
            		{
-				"resourceVersion": "",
-				"selfLink": ""
+				"resourceVersion": ""
 			}
 		]
 	}`)

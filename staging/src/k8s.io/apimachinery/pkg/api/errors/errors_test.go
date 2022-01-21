@@ -125,6 +125,7 @@ func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
 		Err     *field.Error
 		Details *metav1.StatusDetails
+		Msg     string
 	}{
 		{
 			field.Duplicate(field.NewPath("field[0].name"), "bar"),
@@ -136,6 +137,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Duplicate value: "bar"`,
 		},
 		{
 			field.Invalid(field.NewPath("field[0].name"), "bar", "detail"),
@@ -147,6 +149,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Invalid value: "bar": detail`,
 		},
 		{
 			field.NotFound(field.NewPath("field[0].name"), "bar"),
@@ -158,6 +161,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Not found: "bar"`,
 		},
 		{
 			field.NotSupported(field.NewPath("field[0].name"), "bar", nil),
@@ -169,6 +173,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Unsupported value: "bar"`,
 		},
 		{
 			field.Required(field.NewPath("field[0].name"), ""),
@@ -180,18 +185,37 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Required value`,
+		},
+		{
+			nil,
+			&metav1.StatusDetails{
+				Kind:   "Kind",
+				Name:   "name",
+				Causes: []metav1.StatusCause{},
+			},
+			`Kind "name" is invalid`,
 		},
 	}
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
-		expected.Causes[0].Message = vErr.ErrorBody()
-		err := NewInvalid(kind("Kind"), "name", field.ErrorList{vErr})
+		if vErr != nil && expected != nil {
+			expected.Causes[0].Message = vErr.ErrorBody()
+		}
+		var errList field.ErrorList
+		if vErr != nil {
+			errList = append(errList, vErr)
+		}
+		err := NewInvalid(kind("Kind"), "name", errList)
 		status := err.ErrStatus
 		if status.Code != 422 || status.Reason != metav1.StatusReasonInvalid {
 			t.Errorf("%d: unexpected status: %#v", i, status)
 		}
 		if !reflect.DeepEqual(expected, status.Details) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected, status.Details)
+		}
+		if testCase.Msg != status.Message {
+			t.Errorf("%d: expected\n%s\ngot\n%s", i, testCase.Msg, status.Message)
 		}
 	}
 }
@@ -255,6 +279,10 @@ func TestReasonForErrorSupportsWrappedErrors(t *testing.T) {
 			err:            fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
 			expectedReason: metav1.StatusReasonUnknown,
 		},
+		{
+			name:           "Nil",
+			expectedReason: metav1.StatusReasonUnknown,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -302,6 +330,10 @@ func TestIsTooManyRequestsSupportsWrappedErrors(t *testing.T) {
 			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
 			expectMatch: false,
 		},
+		{
+			name:        "Nil",
+			expectMatch: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -344,6 +376,10 @@ func TestIsRequestEntityTooLargeErrorSupportsWrappedErrors(t *testing.T) {
 		{
 			name:        "Nested,no match",
 			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}
@@ -390,6 +426,10 @@ func TestIsUnexpectedServerError(t *testing.T) {
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
 			expectMatch: false,
 		},
+		{
+			name:        "Nil",
+			expectMatch: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -428,6 +468,10 @@ func TestIsUnexpectedObjectError(t *testing.T) {
 		{
 			name:        "Nested, no match",
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}
@@ -473,6 +517,10 @@ func TestSuggestsClientDelaySupportsWrapping(t *testing.T) {
 		{
 			name:        "Nested, no match",
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}

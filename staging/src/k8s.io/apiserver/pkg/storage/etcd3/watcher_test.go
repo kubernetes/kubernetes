@@ -43,9 +43,6 @@ import (
 
 func TestWatch(t *testing.T) {
 	testWatch(t, false)
-}
-
-func TestWatchList(t *testing.T) {
 	testWatch(t, true)
 }
 
@@ -94,7 +91,7 @@ func testWatch(t *testing.T, recursive bool) {
 		},
 	}}
 	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred}, recursive)
+		w, err := store.Watch(ctx, tt.key, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred, Recursive: recursive})
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}

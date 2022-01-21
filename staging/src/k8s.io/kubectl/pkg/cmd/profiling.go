@@ -37,11 +37,15 @@ func addProfilingFlags(flags *pflag.FlagSet) {
 }
 
 func initProfiling() error {
+	var (
+		f   *os.File
+		err error
+	)
 	switch profileName {
 	case "none":
 		return nil
 	case "cpu":
-		f, err := os.Create(profileOutput)
+		f, err = os.Create(profileOutput)
 		if err != nil {
 			return err
 		}
@@ -68,6 +72,7 @@ func initProfiling() error {
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		<-c
+		f.Close()
 		flushProfiling()
 		os.Exit(0)
 	}()
@@ -93,6 +98,7 @@ func flushProfiling() error {
 		if err != nil {
 			return err
 		}
+		defer f.Close()
 		profile.WriteTo(f, 0)
 	}
 

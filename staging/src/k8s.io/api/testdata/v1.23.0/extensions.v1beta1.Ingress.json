@@ -1,0 +1,103 @@
+{
+  "kind": "Ingress",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "2",
+    "generateName": "3",
+    "namespace": "4",
+    "selfLink": "5",
+    "uid": "7",
+    "resourceVersion": "11042405498087606203",
+    "generation": 8071137005907523419,
+    "creationTimestamp": "2061-09-19T18:13:36Z",
+    "deletionGracePeriodSeconds": -4955867275792137171,
+    "labels": {
+      "7": "8"
+    },
+    "annotations": {
+      "9": "10"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "11",
+        "kind": "12",
+        "name": "13",
+        "uid": "Dz廔ȇ{sŊƏp",
+        "controller": false,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "14"
+    ],
+    "clusterName": "15",
+    "managedFields": [
+      {
+        "manager": "16",
+        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
+        "apiVersion": "17",
+        "fieldsType": "18",
+        "subresource": "19"
+      }
+    ]
+  },
+  "spec": {
+    "ingressClassName": "20",
+    "backend": {
+      "serviceName": "21",
+      "servicePort": "22",
+      "resource": {
+        "apiGroup": "23",
+        "kind": "24",
+        "name": "25"
+      }
+    },
+    "tls": [
+      {
+        "hosts": [
+          "26"
+        ],
+        "secretName": "27"
+      }
+    ],
+    "rules": [
+      {
+        "host": "28",
+        "http": {
+          "paths": [
+            {
+              "path": "29",
+              "pathType": ")晿\u003co,c鮽ort昍řČ",
+              "backend": {
+                "serviceName": "30",
+                "servicePort": 1973774989,
+                "resource": {
+                  "apiGroup": "31",
+                  "kind": "32",
+                  "name": "33"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "status": {
+    "loadBalancer": {
+      "ingress": [
+        {
+          "ip": "34",
+          "hostname": "35",
+          "ports": [
+            {
+              "port": 2114329341,
+              "protocol": "Ă凗蓏Ŋ蛊ĉy",
+              "error": "36"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

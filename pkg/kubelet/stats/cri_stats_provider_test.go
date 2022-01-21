@@ -33,7 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critest "k8s.io/cri-api/pkg/apis/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -236,6 +236,7 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 		false,
+		false,
 	)
 
 	stats, err := provider.ListPodStats()
@@ -396,6 +397,7 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProvider(),
 		true, // this is what the test is actually testing
+		false,
 	)
 
 	stats, err := provider.ListPodStats()
@@ -541,6 +543,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		nil,
 		NewFakeHostStatsProvider(),
 		false,
+		false,
 	)
 
 	stats, err := provider.ListPodCPUAndMemoryStats()
@@ -670,6 +673,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProvider(),
+		false,
 		false,
 	)
 

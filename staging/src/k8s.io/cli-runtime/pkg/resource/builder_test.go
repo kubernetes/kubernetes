@@ -50,7 +50,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 
 	// TODO we need to remove this linkage and create our own scheme
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -333,6 +333,10 @@ type errorRestMapper struct {
 
 func (l *errorRestMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	return nil, l.err
+}
+
+func (l *errorRestMapper) Reset() {
+	meta.MaybeResetRESTMapper(l.RESTMapper)
 }
 
 func newDefaultBuilderWithMapperError(fakeClientFn FakeClientFunc, err error) *Builder {
@@ -1762,7 +1766,7 @@ func TestUnstructured(t *testing.T) {
 		{
 			name:          "badpod",
 			file:          "badpod.json",
-			expectedError: "v1.ObjectMeta.Annotations",
+			expectedError: "ObjectMeta.",
 		},
 	}
 

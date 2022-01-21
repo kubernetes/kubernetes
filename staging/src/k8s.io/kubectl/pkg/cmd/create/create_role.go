@@ -112,6 +112,14 @@ var (
 	}
 )
 
+// AddSpecialVerb allows the addition of items to the `specialVerbs` map for non-k8s native resources.
+func AddSpecialVerb(verb string, gr schema.GroupResource) {
+	if resources, ok := specialVerbs[verb]; ok {
+		resources = append(resources, gr)
+		specialVerbs[verb] = resources
+	}
+}
+
 // ResourceOptions holds the related options for '--resource' option
 type ResourceOptions struct {
 	Group       string

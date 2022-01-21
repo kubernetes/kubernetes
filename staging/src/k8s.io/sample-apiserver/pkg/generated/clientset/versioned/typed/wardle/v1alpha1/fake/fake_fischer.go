@@ -99,7 +99,7 @@ func (c *FakeFischers) Update(ctx context.Context, fischer *v1alpha1.Fischer, op
 // Delete takes name of the fischer and deletes it. Returns an error if one occurs.
 func (c *FakeFischers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(fischersResource, name), &v1alpha1.Fischer{})
+		Invokes(testing.NewRootDeleteActionWithOptions(fischersResource, name, opts), &v1alpha1.Fischer{})
 	return err
 }
 

@@ -99,7 +99,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       -10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 			},
-			expectErr: "--json-patch-max-copy-bytes can not be negative value",
+			expectErr: "ServerRunOptions.JSONPatchMaxCopyBytes can not be negative value",
 		},
 		{
 			name: "Test when MaxRequestBodyBytes is negative value",
@@ -113,7 +113,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         -10 * 1024 * 1024,
 			},
-			expectErr: "--max-resource-write-bytes can not be negative value",
+			expectErr: "ServerRunOptions.MaxRequestBodyBytes can not be negative value",
 		},
 		{
 			name: "Test when LivezGracePeriod is negative value",

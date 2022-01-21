@@ -56,6 +56,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
+	gvr("autoscaling", "v2", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
 	gvr("batch", "v1", "cronjobs"):                                  `{"status": {"lastScheduleTime":  "2020-01-01T00:00:00Z"}}`,
 	gvr("batch", "v1beta1", "cronjobs"):                             `{"status": {"lastScheduleTime":  "2020-01-01T00:00:00Z"}}`,
 	gvr("storage.k8s.io", "v1", "volumeattachments"):                `{"status": {"attached": false}}`,
@@ -67,11 +68,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 // resetFieldsStatusDefault conflicts with statusDefault
 const resetFieldsStatusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"False"}]}}`
 
-var resetFieldsSkippedResources = map[string]struct{}{
-	// TODO: flowschemas is flaking,
-	// possible bug in the flowschemas controller.
-	"flowschemas": {},
-}
+var resetFieldsSkippedResources = map[string]struct{}{}
 
 // noConflicts is the set of reources for which
 // a conflict cannot occur.
@@ -110,6 +107,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("apps", "v1", "replicasets"):                                               `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container4"}]}}}}`,
 	gvr("apps", "v1", "statefulsets"):                                              `{"spec": {"selector": {"matchLabels": {"a2": "b2"}}}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):                           `{"spec": {"maxReplicas": 23}}`,
+	gvr("autoscaling", "v2", "horizontalpodautoscalers"):                           `{"spec": {"maxReplicas": 23}}`,
 	gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"):                      `{"spec": {"maxReplicas": 23}}`,
 	gvr("autoscaling", "v2beta2", "horizontalpodautoscalers"):                      `{"spec": {"maxReplicas": 23}}`,
 	gvr("batch", "v1", "jobs"):                                                     `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container1"}]}}}}`,

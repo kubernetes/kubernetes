@@ -108,7 +108,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 				driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 				claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
-				r.VolSource = createEphemeralVolumeSource(r.Sc.Name, dInfo.RequiredAccessModes, claimSize)
+				r.VolSource = createEphemeralVolumeSource(r.Sc.Name, pattern.VolMode, dInfo.RequiredAccessModes, claimSize)
 			}
 		}
 	case CSIInlineVolume:
@@ -133,9 +133,12 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 	return &r
 }
 
-func createEphemeralVolumeSource(scName string, accessModes []v1.PersistentVolumeAccessMode, claimSize string) *v1.VolumeSource {
+func createEphemeralVolumeSource(scName string, volMode v1.PersistentVolumeMode, accessModes []v1.PersistentVolumeAccessMode, claimSize string) *v1.VolumeSource {
 	if len(accessModes) == 0 {
 		accessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	}
+	if volMode == "" {
+		volMode = v1.PersistentVolumeFilesystem
 	}
 	return &v1.VolumeSource{
 		Ephemeral: &v1.EphemeralVolumeSource{
@@ -143,6 +146,7 @@ func createEphemeralVolumeSource(scName string, accessModes []v1.PersistentVolum
 				Spec: v1.PersistentVolumeClaimSpec{
 					StorageClassName: &scName,
 					AccessModes:      accessModes,
+					VolumeMode:       &volMode,
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse(claimSize),
@@ -255,7 +259,7 @@ func createPVCPV(
 	}
 
 	framework.Logf("Creating PVC and PV")
-	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
+	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, f.Timeouts, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
 	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Timeouts, f.Namespace.Name, pv, pvc)

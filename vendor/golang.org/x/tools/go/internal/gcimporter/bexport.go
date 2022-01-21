@@ -34,9 +34,6 @@ import (
 // (suspected) format errors, and whenever a change is made to the format.
 const debugFormat = false // default: false
 
-// If trace is set, debugging output is printed to std out.
-const trace = false // default: false
-
 // Current export format version. Increase with each format change.
 // Note: The latest binary (non-indexed) export format is at version 6.
 //       This exporter is still at level 4, but it doesn't matter since
@@ -92,16 +89,18 @@ func internalErrorf(format string, args ...interface{}) error {
 // BExportData returns binary export data for pkg.
 // If no file set is provided, position info will be missing.
 func BExportData(fset *token.FileSet, pkg *types.Package) (b []byte, err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			if ierr, ok := e.(internalError); ok {
-				err = ierr
-				return
+	if !debug {
+		defer func() {
+			if e := recover(); e != nil {
+				if ierr, ok := e.(internalError); ok {
+					err = ierr
+					return
+				}
+				// Not an internal error; panic again.
+				panic(e)
 			}
-			// Not an internal error; panic again.
-			panic(e)
-		}
-	}()
+		}()
+	}
 
 	p := exporter{
 		fset:          fset,

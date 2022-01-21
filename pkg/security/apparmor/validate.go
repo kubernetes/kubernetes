@@ -29,7 +29,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -44,8 +43,8 @@ type Validator interface {
 }
 
 // NewValidator is in order to find AppArmor FS
-func NewValidator(runtime string) Validator {
-	if err := validateHost(runtime); err != nil {
+func NewValidator() Validator {
+	if err := validateHost(); err != nil {
 		return &validator{validateHostErr: err}
 	}
 	appArmorFS, err := getAppArmorFS()
@@ -73,14 +72,9 @@ func (v *validator) Validate(pod *v1.Pod) error {
 		return v.validateHostErr
 	}
 
-	loadedProfiles, err := v.getLoadedProfiles()
-	if err != nil {
-		return fmt.Errorf("could not read loaded profiles: %v", err)
-	}
-
 	var retErr error
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
-		retErr = validateProfile(GetProfileName(pod, container.Name), loadedProfiles)
+		retErr = ValidateProfileFormat(GetProfileName(pod, container.Name))
 		if retErr != nil {
 			return false
 		}
@@ -95,7 +89,7 @@ func (v *validator) ValidateHost() error {
 }
 
 // Verify that the host and runtime is capable of enforcing AppArmor profiles.
-func validateHost(runtime string) error {
+func validateHost() error {
 	// Check feature-gates
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
 		return errors.New("AppArmor disabled by feature-gate")
@@ -111,27 +105,6 @@ func validateHost(runtime string) error {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 
-	// Check runtime support. Currently only Docker is supported.
-	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q", runtime)
-	}
-
-	return nil
-}
-
-// Verify that the profile is valid and loaded.
-func validateProfile(profile string, loadedProfiles map[string]bool) error {
-	if err := ValidateProfileFormat(profile); err != nil {
-		return err
-	}
-
-	if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
-		profileName := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
-		if !loadedProfiles[profileName] {
-			return fmt.Errorf("profile %q is not loaded", profileName)
-		}
-	}
-
 	return nil
 }
 
@@ -144,40 +117,6 @@ func ValidateProfileFormat(profile string) error {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
 	}
 	return nil
-}
-
-func (v *validator) getLoadedProfiles() (map[string]bool, error) {
-	profilesPath := path.Join(v.appArmorFS, "profiles")
-	profilesFile, err := os.Open(profilesPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open %s: %v", profilesPath, err)
-	}
-	defer profilesFile.Close()
-
-	profiles := map[string]bool{}
-	scanner := bufio.NewScanner(profilesFile)
-	for scanner.Scan() {
-		profileName := parseProfileName(scanner.Text())
-		if profileName == "" {
-			// Unknown line format; skip it.
-			continue
-		}
-		profiles[profileName] = true
-	}
-	return profiles, nil
-}
-
-// The profiles file is formatted with one profile per line, matching a form:
-//   namespace://profile-name (mode)
-//   profile-name (mode)
-// Where mode is {enforce, complain, kill}. The "namespace://" is only included for namespaced
-// profiles. For the purposes of Kubernetes, we consider the namespace part of the profile name.
-func parseProfileName(profileLine string) string {
-	modeIndex := strings.IndexRune(profileLine, '(')
-	if modeIndex < 0 {
-		return ""
-	}
-	return strings.TrimSpace(profileLine[:modeIndex])
 }
 
 func getAppArmorFS() (string, error) {
