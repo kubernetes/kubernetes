@@ -162,7 +162,7 @@ func pingTimeoutSeconds() int {
 	if s := os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"); len(s) > 0 {
 		i, err := strconv.Atoi(s)
 		if err != nil {
-			klog.InfoS("Illegal HTTP2_PING_TIMEOUT_SECONDS and default value is used", "HTTP2_PING_TIMEOUT_SECONDS", s, "defaultPingTimeoutSeconds", ret, "err", err)
+			klog.InfoS("Illegal HTTP2_PING_TIMEOUT_SECONDS and default value is used", "HTTP2_PING_TIMEOUT_SECONDS_test", s, "defaultPingTimeoutSeconds", ret, "err", err)
 			return ret
 		}
 		ret = i
