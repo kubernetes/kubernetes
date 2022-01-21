@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
@@ -36,104 +35,21 @@ var (
 	errObjectNotFlowSchema = errors.New("object is not a FlowSchema type")
 )
 
-// FlowSchemaEnsurer ensures the specified bootstrap configuration objects
-type FlowSchemaEnsurer interface {
-	Ensure([]*flowcontrolv1beta2.FlowSchema) error
-}
-
-// FlowSchemaRemover is the interface that wraps the
-// RemoveAutoUpdateEnabledObjects method.
-//
-// RemoveAutoUpdateEnabledObjects removes a set of bootstrap FlowSchema
-// objects specified via their names. The function removes an object
-// only if automatic update of the spec is enabled for it.
-type FlowSchemaRemover interface {
-	RemoveAutoUpdateEnabledObjects([]string) error
-}
-
-// NewSuggestedFlowSchemaEnsurer returns a FlowSchemaEnsurer instance that
-// can be used to ensure a set of suggested FlowSchema configuration objects.
-func NewSuggestedFlowSchemaEnsurer(client flowcontrolclient.FlowSchemaInterface, lister flowcontrollisters.FlowSchemaLister) FlowSchemaEnsurer {
-	wrapper := &flowSchemaWrapper{
+// NewFlowSchemaWrapper makes a ConfigurationWrapper for FlowSchema objects
+func NewFlowSchemaWrapper(client flowcontrolclient.FlowSchemaInterface, lister flowcontrollisters.FlowSchemaLister) ConfigurationWrapper {
+	return &flowSchemaWrapper{
 		client: client,
 		lister: lister,
 	}
-	return &fsEnsurer{
-		strategy: newSuggestedEnsureStrategy(wrapper),
-		wrapper:  wrapper,
-	}
 }
 
-// NewMandatoryFlowSchemaEnsurer returns a FlowSchemaEnsurer instance that
-// can be used to ensure a set of mandatory FlowSchema configuration objects.
-func NewMandatoryFlowSchemaEnsurer(client flowcontrolclient.FlowSchemaInterface, lister flowcontrollisters.FlowSchemaLister) FlowSchemaEnsurer {
-	wrapper := &flowSchemaWrapper{
-		client: client,
-		lister: lister,
+// ObjectifyFlowSchemas copies the given list to a generic form
+func ObjectifyFlowSchemas(objs []*flowcontrolv1beta2.FlowSchema) configurationObjectSlice {
+	slice := make(configurationObjectSlice, 0, len(objs))
+	for _, obj := range objs {
+		slice = append(slice, obj)
 	}
-	return &fsEnsurer{
-		strategy: newMandatoryEnsureStrategy(wrapper),
-		wrapper:  wrapper,
-	}
-}
-
-// NewFlowSchemaRemover returns a FlowSchemaRemover instance that
-// can be used to remove a set of FlowSchema configuration objects.
-func NewFlowSchemaRemover(client flowcontrolclient.FlowSchemaInterface, lister flowcontrollisters.FlowSchemaLister) FlowSchemaRemover {
-	return &fsEnsurer{
-		wrapper: &flowSchemaWrapper{
-			client: client,
-			lister: lister,
-		},
-	}
-}
-
-// GetFlowSchemaRemoveCandidates returns a list of FlowSchema object
-// names that are candidates for deletion from the cluster.
-// bootstrap: a set of hard coded FlowSchema configuration objects
-// kube-apiserver maintains in-memory.
-func GetFlowSchemaRemoveCandidates(lister flowcontrollisters.FlowSchemaLister, bootstrap []*flowcontrolv1beta2.FlowSchema) ([]string, error) {
-	fsList, err := lister.List(labels.Everything())
-	if err != nil {
-		return nil, fmt.Errorf("failed to list FlowSchema - %w", err)
-	}
-
-	bootstrapNames := sets.String{}
-	for i := range bootstrap {
-		bootstrapNames.Insert(bootstrap[i].GetName())
-	}
-
-	currentObjects := make([]metav1.Object, len(fsList))
-	for i := range fsList {
-		currentObjects[i] = fsList[i]
-	}
-
-	return getDanglingBootstrapObjectNames(bootstrapNames, currentObjects), nil
-}
-
-type fsEnsurer struct {
-	strategy ensureStrategy
-	wrapper  configurationWrapper
-}
-
-func (e *fsEnsurer) Ensure(flowSchemas []*flowcontrolv1beta2.FlowSchema) error {
-	for _, flowSchema := range flowSchemas {
-		if err := ensureConfiguration(e.wrapper, e.strategy, flowSchema); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (e *fsEnsurer) RemoveAutoUpdateEnabledObjects(flowSchemas []string) error {
-	for _, flowSchema := range flowSchemas {
-		if err := removeAutoUpdateEnabledConfiguration(e.wrapper, flowSchema); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return slice
 }
 
 // flowSchemaWrapper abstracts all FlowSchema specific logic, with this
@@ -142,6 +58,8 @@ type flowSchemaWrapper struct {
 	client flowcontrolclient.FlowSchemaInterface
 	lister flowcontrollisters.FlowSchemaLister
 }
+
+var _ ConfigurationWrapper = &flowSchemaWrapper{}
 
 func (fs *flowSchemaWrapper) TypeName() string {
 	return "FlowSchema"
@@ -169,8 +87,8 @@ func (fs *flowSchemaWrapper) Get(name string) (configurationObject, error) {
 	return fs.lister.Get(name)
 }
 
-func (fs *flowSchemaWrapper) Delete(name string) error {
-	return fs.client.Delete(context.TODO(), name, metav1.DeleteOptions{})
+func (fs *flowSchemaWrapper) Delete(name, resourceVersion string) error {
+	return fs.client.Delete(context.TODO(), name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &resourceVersion}})
 }
 
 func (fs *flowSchemaWrapper) CopySpec(bootstrap, current runtime.Object) error {
@@ -205,4 +123,12 @@ func flowSchemaSpecChanged(expected, actual *flowcontrolv1beta2.FlowSchema) bool
 	copiedExpectedFlowSchema := expected.DeepCopy()
 	flowcontrolapisv1beta2.SetObjectDefaults_FlowSchema(copiedExpectedFlowSchema)
 	return !equality.Semantic.DeepEqual(copiedExpectedFlowSchema.Spec, actual.Spec)
+}
+
+func (wr flowSchemaWrapper) GetExistingObjects() (configurationObjectSlice, error) {
+	objs, err := wr.lister.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list FlowSchema objects - %w", err)
+	}
+	return ObjectifyFlowSchemas(objs), nil
 }

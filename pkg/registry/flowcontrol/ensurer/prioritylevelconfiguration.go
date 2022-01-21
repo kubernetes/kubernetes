@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
@@ -36,105 +35,21 @@ var (
 	errObjectNotPriorityLevel = errors.New("object is not a PriorityLevelConfiguration type")
 )
 
-// PriorityLevelEnsurer ensures the specified bootstrap configuration objects
-type PriorityLevelEnsurer interface {
-	Ensure([]*flowcontrolv1beta2.PriorityLevelConfiguration) error
-}
-
-// PriorityLevelRemover is the interface that wraps the
-// RemoveAutoUpdateEnabledObjects method.
-//
-// RemoveAutoUpdateEnabledObjects removes a set of bootstrap
-// PriorityLevelConfiguration objects specified via their names.
-// The function removes an object only if automatic update
-// of the spec is enabled for it.
-type PriorityLevelRemover interface {
-	RemoveAutoUpdateEnabledObjects([]string) error
-}
-
-// NewSuggestedPriorityLevelEnsurerEnsurer returns a PriorityLevelEnsurer instance that
-// can be used to ensure a set of suggested PriorityLevelConfiguration configuration objects.
-func NewSuggestedPriorityLevelEnsurerEnsurer(client flowcontrolclient.PriorityLevelConfigurationInterface, lister flowcontrollisters.PriorityLevelConfigurationLister) PriorityLevelEnsurer {
-	wrapper := &priorityLevelConfigurationWrapper{
+// NewPriorityLevelConfigurationWrapper makes a ConfigurationWrapper for PriorityLevelConfiguration objects
+func NewPriorityLevelConfigurationWrapper(client flowcontrolclient.PriorityLevelConfigurationInterface, lister flowcontrollisters.PriorityLevelConfigurationLister) ConfigurationWrapper {
+	return &priorityLevelConfigurationWrapper{
 		client: client,
 		lister: lister,
 	}
-	return &plEnsurer{
-		strategy: newSuggestedEnsureStrategy(wrapper),
-		wrapper:  wrapper,
-	}
 }
 
-// NewMandatoryPriorityLevelEnsurer returns a PriorityLevelEnsurer instance that
-// can be used to ensure a set of mandatory PriorityLevelConfiguration configuration objects.
-func NewMandatoryPriorityLevelEnsurer(client flowcontrolclient.PriorityLevelConfigurationInterface, lister flowcontrollisters.PriorityLevelConfigurationLister) PriorityLevelEnsurer {
-	wrapper := &priorityLevelConfigurationWrapper{
-		client: client,
-		lister: lister,
+// ObjectifyPriorityLevelConfigurations copies the given list to a generic form
+func ObjectifyPriorityLevelConfigurations(objs []*flowcontrolv1beta2.PriorityLevelConfiguration) configurationObjectSlice {
+	slice := make(configurationObjectSlice, 0, len(objs))
+	for _, obj := range objs {
+		slice = append(slice, obj)
 	}
-	return &plEnsurer{
-		strategy: newMandatoryEnsureStrategy(wrapper),
-		wrapper:  wrapper,
-	}
-}
-
-// NewPriorityLevelRemover returns a PriorityLevelRemover instance that
-// can be used to remove a set of PriorityLevelConfiguration configuration objects.
-func NewPriorityLevelRemover(client flowcontrolclient.PriorityLevelConfigurationInterface, lister flowcontrollisters.PriorityLevelConfigurationLister) PriorityLevelRemover {
-	return &plEnsurer{
-		wrapper: &priorityLevelConfigurationWrapper{
-			client: client,
-			lister: lister,
-		},
-	}
-}
-
-// GetPriorityLevelRemoveCandidates returns a list of PriorityLevelConfiguration
-// names that are candidates for removal from the cluster.
-// bootstrap: a set of hard coded PriorityLevelConfiguration configuration
-// objects kube-apiserver maintains in-memory.
-func GetPriorityLevelRemoveCandidates(lister flowcontrollisters.PriorityLevelConfigurationLister, bootstrap []*flowcontrolv1beta2.PriorityLevelConfiguration) ([]string, error) {
-	plList, err := lister.List(labels.Everything())
-	if err != nil {
-		return nil, fmt.Errorf("failed to list PriorityLevelConfiguration - %w", err)
-	}
-
-	bootstrapNames := sets.String{}
-	for i := range bootstrap {
-		bootstrapNames.Insert(bootstrap[i].GetName())
-	}
-
-	currentObjects := make([]metav1.Object, len(plList))
-	for i := range plList {
-		currentObjects[i] = plList[i]
-	}
-
-	return getDanglingBootstrapObjectNames(bootstrapNames, currentObjects), nil
-}
-
-type plEnsurer struct {
-	strategy ensureStrategy
-	wrapper  configurationWrapper
-}
-
-func (e *plEnsurer) Ensure(priorityLevels []*flowcontrolv1beta2.PriorityLevelConfiguration) error {
-	for _, priorityLevel := range priorityLevels {
-		if err := ensureConfiguration(e.wrapper, e.strategy, priorityLevel); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (e *plEnsurer) RemoveAutoUpdateEnabledObjects(priorityLevels []string) error {
-	for _, priorityLevel := range priorityLevels {
-		if err := removeAutoUpdateEnabledConfiguration(e.wrapper, priorityLevel); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return slice
 }
 
 // priorityLevelConfigurationWrapper abstracts all PriorityLevelConfiguration specific logic,
@@ -143,6 +58,8 @@ type priorityLevelConfigurationWrapper struct {
 	client flowcontrolclient.PriorityLevelConfigurationInterface
 	lister flowcontrollisters.PriorityLevelConfigurationLister
 }
+
+var _ ConfigurationWrapper = &priorityLevelConfigurationWrapper{}
 
 func (fs *priorityLevelConfigurationWrapper) TypeName() string {
 	return "PriorityLevelConfiguration"
@@ -170,8 +87,8 @@ func (fs *priorityLevelConfigurationWrapper) Get(name string) (configurationObje
 	return fs.lister.Get(name)
 }
 
-func (fs *priorityLevelConfigurationWrapper) Delete(name string) error {
-	return fs.client.Delete(context.TODO(), name, metav1.DeleteOptions{})
+func (fs *priorityLevelConfigurationWrapper) Delete(name, resourceVersion string) error {
+	return fs.client.Delete(context.TODO(), name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &resourceVersion}})
 }
 
 func (fs *priorityLevelConfigurationWrapper) CopySpec(bootstrap, current runtime.Object) error {
@@ -206,4 +123,12 @@ func priorityLevelSpecChanged(expected, actual *flowcontrolv1beta2.PriorityLevel
 	copiedExpectedPriorityLevel := expected.DeepCopy()
 	flowcontrolapisv1beta2.SetObjectDefaults_PriorityLevelConfiguration(copiedExpectedPriorityLevel)
 	return !equality.Semantic.DeepEqual(copiedExpectedPriorityLevel.Spec, actual.Spec)
+}
+
+func (wr priorityLevelConfigurationWrapper) GetExistingObjects() (configurationObjectSlice, error) {
+	objs, err := wr.lister.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list PriorityLevelConfiguration objects - %w", err)
+	}
+	return ObjectifyPriorityLevelConfigurations(objs), nil
 }
