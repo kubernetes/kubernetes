@@ -629,15 +629,29 @@ func getAttachmentName(volName, csiDriverName, nodeName string) string {
 
 func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
 	if spec == nil {
-		return "", errors.New(log("makeDeviceMountPath failed, spec is nil"))
+		return "", errors.New("makeDeviceMountPath failed, spec is nil")
 	}
 
-	pvName := spec.PersistentVolume.Name
-	if pvName == "" {
-		return "", errors.New(log("makeDeviceMountPath failed, pv name empty"))
+	driver, err := GetCSIDriverName(spec)
+	if err != nil {
+		return "", err
+	}
+	if driver == "" {
+		return "", errors.New("makeDeviceMountPath failed, csi source driver name is empty")
 	}
 
-	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), persistentVolumeInGlobalPath, pvName, globalMountInGlobalPath), nil
+	csiSource, err := getPVSourceFromSpec(spec)
+	if err != nil {
+		return "", errors.New(log("makeDeviceMountPath failed to get CSIPersistentVolumeSource: %v", err))
+	}
+
+	if csiSource.VolumeHandle == "" {
+		return "", errors.New("makeDeviceMountPath failed, CSIPersistentVolumeSource volume handle is empty")
+	}
+
+	result := sha256.Sum256([]byte(fmt.Sprintf("%s", csiSource.VolumeHandle)))
+	volSha := fmt.Sprintf("%x", result)
+	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), driver, volSha, globalMountInGlobalPath), nil
 }
 
 func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMountPath string) (string, string, error) {
