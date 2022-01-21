@@ -307,7 +307,7 @@ func (o *LabelOptions) RunLabel() error {
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
+			dataChangeMsg = updateDataChangeMsg(oldData, newObj, o.overwrite)
 			outputObj = info.Object
 		} else {
 			name, namespace := info.Name, info.Namespace
@@ -334,7 +334,7 @@ func (o *LabelOptions) RunLabel() error {
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
+			dataChangeMsg = updateDataChangeMsg(oldData, newObj, o.overwrite)
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
 			createdPatch := err == nil
 			if err != nil {
@@ -395,11 +395,11 @@ func (o *LabelOptions) RunLabel() error {
 	})
 }
 
-func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
+func updateDataChangeMsg(oldObj []byte, newObj []byte, overwrite bool) string {
 	msg := MsgNotLabeled
 	if !reflect.DeepEqual(oldObj, newObj) {
 		msg = MsgLabeled
-		if len(newObj) < len(oldObj) {
+		if !overwrite && len(newObj) < len(oldObj) {
 			msg = MsgUnLabeled
 		}
 	}
