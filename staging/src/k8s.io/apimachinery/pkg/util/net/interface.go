@@ -234,7 +234,7 @@ func getMatchingGlobalIP(addrs []net.Addr, family AddressFamily) (net.IP, error)
 					klog.V(4).Infof("Non-global unicast address found %v", ip)
 				}
 			} else {
-				klog.V(4).Infof("%v is not an IPv%d address", ip, int(family))
+				klog.V(4).InfoS("Unexpected IP version", "IP", ip, "expectedIPVersion", int(family))
 			}
 
 		}
@@ -254,13 +254,13 @@ func getIPFromInterface(intfName string, forFamily AddressFamily, nw networkInte
 		if err != nil {
 			return nil, err
 		}
-		klog.V(4).Infof("Interface %q has %d addresses :%v.", intfName, len(addrs), addrs)
+		klog.V(4).InfoS("Address information of the interface", "interfaceName", intfName, "addressesNum", len(addrs), "addresses", addrs)
 		matchingIP, err := getMatchingGlobalIP(addrs, forFamily)
 		if err != nil {
 			return nil, err
 		}
 		if matchingIP != nil {
-			klog.V(4).Infof("Found valid IPv%d address %v for interface %q.", int(forFamily), matchingIP, intfName)
+			klog.V(4).InfoS("Found valid address for interface", "interfaceName", intfName, "address", matchingIP, "ipVersion", int(forFamily))
 			return matchingIP, nil
 		}
 	}
@@ -283,7 +283,7 @@ func getIPFromLoopbackInterface(forFamily AddressFamily, nw networkInterfacer) (
 			if err != nil {
 				return nil, err
 			}
-			klog.V(4).Infof("Interface %q has %d addresses :%v.", intf.Name, len(addrs), addrs)
+			klog.V(4).InfoS("Address information of the interface", "interfaceName", intf.Name, "addressesNum", len(addrs), "addresses", addrs)
 			matchingIP, err := getMatchingGlobalIP(addrs, forFamily)
 			if err != nil {
 				return nil, err
@@ -318,7 +318,7 @@ func chooseIPFromHostInterfaces(nw networkInterfacer, addressFamilies AddressFam
 		return nil, fmt.Errorf("no interfaces found on host.")
 	}
 	for _, family := range addressFamilies {
-		klog.V(4).Infof("Looking for system interface with a global IPv%d address", uint(family))
+		klog.V(4).InfoS("Looking for system interface with a global address", "ipVersionOfAddress", uint(family))
 		for _, intf := range intfs {
 			if !isInterfaceUp(&intf) {
 				klog.V(4).Infof("Skipping: down interface %q", intf.Name)
@@ -429,7 +429,7 @@ func getAllDefaultRoutes() ([]Route, error) {
 // addressFamilies determines whether it prefers IPv4 or IPv6
 func chooseHostInterfaceFromRoute(routes []Route, nw networkInterfacer, addressFamilies AddressFamilyPreference) (net.IP, error) {
 	for _, family := range addressFamilies {
-		klog.V(4).Infof("Looking for default routes with IPv%d addresses", uint(family))
+		klog.V(4).InfoS("Looking for default routes with addresses", "ipVersionOfAddress", uint(family))
 		for _, route := range routes {
 			if route.Family != family {
 				continue
