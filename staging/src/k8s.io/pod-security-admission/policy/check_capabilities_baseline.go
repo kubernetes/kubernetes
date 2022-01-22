@@ -41,11 +41,13 @@ func init() {
 	addCheck(CheckCapabilitiesBaseline)
 }
 
+const checkCapabilitiesBaselineID CheckID = "capabilities_baseline"
+
 // CheckCapabilitiesBaseline returns a baseline level check
 // that limits the capabilities that can be added in 1.0+
 func CheckCapabilitiesBaseline() Check {
 	return Check{
-		ID:    "capabilities_baseline",
+		ID:    checkCapabilitiesBaselineID,
 		Level: api.LevelBaseline,
 		Versions: []VersionedCheck{
 			{

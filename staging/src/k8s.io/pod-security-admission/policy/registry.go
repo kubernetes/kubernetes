@@ -33,7 +33,7 @@ type Evaluator interface {
 
 // checkRegistry provides a default implementation of an Evaluator.
 type checkRegistry struct {
-	// The checks are a map policy verison to a slice of checks registered for that version.
+	// The checks are a map policy version to a slice of checks registered for that version.
 	baselineChecks, restrictedChecks map[api.Version][]CheckPodFn
 	// maxVersion is the maximum version that is cached, guaranteed to be at least
 	// the max MinimumVersion of all registered checks.
