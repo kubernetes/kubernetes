@@ -1405,7 +1405,7 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 
 	// Set up an API server
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()

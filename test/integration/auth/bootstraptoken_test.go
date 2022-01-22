@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
@@ -115,7 +116,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	}
 	for _, test := range tests {
 
-		authenticator := bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret}))
+		authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret})))
 		// Set up an API server
 		controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
