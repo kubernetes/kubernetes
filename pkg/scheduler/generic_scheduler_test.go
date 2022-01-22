@@ -976,7 +976,8 @@ func TestGenericScheduler(t *testing.T) {
 				cache.AddNode(node)
 			}
 
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			for _, pvc := range test.pvcs {

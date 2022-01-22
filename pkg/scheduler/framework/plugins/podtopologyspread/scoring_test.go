@@ -244,7 +244,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
@@ -869,7 +870,8 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			f, err := frameworkruntime.NewFramework(nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
