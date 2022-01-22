@@ -13,7 +13,6 @@ func applyOpenShiftGCConfig(controllerManager *config.Config) error {
 		// explicitly disabled from GC for now - not enough value to track them
 		gcconfig.GroupResource{Group: "authorization.openshift.io", Resource: "rolebindingrestrictions"},
 		gcconfig.GroupResource{Group: "network.openshift.io", Resource: "clusternetworks"},
-		gcconfig.GroupResource{Group: "network.openshift.io", Resource: "egressnetworkpolicies"},
 		gcconfig.GroupResource{Group: "network.openshift.io", Resource: "hostsubnets"},
 		gcconfig.GroupResource{Group: "network.openshift.io", Resource: "netnamespaces"},
 		gcconfig.GroupResource{Group: "oauth.openshift.io", Resource: "oauthclientauthorizations"},
