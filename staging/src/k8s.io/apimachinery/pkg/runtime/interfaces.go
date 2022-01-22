@@ -207,6 +207,12 @@ type NestedObjectEncoder interface {
 
 // NestedObjectDecoder is an optional interface that objects may implement to be given
 // an opportunity to decode any nested Objects / RawExtensions during serialization.
+// It is possible for DecodeNestedObjects to return a non-nil error but for the decoding
+// to have succeeded in the case of strict decoding errors (e.g. unknown/duplicate fields).
+// As such it is important for callers of DecodeNestedObjects to check to confirm whether
+// an error is a runtime.StrictDecodingError before short circuiting.
+// Similarly, implementations of DecodeNestedObjects should ensure that a runtime.StrictDecodingError
+// is only returned when the rest of decoding has succeeded.
 type NestedObjectDecoder interface {
 	DecodeNestedObjects(d Decoder) error
 }

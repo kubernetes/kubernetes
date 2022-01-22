@@ -133,24 +133,34 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 		}
 	}
 
-	var strictDecodingErr error
+	var strictDecodingErrs []error
 	obj, gvk, err := c.decoder.Decode(data, defaultGVK, decodeInto)
 	if err != nil {
-		if obj != nil && runtime.IsStrictDecodingError(err) {
-			// save the strictDecodingError and the caller decide what to do with it
-			strictDecodingErr = err
+		if strictErr, ok := runtime.AsStrictDecodingError(err); obj != nil && ok {
+			// save the strictDecodingError and let the caller decide what to do with it
+			strictDecodingErrs = append(strictDecodingErrs, strictErr.Errors()...)
 		} else {
 			return nil, gvk, err
 		}
 	}
 
-	// TODO: look into strict handling of nested object decoding
 	if d, ok := obj.(runtime.NestedObjectDecoder); ok {
 		if err := d.DecodeNestedObjects(runtime.WithoutVersionDecoder{c.decoder}); err != nil {
-			return nil, gvk, err
+			if strictErr, ok := runtime.AsStrictDecodingError(err); ok {
+				// save the strictDecodingError let and the caller decide what to do with it
+				strictDecodingErrs = append(strictDecodingErrs, strictErr.Errors()...)
+			} else {
+				return nil, gvk, err
+
+			}
 		}
 	}
 
+	// aggregate the strict decoding errors into one
+	var strictDecodingErr error
+	if len(strictDecodingErrs) > 0 {
+		strictDecodingErr = runtime.NewStrictDecodingError(strictDecodingErrs)
+	}
 	// if we specify a target, use generic conversion.
 	if into != nil {
 		// perform defaulting if requested
