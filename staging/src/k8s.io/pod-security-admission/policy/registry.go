@@ -18,6 +18,7 @@ package policy
 
 import (
 	"fmt"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,7 @@ type Evaluator interface {
 
 // checkRegistry provides a default implementation of an Evaluator.
 type checkRegistry struct {
-	// The checks are a map of check_ID -> sorted slice of versioned checks, newest first
+	// The checks are a map policy verison to a slice of checks registered for that version.
 	baselineChecks, restrictedChecks map[api.Version][]CheckPodFn
 	// maxVersion is the maximum version that is cached, guaranteed to be at least
 	// the max MinimumVersion of all registered checks.
@@ -64,26 +65,29 @@ func (r *checkRegistry) EvaluatePod(lv api.LevelVersion, podMetadata *metav1.Obj
 	if r.maxVersion.Older(lv.Version) {
 		lv.Version = r.maxVersion
 	}
-	results := []CheckResult{}
-	for _, check := range r.baselineChecks[lv.Version] {
-		results = append(results, check(podMetadata, podSpec))
-	}
+
+	var checks []CheckPodFn
 	if lv.Level == api.LevelBaseline {
-		return results
+		checks = r.baselineChecks[lv.Version]
+	} else {
+		// includes non-overridden baseline checks
+		checks = r.restrictedChecks[lv.Version]
 	}
-	for _, check := range r.restrictedChecks[lv.Version] {
+
+	var results []CheckResult
+	for _, check := range checks {
 		results = append(results, check(podMetadata, podSpec))
 	}
 	return results
 }
 
 func validateChecks(checks []Check) error {
-	ids := map[string]bool{}
+	ids := map[CheckID]api.Level{}
 	for _, check := range checks {
-		if ids[check.ID] {
+		if _, ok := ids[check.ID]; ok {
 			return fmt.Errorf("multiple checks registered for ID %s", check.ID)
 		}
-		ids[check.ID] = true
+		ids[check.ID] = check.Level
 		if check.Level != api.LevelBaseline && check.Level != api.LevelRestricted {
 			return fmt.Errorf("check %s: invalid level %s", check.ID, check.Level)
 		}
@@ -107,6 +111,23 @@ func validateChecks(checks []Check) error {
 			maxVersion = c.MinimumVersion
 		}
 	}
+	// Second pass to validate overrides.
+	for _, check := range checks {
+		for _, c := range check.Versions {
+			if len(c.OverrideCheckIDs) == 0 {
+				continue
+			}
+
+			if check.Level != api.LevelRestricted {
+				return fmt.Errorf("check %s: only restricted checks may set overrides", check.ID)
+			}
+			for _, override := range c.OverrideCheckIDs {
+				if overriddenLevel, ok := ids[override]; ok && overriddenLevel != api.LevelBaseline {
+					return fmt.Errorf("check %s: overrides %s check %s", check.ID, overriddenLevel, override)
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -119,28 +140,87 @@ func populate(r *checkRegistry, validChecks []Check) {
 		}
 	}
 
+	var (
+		restrictedVersionedChecks = map[api.Version]map[CheckID]VersionedCheck{}
+		baselineVersionedChecks   = map[api.Version]map[CheckID]VersionedCheck{}
+
+		baselineIDs, restrictedIDs []CheckID
+	)
 	for _, c := range validChecks {
 		if c.Level == api.LevelRestricted {
-			inflateVersions(c, r.restrictedChecks, r.maxVersion)
+			restrictedIDs = append(restrictedIDs, c.ID)
+			inflateVersions(c, restrictedVersionedChecks, r.maxVersion)
 		} else {
-			inflateVersions(c, r.baselineChecks, r.maxVersion)
+			baselineIDs = append(baselineIDs, c.ID)
+			inflateVersions(c, baselineVersionedChecks, r.maxVersion)
 		}
+	}
+
+	// Sort the IDs to maintain consistent error messages.
+	sort.Slice(restrictedIDs, func(i, j int) bool { return restrictedIDs[i] < restrictedIDs[j] })
+	sort.Slice(baselineIDs, func(i, j int) bool { return baselineIDs[i] < baselineIDs[j] })
+	orderedIDs := append(baselineIDs, restrictedIDs...) // Baseline checks first, then restricted.
+
+	for v := api.MajorMinorVersion(1, 0); v.Older(nextMinor(r.maxVersion)); v = nextMinor(v) {
+		// Aggregate all the overridden baseline check ids.
+		overrides := map[CheckID]bool{}
+		for _, c := range restrictedVersionedChecks[v] {
+			for _, override := range c.OverrideCheckIDs {
+				overrides[override] = true
+			}
+		}
+		// Add the filtered baseline checks to restricted.
+		for id, c := range baselineVersionedChecks[v] {
+			if overrides[id] {
+				continue // Overridden check: skip it.
+			}
+			if restrictedVersionedChecks[v] == nil {
+				restrictedVersionedChecks[v] = map[CheckID]VersionedCheck{}
+			}
+			restrictedVersionedChecks[v][id] = c
+		}
+
+		r.restrictedChecks[v] = mapCheckPodFns(restrictedVersionedChecks[v], orderedIDs)
+		r.baselineChecks[v] = mapCheckPodFns(baselineVersionedChecks[v], orderedIDs)
 	}
 }
 
-func inflateVersions(check Check, versions map[api.Version][]CheckPodFn, maxVersion api.Version) {
+func inflateVersions(check Check, versions map[api.Version]map[CheckID]VersionedCheck, maxVersion api.Version) {
 	for i, c := range check.Versions {
 		var nextVersion api.Version
 		if i+1 < len(check.Versions) {
 			nextVersion = check.Versions[i+1].MinimumVersion
 		} else {
 			// Assumes only 1 Major version.
-			nextVersion = api.MajorMinorVersion(1, maxVersion.Minor()+1)
+			nextVersion = nextMinor(maxVersion)
 		}
 		// Iterate over all versions from the minimum of the current check, to the minimum of the
 		// next check, or the maxVersion++.
-		for v := c.MinimumVersion; v.Older(nextVersion); v = api.MajorMinorVersion(1, v.Minor()+1) {
-			versions[v] = append(versions[v], check.Versions[i].CheckPod)
+		for v := c.MinimumVersion; v.Older(nextVersion); v = nextMinor(v) {
+			if versions[v] == nil {
+				versions[v] = map[CheckID]VersionedCheck{}
+			}
+			versions[v][check.ID] = check.Versions[i]
 		}
 	}
+}
+
+// mapCheckPodFns converts the versioned check map to an ordered slice of CheckPodFn,
+// using the order specified by orderedIDs. All checks must have a corresponding ID in orderedIDs.
+func mapCheckPodFns(checks map[CheckID]VersionedCheck, orderedIDs []CheckID) []CheckPodFn {
+	fns := make([]CheckPodFn, 0, len(checks))
+	for _, id := range orderedIDs {
+		if check, ok := checks[id]; ok {
+			fns = append(fns, check.CheckPod)
+		}
+	}
+	return fns
+}
+
+// nextMinor increments the minor version
+func nextMinor(v api.Version) api.Version {
+	if v.Latest() {
+		return v
+	}
+	return api.MajorMinorVersion(v.Major(), v.Minor()+1)
 }
