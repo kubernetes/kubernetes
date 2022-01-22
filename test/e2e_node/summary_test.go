@@ -96,7 +96,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
-			swapLimit := node.Status.Capacity.Swap()
+			swapCapacity := node.Status.Capacity.Swap()
+			swapLimit := swapCapacity.Value()
 			fsCapacityBounds := bounded(100*e2evolume.Mb, 10*e2evolume.Tb)
 			// Expectations for system containers.
 			sysContExpectations := func() types.GomegaMatcher {
