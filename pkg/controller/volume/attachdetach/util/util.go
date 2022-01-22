@@ -190,8 +190,13 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 	}
 
 	if util.IsPodTerminated(pod, pod.Status) {
+<<<<<<< HEAD
 		nodeName := types.NodeName(pod.Spec.NodeName)
 		keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
+=======
+                nodeName := types.NodeName(pod.Spec.NodeName)
+                keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
+>>>>>>> 641f20db8db7b781aeef1a76ad871122342136f7
 		// if pod is terminate we let kubelet policy dictate if volume
 		// should be detached or not
 		return keepTerminatedPodVolume
