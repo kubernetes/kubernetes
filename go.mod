@@ -137,7 +137,7 @@ require (
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.6.0
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -287,7 +287,7 @@ replace (
 	github.com/gonum/lapack => github.com/gonum/lapack v0.0.0-20181123203213-e4cdc5a0bff9
 	github.com/gonum/matrix => github.com/gonum/matrix v0.0.0-20181209220409-c518dec07be9
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/google/cadvisor v0.43.0
+	github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.33.2-0.20220117214446-bb33a1245805
 	github.com/google/cel-go => github.com/google/cel-go v0.9.0
 	github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
@@ -552,7 +552,7 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/system-validators => k8s.io/system-validators v1.6.0
-	k8s.io/utils => k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/utils => k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
 	modernc.org/cc => modernc.org/cc v1.0.0
 	modernc.org/golex => modernc.org/golex v1.0.0
 	modernc.org/mathutil => modernc.org/mathutil v1.0.0
