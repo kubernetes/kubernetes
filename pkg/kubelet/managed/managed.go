@@ -62,8 +62,8 @@ func IsEnabled() bool {
 	return pinnedManagementEnabled
 }
 
-/// IsPodManaged returns true and the name of the workload if enabled.
-/// returns true, workload name, and the annotation payload.
+// IsPodManaged returns true and the name of the workload if enabled.
+// returns true, workload name, and the annotation payload.
 func IsPodManaged(pod *v1.Pod) (bool, string, string) {
 	if pod.ObjectMeta.Annotations == nil {
 		return false, "", ""
