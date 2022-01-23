@@ -995,7 +995,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
 			fts := feature.Features{EnablePodAffinityNamespaceSelector: !test.disableNSSelector}
 			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(fts, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
@@ -1860,7 +1861,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot,
 				[]runtime.Object{

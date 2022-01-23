@@ -422,10 +422,11 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			testSched := Scheduler{
-				StopEverything:  stopCh,
-				SchedulingQueue: queue.NewTestQueue(context.Background(), nil),
+				StopEverything:  ctx.Done(),
+				SchedulingQueue: queue.NewTestQueue(ctx, nil),
 			}
 
 			client := fake.NewSimpleClientset()

@@ -73,7 +73,9 @@ func TestGCEDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -121,7 +123,9 @@ func TestAWSDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -175,7 +179,9 @@ func TestRBDDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -229,7 +235,9 @@ func TestISCSIDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -355,7 +363,9 @@ func TestAccessModeConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPluginWithListers(t, test.existingPods, test.existingNodes, test.existingPVCs, test.enableReadWriteOncePod)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPluginWithListers(ctx, t, test.existingPods, test.existingNodes, test.existingPVCs, test.enableReadWriteOncePod)
 			gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %+v, want: %+v", gotStatus, test.wantStatus)
@@ -364,12 +374,11 @@ func TestAccessModeConflicts(t *testing.T) {
 	}
 }
 
-func newPlugin(t *testing.T) framework.Plugin {
-	return newPluginWithListers(t, nil, nil, nil, true)
+func newPlugin(ctx context.Context, t *testing.T) framework.Plugin {
+	return newPluginWithListers(ctx, t, nil, nil, nil, true)
 }
 
-func newPluginWithListers(t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, enableReadWriteOncePod bool) framework.Plugin {
-	ctx := context.Background()
+func newPluginWithListers(ctx context.Context, t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, enableReadWriteOncePod bool) framework.Plugin {
 	pluginFactory := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		return New(plArgs, fh, feature.Features{
 			EnableReadWriteOncePod: enableReadWriteOncePod,
