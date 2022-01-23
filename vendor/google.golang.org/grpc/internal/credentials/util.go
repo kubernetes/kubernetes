@@ -18,7 +18,9 @@
 
 package credentials
 
-import "crypto/tls"
+import (
+	"crypto/tls"
+)
 
 const alpnProtoStrH2 = "h2"
 

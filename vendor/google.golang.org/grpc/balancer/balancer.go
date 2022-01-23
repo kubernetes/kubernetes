@@ -75,24 +75,26 @@ func Get(name string) Builder {
 	return nil
 }
 
-// SubConn represents a gRPC sub connection.
-// Each sub connection contains a list of addresses. gRPC will
-// try to connect to them (in sequence), and stop trying the
-// remainder once one connection is successful.
+// A SubConn represents a single connection to a gRPC backend service.
 //
-// The reconnect backoff will be applied on the list, not a single address.
-// For example, try_on_all_addresses -> backoff -> try_on_all_addresses.
+// Each SubConn contains a list of addresses.
 //
-// All SubConns start in IDLE, and will not try to connect. To trigger
-// the connecting, Balancers must call Connect.
-// When the connection encounters an error, it will reconnect immediately.
-// When the connection becomes IDLE, it will not reconnect unless Connect is
-// called.
+// All SubConns start in IDLE, and will not try to connect. To trigger the
+// connecting, Balancers must call Connect.  If a connection re-enters IDLE,
+// Balancers must call Connect again to trigger a new connection attempt.
 //
-// This interface is to be implemented by gRPC. Users should not need a
-// brand new implementation of this interface. For the situations like
-// testing, the new implementation should embed this interface. This allows
-// gRPC to add new methods to this interface.
+// gRPC will try to connect to the addresses in sequence, and stop trying the
+// remainder once the first connection is successful. If an attempt to connect
+// to all addresses encounters an error, the SubConn will enter
+// TRANSIENT_FAILURE for a backoff period, and then transition to IDLE.
+//
+// Once established, if a connection is lost, the SubConn will transition
+// directly to IDLE.
+//
+// This interface is to be implemented by gRPC. Users should not need their own
+// implementation of this interface. For situations like testing, any
+// implementations should embed this interface. This allows gRPC to add new
+// methods to this interface.
 type SubConn interface {
 	// UpdateAddresses updates the addresses used in this SubConn.
 	// gRPC checks if currently-connected address is still in the new list.
@@ -326,6 +328,20 @@ type Balancer interface {
 	Close()
 }
 
+// ExitIdler is an optional interface for balancers to implement.  If
+// implemented, ExitIdle will be called when ClientConn.Connect is called, if
+// the ClientConn is idle.  If unimplemented, ClientConn.Connect will cause
+// all SubConns to connect.
+//
+// Notice: it will be required for all balancers to implement this in a future
+// release.
+type ExitIdler interface {
+	// ExitIdle instructs the LB policy to reconnect to backends / exit the
+	// IDLE state, if appropriate and possible.  Note that SubConns that enter
+	// the IDLE state will not reconnect until SubConn.Connect is called.
+	ExitIdle()
+}
+
 // SubConnState describes the state of a SubConn.
 type SubConnState struct {
 	// ConnectivityState is the connectivity state of the SubConn.
@@ -353,8 +369,10 @@ var ErrBadResolverState = errors.New("bad resolver state")
 //
 // It's not thread safe.
 type ConnectivityStateEvaluator struct {
-	numReady      uint64 // Number of addrConns in ready state.
-	numConnecting uint64 // Number of addrConns in connecting state.
+	numReady            uint64 // Number of addrConns in ready state.
+	numConnecting       uint64 // Number of addrConns in connecting state.
+	numTransientFailure uint64 // Number of addrConns in transient failure state.
+	numIdle             uint64 // Number of addrConns in idle state.
 }
 
 // RecordTransition records state change happening in subConn and based on that
@@ -362,9 +380,11 @@ type ConnectivityStateEvaluator struct {
 //
 //  - If at least one SubConn in Ready, the aggregated state is Ready;
 //  - Else if at least one SubConn in Connecting, the aggregated state is Connecting;
-//  - Else the aggregated state is TransientFailure.
+//  - Else if at least one SubConn is TransientFailure, the aggregated state is Transient Failure;
+//  - Else if at least one SubConn is Idle, the aggregated state is Idle;
+//  - Else there are no subconns and the aggregated state is Transient Failure
 //
-// Idle and Shutdown are not considered.
+// Shutdown is not considered.
 func (cse *ConnectivityStateEvaluator) RecordTransition(oldState, newState connectivity.State) connectivity.State {
 	// Update counters.
 	for idx, state := range []connectivity.State{oldState, newState} {
@@ -374,6 +394,10 @@ func (cse *ConnectivityStateEvaluator) RecordTransition(oldState, newState conne
 			cse.numReady += updateVal
 		case connectivity.Connecting:
 			cse.numConnecting += updateVal
+		case connectivity.TransientFailure:
+			cse.numTransientFailure += updateVal
+		case connectivity.Idle:
+			cse.numIdle += updateVal
 		}
 	}
 
@@ -383,6 +407,12 @@ func (cse *ConnectivityStateEvaluator) RecordTransition(oldState, newState conne
 	}
 	if cse.numConnecting > 0 {
 		return connectivity.Connecting
+	}
+	if cse.numTransientFailure > 0 {
+		return connectivity.TransientFailure
+	}
+	if cse.numIdle > 0 {
+		return connectivity.Idle
 	}
 	return connectivity.TransientFailure
 }

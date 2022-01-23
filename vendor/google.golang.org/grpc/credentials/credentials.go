@@ -140,6 +140,11 @@ type TransportCredentials interface {
 	// Additionally, ClientHandshakeInfo data will be available via the context
 	// passed to this call.
 	//
+	// The second argument to this method is the `:authority` header value used
+	// while creating new streams on this connection after authentication
+	// succeeds. Implementations must use this as the server name during the
+	// authentication handshake.
+	//
 	// If the returned net.Conn is closed, it MUST close the net.Conn provided.
 	ClientHandshake(context.Context, string, net.Conn) (net.Conn, AuthInfo, error)
 	// ServerHandshake does the authentication handshake for servers. It returns
@@ -153,9 +158,13 @@ type TransportCredentials interface {
 	Info() ProtocolInfo
 	// Clone makes a copy of this TransportCredentials.
 	Clone() TransportCredentials
-	// OverrideServerName overrides the server name used to verify the hostname on the returned certificates from the server.
-	// gRPC internals also use it to override the virtual hosting name if it is set.
-	// It must be called before dialing. Currently, this is only used by grpclb.
+	// OverrideServerName specifies the value used for the following:
+	// - verifying the hostname on the returned certificates
+	// - as SNI in the client's handshake to support virtual hosting
+	// - as the value for `:authority` header at stream creation time
+	//
+	// Deprecated: use grpc.WithAuthority instead. Will be supported
+	// throughout 1.x.
 	OverrideServerName(string) error
 }
 

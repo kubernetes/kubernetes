@@ -192,7 +192,7 @@ type DecodeHookFuncType func(reflect.Type, reflect.Type, interface{}) (interface
 // source and target types.
 type DecodeHookFuncKind func(reflect.Kind, reflect.Kind, interface{}) (interface{}, error)
 
-// DecodeHookFuncRaw is a DecodeHookFunc which has complete access to both the source and target
+// DecodeHookFuncValue is a DecodeHookFunc which has complete access to both the source and target
 // values.
 type DecodeHookFuncValue func(from reflect.Value, to reflect.Value) (interface{}, error)
 
@@ -258,6 +258,11 @@ type DecoderConfig struct {
 	// The tag name that mapstructure reads for field names. This
 	// defaults to "mapstructure"
 	TagName string
+
+	// MatchName is the function used to match the map key to the struct
+	// field name or tag. Defaults to `strings.EqualFold`. This can be used
+	// to implement case-sensitive tag values, support snake casing, etc.
+	MatchName func(mapKey, fieldName string) bool
 }
 
 // A Decoder takes a raw interface value and turns it into structured
@@ -374,6 +379,10 @@ func NewDecoder(config *DecoderConfig) (*Decoder, error) {
 
 	if config.TagName == "" {
 		config.TagName = "mapstructure"
+	}
+
+	if config.MatchName == nil {
+		config.MatchName = strings.EqualFold
 	}
 
 	result := &Decoder{
@@ -675,16 +684,12 @@ func (d *Decoder) decodeUint(name string, data interface{}, val reflect.Value) e
 		}
 	case dataType.PkgPath() == "encoding/json" && dataType.Name() == "Number":
 		jn := data.(json.Number)
-		i, err := jn.Int64()
+		i, err := strconv.ParseUint(string(jn), 0, 64)
 		if err != nil {
 			return fmt.Errorf(
 				"error decoding json.Number into %s: %s", name, err)
 		}
-		if i < 0 && !d.config.WeaklyTypedInput {
-			return fmt.Errorf("cannot parse '%s', %d overflows uint",
-				name, i)
-		}
-		val.SetUint(uint64(i))
+		val.SetUint(i)
 	default:
 		return fmt.Errorf(
 			"'%s' expected type '%s', got unconvertible type '%s', value: '%v'",
@@ -1340,7 +1345,7 @@ func (d *Decoder) decodeStructFromMap(name string, dataVal, val reflect.Value) e
 					continue
 				}
 
-				if strings.EqualFold(mK, fieldName) {
+				if d.config.MatchName(mK, fieldName) {
 					rawMapKey = dataValKey
 					rawMapVal = dataVal.MapIndex(dataValKey)
 					break

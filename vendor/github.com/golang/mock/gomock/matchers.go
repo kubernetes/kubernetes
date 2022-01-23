@@ -120,7 +120,7 @@ func (e eqMatcher) Matches(x interface{}) bool {
 }
 
 func (e eqMatcher) String() string {
-	return fmt.Sprintf("is equal to %v", e.x)
+	return fmt.Sprintf("is equal to %v (%T)", e.x, e.x)
 }
 
 type nilMatcher struct{}
@@ -153,7 +153,6 @@ func (n notMatcher) Matches(x interface{}) bool {
 }
 
 func (n notMatcher) String() string {
-	// TODO: Improve this if we add a NotString method to the Matcher interface.
 	return "not(" + n.m.String() + ")"
 }
 
@@ -206,6 +205,70 @@ func (m lenMatcher) Matches(x interface{}) bool {
 
 func (m lenMatcher) String() string {
 	return fmt.Sprintf("has length %d", m.i)
+}
+
+type inAnyOrderMatcher struct {
+	x interface{}
+}
+
+func (m inAnyOrderMatcher) Matches(x interface{}) bool {
+	given, ok := m.prepareValue(x)
+	if !ok {
+		return false
+	}
+	wanted, ok := m.prepareValue(m.x)
+	if !ok {
+		return false
+	}
+
+	if given.Len() != wanted.Len() {
+		return false
+	}
+
+	usedFromGiven := make([]bool, given.Len())
+	foundFromWanted := make([]bool, wanted.Len())
+	for i := 0; i < wanted.Len(); i++ {
+		wantedMatcher := Eq(wanted.Index(i).Interface())
+		for j := 0; j < given.Len(); j++ {
+			if usedFromGiven[j] {
+				continue
+			}
+			if wantedMatcher.Matches(given.Index(j).Interface()) {
+				foundFromWanted[i] = true
+				usedFromGiven[j] = true
+				break
+			}
+		}
+	}
+
+	missingFromWanted := 0
+	for _, found := range foundFromWanted {
+		if !found {
+			missingFromWanted++
+		}
+	}
+	extraInGiven := 0
+	for _, used := range usedFromGiven {
+		if !used {
+			extraInGiven++
+		}
+	}
+
+	return extraInGiven == 0 && missingFromWanted == 0
+}
+
+func (m inAnyOrderMatcher) prepareValue(x interface{}) (reflect.Value, bool) {
+	xValue := reflect.ValueOf(x)
+	switch xValue.Kind() {
+	case reflect.Slice, reflect.Array:
+		return xValue, true
+	default:
+		return reflect.Value{}, false
+	}
+}
+
+func (m inAnyOrderMatcher) String() string {
+	return fmt.Sprintf("has the same elements as %v", m.x)
 }
 
 // Constructors
@@ -266,4 +329,13 @@ func AssignableToTypeOf(x interface{}) Matcher {
 		return assignableToTypeOfMatcher{xt}
 	}
 	return assignableToTypeOfMatcher{reflect.TypeOf(x)}
+}
+
+// InAnyOrder is a Matcher that returns true for collections of the same elements ignoring the order.
+//
+// Example usage:
+//   InAnyOrder([]int{1, 2, 3}).Matches([]int{1, 3, 2}) // returns true
+//   InAnyOrder([]int{1, 2, 3}).Matches([]int{1, 2}) // returns false
+func InAnyOrder(x interface{}) Matcher {
+	return inAnyOrderMatcher{x}
 }

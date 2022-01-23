@@ -12,9 +12,9 @@ Cross platform: Windows, Linux, BSD and macOS.
 
 | Adapter               | OS                               | Status                                                                                                                          |
 | --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| inotify               | Linux 2.6.27 or later, Android\* | Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify) |
-| kqueue                | BSD, macOS, iOS\*                | Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify) |
-| ReadDirectoryChangesW | Windows                          | Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify) |
+| inotify               | Linux 2.6.27 or later, Android\* | Supported |
+| kqueue                | BSD, macOS, iOS\*                | Supported |
+| ReadDirectoryChangesW | Windows                          | Supported |
 | FSEvents              | macOS                            | [Planned](https://github.com/fsnotify/fsnotify/issues/11)                                                                       |
 | FEN                   | Solaris 11                       | [In Progress](https://github.com/fsnotify/fsnotify/issues/12)                                                                   |
 | fanotify              | Linux 2.6.37+                    | [Planned](https://github.com/fsnotify/fsnotify/issues/114)                                                                      |
