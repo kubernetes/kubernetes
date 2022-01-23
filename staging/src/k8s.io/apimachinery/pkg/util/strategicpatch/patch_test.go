@@ -6713,6 +6713,106 @@ func TestUnknownField(t *testing.T) {
 			ExpectedThreeWay:       `{}`,
 			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
 		},
+		"no diff even if modified null": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":null},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":{"key":null}}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":{"key":null}}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{},"name":"foo","scalar":true}`,
+		},
+		"discard nulls in nested and adds not nulls": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value","keynull":null}},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":{"key":{"keynotnull":"value","keynull":null}}}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value"}},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":{"key":{"keynotnull":"value","keynull":null}}}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value"}},"name":"foo","scalar":true}`,
+		},
+		"discard if modified all nulls": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex":{"nested":null}}`,
+
+			ExpectedTwoWay:         `{"complex":{"nested":null}}`,
+			ExpectedTwoWayResult:   `{"complex":{}}`,
+			ExpectedThreeWay:       `{"complex":{"nested":null}}`,
+			ExpectedThreeWayResult: `{"complex":{}}`,
+		},
+		"add only not nulls": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex":{"nested":null,"nested2":"foo"}}`,
+
+			ExpectedTwoWay:         `{"complex":{"nested":null,"nested2":"foo"}}`,
+			ExpectedTwoWayResult:   `{"complex":{"nested2":"foo"}}`,
+			ExpectedThreeWay:       `{"complex":{"nested":null,"nested2":"foo"}}`,
+			ExpectedThreeWayResult: `{"complex":{"nested2":"foo"}}`,
+		},
+		"null values in original are preserved": {
+			Original: `{"thing":null}`,
+			Current:  `{"thing":null}`,
+			Modified: `{"nested":{"value":5},"thing":null}`,
+
+			ExpectedTwoWay:         `{"nested":{"value":5}}`,
+			ExpectedTwoWayResult:   `{"nested":{"value":5},"thing":null}`,
+			ExpectedThreeWay:       `{"nested":{"value":5}}`,
+			ExpectedThreeWayResult: `{"nested":{"value":5},"thing":null}`,
+		},
+		"nested null values in original are preserved": {
+			Original: `{"complex":{"key":null},"thing":null}`,
+			Current:  `{"complex":{"key":null},"thing":null}`,
+			Modified: `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+
+			ExpectedTwoWay:         `{"nested":{"value":5}}`,
+			ExpectedTwoWayResult:   `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+			ExpectedThreeWay:       `{"nested":{"value":5}}`,
+			ExpectedThreeWayResult: `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+		},
+		"add empty slices": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[]}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":[]}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+		},
+		"filter nulls from nested slices": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":[{"inner_one":{"key_one":"foo"}}]}`,
+			ExpectedThreeWay:       `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":[{"inner_one":{"key_one":"foo"}}]}`,
+		},
+		"filter if slice is all empty": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":[{"inner_one":{}}]}`,
+			ExpectedThreeWay:       `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":[{"inner_one":{}}]}`,
+		},
+		"not filter nulls from non-associative slice": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":["key1",null,"key2"]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedThreeWay:       `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":["key1",null,"key2"]}`,
+		},
 		"added only": {
 			Original: `{"name":"foo"}`,
 			Current:  `{"name":"foo"}`,

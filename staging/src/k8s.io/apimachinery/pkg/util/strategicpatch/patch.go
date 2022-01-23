@@ -1330,7 +1330,11 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		if !ok {
 			if !isDeleteList {
 				// If it's not in the original document, just take the patch value.
-				original[k] = patchV
+				if mergeOptions.IgnoreUnmatchedNulls {
+					original[k] = discardNullValuesFromPatch(patchV)
+				} else {
+					original[k] = patchV
+				}
 			}
 			continue
 		}
@@ -1339,7 +1343,11 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		patchType := reflect.TypeOf(patchV)
 		if originalType != patchType {
 			if !isDeleteList {
-				original[k] = patchV
+				if mergeOptions.IgnoreUnmatchedNulls {
+					original[k] = discardNullValuesFromPatch(patchV)
+				} else {
+					original[k] = patchV
+				}
 			}
 			continue
 		}
@@ -1373,6 +1381,29 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		}
 	}
 	return original, nil
+}
+
+// discardNullValuesFromPatch discards all null values from patch.
+// It traverses for all slices and map types to discard all nulls.
+func discardNullValuesFromPatch(patchV interface{}) interface{} {
+	switch patchV.(type) {
+	case map[string]interface{}:
+		for k, v := range patchV.(map[string]interface{}) {
+			if v == nil {
+				delete(patchV.(map[string]interface{}), k)
+			} else {
+				discardNullValuesFromPatch(v)
+			}
+		}
+	case []interface{}:
+		patchS := patchV.([]interface{})
+		for i, v := range patchV.([]interface{}) {
+			patchS[i] = discardNullValuesFromPatch(v)
+		}
+		return patchS
+	}
+
+	return patchV
 }
 
 // mergeMapHandler handles how to merge `patchV` whose key is `key` with `original` respecting
