@@ -63,9 +63,9 @@ var (
 	)
 
 	volumeStatsHealthAbnormalDesc = metrics.NewDesc(
-		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsHealthStatusKey),
-		"Abnormal volume health status. The count is either 1 or 0. When volume_health_status is abnormal, 1 indicates the volume is unhealthy, 0 indicates volume is healthy",
-		[]string{"namespace", "persistentvolumeclaim", "volume_health_status"}, nil,
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsHealthStatusAbnormalKey),
+		"Abnormal volume health status. The count is either 1 or 0. 1 indicates the volume is unhealthy, 0 indicates volume is healthy",
+		[]string{"namespace", "persistentvolumeclaim"}, nil,
 		metrics.ALPHA, "")
 )
 
@@ -126,7 +126,7 @@ func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Me
 			addGauge(volumeStatsInodesDesc, pvcRef, float64(*volumeStat.Inodes))
 			addGauge(volumeStatsInodesFreeDesc, pvcRef, float64(*volumeStat.InodesFree))
 			addGauge(volumeStatsInodesUsedDesc, pvcRef, float64(*volumeStat.InodesUsed))
-			addGauge(volumeStatsHealthAbnormalDesc, pvcRef, convertBoolToFloat64(volumeStat.VolumeHealthStats.Abnormal), "abnormal")
+			addGauge(volumeStatsHealthAbnormalDesc, pvcRef, convertBoolToFloat64(volumeStat.VolumeHealthStats.Abnormal))
 			allPVCs.Insert(pvcUniqStr)
 		}
 	}
