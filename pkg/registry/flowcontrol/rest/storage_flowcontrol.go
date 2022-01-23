@@ -177,59 +177,63 @@ func (bce *bootstrapConfigurationEnsurer) ensureAPFBootstrapConfiguration(hookCo
 }
 
 func ensure(clientset flowcontrolclient.FlowcontrolV1beta2Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
-	fsWrapper := ensurer.NewFlowSchemaWrapper(clientset.FlowSchemas(), fsLister)
-	plcWrapper := ensurer.NewPriorityLevelConfigurationWrapper(clientset.PriorityLevelConfigurations(), plcLister)
 
-	if err := ensureSuggestedConfiguration(fsWrapper, plcWrapper); err != nil {
+	if err := ensureSuggestedConfiguration(clientset, fsLister, plcLister); err != nil {
 		// We should not attempt creation of mandatory objects if ensuring the suggested
 		// configuration resulted in an error.
 		// This only happens when the stop channel is closed.
 		return fmt.Errorf("failed ensuring suggested settings - %w", err)
 	}
 
-	if err := ensureMandatoryConfiguration(fsWrapper, plcWrapper); err != nil {
+	if err := ensureMandatoryConfiguration(clientset, fsLister, plcLister); err != nil {
 		return fmt.Errorf("failed ensuring mandatory settings - %w", err)
 	}
 
-	if err := removeDanglingBootstrapConfiguration(fsWrapper, plcWrapper); err != nil {
+	if err := removeDanglingBootstrapConfiguration(clientset, fsLister, plcLister); err != nil {
 		return fmt.Errorf("failed to delete removed settings - %w", err)
 	}
 
 	return nil
 }
 
-func ensureSuggestedConfiguration(fsWrapper, plcWrapper ensurer.ConfigurationWrapper) error {
-	if err := ensurer.EnsureConfigurations(plcWrapper, ensurer.NewSuggestedEnsureStrategy(), ensurer.ObjectifyPriorityLevelConfigurations(flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)); err != nil {
+func ensureSuggestedConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
+	plcSuggesteds := ensurer.WrapBootstrapPriorityLevelConfigurations(clientset.PriorityLevelConfigurations(), plcLister, flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
+	if err := ensurer.EnsureConfigurations(plcSuggesteds, ensurer.NewSuggestedEnsureStrategy()); err != nil {
 		return err
 	}
 
-	return ensurer.EnsureConfigurations(fsWrapper, ensurer.NewSuggestedEnsureStrategy(), ensurer.ObjectifyFlowSchemas(flowcontrolbootstrap.SuggestedFlowSchemas))
+	fsSuggesteds := ensurer.WrapBootstrapFlowSchemas(clientset.FlowSchemas(), fsLister, flowcontrolbootstrap.SuggestedFlowSchemas)
+	return ensurer.EnsureConfigurations(fsSuggesteds, ensurer.NewSuggestedEnsureStrategy())
 }
 
-func ensureMandatoryConfiguration(fsWrapper, plcWrapper ensurer.ConfigurationWrapper) error {
-	if err := ensurer.EnsureConfigurations(plcWrapper, ensurer.NewMandatoryEnsureStrategy(), ensurer.ObjectifyPriorityLevelConfigurations(flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)); err != nil {
+func ensureMandatoryConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
+	plcMandatories := ensurer.WrapBootstrapPriorityLevelConfigurations(clientset.PriorityLevelConfigurations(), plcLister, flowcontrolbootstrap.MandatoryPriorityLevelConfigurations)
+	if err := ensurer.EnsureConfigurations(plcMandatories, ensurer.NewMandatoryEnsureStrategy()); err != nil {
 		return err
 	}
 
-	return ensurer.EnsureConfigurations(fsWrapper, ensurer.NewMandatoryEnsureStrategy(), ensurer.ObjectifyFlowSchemas(flowcontrolbootstrap.SuggestedFlowSchemas))
+	fsMandatories := ensurer.WrapBootstrapFlowSchemas(clientset.FlowSchemas(), fsLister, flowcontrolbootstrap.MandatoryFlowSchemas)
+	return ensurer.EnsureConfigurations(fsMandatories, ensurer.NewMandatoryEnsureStrategy())
 }
 
-func removeDanglingBootstrapConfiguration(fsWrapper, plcWrapper ensurer.ConfigurationWrapper) error {
-	if err := removeDanglingBootstrapFlowSchema(fsWrapper); err != nil {
+func removeDanglingBootstrapConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
+	if err := removeDanglingBootstrapFlowSchema(clientset, fsLister); err != nil {
 		return err
 	}
 
-	return removeDanglingBootstrapPriorityLevel(plcWrapper)
+	return removeDanglingBootstrapPriorityLevel(clientset, plcLister)
 }
 
-func removeDanglingBootstrapFlowSchema(wrapper ensurer.ConfigurationWrapper) error {
+func removeDanglingBootstrapFlowSchema(clientset flowcontrolclient.FlowcontrolV1beta2Interface, fsLister flowcontrollisters.FlowSchemaLister) error {
 	bootstrap := append(flowcontrolbootstrap.MandatoryFlowSchemas, flowcontrolbootstrap.SuggestedFlowSchemas...)
-	return ensurer.RemoveUnwantedObjects(wrapper, ensurer.ObjectifyFlowSchemas(bootstrap).Names())
+	fsBoots := ensurer.WrapBootstrapFlowSchemas(clientset.FlowSchemas(), fsLister, bootstrap)
+	return ensurer.RemoveUnwantedObjects(fsBoots)
 }
 
-func removeDanglingBootstrapPriorityLevel(wrapper ensurer.ConfigurationWrapper) error {
+func removeDanglingBootstrapPriorityLevel(clientset flowcontrolclient.FlowcontrolV1beta2Interface, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
 	bootstrap := append(flowcontrolbootstrap.MandatoryPriorityLevelConfigurations, flowcontrolbootstrap.SuggestedPriorityLevelConfigurations...)
-	return ensurer.RemoveUnwantedObjects(wrapper, ensurer.ObjectifyPriorityLevelConfigurations(bootstrap).Names())
+	plcBoots := ensurer.WrapBootstrapPriorityLevelConfigurations(clientset.PriorityLevelConfigurations(), plcLister, bootstrap)
+	return ensurer.RemoveUnwantedObjects(plcBoots)
 }
 
 // contextFromChannelAndMaxWaitDuration returns a Context that is bound to the

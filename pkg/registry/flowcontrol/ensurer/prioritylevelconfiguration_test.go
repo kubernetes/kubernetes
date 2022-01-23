@@ -24,7 +24,6 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
@@ -99,10 +98,10 @@ func TestEnsurePriorityLevel(t *testing.T) {
 				indexer.Add(test.current)
 			}
 
-			wrapper := NewPriorityLevelConfigurationWrapper(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer))
+			boots := WrapBootstrapPriorityLevelConfigurations(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer), []*flowcontrolv1beta2.PriorityLevelConfiguration{test.bootstrap})
 			strategy := test.strategy()
 
-			err := EnsureConfigurations(wrapper, strategy, configurationObjectSlice{test.bootstrap})
+			err := EnsureConfigurations(boots, strategy)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
@@ -208,12 +207,18 @@ func TestSuggestedPLEnsureStrategy_ShouldUpdate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			strategy := NewSuggestedEnsureStrategy()
-			sCopier := &priorityLevelConfigurationWrapper{}
-			newObjectGot, updateGot, err := strategy.ShouldUpdate(sCopier, test.current, test.bootstrap)
+			wah := &wantAndHavePriorityLevelConfiguration{
+				want: test.bootstrap,
+				have: test.current,
+			}
+			updatableGot, updateGot, err := strategy.ShouldUpdate(wah)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
-
+			var newObjectGot *flowcontrolv1beta2.PriorityLevelConfiguration
+			if updatableGot != nil {
+				newObjectGot = updatableGot.(*updatablePriorityLevelConfiguration).PriorityLevelConfiguration
+			}
 			if test.newObjectExpected == nil {
 				if newObjectGot != nil {
 					t.Errorf("Expected a nil object, but got: %#v", newObjectGot)
@@ -356,8 +361,9 @@ func TestRemovePriorityLevelConfiguration(t *testing.T) {
 				indexer.Add(test.current)
 			}
 
-			wrapper := NewPriorityLevelConfigurationWrapper(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer))
-			err := RemoveUnwantedObjects(wrapper, sets.NewString(test.bootstrapName))
+			boot := newPLConfiguration(test.bootstrapName).Object()
+			boots := WrapBootstrapPriorityLevelConfigurations(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer), []*flowcontrolv1beta2.PriorityLevelConfiguration{boot})
+			err := RemoveUnwantedObjects(boots)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}

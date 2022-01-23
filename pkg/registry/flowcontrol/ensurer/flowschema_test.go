@@ -24,7 +24,6 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
@@ -104,9 +103,9 @@ func TestEnsureFlowSchema(t *testing.T) {
 				indexer.Add(test.current)
 			}
 
-			wrapper := NewFlowSchemaWrapper(client, flowcontrollisters.NewFlowSchemaLister(indexer))
+			boots := WrapBootstrapFlowSchemas(client, flowcontrollisters.NewFlowSchemaLister(indexer), []*flowcontrolv1beta2.FlowSchema{test.bootstrap})
 			strategy := test.strategy()
-			err := EnsureConfigurations(wrapper, strategy, configurationObjectSlice{test.bootstrap})
+			err := EnsureConfigurations(boots, strategy)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
@@ -211,13 +210,19 @@ func TestSuggestedFSEnsureStrategy_ShouldUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sCopier := &flowSchemaWrapper{}
+			wah := &wantAndHaveFlowSchema{
+				want: test.bootstrap,
+				have: test.current,
+			}
 			strategy := NewSuggestedEnsureStrategy()
-			newObjectGot, updateGot, err := strategy.ShouldUpdate(sCopier, test.current, test.bootstrap)
+			updatableGot, updateGot, err := strategy.ShouldUpdate(wah)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
-
+			var newObjectGot *flowcontrolv1beta2.FlowSchema
+			if updatableGot != nil {
+				newObjectGot = updatableGot.(*updatableFlowSchema).FlowSchema
+			}
 			if test.newObjectExpected == nil {
 				if newObjectGot != nil {
 					t.Errorf("Expected a nil object, but got: %#v", newObjectGot)
@@ -343,8 +348,9 @@ func TestRemoveFlowSchema(t *testing.T) {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
 				indexer.Add(test.current)
 			}
-			wrapper := NewFlowSchemaWrapper(client, flowcontrollisters.NewFlowSchemaLister(indexer))
-			err := RemoveUnwantedObjects(wrapper, sets.NewString(test.bootstrapName))
+			bootFS := newFlowSchema(test.bootstrapName, "pl", 100).Object()
+			boots := WrapBootstrapFlowSchemas(client, flowcontrollisters.NewFlowSchemaLister(indexer), []*flowcontrolv1beta2.FlowSchema{bootFS})
+			err := RemoveUnwantedObjects(boots)
 
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)

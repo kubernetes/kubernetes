@@ -17,104 +17,98 @@ limitations under the License.
 package ensurer
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/google/go-cmp/cmp"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 const (
 	fieldManager = "api-priority-and-fairness-config-producer-v1"
 )
 
-// EnsureStrategy provides a strategy for ensuring apf bootstrap ConfigurationWrapper.
-// We have two types of ConfigurationWrapper objects:
-// - mandatory: the mandatory ConfigurationWrapper objects are about ensuring that the P&F
+// EnsureStrategy provides a maintenance strategy for APF configuration objects.
+// We have two types of strategy, corresponding to the two types of config objetcs:
+// - mandatory: the mandatory objects are about ensuring that the P&F
 //   system itself won't crash; we have to be sure there's 'catch-all' place for
 //   everything to go. Any changes made by the cluster operators to these
-//   ConfigurationWrapper objects will be stomped by the apiserver.
+//   objects will be stomped by the apiserver.
 //
-// - suggested: additional ConfigurationWrapper objects for initial behavior.
-//   the cluster operators have an option to edit or delete these ConfigurationWrapper objects.
+// - suggested: additional config objects for default behavior.
+//   the cluster operators have an option to modify these objects.
 type EnsureStrategy interface {
 	// Name of the strategy, for now we have two: 'mandatory' and 'suggested'.
 	// This comes handy in logging.
 	Name() string
 
-	// ShouldUpdate accepts the current and the bootstrap configuration and determines
+	// ShouldUpdate accepts a pair of the current and the bootstrap configuration and determines
 	// whether an update is necessary.
 	// current is the existing in-cluster configuration object.
 	// bootstrap is the configuration the kube-apiserver maintains in-memory.
 	//
+	// revised: the new object represents the new configuration to be stored in-cluster.
 	// ok: true if auto update is required, otherwise false
-	// object: the new object represents the new configuration to be stored in-cluster.
 	// err: err is set when the function runs into an error and can not
-	// determine if auto update is needed.
-	ShouldUpdate(sCopier specCopier, current, bootstrap configurationObject) (object runtime.Object, ok bool, err error)
+	//      determine if auto update is needed.
+	ShouldUpdate(wantAndHave) (revised updatable, ok bool, err error)
 }
 
-// this internal interface provides abstraction for dealing with the `Spec`
-// of both 'FlowSchema' and 'PriorityLevelConfiguration' objects.
-// Since the ensure logic for both types is common, we use a few internal interfaces
-// to abstract out the differences of these two types.
-type specCopier interface {
-	// HasSpecChanged returns true if the spec of both the bootstrap and
-	// the current configuration object is same, otherwise false.
-	HasSpecChanged(bootstrap, current runtime.Object) (bool, error)
-
-	// CopySpec makes a deep copy the spec of the bootstrap object
-	// and copies it to that of the current object.
-	// CopySpec assumes that the current object is safe to mutate, so it
-	// rests with the caller to make a deep copy of the current.
-	CopySpec(bootstrap, current runtime.Object) error
+// BootstrapObjects is a generic interface to a list of bootstrap objects bound up with the relevant operations on them.
+// The binding makes it unnecessary to have any type casts.
+// A bootstrap object is a mandatory or suggested config object,
+// with the spec that the code is built to provide.
+type BootstrapObjects interface {
+	typeName() string                         // the Kind of the objects
+	len() int                                 // number of objects
+	get(int) bootstrapObject                  // extract one object, origin 0
+	getExistingObjects() ([]deletable, error) // returns all the APF config objects that exist at the moment
 }
 
-// this internal interface provides abstraction for CRUD operation
-// related to both 'FlowSchema' and 'PriorityLevelConfiguration' objects.
-// Since the ensure logic for both types is common, we use a few internal interfaces
-// to abstract out the differences of these two types.
-type configurationClient interface {
-	Create(object runtime.Object) (runtime.Object, error)
-	Update(object runtime.Object) (runtime.Object, error)
-	Get(name string) (configurationObject, error)
-	Delete(name, resourceVersion string) error
+// deletable is an existing config object and it supports the delete operation
+type deletable interface {
+	configurationObject
+	delete(resourceVersion string) error // delete the object if and only if it has the given resourceVersion
 }
 
-// ConfigurationWrapper collects together generic versions of all the operations
-// that are needed on configuration objects.
-type ConfigurationWrapper interface {
-	// TypeName returns the type of the configuration that this interface deals with.
-	// We use it to log the type name of the configuration object being ensured.
-	// It is either 'PriorityLevelConfiguration' or 'FlowSchema'
-	TypeName() string
+// bootstrapObject is a single bootstrap object.
+// Its spec is what the code provides.
+type bootstrapObject interface {
+	typeName() string                 // the Kind of the object
+	getName() string                  // the object's name
+	create() error                    // request the server to create the object
+	getCurrent() (wantAndHave, error) // pair up with the object as it currently exists
+}
 
-	configurationClient
-	specCopier
-	GetExistingObjects() (configurationObjectSlice, error)
+// wantAndHave is a pair of versions of an APF config object.
+// The "want" has the spec that the code provides.
+// The "have" is what came from the server.
+type wantAndHave interface {
+	getWant() configurationObject
+	getHave() configurationObject
+
+	specsDiffer() bool
+
+	// copyHave returns a copy of the "have" version,
+	// optionally with spec replaced by the spec from "want".
+	copyHave(specFromWant bool) updatable
+}
+
+// updatable is an APF config object that can be written back to the apiserver
+type updatable interface {
+	configurationObject
+	update() error
 }
 
 // A convenient wrapper interface that is used by the ensure logic.
 type configurationObject interface {
 	metav1.Object
 	runtime.Object
-}
-
-type configurationObjectSlice []configurationObject
-
-func (cobjs configurationObjectSlice) Names() sets.String {
-	names := sets.String{}
-	for _, obj := range cobjs {
-		names.Insert(obj.GetName())
-	}
-	return names
 }
 
 // NewSuggestedEnsureStrategy returns an EnsureStrategy for suggested config objects
@@ -143,8 +137,10 @@ func (s *strategy) Name() string {
 	return s.name
 }
 
-func (s *strategy) ShouldUpdate(sCopier specCopier, current, bootstrap configurationObject) (runtime.Object, bool, error) {
-	if current == nil || bootstrap == nil {
+func (s *strategy) ShouldUpdate(wah wantAndHave) (updatable, bool, error) {
+	current := wah.getHave()
+
+	if current == nil {
 		return nil, false, nil
 	}
 
@@ -154,39 +150,23 @@ func (s *strategy) ShouldUpdate(sCopier specCopier, current, bootstrap configura
 	}
 	updateAnnotation := shouldUpdateAnnotation(current, autoUpdateSpec)
 
-	var specChanged bool
-	if autoUpdateSpec {
-		changed, err := sCopier.HasSpecChanged(bootstrap, current)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to compare spec - %w", err)
-		}
-		specChanged = changed
-	}
+	specChanged := autoUpdateSpec && wah.specsDiffer()
 
 	if !(updateAnnotation || specChanged) {
 		// the annotation key is up to date and the spec has not changed, no update is necessary
 		return nil, false, nil
 	}
 
-	// if we are here, either we need to update the annotation key or the spec.
-	copy, ok := current.DeepCopyObject().(configurationObject)
-	if !ok {
-		// we should never be here
-		return nil, false, errors.New("incompatible object type")
-	}
-
+	revised := wah.copyHave(specChanged)
 	if updateAnnotation {
-		setAutoUpdateAnnotation(copy, autoUpdateSpec)
-	}
-	if specChanged {
-		sCopier.CopySpec(bootstrap, copy)
+		setAutoUpdateAnnotation(revised, autoUpdateSpec)
 	}
 
-	return copy, true, nil
+	return revised, true, nil
 }
 
 // shouldUpdateSpec inspects the auto-update annotation key and generation field to determine
-// whether the ConfigurationWrapper object should be auto-updated.
+// whether the config object should be auto-updated.
 func shouldUpdateSpec(accessor metav1.Object) bool {
 	value, _ := accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]
 	if autoUpdate, err := strconv.ParseBool(value); err == nil {
@@ -228,9 +208,11 @@ func setAutoUpdateAnnotation(accessor metav1.Object, autoUpdate bool) {
 
 // EnsureConfigurations applies the given maintenance strategy to the given objects.
 // At the first error, if any, it stops and returns that error.
-func EnsureConfigurations(wrapper ConfigurationWrapper, strategy EnsureStrategy, bootstrap configurationObjectSlice) error {
-	for _, obj := range bootstrap {
-		err := EnsureConfiguration(wrapper, strategy, obj)
+func EnsureConfigurations(boots BootstrapObjects, strategy EnsureStrategy) error {
+	len := boots.len()
+	for i := 0; i < len; i++ {
+		bo := boots.get(i)
+		err := EnsureConfiguration(bo, strategy)
 		if err != nil {
 			return err
 		}
@@ -239,71 +221,72 @@ func EnsureConfigurations(wrapper ConfigurationWrapper, strategy EnsureStrategy,
 }
 
 // EnsureConfiguration applies the given maintenance strategy to the given object.
-func EnsureConfiguration(wrapper ConfigurationWrapper, strategy EnsureStrategy, bootstrap configurationObject) error {
-	name := bootstrap.GetName()
+func EnsureConfiguration(bootstrap bootstrapObject, strategy EnsureStrategy) error {
+	name := bootstrap.getName()
 	configurationType := strategy.Name()
 
-	var current configurationObject
+	var wah wantAndHave
 	var err error
 	for {
-		current, err = wrapper.Get(bootstrap.GetName())
+		wah, err = bootstrap.getCurrent()
 		if err == nil {
 			break
 		}
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
 		}
 
 		// we always re-create a missing configuration object
-		if _, err = wrapper.Create(bootstrap); err == nil {
-			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", wrapper.TypeName()), "type", configurationType, "name", name)
+		if err = bootstrap.create(); err == nil {
+			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", bootstrap.typeName()), "type", configurationType, "name", name)
 			return nil
 		}
 
 		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
 		}
-		klog.V(5).InfoS(fmt.Sprintf("Something created the %s concurrently", wrapper.TypeName()), "type", configurationType, "name", name)
+		klog.V(5).InfoS(fmt.Sprintf("Something created the %s concurrently", bootstrap.typeName()), "type", configurationType, "name", name)
 	}
 
-	klog.V(5).InfoS(fmt.Sprintf("The %s already exists, checking whether it is up to date", wrapper.TypeName()), "type", configurationType, "name", name)
-	newObject, update, err := strategy.ShouldUpdate(wrapper, current, bootstrap)
+	klog.V(5).InfoS(fmt.Sprintf("The %s already exists, checking whether it is up to date", bootstrap.typeName()), "type", configurationType, "name", name)
+	newObject, update, err := strategy.ShouldUpdate(wah)
 	if err != nil {
-		return fmt.Errorf("failed to determine whether auto-update is required for %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+		return fmt.Errorf("failed to determine whether auto-update is required for %s type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
 	}
 	if !update {
 		if klogV := klog.V(5); klogV.Enabled() {
-			klogV.InfoS("No update required", "wrapper", wrapper.TypeName(), "type", configurationType, "name", name,
-				"diff", cmp.Diff(current, bootstrap))
+			klogV.InfoS("No update required", "wrapper", bootstrap.typeName(), "type", configurationType, "name", name,
+				"diff", cmp.Diff(wah.getHave(), wah.getWant()))
 		}
 		return nil
 	}
 
-	if _, err = wrapper.Update(newObject); err == nil {
-		klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", wrapper.TypeName(), configurationType, name, cmp.Diff(current, newObject))
+	if err = newObject.update(); err == nil {
+		klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", bootstrap.typeName(), configurationType, name, cmp.Diff(wah.getHave(), wah.getWant()))
 		return nil
 	}
 
 	if apierrors.IsConflict(err) {
-		klog.V(2).InfoS(fmt.Sprintf("Something updated the %s concurrently, I will check its spec later", wrapper.TypeName()), "type", configurationType, "name", name)
+		klog.V(2).InfoS(fmt.Sprintf("Something updated the %s concurrently, I will check its spec later", bootstrap.typeName()), "type", configurationType, "name", name)
 		return nil
 	}
 
-	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
 }
 
 // RemoveUnwantedObjects attempts to delete the configuration objects
 // that exist, are annotated `apf.kubernetes.io/autoupdate-spec=true`, and do not
 // have a name in the given set.  A refusal due to concurrent update is logged
 // and not considered an error; the object will be reconsidered later.
-func RemoveUnwantedObjects(wrapper ConfigurationWrapper, bootstrap sets.String) error {
-	current, err := wrapper.GetExistingObjects()
+func RemoveUnwantedObjects(boots BootstrapObjects) error {
+	current, err := boots.getExistingObjects()
 	if err != nil {
-		klog.ErrorS(err, "Failed to list existing APF configuration objects", "type", wrapper.TypeName())
+		klog.ErrorS(err, "Failed to list existing APF configuration objects", "type", boots.typeName())
 	}
+	wantedNames := namesOfBootstrapObjects(boots)
 	for _, object := range current {
 		name := object.GetName()
-		if bootstrap.Has(name) {
+		if wantedNames.Has(name) {
 			continue
 		}
 		var value string
@@ -327,9 +310,9 @@ func RemoveUnwantedObjects(wrapper ConfigurationWrapper, bootstrap sets.String) 
 			continue
 		}
 		expectedResourceVersion := object.GetResourceVersion()
-		err = wrapper.Delete(name, expectedResourceVersion)
+		err = object.delete(expectedResourceVersion)
 		if err == nil {
-			klog.V(2).InfoS(fmt.Sprintf("Successfully deleted the unwanted %s", wrapper.TypeName()), "name", name)
+			klog.V(2).InfoS(fmt.Sprintf("Successfully deleted the unwanted %s", boots.typeName()), "name", name)
 			continue
 		}
 		if apierrors.IsConflict(err) {
@@ -341,4 +324,14 @@ func RemoveUnwantedObjects(wrapper ConfigurationWrapper, bootstrap sets.String) 
 		}
 	}
 	return nil
+}
+
+func namesOfBootstrapObjects(bos BootstrapObjects) sets.String {
+	names := sets.NewString()
+	len := bos.len()
+	for i := 0; i < len; i++ {
+		bo := bos.get(i)
+		names.Insert(bo.getName())
+	}
+	return names
 }

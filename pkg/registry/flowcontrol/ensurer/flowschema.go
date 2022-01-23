@@ -18,105 +18,115 @@ package ensurer
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 )
 
-var (
-	errObjectNotFlowSchema = errors.New("object is not a FlowSchema type")
-)
-
-// NewFlowSchemaWrapper makes a ConfigurationWrapper for FlowSchema objects
-func NewFlowSchemaWrapper(client flowcontrolclient.FlowSchemaInterface, lister flowcontrollisters.FlowSchemaLister) ConfigurationWrapper {
-	return &flowSchemaWrapper{
+// WrapBootstrapFlowSchemas creates a generic representation of the given bootstrap objects bound with their operations
+func WrapBootstrapFlowSchemas(client flowcontrolclient.FlowSchemaInterface, lister flowcontrollisters.FlowSchemaLister, boots []*flowcontrolv1beta2.FlowSchema) BootstrapObjects {
+	return &bootstrapFlowSchemas{
 		client: client,
 		lister: lister,
+		boots:  boots,
 	}
 }
 
-// ObjectifyFlowSchemas copies the given list to a generic form
-func ObjectifyFlowSchemas(objs []*flowcontrolv1beta2.FlowSchema) configurationObjectSlice {
-	slice := make(configurationObjectSlice, 0, len(objs))
-	for _, obj := range objs {
-		slice = append(slice, obj)
-	}
-	return slice
-}
-
-// flowSchemaWrapper abstracts all FlowSchema specific logic, with this
-// we can manage all boiler plate code in one place.
-type flowSchemaWrapper struct {
+type bootstrapFlowSchemas struct {
 	client flowcontrolclient.FlowSchemaInterface
 	lister flowcontrollisters.FlowSchemaLister
+	boots  []*flowcontrolv1beta2.FlowSchema
 }
 
-var _ ConfigurationWrapper = &flowSchemaWrapper{}
-
-func (fs *flowSchemaWrapper) TypeName() string {
+func (*bootstrapFlowSchemas) typeName() string {
 	return "FlowSchema"
 }
 
-func (fs *flowSchemaWrapper) Create(object runtime.Object) (runtime.Object, error) {
-	fsObject, ok := object.(*flowcontrolv1beta2.FlowSchema)
-	if !ok {
-		return nil, errObjectNotFlowSchema
-	}
-
-	return fs.client.Create(context.TODO(), fsObject, metav1.CreateOptions{FieldManager: fieldManager})
+func (boots *bootstrapFlowSchemas) len() int {
+	return len(boots.boots)
 }
 
-func (fs *flowSchemaWrapper) Update(object runtime.Object) (runtime.Object, error) {
-	fsObject, ok := object.(*flowcontrolv1beta2.FlowSchema)
-	if !ok {
-		return nil, errObjectNotFlowSchema
+func (boots *bootstrapFlowSchemas) get(i int) bootstrapObject {
+	return &bootstrapFlowSchema{
+		bootstrapFlowSchemas: boots,
+		bootstrap:            boots.boots[i],
 	}
-
-	return fs.client.Update(context.TODO(), fsObject, metav1.UpdateOptions{FieldManager: fieldManager})
 }
 
-func (fs *flowSchemaWrapper) Get(name string) (configurationObject, error) {
-	return fs.lister.Get(name)
+func (boots *bootstrapFlowSchemas) getExistingObjects() ([]deletable, error) {
+	objs, err := boots.lister.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list FlowSchema objects - %w", err)
+	}
+	dels := make([]deletable, len(objs))
+	for i, obj := range objs {
+		dels[i] = &deletableFlowSchema{
+			FlowSchema: obj,
+			client:     boots.client,
+		}
+	}
+	return dels, nil
 }
 
-func (fs *flowSchemaWrapper) Delete(name, resourceVersion string) error {
-	return fs.client.Delete(context.TODO(), name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &resourceVersion}})
+type bootstrapFlowSchema struct {
+	*bootstrapFlowSchemas
+	bootstrap *flowcontrolv1beta2.FlowSchema
 }
 
-func (fs *flowSchemaWrapper) CopySpec(bootstrap, current runtime.Object) error {
-	bootstrapFS, ok := bootstrap.(*flowcontrolv1beta2.FlowSchema)
-	if !ok {
-		return errObjectNotFlowSchema
-	}
-	currentFS, ok := current.(*flowcontrolv1beta2.FlowSchema)
-	if !ok {
-		return errObjectNotFlowSchema
-	}
-
-	specCopy := bootstrapFS.Spec.DeepCopy()
-	currentFS.Spec = *specCopy
-	return nil
+func (boot *bootstrapFlowSchema) getName() string {
+	return boot.bootstrap.Name
 }
 
-func (fs *flowSchemaWrapper) HasSpecChanged(bootstrap, current runtime.Object) (bool, error) {
-	bootstrapFS, ok := bootstrap.(*flowcontrolv1beta2.FlowSchema)
-	if !ok {
-		return false, errObjectNotFlowSchema
-	}
-	currentFS, ok := current.(*flowcontrolv1beta2.FlowSchema)
-	if !ok {
-		return false, errObjectNotFlowSchema
-	}
+func (boot *bootstrapFlowSchema) create() error {
+	_, err := boot.bootstrapFlowSchemas.client.Create(context.TODO(), boot.bootstrap, metav1.CreateOptions{FieldManager: fieldManager})
+	return err
+}
 
-	return flowSchemaSpecChanged(bootstrapFS, currentFS), nil
+func (boot *bootstrapFlowSchema) getCurrent() (wantAndHave, error) {
+	current, err := boot.bootstrapFlowSchemas.lister.Get(boot.bootstrap.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &wantAndHaveFlowSchema{
+		client: boot.bootstrapFlowSchemas.client,
+		want:   boot.bootstrap,
+		have:   current,
+	}, nil
+}
+
+type wantAndHaveFlowSchema struct {
+	client flowcontrolclient.FlowSchemaInterface
+	want   *flowcontrolv1beta2.FlowSchema
+	have   *flowcontrolv1beta2.FlowSchema
+}
+
+func (wah *wantAndHaveFlowSchema) getWant() configurationObject {
+	return wah.want
+}
+
+func (wah *wantAndHaveFlowSchema) getHave() configurationObject {
+	return wah.have
+}
+
+func (wah *wantAndHaveFlowSchema) copyHave(specFromWant bool) updatable {
+	copy := wah.have.DeepCopy()
+	if specFromWant {
+		copy.Spec = *wah.want.Spec.DeepCopy()
+	}
+	return &updatableFlowSchema{
+		FlowSchema: copy,
+		client:     wah.client,
+	}
+}
+
+func (wah *wantAndHaveFlowSchema) specsDiffer() bool {
+	return flowSchemaSpecChanged(wah.want, wah.have)
 }
 
 func flowSchemaSpecChanged(expected, actual *flowcontrolv1beta2.FlowSchema) bool {
@@ -125,10 +135,21 @@ func flowSchemaSpecChanged(expected, actual *flowcontrolv1beta2.FlowSchema) bool
 	return !equality.Semantic.DeepEqual(copiedExpectedFlowSchema.Spec, actual.Spec)
 }
 
-func (wr flowSchemaWrapper) GetExistingObjects() (configurationObjectSlice, error) {
-	objs, err := wr.lister.List(labels.Everything())
-	if err != nil {
-		return nil, fmt.Errorf("failed to list FlowSchema objects - %w", err)
-	}
-	return ObjectifyFlowSchemas(objs), nil
+type updatableFlowSchema struct {
+	*flowcontrolv1beta2.FlowSchema
+	client flowcontrolclient.FlowSchemaInterface
+}
+
+func (u *updatableFlowSchema) update() error {
+	_, err := u.client.Update(context.TODO(), u.FlowSchema, metav1.UpdateOptions{FieldManager: fieldManager})
+	return err
+}
+
+type deletableFlowSchema struct {
+	*flowcontrolv1beta2.FlowSchema
+	client flowcontrolclient.FlowSchemaInterface
+}
+
+func (dbl *deletableFlowSchema) delete(resourceVersion string) error {
+	return dbl.client.Delete(context.TODO(), dbl.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &resourceVersion}})
 }
