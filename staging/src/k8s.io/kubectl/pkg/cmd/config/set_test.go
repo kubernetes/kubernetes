@@ -24,6 +24,7 @@ import (
 
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -49,6 +50,69 @@ func TestSetConfigCurrentContext(t *testing.T) {
 		config:         conf,
 		args:           []string{"current-context", "my-cluster"},
 		expected:       `Property "current-context" set.` + "\n",
+		expectedConfig: expectedConfig,
+	}
+	test.run(t)
+}
+
+func TestSetConfigAuthProviderName(t *testing.T) {
+	conf := *clientcmdapi.NewConfig()
+	expectedConfig := clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"foo": {
+				AuthProvider: &clientcmdapi.AuthProviderConfig{
+					Name: "oidc",
+				},
+				Extensions: map[string]runtime.Object{},
+			},
+		},
+		Clusters:   map[string]*clientcmdapi.Cluster{},
+		Contexts:   map[string]*clientcmdapi.Context{},
+		Extensions: map[string]runtime.Object{},
+		Preferences: clientcmdapi.Preferences{
+			Colors:     false,
+			Extensions: map[string]runtime.Object{},
+		},
+	}
+	expectedConfig.Extensions = map[string]runtime.Object{}
+	test := setConfigTest{
+		description:    "Testing for kubectl config set users.foo.auth-provider.name to oidc",
+		config:         conf,
+		args:           []string{"users.foo.auth-provider.name", "oidc"},
+		expected:       `Property "users.foo.auth-provider.name" set.` + "\n",
+		expectedConfig: expectedConfig,
+	}
+	test.run(t)
+}
+
+func TestSetConfigAuthProviderConfigRefreshToken(t *testing.T) {
+	conf := *clientcmdapi.NewConfig()
+	expectedConfig := clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"foo": {
+				AuthProvider: &clientcmdapi.AuthProviderConfig{
+					Name: "",
+					Config: map[string]string{
+						"refresh-token": "test",
+					},
+				},
+				Extensions: map[string]runtime.Object{},
+			},
+		},
+		Clusters:   map[string]*clientcmdapi.Cluster{},
+		Contexts:   map[string]*clientcmdapi.Context{},
+		Extensions: map[string]runtime.Object{},
+		Preferences: clientcmdapi.Preferences{
+			Colors:     false,
+			Extensions: map[string]runtime.Object{},
+		},
+	}
+	expectedConfig.Extensions = map[string]runtime.Object{}
+	test := setConfigTest{
+		description:    "Testing for kubectl config set users.foo.auth-provider.config.refresh-token to oidc",
+		config:         conf,
+		args:           []string{"users.foo.auth-provider.config.refresh-token", "test"},
+		expected:       `Property "users.foo.auth-provider.config.refresh-token" set.` + "\n",
 		expectedConfig: expectedConfig,
 	}
 	test.run(t)
