@@ -193,10 +193,14 @@ func (c *containerLogManager) Clean(containerID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
 	}
-	if resp.GetStatus() == nil {
+	status := resp.GetStatus()
+	if status == nil {
 		return fmt.Errorf("container status is nil for %q", containerID)
 	}
-	pattern := fmt.Sprintf("%s*", resp.GetStatus().GetLogPath())
+	if status.GetLogPath() == "" {
+		return fmt.Errorf("log path of container %s can't be empty", containerID)
+	}
+	pattern := fmt.Sprintf("%s*", status.GetLogPath())
 	logs, err := c.osInterface.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to list all log files with pattern %q: %v", pattern, err)
