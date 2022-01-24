@@ -104,7 +104,9 @@ func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 		}
 
 		// verify the validity of the YAML
-		strict.VerifyUnmarshalStrict(bytes, gvk)
+		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
+			klog.Warning(err.Error())
+		}
 
 		joinBytes = bytes
 	}
