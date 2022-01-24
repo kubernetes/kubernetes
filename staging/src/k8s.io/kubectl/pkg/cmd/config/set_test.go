@@ -83,6 +83,6 @@ func (test setConfigTest) run(t *testing.T) {
 		}
 	}
 	if !reflect.DeepEqual(*config, test.expectedConfig) {
-		t.Errorf("Failed in: %q\n expected %v\n but got %v", test.description, *config, test.expectedConfig)
+		t.Errorf("Failed in: %q\n expected %#v\n but got %#v", test.description, *config, test.expectedConfig)
 	}
 }
