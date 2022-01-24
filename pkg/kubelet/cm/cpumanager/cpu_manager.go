@@ -362,7 +362,17 @@ func (m *manager) removeStaleState() {
 	// Get the list of active pods.
 	activeAndAdmittedPods := m.activePods()
 	if m.pendingAdmissionPod != nil {
-		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
+		pendingAdmissionPodNullified := false
+		for _, p := range activeAndAdmittedPods {
+			if p == m.pendingAdmissionPod {
+				m.pendingAdmissionPod = nil
+				pendingAdmissionPodNullified = true
+				break
+			}
+		}
+		if pendingAdmissionPodNullified == false {
+			activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
+		}
 	}
 
 	// Build a list of (podUID, containerName) pairs for all containers in all active Pods.
