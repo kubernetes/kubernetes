@@ -27,7 +27,6 @@ DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
 PSP_ADMISSION=${PSP_ADMISSION:-""}
-NODE_ADMISSION=${NODE_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
@@ -113,7 +112,7 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 # Default list of admission Controllers to invoke prior to persisting objects in cluster
 # The order defined here does not matter.
-ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,Priority,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
+ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,Priority,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction"}
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
@@ -474,9 +473,6 @@ function start_apiserver {
     fi
     if [[ -n "${PSP_ADMISSION}" ]]; then
       security_admission=",PodSecurityPolicy"
-    fi
-    if [[ -n "${NODE_ADMISSION}" ]]; then
-      security_admission=",NodeRestriction"
     fi
 
     # Append security_admission plugin
