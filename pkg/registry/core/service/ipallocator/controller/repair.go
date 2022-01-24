@@ -74,6 +74,7 @@ const numRepairsBeforeLeakCleanup = 3
 // and generates informational warnings for a cluster that is not in sync.
 func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient eventsv1client.EventsV1Interface, network *net.IPNet, alloc rangeallocation.RangeRegistry, secondaryNetwork *net.IPNet, secondaryAlloc rangeallocation.RangeRegistry) *Repair {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: eventClient})
+	defer eventBroadcaster.Shutdown()
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "ipallocator-repair-controller")
 
 	// build *ByFamily struct members
