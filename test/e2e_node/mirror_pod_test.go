@@ -193,6 +193,55 @@ var _ = SIGDescribe("MirrorPod", func() {
 				return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
+		/*
+			Release: v1.23
+			Testname: Mirror Pod, recreate after success
+			Description: When a finished static pod's manifest is removed and readded, the mirror pod MUST successfully recreate. Create the static pod, verify it is running, remove its manifest and then add it back, and verify the static pod runs again.
+		*/
+		ginkgo.It("should successfully recreate when file is removed and recreated [NodeConformance]", func() {
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+
+			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			ginkgo.By("create the static pod")
+			err := createStaticPod(podPath, staticPodName, ns,
+				imageutils.GetE2EImage(imageutils.BusyBox), v1.RestartPolicyAlways)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to be running")
+			gomega.Eventually(func() error {
+				return checkMirrorPodSucceeded(f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("delete the pod manifest from disk")
+			err = deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("recreate the file")
+			err = createStaticPod(podPath, staticPodName, ns,
+				imageutils.GetE2EImage(imageutils.BusyBox), v1.RestartPolicyAlways)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("mirror pod should restart with count 1")
+			gomega.Eventually(func() error {
+				return checkMirrorPodRunningWithRestartCount(2*time.Second, 2*time.Minute, f.ClientSet, mirrorPodName, ns, 1)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("mirror pod should stay running")
+			gomega.Consistently(func() error {
+				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+			}, time.Second*30, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("delete the static pod")
+			err = deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(func() error {
+				return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+		})
 	})
 })
 
@@ -297,6 +346,49 @@ func checkMirrorPodRecreatedAndRunning(cl clientset.Interface, name, namespace s
 	}
 	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
+	}
+	return validateMirrorPod(cl, pod)
+}
+
+func checkMirrorPodSucceeded(cl clientset.Interface, name, namespace string) error {
+	pod, err := cl.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+	}
+	if pod.Status.Phase != v1.PodSucceeded {
+		return fmt.Errorf("expected the mirror pod %q to be succeeded, got %q", name, pod.Status.Phase)
+	}
+	return validateMirrorPod(cl, pod)
+}
+
+func checkMirrorPodSucceededWithRestartCount(interval time.Duration, timeout time.Duration, cl clientset.Interface, name, namespace string, count int32) error {
+	var pod *v1.Pod
+	var err error
+	err = wait.PollImmediate(interval, timeout, func() (bool, error) {
+		pod, err = cl.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+		}
+		if pod.Status.Phase != v1.PodSucceeded {
+			return false, fmt.Errorf("expected the mirror pod %q to be succeeded, got %q", name, pod.Status.Phase)
+		}
+		for i := range pod.Status.ContainerStatuses {
+			if pod.Status.ContainerStatuses[i].State.Waiting != nil {
+				// retry if pod is in waiting state
+				return false, nil
+			}
+			if pod.Status.ContainerStatuses[i].State.Running == nil {
+				return false, fmt.Errorf("expected the mirror pod %q with container %q to be running (got containers=%v)", name, pod.Status.ContainerStatuses[i].Name, pod.Status.ContainerStatuses[i].State)
+			}
+			if pod.Status.ContainerStatuses[i].RestartCount == count {
+				// found the restart count
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
 	}
 	return validateMirrorPod(cl, pod)
 }

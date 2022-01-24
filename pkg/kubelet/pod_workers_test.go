@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
@@ -160,6 +161,21 @@ func newStaticPod(uid, name string) *v1.Pod {
 			Annotations: map[string]string{
 				kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource,
 			},
+		},
+	}
+}
+
+func newStaticPodWithPhase(uid, name string, phase v1.PodPhase) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(uid),
+			Name: name,
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource,
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: phase,
 		},
 	}
 }
@@ -423,6 +439,49 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 		}
 		if syncPodRecords[1].updateType != kubetypes.SyncPodKill {
 			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[1].updateType, kubetypes.SyncPodKill)
+		}
+	}
+}
+
+func TestUpdatePodWithStaticPod(t *testing.T) {
+	podWorkers, processed := createPodWorkers()
+
+	numPods := 20
+	for i := 0; i < numPods; i++ {
+		podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        newStaticPod(strconv.Itoa(i), strconv.Itoa(i)),
+			UpdateType: kubetypes.SyncPodCreate,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	if len(processed) != numPods {
+		t.Errorf("Not all pods processed: %v", len(processed))
+		return
+	}
+	for i := 0; i < numPods; i++ {
+		fullname := fmt.Sprintf("%s_%s", strconv.Itoa(i), "")
+		if _, exists := podWorkers.startedStaticPodsByFullname[fullname]; !exists {
+			t.Errorf("Pod %v: does not exists in startedStaticPodsByFullname", fullname)
+		}
+	}
+
+	for i := 0; i < numPods; i++ {
+		podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        newStaticPod(strconv.Itoa(i), strconv.Itoa(i)),
+			UpdateType: kubetypes.SyncPodKill,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	if len(processed) != numPods {
+		t.Errorf("Not all pods processed: %v", len(processed))
+		return
+	}
+	for i := 0; i < numPods; i++ {
+		fullname := fmt.Sprintf("%s_%s", strconv.Itoa(i), "")
+		if _, exists := podWorkers.startedStaticPodsByFullname[fullname]; exists {
+			t.Errorf("Pod %v: still exists in startedStaticPodsByFullname", fullname)
 		}
 	}
 }
