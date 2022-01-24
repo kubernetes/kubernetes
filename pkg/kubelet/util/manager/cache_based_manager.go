@@ -22,13 +22,15 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storageetcd3 "k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/clock"
 )
@@ -207,6 +209,8 @@ func (s *objectStore) Get(namespace, name string) (runtime.Object, error) {
 // may result in different semantics for freshness of objects
 // (e.g. ttl-based implementation vs watch-based implementation).
 type cacheBasedManager struct {
+	groupResource schema.GroupResource
+
 	objectStore          Store
 	getReferencedObjects func(*v1.Pod) sets.String
 
@@ -221,6 +225,7 @@ func (c *cacheBasedManager) GetObject(namespace, name string) (runtime.Object, e
 func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 	names := c.getReferencedObjects(pod)
 	c.lock.Lock()
+	klog.InfoS(c.groupResource.String()+".RegisterPod.pod", "namespace", pod.Namespace, "name", pod.Name)
 	defer c.lock.Unlock()
 	for name := range names {
 		c.objectStore.AddReference(pod.Namespace, name)
@@ -230,6 +235,10 @@ func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 	prev = c.registeredPods[key]
 	c.registeredPods[key] = pod
 	if prev != nil {
+		if prev.Namespace != pod.Namespace || prev.Name != pod.Name {
+			panic(fmt.Errorf(c.groupResource.String()+".236: mismatch in key/obj: %#v, %#v", key, prev))
+		}
+		klog.InfoS(c.groupResource.String()+".RegisterPod.prev", "namespace", prev.Namespace, "name", prev.Name)
 		for name := range c.getReferencedObjects(prev) {
 			// On an update, the .Add() call above will have re-incremented the
 			// ref count of any existing object, so any objects that are in both
@@ -249,6 +258,10 @@ func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 	prev = c.registeredPods[key]
 	delete(c.registeredPods, key)
 	if prev != nil {
+		if prev.Namespace != pod.Namespace || prev.Name != pod.Name {
+			panic(fmt.Errorf(c.groupResource.String()+".259: mismatch in key/obj: %#v, %#v", key, prev))
+		}
+		klog.InfoS(c.groupResource.String()+".UnregisterPod.prev", "namespace", prev.Namespace, "name", prev.Name)
 		for name := range c.getReferencedObjects(prev) {
 			c.objectStore.DeleteReference(prev.Namespace, name)
 		}
@@ -263,8 +276,9 @@ func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 // - every GetObject() call tries to fetch the value from local cache; if it is
 //   not there, invalidated or too old, we fetch it from apiserver and refresh the
 //   value in cache; otherwise it is just fetched from cache
-func NewCacheBasedManager(objectStore Store, getReferencedObjects func(*v1.Pod) sets.String) Manager {
+func NewCacheBasedManager(groupResource schema.GroupResource, objectStore Store, getReferencedObjects func(*v1.Pod) sets.String) Manager {
 	return &cacheBasedManager{
+		groupResource:        groupResource,
 		objectStore:          objectStore,
 		getReferencedObjects: getReferencedObjects,
 		registeredPods:       make(map[objectKey]*v1.Pod),

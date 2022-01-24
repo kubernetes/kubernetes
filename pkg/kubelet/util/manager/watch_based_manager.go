@@ -18,10 +18,11 @@ package manager
 
 import (
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
@@ -255,6 +256,7 @@ func (c *objectCache) AddReference(namespace, name string) {
 		c.items[key] = item
 	}
 	item.refCount++
+	klog.InfoS(c.groupResource.String()+".AddReference", "namespace", namespace, "name", name, "refCount", item.refCount)
 }
 
 func (c *objectCache) DeleteReference(namespace, name string) {
@@ -268,6 +270,9 @@ func (c *objectCache) DeleteReference(namespace, name string) {
 			// Stop the underlying reflector.
 			item.stop()
 			delete(c.items, key)
+			klog.InfoS(c.groupResource.String()+".DeleteReference", "namespace", namespace, "name", name, "result", "deleted")
+		} else {
+			klog.InfoS(c.groupResource.String()+".DeleteReference", "namespace", namespace, "name", name, "result", item.refCount)
 		}
 	}
 }
@@ -289,6 +294,8 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	c.lock.RUnlock()
 
 	if !exists {
+		klog.InfoS(c.groupResource.String()+".objectCache#Get not registered", "namespace", namespace, "name", name)
+		debug.PrintStack()
 		return nil, fmt.Errorf("object %q/%q not registered", namespace, name)
 	}
 	// Record last access time independently if it succeeded or not.
@@ -361,5 +368,5 @@ func NewWatchBasedManager(
 	maxIdleTime := resyncInterval * 5
 
 	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime)
-	return NewCacheBasedManager(objectStore, getReferencedObjects)
+	return NewCacheBasedManager(groupResource, objectStore, getReferencedObjects)
 }

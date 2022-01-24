@@ -23,10 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -117,7 +118,7 @@ func TestCacheBasedConfigMapManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	store := manager.NewObjectStore(getConfigMap(fakeClient), clock.RealClock{}, noObjectTTL, 0)
 	manager := &configMapManager{
-		manager: manager.NewCacheBasedManager(store, getConfigMapNames),
+		manager: manager.NewCacheBasedManager(schema.GroupResource{Resource: "configmaps"}, store, getConfigMapNames),
 	}
 
 	// Create a pod with some configMaps.

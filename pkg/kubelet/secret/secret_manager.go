@@ -29,6 +29,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/clock"
@@ -126,7 +127,7 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetO
 	}
 	secretStore := manager.NewObjectStore(getSecret, clock.RealClock{}, getTTL, defaultTTL)
 	return &secretManager{
-		manager: manager.NewCacheBasedManager(secretStore, getSecretNames),
+		manager: manager.NewCacheBasedManager(schema.GroupResource{Resource: "secrets"}, secretStore, getSecretNames),
 	}
 }
 

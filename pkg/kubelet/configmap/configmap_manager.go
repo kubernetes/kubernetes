@@ -29,6 +29,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/clock"
@@ -125,7 +126,7 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 	}
 	configMapStore := manager.NewObjectStore(getConfigMap, clock.RealClock{}, getTTL, defaultTTL)
 	return &configMapManager{
-		manager: manager.NewCacheBasedManager(configMapStore, getConfigMapNames),
+		manager: manager.NewCacheBasedManager(schema.GroupResource{Resource: "configmaps"}, configMapStore, getConfigMapNames),
 	}
 }
 

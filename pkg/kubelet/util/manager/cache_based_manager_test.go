@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -82,7 +83,7 @@ func getSecretNames(pod *v1.Pod) sets.String {
 }
 
 func newCacheBasedSecretManager(store Store) Manager {
-	return NewCacheBasedManager(store, getSecretNames)
+	return NewCacheBasedManager(schema.GroupResource{Resource: "secrets"}, store, getSecretNames)
 }
 
 func TestSecretStore(t *testing.T) {
