@@ -70,7 +70,7 @@ var (
 		kubectl logs -f -l app=nginx --all-containers=true
 
 		# Display only the most recent 20 lines of output in pod nginx
-		kubectl logs --tail=20 nginx
+		kubectl logs -t=20 nginx
 
 		# Show all logs from pod nginx written in the last hour
 		kubectl logs --since=1h nginx
@@ -314,7 +314,7 @@ func (o LogsOptions) Validate() error {
 	}
 
 	if logsOptions.TailLines != nil && *logsOptions.TailLines < -1 {
-		return fmt.Errorf("--tail must be greater than or equal to -1")
+		return fmt.Errorf("-t must be greater than or equal to -1")
 	}
 
 	return nil
