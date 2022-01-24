@@ -77,6 +77,18 @@ func (test setConfigTest) run(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
 	}
+
+	// Must manually set LocationOfOrigin field of AuthInfos if they exists
+	if len(config.AuthInfos) > 0 {
+		for k := range config.AuthInfos {
+			if test.expectedConfig.AuthInfos[k] != nil && config.AuthInfos[k] != nil {
+				test.expectedConfig.AuthInfos[k].LocationOfOrigin = config.AuthInfos[k].LocationOfOrigin
+			} else {
+				t.Errorf("Failed in:%q\n cannot find key %v in either expectedConfig or config", test.description, k)
+			}
+		}
+	}
+
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
 			t.Errorf("Failed in:%q\n expected %v\n but got %v", test.description, test.expected, buf.String())
