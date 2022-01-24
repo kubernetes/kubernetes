@@ -11,8 +11,8 @@ go 1.16
 require (
 	bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 	github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.18
-	github.com/Azure/go-autorest/autorest/adal v0.9.13
+	github.com/Azure/go-autorest/autorest v0.11.24
+	github.com/Azure/go-autorest/autorest/adal v0.9.18
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v1.16.1-0.20210702024009-ea6160c1d0e3
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
@@ -149,8 +149,8 @@ replace (
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.18
-	github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.13
+	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.24
+	github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.18
 	github.com/Azure/go-autorest/autorest/date => github.com/Azure/go-autorest/autorest/date v0.3.0
 	github.com/Azure/go-autorest/autorest/mocks => github.com/Azure/go-autorest/autorest/mocks v0.4.1
 	github.com/Azure/go-autorest/autorest/to => github.com/Azure/go-autorest/autorest/to v0.4.0
@@ -261,6 +261,7 @@ replace (
 	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.4
 	github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+	github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.2.0
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v1.0.0
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da

@@ -1,3 +1,4 @@
+//go:build !go1.13
 // +build !go1.13
 
 // Copyright 2017 Microsoft Corporation
@@ -23,7 +24,7 @@ import (
 )
 
 func getMSIEndpoint(ctx context.Context, sender Sender) (*http.Response, error) {
-	tempCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	tempCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	req, _ := http.NewRequest(http.MethodGet, msiEndpoint, nil)
 	req = req.WithContext(tempCtx)

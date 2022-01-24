@@ -45,9 +45,12 @@ type ResourceIdentifier struct {
 	Datalake            string `json:"datalake"`
 	Batch               string `json:"batch"`
 	OperationalInsights string `json:"operationalInsights"`
+	OSSRDBMS            string `json:"ossRDBMS"`
 	Storage             string `json:"storage"`
 	Synapse             string `json:"synapse"`
 	ServiceBus          string `json:"serviceBus"`
+	SQLDatabase         string `json:"sqlDatabase"`
+	CosmosDB            string `json:"cosmosDB"`
 }
 
 // Environment represents a set of endpoints for each of Azure's Clouds.
@@ -64,6 +67,10 @@ type Environment struct {
 	ServiceBusEndpoint           string             `json:"serviceBusEndpoint"`
 	BatchManagementEndpoint      string             `json:"batchManagementEndpoint"`
 	StorageEndpointSuffix        string             `json:"storageEndpointSuffix"`
+	CosmosDBDNSSuffix            string             `json:"cosmosDBDNSSuffix"`
+	MariaDBDNSSuffix             string             `json:"mariaDBDNSSuffix"`
+	MySQLDatabaseDNSSuffix       string             `json:"mySqlDatabaseDNSSuffix"`
+	PostgresqlDatabaseDNSSuffix  string             `json:"postgresqlDatabaseDNSSuffix"`
 	SQLDatabaseDNSSuffix         string             `json:"sqlDatabaseDNSSuffix"`
 	TrafficManagerDNSSuffix      string             `json:"trafficManagerDNSSuffix"`
 	KeyVaultDNSSuffix            string             `json:"keyVaultDNSSuffix"`
@@ -71,7 +78,6 @@ type Environment struct {
 	ServiceManagementVMDNSSuffix string             `json:"serviceManagementVMDNSSuffix"`
 	ResourceManagerVMDNSSuffix   string             `json:"resourceManagerVMDNSSuffix"`
 	ContainerRegistryDNSSuffix   string             `json:"containerRegistryDNSSuffix"`
-	CosmosDBDNSSuffix            string             `json:"cosmosDBDNSSuffix"`
 	TokenAudience                string             `json:"tokenAudience"`
 	APIManagementHostNameSuffix  string             `json:"apiManagementHostNameSuffix"`
 	SynapseEndpointSuffix        string             `json:"synapseEndpointSuffix"`
@@ -93,6 +99,10 @@ var (
 		ServiceBusEndpoint:           "https://servicebus.windows.net/",
 		BatchManagementEndpoint:      "https://batch.core.windows.net/",
 		StorageEndpointSuffix:        "core.windows.net",
+		CosmosDBDNSSuffix:            "documents.azure.com",
+		MariaDBDNSSuffix:             "mariadb.database.azure.com",
+		MySQLDatabaseDNSSuffix:       "mysql.database.azure.com",
+		PostgresqlDatabaseDNSSuffix:  "postgres.database.azure.com",
 		SQLDatabaseDNSSuffix:         "database.windows.net",
 		TrafficManagerDNSSuffix:      "trafficmanager.net",
 		KeyVaultDNSSuffix:            "vault.azure.net",
@@ -100,7 +110,6 @@ var (
 		ServiceManagementVMDNSSuffix: "cloudapp.net",
 		ResourceManagerVMDNSSuffix:   "cloudapp.azure.com",
 		ContainerRegistryDNSSuffix:   "azurecr.io",
-		CosmosDBDNSSuffix:            "documents.azure.com",
 		TokenAudience:                "https://management.azure.com/",
 		APIManagementHostNameSuffix:  "azure-api.net",
 		SynapseEndpointSuffix:        "dev.azuresynapse.net",
@@ -110,9 +119,12 @@ var (
 			Datalake:            "https://datalake.azure.net/",
 			Batch:               "https://batch.core.windows.net/",
 			OperationalInsights: "https://api.loganalytics.io",
+			OSSRDBMS:            "https://ossrdbms-aad.database.windows.net",
 			Storage:             "https://storage.azure.com/",
 			Synapse:             "https://dev.azuresynapse.net",
 			ServiceBus:          "https://servicebus.azure.net/",
+			SQLDatabase:         "https://database.windows.net/",
+			CosmosDB:            "https://cosmos.azure.com",
 		},
 	}
 
@@ -130,6 +142,10 @@ var (
 		ServiceBusEndpoint:           "https://servicebus.usgovcloudapi.net/",
 		BatchManagementEndpoint:      "https://batch.core.usgovcloudapi.net/",
 		StorageEndpointSuffix:        "core.usgovcloudapi.net",
+		CosmosDBDNSSuffix:            "documents.azure.us",
+		MariaDBDNSSuffix:             "mariadb.database.usgovcloudapi.net",
+		MySQLDatabaseDNSSuffix:       "mysql.database.usgovcloudapi.net",
+		PostgresqlDatabaseDNSSuffix:  "postgres.database.usgovcloudapi.net",
 		SQLDatabaseDNSSuffix:         "database.usgovcloudapi.net",
 		TrafficManagerDNSSuffix:      "usgovtrafficmanager.net",
 		KeyVaultDNSSuffix:            "vault.usgovcloudapi.net",
@@ -137,7 +153,6 @@ var (
 		ServiceManagementVMDNSSuffix: "usgovcloudapp.net",
 		ResourceManagerVMDNSSuffix:   "cloudapp.usgovcloudapi.net",
 		ContainerRegistryDNSSuffix:   "azurecr.us",
-		CosmosDBDNSSuffix:            "documents.azure.us",
 		TokenAudience:                "https://management.usgovcloudapi.net/",
 		APIManagementHostNameSuffix:  "azure-api.us",
 		SynapseEndpointSuffix:        NotAvailable,
@@ -147,9 +162,12 @@ var (
 			Datalake:            NotAvailable,
 			Batch:               "https://batch.core.usgovcloudapi.net/",
 			OperationalInsights: "https://api.loganalytics.us",
+			OSSRDBMS:            "https://ossrdbms-aad.database.usgovcloudapi.net",
 			Storage:             "https://storage.azure.com/",
 			Synapse:             NotAvailable,
 			ServiceBus:          "https://servicebus.azure.net/",
+			SQLDatabase:         "https://database.usgovcloudapi.net/",
+			CosmosDB:            "https://cosmos.azure.com",
 		},
 	}
 
@@ -167,6 +185,10 @@ var (
 		ServiceBusEndpoint:           "https://servicebus.chinacloudapi.cn/",
 		BatchManagementEndpoint:      "https://batch.chinacloudapi.cn/",
 		StorageEndpointSuffix:        "core.chinacloudapi.cn",
+		CosmosDBDNSSuffix:            "documents.azure.cn",
+		MariaDBDNSSuffix:             "mariadb.database.chinacloudapi.cn",
+		MySQLDatabaseDNSSuffix:       "mysql.database.chinacloudapi.cn",
+		PostgresqlDatabaseDNSSuffix:  "postgres.database.chinacloudapi.cn",
 		SQLDatabaseDNSSuffix:         "database.chinacloudapi.cn",
 		TrafficManagerDNSSuffix:      "trafficmanager.cn",
 		KeyVaultDNSSuffix:            "vault.azure.cn",
@@ -174,7 +196,6 @@ var (
 		ServiceManagementVMDNSSuffix: "chinacloudapp.cn",
 		ResourceManagerVMDNSSuffix:   "cloudapp.chinacloudapi.cn",
 		ContainerRegistryDNSSuffix:   "azurecr.cn",
-		CosmosDBDNSSuffix:            "documents.azure.cn",
 		TokenAudience:                "https://management.chinacloudapi.cn/",
 		APIManagementHostNameSuffix:  "azure-api.cn",
 		SynapseEndpointSuffix:        "dev.azuresynapse.azure.cn",
@@ -184,9 +205,12 @@ var (
 			Datalake:            NotAvailable,
 			Batch:               "https://batch.chinacloudapi.cn/",
 			OperationalInsights: NotAvailable,
+			OSSRDBMS:            "https://ossrdbms-aad.database.chinacloudapi.cn",
 			Storage:             "https://storage.azure.com/",
 			Synapse:             "https://dev.azuresynapse.net",
 			ServiceBus:          "https://servicebus.azure.net/",
+			SQLDatabase:         "https://database.chinacloudapi.cn/",
+			CosmosDB:            "https://cosmos.azure.com",
 		},
 	}
 
@@ -204,6 +228,10 @@ var (
 		ServiceBusEndpoint:           "https://servicebus.cloudapi.de/",
 		BatchManagementEndpoint:      "https://batch.cloudapi.de/",
 		StorageEndpointSuffix:        "core.cloudapi.de",
+		CosmosDBDNSSuffix:            "documents.microsoftazure.de",
+		MariaDBDNSSuffix:             "mariadb.database.cloudapi.de",
+		MySQLDatabaseDNSSuffix:       "mysql.database.cloudapi.de",
+		PostgresqlDatabaseDNSSuffix:  "postgres.database.cloudapi.de",
 		SQLDatabaseDNSSuffix:         "database.cloudapi.de",
 		TrafficManagerDNSSuffix:      "azuretrafficmanager.de",
 		KeyVaultDNSSuffix:            "vault.microsoftazure.de",
@@ -211,7 +239,6 @@ var (
 		ServiceManagementVMDNSSuffix: "azurecloudapp.de",
 		ResourceManagerVMDNSSuffix:   "cloudapp.microsoftazure.de",
 		ContainerRegistryDNSSuffix:   NotAvailable,
-		CosmosDBDNSSuffix:            "documents.microsoftazure.de",
 		TokenAudience:                "https://management.microsoftazure.de/",
 		APIManagementHostNameSuffix:  NotAvailable,
 		SynapseEndpointSuffix:        NotAvailable,
@@ -221,9 +248,12 @@ var (
 			Datalake:            NotAvailable,
 			Batch:               "https://batch.cloudapi.de/",
 			OperationalInsights: NotAvailable,
+			OSSRDBMS:            "https://ossrdbms-aad.database.cloudapi.de",
 			Storage:             "https://storage.azure.com/",
 			Synapse:             NotAvailable,
 			ServiceBus:          "https://servicebus.azure.net/",
+			SQLDatabase:         "https://database.cloudapi.de/",
+			CosmosDB:            "https://cosmos.azure.com",
 		},
 	}
 )
