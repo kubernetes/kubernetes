@@ -16,7 +16,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/klog/v2 v2.9.0
-	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
+	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 )
 
 replace (
