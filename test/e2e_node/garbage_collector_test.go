@@ -53,8 +53,10 @@ type testPodSpec struct {
 	restartCount int32
 	// the number of containers in the test pod
 	numContainers int
-	// a function that returns the number of containers currently on the node (including dead containers).
+	// a function that returns the names of containers currently on the node (including dead containers).
 	getContainerNames func() ([]string, error)
+	// a function that returns the IDs of sandboxes currently on the node (including dead sandboxes).
+	getSandboxIDs func() ([]string, error)
 }
 
 func (pod *testPodSpec) getContainerName(containerNumber int) string {
@@ -165,6 +167,22 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			}
 			return relevantContainers, nil
 		}
+		pod.getSandboxIDs = func() ([]string, error) {
+			relevantSandboxes := []string{}
+			sandboxes, err := runtime.ListPodSandbox(&runtimeapi.PodSandboxFilter{
+				LabelSelector: map[string]string{
+					types.KubernetesPodNameLabel:      pod.podName,
+					types.KubernetesPodNamespaceLabel: f.Namespace.Name,
+				},
+			})
+			if err != nil {
+				return relevantSandboxes, err
+			}
+			for _, sandbox := range sandboxes {
+				relevantSandboxes = append(relevantSandboxes, sandbox.Id)
+			}
+			return relevantSandboxes, nil
+		}
 	}
 
 	ginkgo.Context(fmt.Sprintf("Garbage Collection Test: %s", test.testName), func() {
@@ -257,6 +275,20 @@ func containerGCTest(f *framework.Framework, test testRun) {
 					}
 					if len(containerNames) > 0 {
 						return fmt.Errorf("%v containers still remain", containerNames)
+					}
+				}
+				return nil
+			}, garbageCollectDuration, runtimePollInterval).Should(gomega.BeNil())
+
+			ginkgo.By("Making sure all sandboxes get cleaned up")
+			gomega.Eventually(func() error {
+				for _, pod := range test.testPods {
+					sandboxIDs, err := pod.getSandboxIDs()
+					if err != nil {
+						return err
+					}
+					if len(sandboxIDs) > 0 {
+						return fmt.Errorf("%v sandboxes still remain", sandboxIDs)
 					}
 				}
 				return nil

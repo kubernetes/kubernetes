@@ -241,7 +241,7 @@ func (q *fakeQueue) GetWork() []types.UID {
 	return work
 }
 
-func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
+func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord, *containertest.FakeRuntime) {
 	lock := sync.Mutex{}
 	processed := make(map[types.UID][]syncPodRecord)
 	fakeRecorder := &record.FakeRecorder{}
@@ -290,7 +290,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 		time.Millisecond,
 		fakeCache,
 	)
-	return w.(*podWorkers), processed
+	return w.(*podWorkers), processed, fakeRuntime
 }
 
 func drainWorkers(podWorkers *podWorkers, numPods int) {
@@ -355,7 +355,7 @@ func drainAllWorkers(podWorkers *podWorkers) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	podWorkers, processed := createPodWorkers()
+	podWorkers, processed, _ := createPodWorkers()
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
@@ -393,10 +393,11 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestUpdatePodWithTerminatedPod(t *testing.T) {
-	podWorkers, _ := createPodWorkers()
+	podWorkers, _, fakeRuntime := createPodWorkers()
 	terminatedPod := newPodWithPhase("0000-0000-0000", "done-pod", v1.PodSucceeded)
-	runningPod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "done-pod"}
+	terminatedRuntimePod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "done-pod"}
 	pod := newPod("0000-0000-0002", "running-pod")
+	runtimePod := &kubecontainer.Pod{ID: "0000-0000-0003", Name: "running-pod"}
 
 	podWorkers.UpdatePod(UpdatePodOptions{
 		Pod:        terminatedPod,
@@ -408,7 +409,21 @@ func TestUpdatePodWithTerminatedPod(t *testing.T) {
 	})
 	podWorkers.UpdatePod(UpdatePodOptions{
 		UpdateType: kubetypes.SyncPodKill,
-		RunningPod: runningPod,
+		RunningPod: terminatedRuntimePod,
+	})
+
+	fakeRuntime.PodStatus = kubecontainer.PodStatus{
+		ID:   runtimePod.ID,
+		Name: runtimePod.Name,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	}
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodKill,
+		RunningPod: runtimePod,
 	})
 
 	if podWorkers.IsPodKnownTerminated(pod.UID) == true {
@@ -417,13 +432,16 @@ func TestUpdatePodWithTerminatedPod(t *testing.T) {
 	if podWorkers.IsPodKnownTerminated(terminatedPod.UID) == false {
 		t.Errorf("podWorker state should be terminated")
 	}
-	if podWorkers.IsPodKnownTerminated(runningPod.ID) == true {
-		t.Errorf("podWorker state should not be marked terminated for a running pod")
+	if podWorkers.IsPodKnownTerminated(terminatedRuntimePod.ID) == false {
+		t.Errorf("podWorker state should be marked terminated for a terminated runtime pod")
+	}
+	if podWorkers.IsPodKnownTerminated(runtimePod.ID) == true {
+		t.Errorf("podWorker state should not be marked terminated for a running runtime pod")
 	}
 }
 
 func TestUpdatePodForRuntimePod(t *testing.T) {
-	podWorkers, processed := createPodWorkers()
+	podWorkers, processed, fakeRuntime := createPodWorkers()
 
 	// ignores running pod of wrong sync type
 	podWorkers.UpdatePod(UpdatePodOptions{
@@ -435,6 +453,13 @@ func TestUpdatePodForRuntimePod(t *testing.T) {
 		t.Fatalf("Not all pods processed: %v", len(processed))
 	}
 
+	fakeRuntime.PodStatus = kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	}
 	// creates synthetic pod
 	podWorkers.UpdatePod(UpdatePodOptions{
 		UpdateType: kubetypes.SyncPodKill,
@@ -454,7 +479,7 @@ func TestUpdatePodForRuntimePod(t *testing.T) {
 }
 
 func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
-	podWorkers, processed := createPodWorkers()
+	podWorkers, processed, _ := createPodWorkers()
 
 	now := time.Now()
 	podWorkers.podSyncStatuses[types.UID("1")] = &podSyncStatus{
@@ -483,7 +508,7 @@ func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
 }
 
 func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
-	podWorkers, processed := createPodWorkers()
+	podWorkers, processed, _ := createPodWorkers()
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		pod := newPod(strconv.Itoa(i), strconv.Itoa(i))
@@ -536,7 +561,7 @@ func init() {
 }
 
 func TestStaticPodExclusion(t *testing.T) {
-	podWorkers, processed := createPodWorkers()
+	podWorkers, processed, _ := createPodWorkers()
 	var channels WorkChannel
 	podWorkers.workerChannelFn = channels.Intercept
 
@@ -990,7 +1015,7 @@ func (w *WorkChannel) Intercept(uid types.UID, ch chan podWork) (outCh <-chan po
 }
 
 func TestSyncKnownPods(t *testing.T) {
-	podWorkers, _ := createPodWorkers()
+	podWorkers, _, _ := createPodWorkers()
 
 	numPods := 20
 	for i := 0; i < numPods; i++ {
@@ -1179,7 +1204,7 @@ func Test_removeTerminatedWorker(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			podWorkers, _ := createPodWorkers()
+			podWorkers, _, _ := createPodWorkers()
 			podWorkers.podSyncStatuses[podUID] = tc.podSyncStatus
 			podWorkers.startedStaticPodsByFullname = tc.startedStaticPodsByFullname
 			podWorkers.waitingToStartStaticPodsByFullname = tc.waitingToStartStaticPodsByFullname
@@ -1293,7 +1318,7 @@ func TestFakePodWorkers(t *testing.T) {
 // TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
 func TestKillPodNowFunc(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
-	podWorkers, processed := createPodWorkers()
+	podWorkers, processed, _ := createPodWorkers()
 	killPodFunc := killPodNow(podWorkers, fakeRecorder)
 	pod := newPod("test", "test")
 	gracePeriodOverride := int64(0)
@@ -1625,7 +1650,7 @@ func Test_allowPodStart(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			podWorkers, _ := createPodWorkers()
+			podWorkers, _, _ := createPodWorkers()
 			if tc.podSyncStatuses != nil {
 				podWorkers.podSyncStatuses = tc.podSyncStatuses
 			}

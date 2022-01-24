@@ -573,8 +573,8 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 			syncedAt: now,
 			fullname: kubecontainer.GetPodFullName(pod),
 		}
-		// if this pod is being synced for the first time, we need to make sure it is an active pod
-		if !isRuntimePod && (pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded) {
+		// if this pod is being synced for the first time, we need to make sure it is not orphan and is an active pod
+		if isRuntimePod || pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
 			// check to see if the pod is not running and the pod is terminal.
 			// If this succeeds then record in the podWorker that it is terminated.
 			if statusCache, err := p.podCache.Get(pod.UID); err == nil {
