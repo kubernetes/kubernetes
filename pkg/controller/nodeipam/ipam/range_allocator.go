@@ -82,6 +82,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	eventBroadcaster.StartStructuredLogging(0)
 	klog.V(0).Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	defer eventBroadcaster.Shutdown()
 
 	// create a cidrSet for each cidr we operate on
 	// cidrSet are mapped to clusterCIDR by index

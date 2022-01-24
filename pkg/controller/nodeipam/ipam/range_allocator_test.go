@@ -537,6 +537,9 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 
 	// test function
 	testFunc := func(tc testCase) {
+		stopAllocatorChan := make(chan struct{})
+		defer close(stopAllocatorChan)
+
 		fakeNodeInformer := getFakeNodeInformer(tc.fakeNodeHandler)
 		nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
 		// Initialize the range allocator.
@@ -552,7 +555,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		}
 		rangeAllocator.nodesSynced = alwaysReady
 		rangeAllocator.recorder = testutil.NewFakeRecorder()
-		go allocator.Run(wait.NeverStop)
+		go allocator.Run(stopAllocatorChan)
 
 		// this is a bit of white box testing
 		// pre allocate the cidrs as per the test
