@@ -133,9 +133,177 @@ for image in $images; do
     download "$project" "$path" "$tag" "$rbac"
 done
 
-# Update the mock driver manifests, too.
+#########################################################################
+# The following section is responsible for generating csi-manifest.go   #
+# and updating all container image references to make use of the images #
+# listed in csi-manifest.go. This is so that CSI test images can be     #
+# mirrored like the rest of the test images                             #
+#########################################################################
+manifest="../../../utils/image/manifest.go"
+csiManifest="../../../utils/image/csi-manifest.go"
+
+set +x # disable shell tracing, so that printed messages can be seden
+
+# A temp on-disk file for holding information about container images
+# Format: {key}\t{registry variable}\t{image name}\t{image version}
+lookupFile=lookup.tmp
+echo -n "" > $lookupFile
+trap "rm -f $lookupFile" EXIT
+
+
+# Lookup the registry variable name (in manifest.go) for the given registry
+lookupRegistry() {
+    registry=$(echo $1 | sed -e 's/\//\\\//') # escape backslash characters
+    awk "\$0 ~ /\"$registry\"/{print substr(\$1,1,length(\$1)-1)}" $manifest
+}
+
+# Lookup the key used for the given container image from the lookup file
+lookupImageKey() {
+    name=$1
+    awk "\$0 ~ /$name/{print \$1}" $lookupFile
+}
+
+# If the given file line contains a templated image reference extract the key used for the container image
+extractKey() {
+    echo "$1" | grep {{.*Image}} | sed -e 's/.*{{\.\([[:upper:]][[:lower:]]*\)Image}}.*/\1/'
+}
+
+# Given a key to a container image, copy the configuration information from csi-manifest into the lookup file
+# This will mean that the given container image information will be carried over when csi-manifest is regenerated
+addExistingToLookup() {
+    key=$1
+    grep "configs\[${key}\]" $csiManifest | sed -e 's;.*configs\[\(.*\)\] = Config{\(.*\), "\(.*\)", "\(.*\)"};\1\t\2\t\3\t\4;' >> $lookupFile
+}
+
+###########################################################
+# Find the new image versions to use
 grep -r image: hostpath/hostpath/csi-hostpath-plugin.yaml | while read -r image; do
     version=$(echo "$image" | sed -e 's/.*:\(.*\)/\1/')
     image=$(echo "$image" | sed -e 's/.*image: \([^:]*\).*/\1/')
-    sed -i -e "s;$image:.*;$image:$version;" mock/*.yaml
+
+    key="$(extractKey $image)"
+    if [ -z "${key}" ] ; then
+        #echo "DEBUG: Could not find key in image $image, adding new entry to lookup file"
+        registry=$(echo "$image" | sed -e 's/\(.*\)\/.*/\1/')
+        name=$(echo $image | sed -e 's/.*\/\(.*\)/\1/')
+        key="$(echo ${name:0:1} | tr '[:lower:]' '[:upper:]')$(echo ${name:1} | sed -e 's/-//g')"
+
+        mapping=$(lookupRegistry $registry)
+        if [ -z "$mapping" ] ; then
+            #echo "Could not find mapping for registry $registry, not updating $image reference"
+            continue
+        fi
+
+        echo -e "${key}\tlist.${mapping}\t${name}\t${version}" >> $lookupFile
+    else
+        #echo "DEBUG: found key $key in image, copying from csi-manifest.go"
+        addExistingToLookup $key
+    fi
 done
+
+###########################################################
+# Check to make sure that all referenced images are in the lookup file
+grep -r --include \*.yaml.in "{{.*Image}}" | while read -r key; do
+    key="$(extractKey "$key")"
+
+    mapping=$(awk "\$1 ~ /$key/{print \$3}" $lookupFile)
+    if [ -z "$mapping" ] ; then
+        #echo "DEBUG: Didn't find existing mapping for key $key, copying from csi-manifest.go"
+        addExistingToLookup $key
+    else
+        #echo "DEBUG: Found existing mapping for key $key"
+        a=1 # needed for if/else syntax to be valid
+    fi
+done
+
+###########################################################
+# Find any manifests with image references and change the file extension to .yaml.in
+# Note: This will move any file with an image reference, even if it has an image
+#       we are not going to template
+grep -r --files-with-matches --include \*.yaml --exclude-dir=csi-driver-host-path --exclude-dir=gce-pd image: | while read -r filename; do
+    # If the file is version controlled use git to move it, else do a plain move
+    git mv "$filename" "${filename}.in" 2>/dev/null || mv "$filename" "${filename}.in"
+
+    # Find all references to this file and update them to use the templated file
+    (cd ../../ && grep -r --include \*.go "${filename}\"") | while read -r reference; do
+        reference=$(echo $reference | sed -e 's/\([^:]\):.*/\1/')
+	sed -i -e "s;${filename}\";${filename}.in\";" ../../$reference
+    done
+done
+
+###########################################################
+# Replace all image references with template references
+grep -r --include \*.yaml.in image: | while read -r image; do
+    file=$(echo $image | sed -e 's/\([^:]\):.*/\1/')
+    image=$(echo "$image" | sed -e 's/.*image: \([^:]*\).*/\1/')
+    name=$(echo $image | sed -e 's/.*\/\(.*\)/\1/')
+
+    key="$(extractKey "$image")"
+    if [ -n "$key" ] ; then
+        #echo "DEBUG: already templated $name in $file"
+        continue
+    fi
+
+    key="$(lookupImageKey $name)"
+    if [ -z "$key" ] ; then
+        echo "Could not find a mapping for image $image, not templating it"
+        continue
+    fi
+
+    sed -i -e "s;$image:.*;{{.${key}Image}};" $file
+done
+
+###########################################################
+# Generate the new csi-manifest.go file
+(
+cat << EOF
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package image
+
+const (
+    // Offset the CSI images so there is no collision
+    CSINone = iota + 500
+EOF
+awk '{print "    "$1}' $lookupFile
+cat << EOF
+)
+
+type TestCSIImagesStruct struct {
+EOF
+awk '{print "    "$1"Image string"}' $lookupFile
+cat << EOF
+}
+
+var TestCSIImages TestCSIImagesStruct
+func init() {
+    TestCSIImages = TestCSIImagesStruct{
+EOF
+awk '{print "        GetE2EImage("$1"),"}' $lookupFile
+cat << EOF
+    }
+}
+
+func initCSIImageConfigs(list RegistryList, configs map[int]Config) {
+EOF
+# 1:key 2:registry 3:name 4:version
+awk '{print "    configs["$1"] = Config{"$2", \""$3"\", \""$4"\"}"}' $lookupFile
+cat << EOF
+}
+EOF
+) > $csiManifest
+gofmt -w $csiManifest

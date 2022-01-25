@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -81,6 +83,22 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 		data, err := e2etestfiles.Read(fileName)
 		if err != nil {
 			framework.Failf("reading manifest file: %v", err)
+		}
+
+		// Handle templated .yaml files
+		if strings.HasSuffix(fileName, ".yaml.in") {
+			dataWithImageName := new(bytes.Buffer)
+			tmpl, err := template.New("imagemanifest").Parse(string(data))
+			if err != nil {
+				framework.Failf("parsing manifest template: %v", err)
+			}
+
+			err = tmpl.Execute(dataWithImageName, imageutils.TestCSIImages)
+			if err != nil {
+				framework.Failf("executing manifest template: %s", err)
+			}
+
+			data = dataWithImageName.Bytes()
 		}
 
 		// Split at the "---" separator before working on
