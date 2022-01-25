@@ -322,22 +322,16 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, nil, serviceAccountHasSecrets)
+	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, nil, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, serviceAccountName)
+		case watch.Added, watch.Modified:
+			return true, nil
+		}
+		return false, nil
+	})
 	return err
-}
-
-// serviceAccountHasSecrets returns true if the service account has at least one secret,
-// false if it does not, or an error.
-func serviceAccountHasSecrets(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
-	}
-	switch t := event.Object.(type) {
-	case *v1.ServiceAccount:
-		return len(t.Secrets) > 0, nil
-	}
-	return false, nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
