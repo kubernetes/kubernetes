@@ -161,14 +161,12 @@ var _ framework.PermitPlugin = &PermitPlugin{}
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-		return plugin, nil
-	}
-}
-
-// newPlugin returns a plugin factory with specified Plugin.
-func newPostFilterPlugin(plugin *PostFilterPlugin) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-		plugin.fh = fh
+		switch pl := plugin.(type) {
+		case *PermitPlugin:
+			pl.fh = fh
+		case *PostFilterPlugin:
+			pl.fh = fh
+		}
 		return plugin, nil
 	}
 }
@@ -525,37 +523,15 @@ func (pp *PermitPlugin) reset() {
 	pp.rejectingPod = ""
 }
 
-// newPermitPlugin returns a factory for permit plugin with specified PermitPlugin.
-func newPermitPlugin(permitPlugin *PermitPlugin) frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-		permitPlugin.fh = fh
-		return permitPlugin, nil
-	}
-}
-
 // TestPreFilterPlugin tests invocation of prefilter plugins.
 func TestPreFilterPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a pre-filter plugin.
 	preFilterPlugin := &PreFilterPlugin{}
-	registry := frameworkruntime.Registry{prefilterPluginName: newPlugin(preFilterPlugin)}
-
-	// Setup initial prefilter plugin for testing.
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				PreFilter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: prefilterPluginName},
-					},
-				},
-			},
-		}},
-	})
+	registry, prof := initRegistryAndConfig(t, preFilterPlugin)
 
 	// Create the API server and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "prefilter-plugin", nil), 2,
-		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -681,7 +657,7 @@ func TestPostFilterPlugin(t *testing.T) {
 			registry := frameworkruntime.Registry{
 				filterPluginName:     newPlugin(filterPlugin),
 				scorePluginName:      newPlugin(scorePlugin),
-				postfilterPluginName: newPostFilterPlugin(postFilterPlugin),
+				postfilterPluginName: newPlugin(postFilterPlugin),
 			}
 
 			// Setup plugins for testing.
@@ -769,25 +745,10 @@ func TestPostFilterPlugin(t *testing.T) {
 func TestScorePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a score plugin.
 	scorePlugin := &ScorePlugin{}
-	registry := frameworkruntime.Registry{
-		scorePluginName: newPlugin(scorePlugin),
-	}
-
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Score: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: scorePluginName},
-					},
-				},
-			},
-		}},
-	})
+	registry, prof := initRegistryAndConfig(t, scorePlugin)
 
 	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "score-plugin", nil), 10,
-		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -846,26 +807,10 @@ func TestScorePlugin(t *testing.T) {
 func TestNormalizeScorePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a normalize score plugin.
 	scoreWithNormalizePlugin := &ScoreWithNormalizePlugin{}
-	registry := frameworkruntime.Registry{
-		scoreWithNormalizePluginName: newPlugin(scoreWithNormalizePlugin),
-	}
-
-	// Setup initial score plugin for testing.
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Score: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: scoreWithNormalizePluginName},
-					},
-				},
-			},
-		}},
-	})
+	registry, prof := initRegistryAndConfig(t, scoreWithNormalizePlugin)
 
 	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "score-plugin", nil), 10,
-		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
 	defer testutils.CleanupTest(t, testCtx)
@@ -895,25 +840,11 @@ func TestNormalizeScorePlugin(t *testing.T) {
 func TestReservePluginReserve(t *testing.T) {
 	// Create a plugin registry for testing. Register only a reserve plugin.
 	reservePlugin := &ReservePlugin{}
-	registry := frameworkruntime.Registry{reservePluginName: newPlugin(reservePlugin)}
-
-	// Setup initial reserve plugin for testing.
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Reserve: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: reservePluginName},
-					},
-				},
-			},
-		}},
-	})
+	registry, prof := initRegistryAndConfig(t, reservePlugin)
 
 	// Create the API server and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "reserve-plugin-reserve", nil), 2,
-		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -1239,19 +1170,12 @@ func TestBindPlugin(t *testing.T) {
 	postBindPlugin := &PostBindPlugin{name: "mock-post-bind-plugin"}
 	// Create a plugin registry for testing. Register reserve, bind, and
 	// postBind plugins.
+
 	registry := frameworkruntime.Registry{
-		reservePlugin.Name(): func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-			return reservePlugin, nil
-		},
-		bindPlugin1.Name(): func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-			return bindPlugin1, nil
-		},
-		bindPlugin2.Name(): func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-			return bindPlugin2, nil
-		},
-		postBindPlugin.Name(): func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-			return postBindPlugin, nil
-		},
+		reservePlugin.Name():  newPlugin(reservePlugin),
+		bindPlugin1.Name():    newPlugin(bindPlugin1),
+		bindPlugin2.Name():    newPlugin(bindPlugin2),
+		postBindPlugin.Name(): newPlugin(postBindPlugin),
 	}
 
 	// Setup initial unreserve and bind plugins for testing.
@@ -1443,37 +1367,11 @@ func TestPostBindPlugin(t *testing.T) {
 				name:                  postBindPluginName,
 				pluginInvokeEventChan: make(chan pluginInvokeEvent, 1),
 			}
-			registry := frameworkruntime.Registry{
-				preBindPluginName:  newPlugin(preBindPlugin),
-				postBindPluginName: newPlugin(postBindPlugin),
-			}
 
-			// Setup initial prebind and postbind plugin for testing.
-			cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-				Profiles: []v1beta3.KubeSchedulerProfile{{
-					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-					Plugins: &v1beta3.Plugins{
-						PreBind: v1beta3.PluginSet{
-							Enabled: []v1beta3.Plugin{
-								{
-									Name: preBindPluginName,
-								},
-							},
-						},
-						PostBind: v1beta3.PluginSet{
-							Enabled: []v1beta3.Plugin{
-								{
-									Name: postBindPluginName,
-								},
-							},
-						},
-					},
-				}},
-			})
-
+			registry, prof := initRegistryAndConfig(t, preBindPlugin, postBindPlugin)
 			// Create the API server and the scheduler with the test plugin set.
 			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "postbind-plugin", nil), 2,
-				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
 			defer testutils.CleanupTest(t, testCtx)
 
@@ -1794,25 +1692,11 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 func TestFilterPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a filter plugin.
 	filterPlugin := &FilterPlugin{}
-	registry := frameworkruntime.Registry{filterPluginName: newPlugin(filterPlugin)}
-
-	// Setup initial filter plugin for testing.
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Filter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: filterPluginName},
-					},
-				},
-			},
-		}},
-	})
+	registry, prof := initRegistryAndConfig(t, filterPlugin)
 
 	// Create the API server and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "filter-plugin", nil), 1,
-		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -1866,25 +1750,11 @@ func TestFilterPlugin(t *testing.T) {
 func TestPreScorePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a pre-score plugin.
 	preScorePlugin := &PreScorePlugin{}
-	registry := frameworkruntime.Registry{preScorePluginName: newPlugin(preScorePlugin)}
-
-	// Setup initial pre-score plugin for testing.
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				PreScore: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: preScorePluginName},
-					},
-				},
-			},
-		}},
-	})
+	registry, prof := initRegistryAndConfig(t, preScorePlugin)
 
 	// Create the API server and the scheduler with the test plugin set.
 	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "pre-score-plugin", nil), 2,
-		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -1945,7 +1815,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	// how many times a Pod gets tried scheduling.
 	filterPlugin := &FilterPlugin{numCalledPerPod: make(map[string]int)}
 	registry := frameworkruntime.Registry{
-		permitPluginName: newPermitPlugin(permitPlugin),
+		permitPluginName: newPlugin(permitPlugin),
 		filterPluginName: newPlugin(filterPlugin),
 	}
 
@@ -2279,25 +2149,45 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 }
 
 // initRegistryAndConfig returns registry and plugins config based on give plugins.
-// TODO: refactor it to a more generic functions that accepts all kinds of Plugins as arguments
-func initRegistryAndConfig(t *testing.T, pp ...*PermitPlugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
-	var registry frameworkruntime.Registry
-	if len(pp) == 0 {
+func initRegistryAndConfig(t *testing.T, plugins ...framework.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
+	if len(plugins) == 0 {
 		return frameworkruntime.Registry{}, schedulerconfig.KubeSchedulerProfile{}
+	}
+
+	registry := frameworkruntime.Registry{}
+	pls := &v1beta3.Plugins{}
+
+	for _, p := range plugins {
+		registry.Register(p.Name(), newPlugin(p))
+		plugin := v1beta3.Plugin{Name: p.Name()}
+
+		switch p.(type) {
+		case *PreFilterPlugin:
+			pls.PreFilter.Enabled = append(pls.PreFilter.Enabled, plugin)
+		case *FilterPlugin:
+			pls.Filter.Enabled = append(pls.Filter.Enabled, plugin)
+		case *PreScorePlugin:
+			pls.PreScore.Enabled = append(pls.PreScore.Enabled, plugin)
+		case *ScorePlugin, *ScoreWithNormalizePlugin:
+			pls.Score.Enabled = append(pls.Score.Enabled, plugin)
+		case *ReservePlugin:
+			pls.Reserve.Enabled = append(pls.Reserve.Enabled, plugin)
+		case *PreBindPlugin:
+			pls.PreBind.Enabled = append(pls.PreBind.Enabled, plugin)
+		case *BindPlugin:
+			pls.Bind.Enabled = append(pls.Bind.Enabled, plugin)
+		case *PostBindPlugin:
+			pls.PostBind.Enabled = append(pls.PostBind.Enabled, plugin)
+		case *PermitPlugin:
+			pls.Permit.Enabled = append(pls.Permit.Enabled, plugin)
+		}
 	}
 
 	versionedCfg := v1beta3.KubeSchedulerConfiguration{
 		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Permit: v1beta3.PluginSet{},
-			},
+			Plugins:       pls,
 		}},
-	}
-	registry = frameworkruntime.Registry{}
-	for _, p := range pp {
-		registry.Register(p.Name(), newPermitPlugin(p))
-		versionedCfg.Profiles[0].Plugins.Permit.Enabled = append(versionedCfg.Profiles[0].Plugins.Permit.Enabled, v1beta3.Plugin{Name: p.Name()})
 	}
 	cfg := configtesting.V1beta3ToInternalWithDefaults(t, versionedCfg)
 	return registry, cfg.Profiles[0]
