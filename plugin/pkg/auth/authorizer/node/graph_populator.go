@@ -157,6 +157,7 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 	}
 	klog.V(4).Infof("updatePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
 	g.graph.AddPod(pod)
+	klog.V(4).Infof("pod %s in namespace %s is updated for the node %s", pod.Name, pod.Namespace, pod.Spec.NodeName)
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {
@@ -174,6 +175,7 @@ func (g *graphPopulator) deletePod(obj interface{}) {
 	}
 	klog.V(4).Infof("deletePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
 	g.graph.DeletePod(pod.Name, pod.Namespace)
+	klog.V(4).Infof("pod %s in namespace %s is deleted from the node %s", pod.Name, pod.Namespace, pod.Spec.NodeName)
 }
 
 func (g *graphPopulator) addPV(obj interface{}) {
