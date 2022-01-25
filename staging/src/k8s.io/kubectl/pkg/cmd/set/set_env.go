@@ -169,11 +169,11 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	cmd.Flags().StringSliceVarP(&o.Keys, "keys", "", o.Keys, "Comma-separated list of keys to import from specified resource")
 	cmd.Flags().BoolVar(&o.List, "list", o.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&o.Resolve, "resolve", o.Resolve, "If true, show secret or configmap references when listing variables")
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set env will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 
 	o.PrintFlags.AddFlags(cmd)
 

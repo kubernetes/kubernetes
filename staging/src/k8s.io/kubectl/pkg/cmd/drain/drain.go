@@ -75,7 +75,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
 		},
 	}
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.drainer.Selector)
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -104,7 +104,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
 		},
 	}
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.drainer.Selector)
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -197,13 +197,13 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-emptydir-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&o.drainer.GracePeriodSeconds, "grace-period", o.drainer.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&o.drainer.Timeout, "timeout", o.drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
 
 	cmdutil.AddChunkSizeFlag(cmd, &o.drainer.ChunkSize)
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.drainer.Selector)
 	return cmd
 }
 
