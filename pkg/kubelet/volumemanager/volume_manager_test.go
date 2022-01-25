@@ -94,7 +94,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
 			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient)
+			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 			stopCh := runVolumeManager(manager)
 			defer close(stopCh)
@@ -154,7 +154,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient)
+	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 	stopCh := runVolumeManager(manager)
 	defer close(stopCh)
@@ -242,7 +242,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		}
 		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-		manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient)
+		manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 		stopCh := runVolumeManager(manager)
 		defer close(stopCh)
@@ -283,12 +283,15 @@ func (p *fakePodStateProvider) ShouldPodContainersBeTerminating(uid kubetypes.UI
 	return ok
 }
 
-func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manager, kubeClient clientset.Interface) VolumeManager {
+func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manager, kubeClient clientset.Interface, node *v1.Node) VolumeManager {
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	// TODO (#51147) inject mock prober
-	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil))
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)
+	fakeVolumeHost.WithNode(node)
+
+	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, nil /* prober */, fakeVolumeHost)
 	stateProvider := &fakePodStateProvider{}
 	fakePathHandler := volumetest.NewBlockVolumePathHandler()
 	vm := NewVolumeManager(

@@ -185,9 +185,7 @@ func (rc *reconciler) unmountVolumes() {
 			klog.V(5).InfoS(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 			err := rc.operationExecutor.UnmountVolume(
 				mountedVolume.MountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
-			if err != nil &&
-				!nestedpendingoperations.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
+			if err != nil && !isExpectedError(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				klog.ErrorS(err, mountedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
@@ -206,6 +204,11 @@ func (rc *reconciler) mountAttachVolumes() {
 		volumeToMount.DevicePath = devicePath
 		if cache.IsVolumeNotAttachedError(err) {
 			if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
+				//// lets not spin a goroutine and unnecessarily trigger exponential backoff if this happens
+				if volumeToMount.PluginIsAttachable && !volumeToMount.ReportedInUse {
+					klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume failed", " volume not marked in-use"), "pod", klog.KObj(volumeToMount.Pod))
+					continue
+				}
 				// Volume is not attached (or doesn't implement attacher), kubelet attach is disabled, wait
 				// for controller to finish attaching volume.
 				klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""))
@@ -213,9 +216,7 @@ func (rc *reconciler) mountAttachVolumes() {
 					volumeToMount.VolumeToMount,
 					rc.nodeName,
 					rc.actualStateOfWorld)
-				if err != nil &&
-					!nestedpendingoperations.IsAlreadyExists(err) &&
-					!exponentialbackoff.IsExponentialBackoff(err) {
+				if err != nil && !isExpectedError(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
 					klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
@@ -233,9 +234,7 @@ func (rc *reconciler) mountAttachVolumes() {
 				}
 				klog.V(5).InfoS(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""))
 				err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
-				if err != nil &&
-					!nestedpendingoperations.IsAlreadyExists(err) &&
-					!exponentialbackoff.IsExponentialBackoff(err) {
+				if err != nil && !isExpectedError(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
 					klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.AttachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
@@ -257,9 +256,7 @@ func (rc *reconciler) mountAttachVolumes() {
 				volumeToMount.VolumeToMount,
 				rc.actualStateOfWorld,
 				isRemount)
-			if err != nil &&
-				!nestedpendingoperations.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
+			if err != nil && !isExpectedError(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.MountVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
@@ -277,9 +274,7 @@ func (rc *reconciler) mountAttachVolumes() {
 			err := rc.operationExecutor.ExpandInUseVolume(
 				volumeToMount.VolumeToMount,
 				rc.actualStateOfWorld)
-			if err != nil &&
-				!nestedpendingoperations.IsAlreadyExists(err) &&
-				!exponentialbackoff.IsExponentialBackoff(err) {
+			if err != nil && !isExpectedError(err) {
 				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				klog.ErrorS(err, volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandInUseVolume failed", err).Error())
@@ -301,9 +296,7 @@ func (rc *reconciler) unmountDetachDevices() {
 				klog.V(5).InfoS(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
 				err := rc.operationExecutor.UnmountDevice(
 					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.hostutil)
-				if err != nil &&
-					!nestedpendingoperations.IsAlreadyExists(err) &&
-					!exponentialbackoff.IsExponentialBackoff(err) {
+				if err != nil && !isExpectedError(err) {
 					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
 					klog.ErrorS(err, attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.UnmountDevice failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
@@ -322,9 +315,7 @@ func (rc *reconciler) unmountDetachDevices() {
 					klog.V(5).InfoS(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.DetachVolume", ""))
 					err := rc.operationExecutor.DetachVolume(
 						attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
-					if err != nil &&
-						!nestedpendingoperations.IsAlreadyExists(err) &&
-						!exponentialbackoff.IsExponentialBackoff(err) {
+					if err != nil && !isExpectedError(err) {
 						// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 						// Log all other errors.
 						klog.ErrorS(err, attachedVolume.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.DetachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error())
@@ -728,4 +719,9 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 	}
 	klog.V(4).InfoS("Get volumes from pod directory", "path", podDir, "volumes", volumes)
 	return volumes, nil
+}
+
+// ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
+func isExpectedError(err error) bool {
+	return nestedpendingoperations.IsAlreadyExists(err) || exponentialbackoff.IsExponentialBackoff(err) || operationexecutor.IsMountFailedPreconditionError(err)
 }
