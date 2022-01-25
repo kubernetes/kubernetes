@@ -67,6 +67,7 @@ const (
 	ProviderName                  = "vsphere"
 	providerIDPrefix              = "vsphere://"
 	updateNodeRetryCount          = 3
+	zoneLabelsResyncPeriod        = 5 * time.Minute
 	VolDir                        = "kubevols"
 	RoundTripperDefaultCount      = 3
 	DummyVMPrefixName             = "vsphere-k8s"
@@ -312,6 +313,11 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		AddFunc:    vs.NodeAdded,
 		DeleteFunc: vs.NodeDeleted,
 	})
+	// Register sync function for node zone/region labels
+	nodeInformer.AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{UpdateFunc: vs.syncNodeZoneLabels},
+		zoneLabelsResyncPeriod,
+	)
 	klog.V(4).Infof("Node informers in vSphere cloud provider initialized")
 
 }
@@ -1542,6 +1548,31 @@ func (vs *VSphere) NodeAdded(obj interface{}) {
 		klog.Errorf("failed to add node %+v: %v", node, err)
 	}
 	vs.setNodeZoneLabels(node)
+}
+
+// Node zone labels sync function, intended to be called periodically within kube-controller-manager.
+func (vs *VSphere) syncNodeZoneLabels(_ interface{}, newObj interface{}) {
+	node, ok := newObj.(*v1.Node)
+	if node == nil || !ok {
+		klog.Warningf("NodeUpdated: unrecognized object %+v", newObj)
+		return
+	}
+
+	// Populate zone and region labels if needed.
+	// This logic engages only if credentials provided via secret.
+	// Returns early if topology labels are already presented.
+	// https://github.com/kubernetes/kubernetes/issues/75175
+	if vs.isSecretInfoProvided && vs.isZoneEnabled() {
+		labels := node.GetLabels()
+		_, zoneOk := labels[v1.LabelTopologyZone]
+		_, regionOk := labels[v1.LabelTopologyRegion]
+		if zoneOk && regionOk {
+			klog.V(6).Infof("Node topology labels are already populated")
+			return
+		}
+		klog.V(4).Infof("Topology labels was not found, trying to populate for node %s", node.Name)
+		vs.setNodeZoneLabels(node)
+	}
 }
 
 func (vs *VSphere) setNodeZoneLabels(node *v1.Node) {
