@@ -15,10 +15,10 @@ conntrack:
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
 detectLocalMode: ""
-interfacePrefix: ""
 enableProfiling: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
+interfacePrefix: ""
 iptables:
   masqueradeAll: false
   masqueradeBit: 14
