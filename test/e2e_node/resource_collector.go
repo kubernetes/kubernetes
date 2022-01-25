@@ -95,7 +95,7 @@ func (r *ResourceCollector) Start() {
 	// Get the cgroup container names for kubelet and runtime
 	kubeletContainer, err1 := getContainerNameForProcess(kubeletProcessName, "")
 	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
-	if err1 == nil && err2 == nil {
+	if err1 == nil && err2 == nil && kubeletContainer != "" && runtimeContainer != "" {
 		systemContainers = map[string]string{
 			kubeletstatsv1alpha1.SystemContainerKubelet: kubeletContainer,
 			kubeletstatsv1alpha1.SystemContainerRuntime: runtimeContainer,
