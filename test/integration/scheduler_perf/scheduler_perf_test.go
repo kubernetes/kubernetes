@@ -645,7 +645,18 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
 			} else {
+				// define Pod's namespace automatically, and create that namespace.
 				namespace = fmt.Sprintf("namespace-%d", opIndex)
+				_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					b.Fatalf("failed to create namespace for Pod: %v", namespace)
+				}
+				b.Cleanup(func() {
+					err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+					if err != nil {
+						b.Errorf("failed to delete namespace %v", namespace)
+					}
+				})
 			}
 			var collectors []testDataCollector
 			var collectorCtx context.Context
