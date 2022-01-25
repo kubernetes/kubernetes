@@ -217,8 +217,18 @@ func TestClean(t *testing.T) {
 				LogPath: filepath.Join(dir, testLogs[2]),
 			},
 		},
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:      "container-4",
+				State:   runtimeapi.ContainerState_CONTAINER_EXITED,
+				LogPath: "",
+			},
+		},
 	}
 	f.SetFakeContainers(testContainers)
+
+	err = c.Clean("container-4")
+	assert.EqualError(t, err, "log path of container container-4 can't be empty")
 
 	err = c.Clean("container-3")
 	require.NoError(t, err)
