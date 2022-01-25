@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"path/filepath"
 	"time"
 
@@ -634,7 +635,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 						IngressRuleValue: networkingv1.IngressRuleValue{
 							HTTP: &networkingv1.HTTPIngressRuleValue{
 								Paths: []networkingv1.HTTPIngressPath{{
-									Path:     "/",
+									Path:     "/testpath/" + fmt.Sprintf("%08x", rand.Int31()),
 									PathType: &prefixPathType,
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
