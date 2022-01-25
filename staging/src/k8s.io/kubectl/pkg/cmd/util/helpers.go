@@ -464,7 +464,7 @@ func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 }
 
 func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
-	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 }
 
 type ValidateOptions struct {
