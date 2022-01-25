@@ -1700,7 +1700,8 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	// Set provisionerName to external provisioner name by setClaimProvisioner
 	var err error
 	provisionerName := storageClass.Provisioner
-	if ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(storageClass.Provisioner) {
+	isMigrationEnabled := ctrl.csiMigratedPluginManager.IsMigrationEnabledForPlugin(storageClass.Provisioner)
+	if isMigrationEnabled {
 		// update the provisioner name to use the migrated CSI plugin name
 		provisionerName, err = ctrl.translator.GetCSINameFromInTreeName(storageClass.Provisioner)
 		if err != nil {
@@ -1718,7 +1719,11 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 		return provisionerName, err
 	}
 	claim = newClaim
-	msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", provisionerName)
+	eventTemplate := "waiting for a volume to be created, either by external provisioner %q or manually created by system administrator"
+	if isMigrationEnabled {
+		eventTemplate = fmt.Sprintf("csi migration has been enabled for provisioner: %s; ", storageClass.Provisioner) + eventTemplate
+	}
+	msg := fmt.Sprintf(eventTemplate, provisionerName)
 	// External provisioner has been requested for provisioning the volume
 	// Report an event and wait for external provisioner to finish
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)

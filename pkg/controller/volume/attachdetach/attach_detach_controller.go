@@ -738,6 +738,10 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 						err)
 					continue
 				}
+				klog.V(10).Infof("CSI Migration has been enabled for volume:%q, va.Name:%q, nodeName:%q",
+					*pvName,
+					va.Name,
+					nodeName)
 			}
 		}
 

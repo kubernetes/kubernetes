@@ -236,7 +236,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 	for _, podVolume := range pod.Spec.Volumes {
 		volumeSpec, err := CreateVolumeSpec(podVolume, pod, nodeName, volumePluginMgr, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
 		if err != nil {
-			klog.V(10).Infof(
+			klog.Errorf(
 				"Error processing volume %q for pod %q/%q: %v",
 				podVolume.Name,
 				pod.Namespace,
@@ -310,6 +310,7 @@ func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName
 		if err != nil {
 			return nil, err
 		}
+		klog.V(5).InfoS("CSI Migration: Translate InTree Volume Spec to CSI", "VolumeSpec", translatedSpec)
 	}
 	return translatedSpec, nil
 }

@@ -512,6 +512,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			if err != nil {
 				return nil, nil, "", err
 			}
+			klog.V(5).InfoS("Translate CSI Migration volumeSpec", "VolumeSpec", volumeSpec)
 		}
 
 		// TODO: replace this with util.GetVolumeMode() when features.BlockVolume is removed.
@@ -554,6 +555,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		if err != nil {
 			return nil, nil, "", err
 		}
+		klog.V(5).InfoS("Translate CSI Migration volumeSpec", "VolumeSpec", spec)
 	}
 	return nil, spec, "", nil
 }
