@@ -438,6 +438,7 @@ func (i *Interceptor) Rewrite(ctx context.Context, req *socks5.Request) (context
 
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
 func TestRoundTripSocks5AndNewConnection(t *testing.T) {
+	t.Skip("Flake https://issues.k8s.io/107708")
 	localhostPool := localhostCertPool(t)
 
 	for _, redirect := range []bool{false, true} {
