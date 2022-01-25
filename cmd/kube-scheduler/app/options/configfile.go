@@ -93,7 +93,7 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 	}
 
 	if klogV.Enabled() {
-		klogV.Info("Using component config", "\n-------------------------Configuration File Contents Start Here---------------------- \n", buf.String(), "\n------------------------------------Configuration File Contents End Here---------------------------------\n")
+		klogV.InfoS("Using component config", "config", buf.String())
 	}
 
 	if len(fileName) > 0 {
