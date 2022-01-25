@@ -663,7 +663,8 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
 func generateWriteCmd(content, path string) []string {
 	var commands []string
-	commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
+	// flush data so volume can be immediately used as a data source
+	commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path + " && sync " + path}
 	return commands
 }
 
