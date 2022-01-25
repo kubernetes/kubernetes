@@ -282,6 +282,32 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 		})
 }
 
+func waitForConfigMapInNamespace(c clientset.Interface, ns, name string, timeout time.Duration) error {
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ConfigMaps(ns).List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ConfigMaps(ns).Watch(context.TODO(), options)
+		},
+	}
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ConfigMap{}, nil, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, name)
+		case watch.Added, watch.Modified:
+			return true, nil
+		}
+		return false, nil
+	})
+	return err
+}
+
 func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountName string, timeout time.Duration) error {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", serviceAccountName).String()
 	lw := &cache.ListWatch{
@@ -319,6 +345,13 @@ func serviceAccountHasSecrets(event watch.Event) (bool, error) {
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace string) error {
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
+}
+
+// WaitForKubeRootCAInNamespace waits for the configmap kube-root-ca.crt containing the service account
+// CA trust bundle to be provisioned in the specified namespace so that pods do not have to retry mounting
+// the config map (which creates noise that hides other issues in the Kubelet).
+func WaitForKubeRootCAInNamespace(c clientset.Interface, namespace string) error {
+	return waitForConfigMapInNamespace(c, namespace, "kube-root-ca.crt", ServiceAccountProvisionTimeout)
 }
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
