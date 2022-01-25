@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"path/filepath"
 	"time"
 
@@ -635,7 +634,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 						IngressRuleValue: networkingv1.IngressRuleValue{
 							HTTP: &networkingv1.HTTPIngressRuleValue{
 								Paths: []networkingv1.HTTPIngressPath{{
-									Path:     "/testpath/" + fmt.Sprintf("%08x", rand.Int31()),
+									Path:     "/",
 									PathType: &prefixPathType,
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
@@ -653,6 +652,14 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			},
 			Status: networkingv1.IngressStatus{LoadBalancer: v1.LoadBalancerStatus{}},
 		}
+
+		ingress1 := ingTemplate.DeepCopy()
+		ingress1.Spec.Rules[0].Host = "host1.bar.com"
+		ingress2 := ingTemplate.DeepCopy()
+		ingress2.Spec.Rules[0].Host = "host2.bar.com"
+		ingress3 := ingTemplate.DeepCopy()
+		ingress3.Spec.Rules[0].Host = "host3.bar.com"
+
 		// Discovery
 		ginkgo.By("getting /apis")
 		{
@@ -709,11 +716,11 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		// Ingress resource create/read/update/watch verbs
 		ginkgo.By("creating")
-		_, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		_, err := ingClient.Create(context.TODO(), ingress1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		_, err = ingClient.Create(context.TODO(), ingress2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		createdIngress, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		createdIngress, err := ingClient.Create(context.TODO(), ingress3, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("getting")
