@@ -2542,6 +2542,7 @@ k8s.io/utils/strings
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27
+## explicit
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 # sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 => sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
@@ -3055,6 +3056,7 @@ sigs.k8s.io/yaml
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27
+# sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.8
 # sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
 # sigs.k8s.io/kube-storage-version-migrator => sigs.k8s.io/kube-storage-version-migrator v0.0.4
 # sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.10.1
