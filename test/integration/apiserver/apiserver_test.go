@@ -93,7 +93,6 @@ func setupWithResourcesWithOptions(t testing.TB, opts *framework.ControlPlaneCon
 		resourceConfig.EnableResources(resources...)
 		controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
@@ -227,7 +226,6 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 
 func TestCacheControl(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
@@ -274,7 +272,6 @@ func TestCacheControl(t *testing.T) {
 // Tests that the apiserver returns HSTS headers as expected.
 func TestHSTS(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	controlPlaneConfig.GenericConfig.HSTSDirectives = []string{"max-age=31536000", "includeSubDomains"}
 	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()

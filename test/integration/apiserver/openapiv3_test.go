@@ -46,7 +46,6 @@ import (
 func TestOpenAPIV3SpecRoundTrip(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV3, true)()
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 	paths := []string{
@@ -200,7 +199,6 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 	t.Skip("Skipping OpenAPI V3 Proto roundtrip test")
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV3, true)()
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
