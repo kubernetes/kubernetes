@@ -79,13 +79,6 @@ type KubeletFlags struct {
 	// mounts,etc).
 	RootDirectory string
 
-	// The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health.
-	// The Kubelet will create this directory if it does not already exist.
-	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
-	// Providing this flag enables dynamic kubelet configuration.
-	// To use this flag, the DynamicKubeletConfig feature gate must be enabled.
-	DynamicConfigDir cliflag.StringFlag
-
 	// The Kubelet will load its initial configuration from this file.
 	// The path may be absolute or relative; relative paths are under the Kubelet's current working directory.
 	// Omit this flag to use the combination of built-in default configuration values and flags.
@@ -171,11 +164,6 @@ func NewKubeletFlags() *KubeletFlags {
 
 // ValidateKubeletFlags validates Kubelet's configuration flags and returns an error if they are invalid.
 func ValidateKubeletFlags(f *KubeletFlags) error {
-	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
-	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
-	}
-
 	unknownLabels := sets.NewString()
 	for k := range f.NodeLabels {
 		if isKubernetesLabel(k) && !kubeletapis.IsKubeletLabel(k) {
@@ -312,9 +300,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
-
-	fs.Var(&f.DynamicConfigDir, "dynamic-config-dir", "The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health. The Kubelet will create this directory if it does not already exist. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Providing this flag enables dynamic Kubelet configuration. The DynamicKubeletConfig feature gate must be enabled to pass this flag.")
-	fs.MarkDeprecated("dynamic-config-dir", "Feature DynamicKubeletConfig is deprecated in 1.22 and will not move to GA. It is planned to be removed from Kubernetes in the version 1.24. Please use alternative ways to update kubelet configuration.")
 
 	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "The endpoint of remote runtime service. Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
 	fs.StringVar(&f.RemoteImageEndpoint, "image-service-endpoint", f.RemoteImageEndpoint, "The endpoint of remote image service. If not specified, it will be the same with --container-runtime-endpoint by default. Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")

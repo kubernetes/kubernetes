@@ -35,10 +35,6 @@ func newKubeletServerOrDie() *KubeletServer {
 	return s
 }
 
-func cleanFlags(s *KubeletServer) {
-	s.DynamicConfigDir = cliflag.NewStringFlag(s.DynamicConfigDir.Value())
-}
-
 // TestRoundTrip ensures that flag values from the Kubelet can be serialized
 // to arguments and then read back and have the same value. Also catches cases
 // where the default value reported by the flag is not actually allowed to be
@@ -103,7 +99,6 @@ func TestRoundTrip(t *testing.T) {
 			}
 			continue
 		}
-		cleanFlags(outputFlags)
 		if !reflect.DeepEqual(modifiedFlags, outputFlags) {
 			t.Errorf("%s: flags did not round trip: %s", testCase.name, diff.ObjectReflectDiff(modifiedFlags, outputFlags))
 			continue

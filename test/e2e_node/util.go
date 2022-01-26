@@ -38,16 +38,13 @@ import (
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
-	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
-	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
@@ -223,57 +220,6 @@ func deleteStateFile(stateFileName string) {
 	framework.ExpectNoError(err, "failed to delete the state file")
 }
 
-// Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.
-func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
-	cfgz, err := getCurrentKubeletConfig()
-	if err != nil {
-		return false, fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
-	}
-	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
-	if !ok {
-		return false, nil
-	}
-	return v, nil
-}
-
-// sets the current node's configSource, this should only be called from Serial tests
-func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) error {
-	// since this is a serial test, we just get the node, change the source, and then update it
-	// this prevents any issues with the patch API from affecting the test results
-	nodeclient := f.ClientSet.CoreV1().Nodes()
-
-	// get the node
-	node, err := nodeclient.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// set new source
-	node.Spec.ConfigSource = source
-
-	// update to the new source
-	_, err = nodeclient.Update(context.TODO(), node, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
-func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *v1.ConfigMap {
-	data, err := kubeletconfigcodec.EncodeKubeletConfig(internalKC, kubeletconfigv1beta1.SchemeGroupVersion)
-	framework.ExpectNoError(err)
-
-	cmap := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"},
-		Data: map[string]string{
-			"kubelet": string(data),
-		},
-	}
-	return cmap
-}
-
 // listNamespaceEvents lists the events in the given namespace.
 func listNamespaceEvents(c clientset.Interface, ns string) error {
 	ls, err := c.CoreV1().Events(ns).List(context.TODO(), metav1.ListOptions{})
@@ -319,24 +265,6 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	} else {
 		framework.Logf("Kubelet Metrics: %+v", e2emetrics.GetKubeletLatencyMetrics(metric, metricSet))
 	}
-}
-
-// returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
-func getKubeletMetrics(filterMetricNames sets.String) (e2emetrics.KubeletMetrics, error) {
-	// grab Kubelet metrics
-	ms, err := e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
-	if err != nil {
-		return nil, err
-	}
-
-	filtered := e2emetrics.NewKubeletMetrics()
-	for name := range ms {
-		if !filterMetricNames.Has(name) {
-			continue
-		}
-		filtered[name] = ms[name]
-	}
-	return filtered, nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
