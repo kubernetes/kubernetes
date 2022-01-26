@@ -95,12 +95,18 @@ func (f *fixture) newController() (*Controller, informers.SharedInformerFactory,
 	c.deploymentsSynced = alwaysReady
 	c.recorder = &record.FakeRecorder{}
 
-	for _, f := range f.fooLister {
-		i.Samplecontroller().V1alpha1().Foos().Informer().GetIndexer().Add(f)
+	for _, foo := range f.fooLister {
+		err := i.Samplecontroller().V1alpha1().Foos().Informer().GetIndexer().Add(foo)
+		if err != nil {
+			f.t.Errorf("error adding fooLister: %v", err)
+		}
 	}
 
 	for _, d := range f.deploymentLister {
-		k8sI.Apps().V1().Deployments().Informer().GetIndexer().Add(d)
+		err := k8sI.Apps().V1().Deployments().Informer().GetIndexer().Add(d)
+		if err != nil {
+			f.t.Errorf("error syncing deploymentLister: %v", err)
+		}
 	}
 
 	return c, i, k8sI
