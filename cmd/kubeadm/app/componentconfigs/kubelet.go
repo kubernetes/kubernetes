@@ -223,7 +223,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		if kc.config.ResolverConfig == nil {
 			kc.config.ResolverConfig = utilpointer.String(kubeletSystemdResolverConfig)
 		} else {
-			if kc.config.ResolverConfig != utilpointer.String(kubeletSystemdResolverConfig) {
+			if *kc.config.ResolverConfig != kubeletSystemdResolverConfig {
 				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, *kc.config.ResolverConfig)
 			}
 		}
