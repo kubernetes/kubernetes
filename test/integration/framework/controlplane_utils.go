@@ -285,11 +285,6 @@ func NewIntegrationTestControlPlaneConfigWithOptions(opts *ControlPlaneConfigOpt
 	// TODO: get rid of these tests or port them to secure serving
 	controlPlaneConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
-	// Enable OpenAPI and Server Side Apply in integration tests
-	if controlPlaneConfig.GenericConfig.OpenAPIConfig == nil {
-		controlPlaneConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
-	}
-
 	return controlPlaneConfig
 }
 
