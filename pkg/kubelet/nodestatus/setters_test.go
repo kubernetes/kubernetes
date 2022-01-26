@@ -303,7 +303,7 @@ func TestNodeAddress(t *testing.T) {
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101::ba3d"},
+				{Type: v1.NodeInternalIP, Address: "2600:1f14:1d4:d101:0:0:0:ba3d"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			shouldError: false,
