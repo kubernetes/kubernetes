@@ -165,6 +165,32 @@ func TestCSILimits(t *testing.T) {
 			StorageClassName: &scName,
 		},
 	}
+	inTreeInlineVolPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+							VolumeID: "aws-inline1",
+						},
+					},
+				},
+			},
+		},
+	}
+	inTreeInlineVolPodWithSameCSIVolumeID := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+							VolumeID: "csi-ebs.csi.aws.com-1",
+						},
+					},
+				},
+			},
+		},
+	}
 
 	tests := []struct {
 		newPod           *v1.Pod
@@ -332,6 +358,17 @@ func TestCSILimits(t *testing.T) {
 			limitSource:      "csinode",
 			test:             "should not count non-migratable in-tree volumes",
 		},
+		{
+			newPod:           inTreeInlineVolPod,
+			existingPods:     []*v1.Pod{inTreeTwoVolPod},
+			filterName:       "csi",
+			maxVols:          2,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			migrationEnabled: true,
+			limitSource:      "csinode",
+			test:             "should count in-tree inline volumes if migration is enabled",
+			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
 		// mixed volumes
 		{
 			newPod:           inTreeOneVolPod,
@@ -343,6 +380,27 @@ func TestCSILimits(t *testing.T) {
 			limitSource:      "csinode",
 			test:             "should count in-tree and csi volumes if migration is enabled (when scheduling in-tree volumes)",
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:           inTreeInlineVolPod,
+			existingPods:     []*v1.Pod{csiEBSTwoVolPod, inTreeOneVolPod},
+			filterName:       "csi",
+			maxVols:          3,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			migrationEnabled: true,
+			limitSource:      "csinode",
+			test:             "should count in-tree, inline and csi volumes if migration is enabled (when scheduling in-tree volumes)",
+			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:           inTreeInlineVolPodWithSameCSIVolumeID,
+			existingPods:     []*v1.Pod{csiEBSTwoVolPod, inTreeOneVolPod},
+			filterName:       "csi",
+			maxVols:          3,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			migrationEnabled: true,
+			limitSource:      "csinode",
+			test:             "should not count in-tree, inline and csi volumes if migration is enabled (when scheduling in-tree volumes)",
 		},
 		{
 			newPod:           csiEBSOneVolPod,
@@ -364,6 +422,16 @@ func TestCSILimits(t *testing.T) {
 			migrationEnabled: false,
 			limitSource:      "csinode",
 			test:             "should not count in-tree and count csi volumes if migration is disabled (when scheduling csi volumes)",
+		},
+		{
+			newPod:           csiEBSOneVolPod,
+			existingPods:     []*v1.Pod{csiEBSTwoVolPod, inTreeTwoVolPod, inTreeInlineVolPod},
+			filterName:       "csi",
+			maxVols:          3,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			migrationEnabled: false,
+			limitSource:      "csinode",
+			test:             "should not count in-tree, inline; should count csi volumes if migration is disabled (when scheduling csi volumes)",
 		},
 		{
 			newPod:           inTreeOneVolPod,
@@ -473,13 +541,14 @@ func TestCSILimits(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 			}
+			csiTranslator := csitrans.New()
 			p := &CSILimits{
 				csiNodeLister:        getFakeCSINodeLister(csiNode),
 				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
 				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
 				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
 				randomVolumeIDPrefix: rand.String(32),
-				translator:           csitrans.New(),
+				translator:           csiTranslator,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
