@@ -1667,7 +1667,7 @@ $LOGGINGEXPORTER_VERSION = 'v0.17.0'
 $LOGGINGEXPORTER_ROOT = 'C:\flb-exporter'
 $LOGGINGEXPORTER_SERVICE = 'flb-exporter'
 $LOGGINGEXPORTER_CMDLINE = '*flb-exporter.exe*'
-$LOGGINGEXPORTER_HASH = 'f84bc732c9078421930cf9791c52066a56e692836e13857133d9927a35663a6b'
+$LOGGINGEXPORTER_HASH = 'c808c9645d84b06b89932bd707d51a9d1d0b451b5a702a5f9b2b4462c8be6502'
 
 # Restart Logging agent or starts it if it is not currently running
 function Restart-LoggingAgent {
