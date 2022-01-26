@@ -17,12 +17,13 @@ limitations under the License.
 package ipvs
 
 import (
+	"fmt"
+	netutils "k8s.io/utils/net"
 	"reflect"
 	"testing"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilipvstest "k8s.io/kubernetes/pkg/util/ipvs/testing"
-	netutils "k8s.io/utils/net"
 )
 
 func Test_GracefulDeleteRS(t *testing.T) {
@@ -398,5 +399,38 @@ func Test_GracefulDeleteRS(t *testing.T) {
 				t.Errorf("unexpected IPVS servers")
 			}
 		})
+	}
+}
+
+func Test_RaceTerminateRSList(t *testing.T) {
+	ipvs := &utilipvstest.FakeIPVS{}
+	gracefulTerminationManager := NewGracefulTerminationManager(ipvs)
+
+	go func() {
+		for i := 1; i <= 10; i++ {
+			for j := 1; i <= 100; j++ {
+				gracefulTerminationManager.rsList.add(makeListItem(i, j))
+			}
+		}
+	}()
+
+	if !gracefulTerminationManager.rsList.flushList(gracefulTerminationManager.deleteRsFunc) {
+		t.Error("failed to flush entries")
+	}
+}
+
+func makeListItem(i, j int) *listItem {
+	vs := fmt.Sprintf("%d.%d.%d.%d", 1, 1, i, i)
+	rs := fmt.Sprintf("%d.%d.%d.%d", 1, 1, i, j)
+	return &listItem{
+		VirtualServer: &utilipvs.VirtualServer{
+			Address:  netutils.ParseIPSloppy(vs),
+			Protocol: "tcp",
+			Port:     uint16(80),
+		},
+		RealServer: &utilipvs.RealServer{
+			Address: netutils.ParseIPSloppy(rs),
+			Port:    uint16(80),
+		},
 	}
 }
