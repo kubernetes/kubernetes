@@ -340,7 +340,7 @@ function install-crictl {
 
   # Create crictl config file.
   cat > /etc/crictl.yaml <<EOF
-runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/containerd/containerd.sock}
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
 EOF
 
   if is-preloaded "${crictl}" "${crictl_hash}"; then
@@ -437,9 +437,7 @@ function try-load-docker-image {
   local -r max_attempts=5
   local -i attempt_num=1
 
-  if [[ "${CONTAINER_RUNTIME_NAME:-}" == "docker" ]]; then
-    load_image_command=${LOAD_IMAGE_COMMAND:-docker load -i}
-  elif [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
+  if [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
     load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
   else
     load_image_command="${LOAD_IMAGE_COMMAND:-}"
@@ -584,40 +582,28 @@ function install-containerd-ubuntu {
 }
 
 function ensure-container-runtime {
-  container_runtime="${CONTAINER_RUNTIME:-containerd}"
-  if [[ "${container_runtime}" == "docker" ]]; then
-    if ! command -v docker >/dev/null 2>&1; then
-      log-wrap "InstallDocker" install-docker
-      if ! command -v docker >/dev/null 2>&1; then
-        echo "ERROR docker not found. Aborting."
-        exit 2
-      fi
-    fi
-    docker version
-  elif [[ "${container_runtime}" == "containerd" ]]; then
-    # Install containerd/runc if requested
-    if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-      log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
-    fi
-    # Verify presence and print versions of ctr, containerd, runc
-    if ! command -v ctr >/dev/null 2>&1; then
-      echo "ERROR ctr not found. Aborting."
-      exit 2
-    fi
-    ctr --version
-
-    if ! command -v containerd >/dev/null 2>&1; then
-      echo "ERROR containerd not found. Aborting."
-      exit 2
-    fi
-    containerd --version
-
-    if ! command -v runc >/dev/null 2>&1; then
-      echo "ERROR runc not found. Aborting."
-      exit 2
-    fi
-    runc --version
+  # Install containerd/runc if requested
+  if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
+    log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
+  # Verify presence and print versions of ctr, containerd, runc
+  if ! command -v ctr >/dev/null 2>&1; then
+    echo "ERROR ctr not found. Aborting."
+    exit 2
+  fi
+  ctr --version
+
+  if ! command -v containerd >/dev/null 2>&1; then
+    echo "ERROR containerd not found. Aborting."
+    exit 2
+  fi
+  containerd --version
+
+  if ! command -v runc >/dev/null 2>&1; then
+    echo "ERROR runc not found. Aborting."
+    exit 2
+  fi
+  runc --version
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
