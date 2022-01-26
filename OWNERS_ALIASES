@@ -300,6 +300,7 @@ aliases:
     - ehashman
     - RainbowMango
     - serathius
+    - dgrisonnet
   sig-instrumentation-reviewers:
     - brancz
     - dashpole
