@@ -60,6 +60,7 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFligh
 	})
 	controlPlaneConfig.GenericConfig.MaxRequestsInFlight = maxReadonlyRequestsInFlight
 	controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight = MaxMutatingRequestsInFlight
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 

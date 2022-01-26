@@ -58,6 +58,7 @@ func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server
 		resourceConfig.EnableVersions(groupVersions...)
 		controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
@@ -2821,6 +2822,7 @@ func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{
 		EtcdOptions: sharedEtcd,
 	})
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 	_, instanceConfig, closeFn := framework.RunAnAPIServer(controlPlaneConfig)

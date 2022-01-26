@@ -535,6 +535,7 @@ func TestRBAC(t *testing.T) {
 			"limitrange-patcher":               {Name: "limitrange-patcher"},
 			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
 		})))
+		controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 		_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 		defer closeFn()
 
