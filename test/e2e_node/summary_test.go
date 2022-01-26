@@ -68,7 +68,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					}
 				}
 				return nil
-			}, time.Minute, 5*time.Second).Should(gomega.BeNil())
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
