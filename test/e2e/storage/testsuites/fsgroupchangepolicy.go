@@ -141,6 +141,11 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		secondPodFsGroup                  int    // FsGroup of the second pod
 		finalExpectedRootDirFileOwnership int    // Final expcted ownership of the file in the root directory (/mnt/volume1/file1), as part of the second pod
 		finalExpectedSubDirFileOwnership  int    // Final expcted ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the second pod
+		// Whether the test can run for drivers that support volumeMountGroup capability.
+		// For CSI drivers that support volumeMountGroup:
+		// * OnRootMismatch policy is not supported.
+		// * It may not be possible to chgrp after mounting a volume.
+		supportsVolumeMountGroup bool
 	}{
 		// Test cases for 'Always' policy
 		{
@@ -150,9 +155,10 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			secondPodFsGroup:                  2000,
 			finalExpectedRootDirFileOwnership: 2000,
 			finalExpectedSubDirFileOwnership:  2000,
+			supportsVolumeMountGroup:          true,
 		},
 		{
-			name:                              "pod created with an initial fsgroup, volume contents ownership changed in first pod, new pod with same fsgroup applied to the volume contents",
+			name:                              "pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup applied to the volume contents",
 			podfsGroupChangePolicy:            "Always",
 			initialPodFsGroup:                 1000,
 			changedRootDirFileOwnership:       2000,
@@ -162,7 +168,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			finalExpectedSubDirFileOwnership:  1000,
 		},
 		{
-			name:                              "pod created with an initial fsgroup, volume contents ownership changed in first pod, new pod with different fsgroup applied to the volume contents",
+			name:                              "pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with different fsgroup applied to the volume contents",
 			podfsGroupChangePolicy:            "Always",
 			initialPodFsGroup:                 1000,
 			changedRootDirFileOwnership:       2000,
@@ -181,7 +187,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			finalExpectedSubDirFileOwnership:  2000,
 		},
 		{
-			name:                              "pod created with an initial fsgroup, volume contents ownership changed in first pod, new pod with same fsgroup skips ownership changes to the volume contents",
+			name:                              "pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents",
 			podfsGroupChangePolicy:            "OnRootMismatch",
 			initialPodFsGroup:                 1000,
 			changedRootDirFileOwnership:       2000,
@@ -191,7 +197,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			finalExpectedSubDirFileOwnership:  3000,
 		},
 		{
-			name:                              "pod created with an initial fsgroup, volume contents ownership changed in first pod, new pod with different fsgroup applied to the volume contents",
+			name:                              "pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with different fsgroup applied to the volume contents",
 			podfsGroupChangePolicy:            "OnRootMismatch",
 			initialPodFsGroup:                 1000,
 			changedRootDirFileOwnership:       2000,
@@ -210,8 +216,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
 
 			if dInfo.Capabilities[storageframework.CapVolumeMountGroup] &&
-				policy == v1.FSGroupChangeOnRootMismatch {
-				e2eskipper.Skipf("Driver %q supports VolumeMountGroup, which doesn't supported the OnRootMismatch FSGroup policy - skipping", dInfo.Name)
+				!test.supportsVolumeMountGroup {
+				e2eskipper.Skipf("Driver %q supports VolumeMountGroup, which is incompatible with this test - skipping", dInfo.Name)
 			}
 
 			init()

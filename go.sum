@@ -560,8 +560,8 @@ golang.org/x/lint v0.0.0-20210508222113-6edffad5e616/go.mod h1:3xt1FjdF8hUf6vQPI
 golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f/go.mod h1:skQtrUTUwhdJvXM/2KKJzY8pDgNr9I/FOMqDVRPBUS4=
 golang.org/x/mod v0.4.2 h1:Gz96sIWK3OalVv/I/qNygP42zyoKp3xptRVCWRFEBvo=
 golang.org/x/mod v0.4.2/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
-golang.org/x/net v0.0.0-20210825183410-e898025ed96a h1:bRuuGXV8wwSdGTB+CtJf+FjgO1APK1CoO39T4BN/XBw=
-golang.org/x/net v0.0.0-20210825183410-e898025ed96a/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
+golang.org/x/net v0.0.0-20211209124913-491a49abca63 h1:iocB37TsdFuN6IBRZ+ry36wrkoV51/tl5vOWqkcPGvY=
+golang.org/x/net v0.0.0-20211209124913-491a49abca63/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f h1:Qmd2pbz05z7z6lm0DrgQVVPuBm92jqujBKMHMOlOQEw=
 golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c h1:5KslGYwFpkhGh+Q16bwMP3cOontH8FOep7tGV86Y7SQ=
@@ -651,17 +651,27 @@ k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65/go.mod h1:sX9MT8g7NVZM5lV
 k8s.io/kubernetes v1.23.0/go.mod h1:sgD3+Qzb8FHlRKlZnNCN+np3zZuHEAb/0PKLJkYyCUI=
 k8s.io/system-validators v1.6.0 h1:21qaPNdZ+mQrm4qc5shU0T5Eh49t/miFqZsn4sW8Hr0=
 k8s.io/system-validators v1.6.0/go.mod h1:bPldcLgkIUK22ALflnsXk8pvkTEndYdNuaHH6gRrl0Q=
+<<<<<<< HEAD
 k8s.io/utils v0.0.0-20211208161948-7d6a63dca704 h1:ZKMMxTvduyf5WUtREOqg5LiXaN1KO/+0oOQPRFrClpo=
 k8s.io/utils v0.0.0-20211208161948-7d6a63dca704/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
+=======
+k8s.io/utils v0.0.0-20211116205334-6203023598ed h1:ck1fRPWPJWsMd8ZRFsWc6mh/zHp5fZ/shhbrgPUxDAE=
+k8s.io/utils v0.0.0-20211116205334-6203023598ed/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
+>>>>>>> v1.23.3
 modernc.org/cc v1.0.0/go.mod h1:1Sk4//wdnYJiUIxnW8ddKpaOJCF37yAdqYnkxUpaYxw=
 modernc.org/golex v1.0.0/go.mod h1:b/QX9oBD/LhixY6NDh+IdGv17hgB+51fET1i2kPSmvk=
 modernc.org/mathutil v1.0.0/go.mod h1:wU0vUrJsVWBZ4P6e7xtFJEhFSNsfRLJ8H458uRjg03k=
 modernc.org/strutil v1.0.0/go.mod h1:lstksw84oURvj9y3tn8lGvRxyRC1S2+g5uuIzNfIOBs=
 modernc.org/xc v1.0.0/go.mod h1:mRNCo0bvLjGhHO9WsyuKVU4q0ceiDDDoEeWDJHrNx8I=
 rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
+<<<<<<< HEAD
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.25 h1:DEQ12ZRxJjsglk5JIi5bLgpKaHihGervKmg5uryaEHw=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.25/go.mod h1:Mlj9PNLmG9bZ6BHFwFKDo5afkpWyUISkb9Me0GnK66I=
 sigs.k8s.io/controller-tools v0.2.8/go.mod h1:9VKHPszmf2DHz/QmHkcfZoewO6BL7pPs9uAiBVsaJSE=
+=======
+sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27 h1:KQOkVzXrLNb0EP6W0FD6u3CCPAwgXFYwZitbj7K0P0Y=
+sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27/go.mod h1:tq2nT0Kx7W+/f2JVE+zxYtUhdjuELJkVpNz+x/QN5R4=
+>>>>>>> v1.23.3
 sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 h1:fD1pz4yfdADVNfFmcP2aBEtudwUQ1AlLnRBALr33v3s=
 sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6/go.mod h1:p4QtZmO4uMYipTQNzagwnNoseA6OxSUutVw05NhYDRs=
 sigs.k8s.io/kube-storage-version-migrator v0.0.4/go.mod h1:mXfSLkx9xbJHQsgNDDUZK/iQTs2tMbx/hsJlWe6Fthw=
@@ -672,8 +682,8 @@ sigs.k8s.io/kustomize/kustomize/v4 v4.4.1 h1:6hgMEo3Gt0XmhDt4vo0FJ0LRDMc4i8JC6SU
 sigs.k8s.io/kustomize/kustomize/v4 v4.4.1/go.mod h1:qOKJMMz2mBP+vcS7vK+mNz4HBLjaQSWRY22EF6Tb7Io=
 sigs.k8s.io/kustomize/kyaml v0.13.0 h1:9c+ETyNfSrVhxvphs+K2dzT3dh5oVPPEqPOE/cUpScY=
 sigs.k8s.io/kustomize/kyaml v0.13.0/go.mod h1:FTJxEZ86ScK184NpGSAQcfEqee0nul8oLCK30D47m4E=
-sigs.k8s.io/structured-merge-diff/v4 v4.1.2 h1:Hr/htKFmJEbtMgS/UD0N+gtgctAqz81t3nu+sPzynno=
-sigs.k8s.io/structured-merge-diff/v4 v4.1.2/go.mod h1:j/nl6xW8vLS49O8YvXW1ocPhZawJtm+Yrr7PPRQ0Vg4=
+sigs.k8s.io/structured-merge-diff/v4 v4.2.1 h1:bKCqE9GvQ5tiVHn5rfn1r+yao3aLQEaLzkkmAkf+A6Y=
+sigs.k8s.io/structured-merge-diff/v4 v4.2.1/go.mod h1:j/nl6xW8vLS49O8YvXW1ocPhZawJtm+Yrr7PPRQ0Vg4=
 sigs.k8s.io/yaml v1.2.0 h1:kr/MCeFWJWTwyaHoR9c8EjH9OumOmoF9YGiZd7lFm/Q=
 sigs.k8s.io/yaml v1.2.0/go.mod h1:yfXDCHCao9+ENCvLSE62v9VSji2MKu5jeNfTrofGhJc=
 vbom.ml/util v0.0.0-20180919145318-efcd4e0f9787/go.mod h1:so/NYdZXCz+E3ZpW0uAoCj6uzU2+8OWDFv/HxUSs7kI=

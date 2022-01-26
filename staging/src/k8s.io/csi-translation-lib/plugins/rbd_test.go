@@ -415,7 +415,7 @@ func TestTranslateCSIPvToInTree(t *testing.T) {
 					},
 					PersistentVolumeSource: v1.PersistentVolumeSource{
 						RBD: &v1.RBDPersistentVolumeSource{
-							CephMonitors: nil,
+							CephMonitors: []string{""},
 							RBDPool:      "replicapool",
 							RBDImage:     "kubernetes-dynamic-pvc-e4111eb6-4088-11ec-b823-0242ac110003",
 							RadosUser:    "admin",

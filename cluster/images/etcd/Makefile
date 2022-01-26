@@ -62,7 +62,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.16.10
+GOLANG_VERSION?=1.16.12
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 

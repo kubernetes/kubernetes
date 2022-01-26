@@ -711,6 +711,8 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 	}()
 
 	statuses := make(framework.PluginToStatus)
+	// `result` records the last meaningful(non-noop) PostFilterResult.
+	var result *framework.PostFilterResult
 	for _, pl := range f.postFilterPlugins {
 		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
 		if s.IsSuccess() {
@@ -718,11 +720,13 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 		} else if !s.IsUnschedulable() {
 			// Any status other than Success or Unschedulable is Error.
 			return nil, framework.AsStatus(s.AsError())
+		} else if r != nil && r.Mode() != framework.ModeNoop {
+			result = r
 		}
 		statuses[pl.Name()] = s
 	}
 
-	return nil, statuses.Merge()
+	return result, statuses.Merge()
 }
 
 func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {

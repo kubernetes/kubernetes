@@ -799,7 +799,10 @@ func (immediateRequest) Finish(execute func()) bool {
 // The returned bool indicates whether the request is exempt from
 // limitation.  The startWaitingTime is when the request started
 // waiting in its queue, or `Time{}` if this did not happen.
-func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest, workEstimator func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) fcrequest.WorkEstimate, queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time) {
+func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest,
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	workEstimator func() fcrequest.WorkEstimate,
+	queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time) {
 	klog.V(7).Infof("startRequest(%#+v)", rd)
 	cfgCtlr.lock.RLock()
 	defer cfgCtlr.lock.RUnlock()
@@ -830,6 +833,7 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	plName := selectedFlowSchema.Spec.PriorityLevelConfiguration.Name
 	plState := cfgCtlr.priorityLevelStates[plName]
 	if plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
+		noteFn(selectedFlowSchema, plState.pl, "")
 		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
 		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}
 	}
@@ -843,7 +847,10 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 		flowDistinguisher = computeFlowDistinguisher(rd, selectedFlowSchema.Spec.DistinguisherMethod)
 		hashValue = hashFlowID(selectedFlowSchema.Name, flowDistinguisher)
 	}
-	workEstimate := workEstimator(selectedFlowSchema, plState.pl, flowDistinguisher)
+
+	noteFn(selectedFlowSchema, plState.pl, flowDistinguisher)
+	workEstimate := workEstimator()
+
 	startWaitingTime = time.Now()
 	klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName, numQueues)
 	req, idle := plState.queues.StartRequest(ctx, &workEstimate, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)

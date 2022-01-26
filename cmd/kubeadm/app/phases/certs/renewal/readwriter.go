@@ -29,7 +29,6 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -83,10 +82,8 @@ func (rw *pkiCertificateReadWriter) Read() (*x509.Certificate, error) {
 		return nil, errors.Wrapf(err, "failed to load existing certificate %s", rw.baseName)
 	}
 
-	if len(certs) != 1 {
-		return nil, errors.Errorf("wanted exactly one certificate, got %d", len(certs))
-	}
-
+	// Safely pick the first one because the sender's certificate must come first in the list.
+	// For details, see: https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
 	return certs[0], nil
 }
 
@@ -141,11 +138,15 @@ func (rw *kubeConfigReadWriter) Read() (*x509.Certificate, error) {
 	// For local CA renewal, the local CA on disk could have changed, thus a reload is needed.
 	// For CSR renewal we assume the same CA on disk is mounted for usage with KCM's
 	// '--cluster-signing-cert-file' flag.
-	caCert, _, err := certsphase.LoadCertificateAuthority(rw.certificateDir, rw.baseName)
+	certificatePath, _ := pkiutil.PathsForCertAndKey(rw.certificateDir, rw.baseName)
+	caCerts, err := certutil.CertsFromFile(certificatePath)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to load existing certificate %s", rw.baseName)
 	}
-	rw.caCert = caCert
+
+	// Safely pick the first one because the sender's certificate must come first in the list.
+	// For details, see: https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
+	rw.caCert = caCerts[0]
 
 	// get current context
 	if _, ok := kubeConfig.Contexts[kubeConfig.CurrentContext]; !ok {

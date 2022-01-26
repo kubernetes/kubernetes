@@ -111,6 +111,7 @@ func (d *delayedRouteUpdater) updateRoutes() {
 
 	// No need to do any updating.
 	if len(d.routesToUpdate) == 0 {
+		klog.V(6).Info("updateRoutes: nothing to update, returning")
 		return
 	}
 
@@ -216,6 +217,8 @@ func (d *delayedRouteUpdater) cleanupOutdatedRoutes(existingRoutes []network.Rou
 	for i := len(existingRoutes) - 1; i >= 0; i-- {
 		existingRouteName := to.String(existingRoutes[i].Name)
 		split := strings.Split(existingRouteName, routeNameSeparator)
+
+		klog.V(4).Infof("cleanupOutdatedRoutes: checking route %s", existingRouteName)
 
 		// filter out unmanaged routes
 		deleteRoute := false
@@ -467,9 +470,8 @@ func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute 
 		return nil
 	}
 
-	klog.V(2).Infof("DeleteRoute: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-
 	routeName := mapNodeNameToRouteName(az.ipv6DualStackEnabled, kubeRoute.TargetNode, string(kubeRoute.DestinationCIDR))
+	klog.V(2).Infof("DeleteRoute: deleting route. clusterName=%q instance=%q cidr=%q routeName=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR, routeName)
 	route := network.Route{
 		Name:                  to.StringPtr(routeName),
 		RoutePropertiesFormat: &network.RoutePropertiesFormat{},
@@ -485,6 +487,28 @@ func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute 
 	if err != nil {
 		klog.Errorf("DeleteRoute failed for node %q with error: %v", kubeRoute.TargetNode, err)
 		return err
+	}
+
+	// Remove outdated ipv4 routes as well
+	if az.ipv6DualStackEnabled {
+		routeNameWithoutIPV6Suffix := strings.Split(routeName, routeNameSeparator)[0]
+		klog.V(2).Infof("DeleteRoute: deleting route. clusterName=%q instance=%q cidr=%q routeName=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR, routeNameWithoutIPV6Suffix)
+		route := network.Route{
+			Name:                  to.StringPtr(routeNameWithoutIPV6Suffix),
+			RoutePropertiesFormat: &network.RoutePropertiesFormat{},
+		}
+		op, err := az.routeUpdater.addRouteOperation(routeOperationDelete, route)
+		if err != nil {
+			klog.Errorf("DeleteRoute failed for node %q with error: %v", kubeRoute.TargetNode, err)
+			return err
+		}
+
+		// Wait for operation complete.
+		err = op.wait()
+		if err != nil {
+			klog.Errorf("DeleteRoute failed for node %q with error: %v", kubeRoute.TargetNode, err)
+			return err
+		}
 	}
 
 	klog.V(2).Infof("DeleteRoute: route deleted. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)

@@ -14,7 +14,11 @@ require (
 	k8s.io/client-go v0.23.0
 	k8s.io/component-base v0.23.0
 	k8s.io/klog/v2 v2.30.0
+<<<<<<< HEAD
 	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
+=======
+	k8s.io/utils v0.0.0-20211116205334-6203023598ed
+>>>>>>> v1.23.3
 )
 
 replace (

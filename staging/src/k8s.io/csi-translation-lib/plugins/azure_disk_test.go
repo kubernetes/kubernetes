@@ -220,9 +220,9 @@ func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 							FSType:   "fstype",
 							ReadOnly: true,
 							VolumeAttributes: map[string]string{
-								azureDiskCachingMode: "cachingmode",
-								azureDiskFSType:      fsType,
-								azureDiskKind:        "Managed",
+								"cachingmode":   "cachingmode",
+								azureDiskFSType: fsType,
+								azureDiskKind:   "Managed",
 							},
 							VolumeHandle: diskURI,
 						},
@@ -267,7 +267,9 @@ func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 }
 
 func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
-	cachingMode := corev1.AzureDataDiskCachingMode("cachingmode")
+	cachingModeNone := corev1.AzureDataDiskCachingNone
+	cachingModeReadOnly := corev1.AzureDataDiskCachingReadOnly
+	cachingModeReadWrite := corev1.AzureDataDiskCachingReadWrite
 	fsType := "fstype"
 	readOnly := true
 	diskURI := "/subscriptions/12/resourceGroups/23/providers/Microsoft.Compute/disks/name"
@@ -275,13 +277,15 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 
 	translator := NewAzureDiskCSITranslator()
 	cases := []struct {
-		name   string
-		volume *corev1.PersistentVolume
-		expVol *corev1.PersistentVolume
-		expErr bool
+		name        string
+		cachingMode corev1.AzureDataDiskCachingMode
+		volume      *corev1.PersistentVolume
+		expVol      *corev1.PersistentVolume
+		expErr      bool
 	}{
 		{
-			name: "azure disk volume",
+			name:        "azure disk volume with ReadOnly cachingMode",
+			cachingMode: corev1.AzureDataDiskCachingReadOnly,
 			volume: &corev1.PersistentVolume{
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
@@ -290,9 +294,9 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 							FSType:   "fstype",
 							ReadOnly: true,
 							VolumeAttributes: map[string]string{
-								azureDiskCachingMode: "cachingmode",
-								azureDiskFSType:      fsType,
-								azureDiskKind:        "managed",
+								"cachingmode":   "ReadOnly",
+								azureDiskFSType: fsType,
+								azureDiskKind:   "managed",
 							},
 							VolumeHandle: diskURI,
 						},
@@ -303,7 +307,115 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
 						AzureDisk: &corev1.AzureDiskVolumeSource{
-							CachingMode: &cachingMode,
+							CachingMode: &cachingModeReadOnly,
+							DataDiskURI: diskURI,
+							FSType:      &fsType,
+							ReadOnly:    &readOnly,
+							Kind:        &managed,
+							DiskName:    "name",
+						},
+					},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name:        "azure disk volume with ReadOnly cachingMode",
+			cachingMode: corev1.AzureDataDiskCachingReadOnly,
+			volume: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver:   "disk.csi.azure.com",
+							FSType:   "fstype",
+							ReadOnly: true,
+							VolumeAttributes: map[string]string{
+								"cachingmode": "ReadOnly",
+								"fstype":      fsType,
+								azureDiskKind: "managed",
+							},
+							VolumeHandle: diskURI,
+						},
+					},
+				},
+			},
+			expVol: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureDisk: &corev1.AzureDiskVolumeSource{
+							CachingMode: &cachingModeReadOnly,
+							DataDiskURI: diskURI,
+							FSType:      &fsType,
+							ReadOnly:    &readOnly,
+							Kind:        &managed,
+							DiskName:    "name",
+						},
+					},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name:        "azure disk volume with None cachingMode",
+			cachingMode: corev1.AzureDataDiskCachingReadOnly,
+			volume: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver:   "disk.csi.azure.com",
+							FSType:   "fstype",
+							ReadOnly: true,
+							VolumeAttributes: map[string]string{
+								"cachingMode": "None",
+								"fsType":      fsType,
+								azureDiskKind: "managed",
+							},
+							VolumeHandle: diskURI,
+						},
+					},
+				},
+			},
+			expVol: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureDisk: &corev1.AzureDiskVolumeSource{
+							CachingMode: &cachingModeNone,
+							DataDiskURI: diskURI,
+							FSType:      &fsType,
+							ReadOnly:    &readOnly,
+							Kind:        &managed,
+							DiskName:    "name",
+						},
+					},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name:        "azure disk volume with ReadWrite cachingMode",
+			cachingMode: corev1.AzureDataDiskCachingReadOnly,
+			volume: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver:   "disk.csi.azure.com",
+							FSType:   "fstype",
+							ReadOnly: true,
+							VolumeAttributes: map[string]string{
+								"cachingMode": "ReadWrite",
+								"fsType":      fsType,
+								azureDiskKind: "managed",
+							},
+							VolumeHandle: diskURI,
+						},
+					},
+				},
+			},
+			expVol: &corev1.PersistentVolume{
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureDisk: &corev1.AzureDiskVolumeSource{
+							CachingMode: &cachingModeReadWrite,
 							DataDiskURI: diskURI,
 							FSType:      &fsType,
 							ReadOnly:    &readOnly,
