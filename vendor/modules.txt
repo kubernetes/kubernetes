@@ -2519,11 +2519,7 @@ k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/system-validators v1.6.0 => k8s.io/system-validators v1.6.0
 ## explicit
 k8s.io/system-validators/validators
-<<<<<<< HEAD
-# k8s.io/utils v0.0.0-20211208161948-7d6a63dca704 => k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
-=======
 # k8s.io/utils v0.0.0-20211116205334-6203023598ed => k8s.io/utils v0.0.0-20211116205334-6203023598ed
->>>>>>> v1.23.3
 ## explicit
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -2632,11 +2628,7 @@ sigs.k8s.io/kustomize/kyaml/yaml/merge2
 sigs.k8s.io/kustomize/kyaml/yaml/merge3
 sigs.k8s.io/kustomize/kyaml/yaml/schema
 sigs.k8s.io/kustomize/kyaml/yaml/walk
-<<<<<<< HEAD
-# sigs.k8s.io/structured-merge-diff/v4 v4.2.0 => sigs.k8s.io/structured-merge-diff/v4 v4.1.2
-=======
 # sigs.k8s.io/structured-merge-diff/v4 v4.2.1 => sigs.k8s.io/structured-merge-diff/v4 v4.2.1
->>>>>>> v1.23.3
 ## explicit
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
 sigs.k8s.io/structured-merge-diff/v4/merge
@@ -3055,23 +3047,14 @@ sigs.k8s.io/yaml
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 # k8s.io/system-validators => k8s.io/system-validators v1.6.0
-<<<<<<< HEAD
-# k8s.io/utils => k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
-=======
 # k8s.io/utils => k8s.io/utils v0.0.0-20211116205334-6203023598ed
->>>>>>> v1.23.3
 # modernc.org/cc => modernc.org/cc v1.0.0
 # modernc.org/golex => modernc.org/golex v1.0.0
 # modernc.org/mathutil => modernc.org/mathutil v1.0.0
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
-<<<<<<< HEAD
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.25
-# sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.8
-=======
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27
->>>>>>> v1.23.3
 # sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
 # sigs.k8s.io/kube-storage-version-migrator => sigs.k8s.io/kube-storage-version-migrator v0.0.4
 # sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.10.1
