@@ -257,7 +257,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
+	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, true); err != nil {
 		return err
 	}
 	return nil
