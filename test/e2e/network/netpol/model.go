@@ -42,7 +42,7 @@ type Model struct {
 
 // NewWindowsModel returns a model specific to windows testing.
 func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsDomain string) *Model {
-	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP}, dnsDomain)
+	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP}, dnsDomain)
 }
 
 // NewModel instantiates a model based on:
