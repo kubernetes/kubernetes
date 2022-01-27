@@ -23,9 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -35,13 +33,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -67,10 +65,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func() {
-			if err := lookEmitSignalCommand(); err != nil {
-				e2eskipper.Skipf("skipping test because: %v", err)
-				return
-			}
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady()
 		})
@@ -264,11 +258,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func() {
-			if err := lookEmitSignalCommand(); err != nil {
-				e2eskipper.Skipf("skipping test because: %v", err)
-				return
-			}
-
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady()
 
@@ -446,14 +435,12 @@ while true; do sleep 5; done
 
 // Emits a fake PrepareForShutdown dbus message on system dbus. Will cause kubelet to react to an active shutdown event.
 func emitSignalPrepareForShutdown(b bool) error {
-	cmd := "dbus-send --system /org/freedesktop/login1 org.freedesktop.login1.Manager.PrepareForShutdown boolean:" + strconv.FormatBool(b)
-	_, err := runCommand("sh", "-c", cmd)
-	return err
-}
-
-func lookEmitSignalCommand() error {
-	_, err := exec.LookPath("dbus-send")
-	return err
+	conn, err := dbus.ConnectSystemBus()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	return conn.Emit("/org/freedesktop/login1", "org.freedesktop.login1.Manager.PrepareForShutdown", b)
 }
 
 func getNodeReadyStatus(f *framework.Framework) bool {
