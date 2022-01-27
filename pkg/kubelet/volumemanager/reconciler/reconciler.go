@@ -72,6 +72,12 @@ type Reconciler interface {
 	StatesHasBeenSynced() bool
 }
 
+// podStateProvider can determine if a pod is is going to be terminated
+type podStateProvider interface {
+	ShouldPodContainersBeTerminating(types.UID) bool
+	ShouldPodRuntimeBeRemoved(types.UID) bool
+}
+
 // NewReconciler returns a new instance of Reconciler.
 //
 // controllerAttachDetachEnabled - if true, indicates that the attach/detach
@@ -106,7 +112,9 @@ func NewReconciler(
 	mounter mount.Interface,
 	hostutil hostutil.HostUtils,
 	volumePluginMgr *volumepkg.VolumePluginMgr,
-	kubeletPodsDir string) Reconciler {
+	kubeletPodsDir string,
+	podStateProvider podStateProvider,
+) Reconciler {
 	return &reconciler{
 		kubeClient:                    kubeClient,
 		controllerAttachDetachEnabled: controllerAttachDetachEnabled,
@@ -122,6 +130,7 @@ func NewReconciler(
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
 		timeOfLastSync:                time.Time{},
+		podStateProvider:              podStateProvider,
 	}
 }
 
@@ -140,6 +149,7 @@ type reconciler struct {
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	kubeletPodsDir                string
 	timeOfLastSync                time.Time
+	podStateProvider              podStateProvider
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -238,7 +248,19 @@ func (rc *reconciler) mountAttachVolumes() {
 				}
 			}
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
-			// Volume is not mounted, or is already mounted, but requires remounting
+			if !volMounted && rc.podStateProvider.ShouldPodContainersBeTerminating(volumeToMount.Pod.UID) {
+				// the volume is not yet mounted, and the pod containers should be terminating, so don't try to set up a new mount
+				// ShouldPodContainersBeTerminating: Intended for use by subsystem sync loops to avoid performing background setup after termination has been requested for a pod.
+				klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("Skipping operationExecutor.MountVolume because pod containers should be terminating", ""), "pod", klog.KObj(volumeToMount.Pod))
+				continue
+			}
+			if rc.podStateProvider.ShouldPodRuntimeBeRemoved(volumeToMount.Pod.UID) {
+				// no containers are running and we should be cleaning up, so don't try to set up a new mount or remount
+				// "ShouldPodRuntimeBeRemoved ... is true when a pod is not yet observed by a worker after the first sync (meaning it can't be running yet) or after all running containers are stopped."
+				klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("Skipping operationExecutor.MountVolume remount because pod runtime should be removed", ""), "pod", klog.KObj(volumeToMount.Pod))
+				continue
+			}
+			// Volume is not mounted, or is already mounted but requires remounting, and containers that need this volume could be starting or could still be running
 			remountingLogStr := ""
 			isRemount := cache.IsRemountRequiredError(err)
 			if isRemount {

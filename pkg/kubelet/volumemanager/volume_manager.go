@@ -228,7 +228,9 @@ func NewVolumeManager(
 		mounter,
 		hostutil,
 		volumePluginMgr,
-		kubeletPodsDir)
+		kubeletPodsDir,
+		podStateProvider,
+	)
 
 	return vm
 }
