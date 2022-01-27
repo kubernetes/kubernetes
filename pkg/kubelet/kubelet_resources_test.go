@@ -17,11 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,7 @@ import (
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
 	tk := newTestKubelet(t, true)
-	defer tk.Cleanup()
+	defer tk.Cleanup(context.Background())
 	tk.kubelet.nodeLister = &testNodeLister{
 		nodes: []*v1.Node{
 			{

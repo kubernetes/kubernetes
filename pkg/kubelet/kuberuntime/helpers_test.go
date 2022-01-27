@@ -225,7 +225,7 @@ func TestGetImageUser(t *testing.T) {
 		i.Images[test.originalImage.name].Username = test.originalImage.username
 		i.Images[test.originalImage.name].Uid = test.originalImage.uid
 
-		uid, username, err := m.getImageUser(test.originalImage.name)
+		uid, username, err := m.getImageUser(context.Background(), test.originalImage.name)
 		assert.NoError(t, err, "TestCase[%d]", j)
 
 		if test.expectedImageUserValues.uid == (*int64)(nil) {

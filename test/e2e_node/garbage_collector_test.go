@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -151,12 +151,14 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		// Initialize the getContainerNames function to use CRI runtime client.
 		pod.getContainerNames = func() ([]string, error) {
 			relevantContainers := []string{}
-			containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
-				LabelSelector: map[string]string{
-					types.KubernetesPodNameLabel:      pod.podName,
-					types.KubernetesPodNamespaceLabel: f.Namespace.Name,
-				},
-			})
+			containers, err := runtime.ListContainers(
+				context.Background(),
+				&runtimeapi.ContainerFilter{
+					LabelSelector: map[string]string{
+						types.KubernetesPodNameLabel:      pod.podName,
+						types.KubernetesPodNamespaceLabel: f.Namespace.Name,
+					},
+				})
 			if err != nil {
 				return relevantContainers, err
 			}

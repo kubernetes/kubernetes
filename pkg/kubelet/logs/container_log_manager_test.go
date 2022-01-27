@@ -18,6 +18,7 @@ package logs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -148,7 +149,7 @@ func TestRotateLogs(t *testing.T) {
 		},
 	}
 	f.SetFakeContainers(testContainers)
-	require.NoError(t, c.rotateLogs())
+	require.NoError(t, c.rotateLogs(context.Background()))
 
 	timestamp := now.Format(timestampFormat)
 	logs, err := ioutil.ReadDir(dir)
@@ -220,7 +221,7 @@ func TestClean(t *testing.T) {
 	}
 	f.SetFakeContainers(testContainers)
 
-	err = c.Clean("container-3")
+	err = c.Clean(context.Background(), "container-3")
 	require.NoError(t, err)
 
 	logs, err := ioutil.ReadDir(dir)
@@ -392,7 +393,7 @@ func TestRotateLatestLog(t *testing.T) {
 		defer testFile.Close()
 		testLog := testFile.Name()
 		rotatedLog := fmt.Sprintf("%s.%s", testLog, now.Format(timestampFormat))
-		err = c.rotateLatestLog("test-id", testLog)
+		err = c.rotateLatestLog(context.Background(), "test-id", testLog)
 		assert.Equal(t, test.expectError, err != nil)
 		_, err = os.Stat(testLog)
 		assert.Equal(t, test.expectOriginal, err == nil)

@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -79,7 +80,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(containerID)
+	err = m.removeContainer(context.Background(), containerID)
 	assert.NoError(t, err)
 
 	// Verify container log is removed.
@@ -89,7 +90,7 @@ func TestRemoveContainer(t *testing.T) {
 		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
+	containers, err := fakeRuntime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }
@@ -122,7 +123,7 @@ func TestKillContainer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := m.killContainer(test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
+		err := m.killContainer(context.TODO(), test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
 		if test.succeed != (err == nil) {
 			t.Errorf("%s: expected %v, got %v (%v)", test.caseName, test.succeed, (err == nil), err)
 		}
@@ -292,7 +293,7 @@ func TestLifeCycleHook(t *testing.T) {
 	// Configured and works as expected
 	t.Run("PreStop-CMDExec", func(t *testing.T) {
 		testPod.Spec.Containers[0].Lifecycle = cmdLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+		m.killContainer(context.TODO(), testPod, cID, "foo", "testKill", "", &gracePeriod)
 		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
 			t.Errorf("CMD Prestop hook was not invoked")
 		}
@@ -302,7 +303,7 @@ func TestLifeCycleHook(t *testing.T) {
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
 		defer func() { fakeHTTP.url = "" }()
 		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+		m.killContainer(context.TODO(), testPod, cID, "foo", "testKill", "", &gracePeriod)
 
 		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Prestop hook was not invoked")
@@ -316,7 +317,7 @@ func TestLifeCycleHook(t *testing.T) {
 		testPod.DeletionGracePeriodSeconds = &gracePeriodLocal
 		testPod.Spec.TerminationGracePeriodSeconds = &gracePeriodLocal
 
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
+		m.killContainer(context.TODO(), testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
 
 		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Should not execute when gracePeriod is 0")
@@ -346,7 +347,7 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
+		_, err := m.startContainer(context.TODO(), fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
 		if err != nil {
 			t.Errorf("startContainer error =%v", err)
 		}

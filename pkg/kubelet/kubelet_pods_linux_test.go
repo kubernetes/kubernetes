@@ -20,10 +20,11 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -272,7 +273,7 @@ func TestMakeMounts(t *testing.T) {
 
 func TestMakeBlockVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	testCases := map[string]struct {
 		container       v1.Container

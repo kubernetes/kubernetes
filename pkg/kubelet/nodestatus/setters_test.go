@@ -17,6 +17,7 @@ limitations under the License.
 package nodestatus
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -1012,7 +1013,7 @@ func TestVersionInfo(t *testing.T) {
 			runtimeTypeFunc := func() string {
 				return tc.runtimeType
 			}
-			runtimeVersionFunc := func() (kubecontainer.Version, error) {
+			runtimeVersionFunc := func(ctx context.Context) (kubecontainer.Version, error) {
 				return tc.runtimeVersion, tc.runtimeVersionError
 			}
 			// construct setter
@@ -1082,7 +1083,7 @@ func TestImages(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			imageListFunc := func() ([]kubecontainer.Image, error) {
+			imageListFunc := func(context.Context) ([]kubecontainer.Image, error) {
 				// today, imageListFunc is expected to return a sorted list,
 				// but we may choose to sort in the setter at some future point
 				// (e.g. if the image cache stopped sorting for us)

@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -166,7 +167,7 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 	sandboxConfig, err := m.generatePodSandboxConfig(template.pod, template.sandboxAttempt)
 	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
 
-	containerConfig, _, err := m.generateContainerConfig(template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil)
+	containerConfig, _, err := m.generateContainerConfig(context.Background(), template.container, template.pod, template.attempt, "", template.container.Image, []string{}, nil)
 	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
@@ -286,7 +287,7 @@ func TestVersion(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	version, err := m.Version()
+	version, err := m.Version(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, kubeRuntimeAPIVersion, version.String())
 }
@@ -329,7 +330,7 @@ func TestGetPodStatus(t *testing.T) {
 	// Set fake sandbox and faked containers to fakeRuntime.
 	makeAndSetFakePod(t, m, fakeRuntime, pod)
 
-	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
 	assert.Equal(t, pod.UID, podStatus.ID)
 	assert.Equal(t, pod.Name, podStatus.Name)
@@ -367,11 +368,11 @@ func TestStopContainerWithNotFoundError(t *testing.T) {
 	// Set fake sandbox and faked containers to fakeRuntime.
 	makeAndSetFakePod(t, m, fakeRuntime, pod)
 	fakeRuntime.InjectError("StopContainer", status.Error(codes.NotFound, "No such container"))
-	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	require.NoError(t, err)
 	p := kubecontainer.ConvertPodStatusToRunningPod("", podStatus)
 	gracePeriod := int64(1)
-	err = m.KillPod(pod, p, &gracePeriod)
+	err = m.KillPod(context.Background(), pod, p, &gracePeriod)
 	require.NoError(t, err)
 }
 
@@ -405,7 +406,7 @@ func TestGetPodStatusWithNotFoundError(t *testing.T) {
 	// Set fake sandbox and faked containers to fakeRuntime.
 	makeAndSetFakePod(t, m, fakeRuntime, pod)
 	fakeRuntime.InjectError("ContainerStatus", status.Error(codes.NotFound, "No such container"))
-	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	require.NoError(t, err)
 	require.Equal(t, pod.UID, podStatus.ID)
 	require.Equal(t, pod.Name, podStatus.Name)
@@ -481,7 +482,7 @@ func TestGetPods(t *testing.T) {
 		},
 	}
 
-	actual, err := m.GetPods(false)
+	actual, err := m.GetPods(context.Background(), false)
 	assert.NoError(t, err)
 
 	if !verifyPods(expected, actual) {
@@ -559,7 +560,7 @@ func TestKillPod(t *testing.T) {
 		},
 	}
 
-	err = m.KillPod(pod, runningPod, nil)
+	err = m.KillPod(context.TODO(), pod, runningPod, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
@@ -599,7 +600,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(context.TODO(), pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
@@ -659,7 +660,7 @@ func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(context.Background(), pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, exceptSysctls, pod.Spec.SecurityContext.Sysctls)
 	for _, sandbox := range fakeRuntime.Sandboxes {
@@ -697,10 +698,10 @@ func TestPruneInitContainers(t *testing.T) {
 	}
 	fakes := makeFakeContainers(t, m, templates)
 	fakeRuntime.SetFakeContainers(fakes)
-	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
 
-	m.pruneInitContainersBeforeStart(pod, podStatus)
+	m.pruneInitContainersBeforeStart(context.Background(), pod, podStatus)
 	expectedContainers := sets.NewString(fakes[0].Id, fakes[2].Id)
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %v, got %v", expectedContainers, actual)
@@ -745,9 +746,9 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 
 	// 1. should only create the init container.
-	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -755,24 +756,24 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
 
 	// 2. should not create app container because init container is still running.
-	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err = m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
 	// 3. should create all app containers because init container finished.
 	// Stop init container instance 0.
-	sandboxIDs, err := m.getSandboxIDByPodUID(pod.UID, nil)
+	sandboxIDs, err := m.getSandboxIDByPodUID(context.Background(), pod.UID, nil)
 	require.NoError(t, err)
 	sandboxID := sandboxIDs[0]
 	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
 	require.NoError(t, err)
-	fakeRuntime.StopContainer(initID0, 0)
+	fakeRuntime.StopContainer(context.TODO(), initID0, 0)
 	// Sync again.
-	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err = m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -783,11 +784,11 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 
 	// 4. should restart the init container if needed to create a new podsandbox
 	// Stop the pod sandbox.
-	fakeRuntime.StopPodSandbox(sandboxID)
+	fakeRuntime.StopPodSandbox(context.TODO(), sandboxID)
 	// Sync again.
-	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err = m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.
@@ -1545,9 +1546,9 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	// GetPodStatus and the following SyncPod will not return errors in the
 	// case where the pod has been deleted. We are not adding any pods into
 	// the fakePodProvider so they are 'deleted'.
-	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	podStatus, err := m.GetPodStatus(context.Background(), pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	// This will return an error if the pod has _not_ been deleted.
 	assert.NoError(t, result.Error())
 }

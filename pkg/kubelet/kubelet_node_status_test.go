@@ -183,7 +183,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			inputImageList, expectedImageList := generateTestingImageLists(numTestImages, int(tc.nodeStatusMaxImages))
 			testKubelet := newTestKubeletWithImageList(
 				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kubelet := testKubelet.kubelet
 			kubelet.nodeStatusMaxImages = tc.nodeStatusMaxImages
 			kubelet.kubeClient = nil // ensure only the heartbeat client is used
@@ -313,7 +313,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
 	kubelet.kubeClient = nil        // ensure only the heartbeat client is used
@@ -531,7 +531,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	assert.NoError(t, err)
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.heartbeatClient, err = clientset.NewForConfig(config)
@@ -566,7 +566,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 
 func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
 	kubelet.kubeClient = nil        // ensure only the heartbeat client is used
@@ -775,7 +775,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	// No matching node for the kubelet
@@ -786,7 +786,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 
 func TestUpdateNodeStatusWithLease(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	clock := testKubelet.fakeClock
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
@@ -1074,7 +1074,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			// Setup
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 
 			kubelet := testKubelet.kubelet
 			kubelet.kubeClient = nil // ensure only the heartbeat client is used
@@ -1123,7 +1123,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 
 func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -1287,7 +1287,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	for _, tc := range cases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
-		defer testKubelet.Cleanup()
+		defer testKubelet.Cleanup(context.Background())
 		kubelet := testKubelet.kubelet
 		kubeClient := testKubelet.fakeKubeClient
 
@@ -1345,7 +1345,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	inputImageList, _ := generateTestingImageLists(nodeStatusMaxImages+1, nodeStatusMaxImages)
 	testKubelet := newTestKubeletWithImageList(
 		t, inputImageList, false /* controllerAttachDetachEnabled */, true /* initFakeVolumePlugin */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = nodeStatusMaxImages
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
@@ -1704,7 +1704,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		defer testKubelet.Cleanup()
+		defer testKubelet.Cleanup(context.Background())
 		kubelet := testKubelet.kubelet
 
 		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
@@ -2205,7 +2205,7 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(T *testing.T) {
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kubelet := testKubelet.kubelet
 
 			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
@@ -2220,7 +2220,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
 	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubeletNoReset.Cleanup()
+	defer testKubeletNoReset.Cleanup(context.Background())
 	extendedResourceName1 := v1.ResourceName("test.com/resource1")
 	extendedResourceName2 := v1.ResourceName("test.com/resource2")
 
@@ -2393,7 +2393,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		defer testKubelet.Cleanup()
+		defer testKubelet.Cleanup(context.Background())
 		kubelet := testKubelet.kubelet
 
 		needsUpdate := kubelet.reconcileExtendedResource(tc.initialNode, tc.existingNode)
@@ -2496,7 +2496,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 
 func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 
@@ -2698,7 +2698,7 @@ func TestNodeStatusHasChanged(t *testing.T) {
 
 func TestUpdateNodeAddresses(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 

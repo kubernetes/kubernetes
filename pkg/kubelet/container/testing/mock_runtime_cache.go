@@ -21,6 +21,7 @@ limitations under the License.
 package testing
 
 import (
+	context "context"
 	gomock "github.com/golang/mock/gomock"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
 	reflect "reflect"
@@ -103,16 +104,16 @@ func (m *MockpodsGetter) EXPECT() *MockpodsGetterMockRecorder {
 }
 
 // GetPods mocks base method
-func (m *MockpodsGetter) GetPods(arg0 bool) ([]*container.Pod, error) {
+func (m *MockpodsGetter) GetPods(ctx context.Context, all bool) ([]*container.Pod, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPods", arg0)
+	ret := m.ctrl.Call(m, "GetPods", ctx, all)
 	ret0, _ := ret[0].([]*container.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPods indicates an expected call of GetPods
-func (mr *MockpodsGetterMockRecorder) GetPods(arg0 interface{}) *gomock.Call {
+func (mr *MockpodsGetterMockRecorder) GetPods(ctx, all interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockpodsGetter)(nil).GetPods), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockpodsGetter)(nil).GetPods), ctx, all)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -29,7 +30,7 @@ func TestNoMetricsCollected(t *testing.T) {
 	descLogSize = descLogSize.GetRawDesc()
 
 	collector := &logMetricsCollector{
-		podStats: func() ([]statsapi.PodStats, error) {
+		podStats: func(context.Context) ([]statsapi.PodStats, error) {
 			return []statsapi.PodStats{}, nil
 		},
 	}
@@ -45,7 +46,7 @@ func TestMetricsCollected(t *testing.T) {
 
 	size := uint64(18)
 	collector := &logMetricsCollector{
-		podStats: func() ([]statsapi.PodStats, error) {
+		podStats: func(context.Context) ([]statsapi.PodStats, error) {
 			return []statsapi.PodStats{
 				{
 					PodRef: statsapi.PodReference{

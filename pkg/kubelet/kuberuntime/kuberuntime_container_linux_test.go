@@ -20,6 +20,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"testing"
@@ -99,8 +100,10 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
 	expectedConfig := makeExpectedConfig(m, pod, 0, false)
-	containerConfig, _, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil)
+	containerConfig, _, err := m.generateContainerConfig(ctx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 	assert.Equal(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
@@ -131,11 +134,11 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
+	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
 	assert.Error(t, err)
 
-	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	resp, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID}, false)
+	imageID, _ := imageService.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
+	resp, _ := imageService.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: imageID}, false)
 
 	resp.Image.Uid = nil
 	resp.Image.Username = "test"
@@ -143,7 +146,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
+	_, _, err = m.generateContainerConfig(ctx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 

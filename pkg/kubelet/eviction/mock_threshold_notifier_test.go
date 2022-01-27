@@ -21,6 +21,7 @@ limitations under the License.
 package eviction
 
 import (
+	context "context"
 	gomock "github.com/golang/mock/gomock"
 	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	reflect "reflect"
@@ -166,17 +167,17 @@ func (m *MockImageGC) EXPECT() *MockImageGCMockRecorder {
 }
 
 // DeleteUnusedImages mocks base method
-func (m *MockImageGC) DeleteUnusedImages() error {
+func (m *MockImageGC) DeleteUnusedImages(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUnusedImages")
+	ret := m.ctrl.Call(m, "DeleteUnusedImages", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteUnusedImages indicates an expected call of DeleteUnusedImages
-func (mr *MockImageGCMockRecorder) DeleteUnusedImages() *gomock.Call {
+func (mr *MockImageGCMockRecorder) DeleteUnusedImages(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUnusedImages", reflect.TypeOf((*MockImageGC)(nil).DeleteUnusedImages))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUnusedImages", reflect.TypeOf((*MockImageGC)(nil).DeleteUnusedImages), ctx)
 }
 
 // MockContainerGC is a mock of ContainerGC interface
@@ -203,17 +204,17 @@ func (m *MockContainerGC) EXPECT() *MockContainerGCMockRecorder {
 }
 
 // DeleteAllUnusedContainers mocks base method
-func (m *MockContainerGC) DeleteAllUnusedContainers() error {
+func (m *MockContainerGC) DeleteAllUnusedContainers(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAllUnusedContainers")
+	ret := m.ctrl.Call(m, "DeleteAllUnusedContainers", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteAllUnusedContainers indicates an expected call of DeleteAllUnusedContainers
-func (mr *MockContainerGCMockRecorder) DeleteAllUnusedContainers() *gomock.Call {
+func (mr *MockContainerGCMockRecorder) DeleteAllUnusedContainers(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUnusedContainers", reflect.TypeOf((*MockContainerGC)(nil).DeleteAllUnusedContainers))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUnusedContainers", reflect.TypeOf((*MockContainerGC)(nil).DeleteAllUnusedContainers), ctx)
 }
 
 // MockCgroupNotifier is a mock of CgroupNotifier interface

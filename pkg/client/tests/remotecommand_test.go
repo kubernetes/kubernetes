@@ -18,6 +18,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -58,11 +59,11 @@ type fakeExecutor struct {
 	exec          bool
 }
 
-func (ex *fakeExecutor) ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize, timeout time.Duration) error {
+func (ex *fakeExecutor) ExecInContainer(ctx context.Context, name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize, timeout time.Duration) error {
 	return ex.run(name, uid, container, cmd, in, out, err, tty)
 }
 
-func (ex *fakeExecutor) AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize) error {
+func (ex *fakeExecutor) AttachContainer(ctx context.Context, name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize) error {
 	return ex.run(name, uid, container, nil, in, out, err, tty)
 }
 

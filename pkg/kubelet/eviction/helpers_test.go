@@ -17,12 +17,14 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/diff"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1252,11 +1254,11 @@ type fakeSummaryProvider struct {
 	result *statsapi.Summary
 }
 
-func (f *fakeSummaryProvider) Get(updateStats bool) (*statsapi.Summary, error) {
+func (f *fakeSummaryProvider) Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 
-func (f *fakeSummaryProvider) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+func (f *fakeSummaryProvider) GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 

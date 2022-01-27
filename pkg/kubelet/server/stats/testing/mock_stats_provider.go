@@ -21,9 +21,7 @@ limitations under the License.
 package testing
 
 import (
-	"context"
-	reflect "reflect"
-
+	context "context"
 	gomock "github.com/golang/mock/gomock"
 	v1 "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
@@ -32,6 +30,7 @@ import (
 	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	cm "k8s.io/kubernetes/pkg/kubelet/cm"
 	volume "k8s.io/kubernetes/pkg/volume"
+	reflect "reflect"
 )
 
 // MockProvider is a mock of Provider interface
@@ -60,61 +59,61 @@ func (m *MockProvider) EXPECT() *MockProviderMockRecorder {
 // ListPodStats mocks base method
 func (m *MockProvider) ListPodStats(ctx context.Context) ([]v1alpha1.PodStats, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPodStats")
+	ret := m.ctrl.Call(m, "ListPodStats", ctx)
 	ret0, _ := ret[0].([]v1alpha1.PodStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListPodStats indicates an expected call of ListPodStats
-func (mr *MockProviderMockRecorder) ListPodStats() *gomock.Call {
+func (mr *MockProviderMockRecorder) ListPodStats(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStats", reflect.TypeOf((*MockProvider)(nil).ListPodStats))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStats", reflect.TypeOf((*MockProvider)(nil).ListPodStats), ctx)
 }
 
 // ListPodCPUAndMemoryStats mocks base method
 func (m *MockProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]v1alpha1.PodStats, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPodCPUAndMemoryStats")
+	ret := m.ctrl.Call(m, "ListPodCPUAndMemoryStats", ctx)
 	ret0, _ := ret[0].([]v1alpha1.PodStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListPodCPUAndMemoryStats indicates an expected call of ListPodCPUAndMemoryStats
-func (mr *MockProviderMockRecorder) ListPodCPUAndMemoryStats() *gomock.Call {
+func (mr *MockProviderMockRecorder) ListPodCPUAndMemoryStats(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodCPUAndMemoryStats", reflect.TypeOf((*MockProvider)(nil).ListPodCPUAndMemoryStats))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodCPUAndMemoryStats", reflect.TypeOf((*MockProvider)(nil).ListPodCPUAndMemoryStats), ctx)
 }
 
 // ListPodStatsAndUpdateCPUNanoCoreUsage mocks base method
 func (m *MockProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]v1alpha1.PodStats, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPodStatsAndUpdateCPUNanoCoreUsage")
+	ret := m.ctrl.Call(m, "ListPodStatsAndUpdateCPUNanoCoreUsage", ctx)
 	ret0, _ := ret[0].([]v1alpha1.PodStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListPodStatsAndUpdateCPUNanoCoreUsage indicates an expected call of ListPodStatsAndUpdateCPUNanoCoreUsage
-func (mr *MockProviderMockRecorder) ListPodStatsAndUpdateCPUNanoCoreUsage() *gomock.Call {
+func (mr *MockProviderMockRecorder) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStatsAndUpdateCPUNanoCoreUsage", reflect.TypeOf((*MockProvider)(nil).ListPodStatsAndUpdateCPUNanoCoreUsage))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStatsAndUpdateCPUNanoCoreUsage", reflect.TypeOf((*MockProvider)(nil).ListPodStatsAndUpdateCPUNanoCoreUsage), ctx)
 }
 
 // ImageFsStats mocks base method
 func (m *MockProvider) ImageFsStats(ctx context.Context) (*v1alpha1.FsStats, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ImageFsStats")
+	ret := m.ctrl.Call(m, "ImageFsStats", ctx)
 	ret0, _ := ret[0].(*v1alpha1.FsStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ImageFsStats indicates an expected call of ImageFsStats
-func (mr *MockProviderMockRecorder) ImageFsStats() *gomock.Call {
+func (mr *MockProviderMockRecorder) ImageFsStats(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageFsStats", reflect.TypeOf((*MockProvider)(nil).ImageFsStats))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageFsStats", reflect.TypeOf((*MockProvider)(nil).ImageFsStats), ctx)
 }
 
 // GetCgroupStats mocks base method

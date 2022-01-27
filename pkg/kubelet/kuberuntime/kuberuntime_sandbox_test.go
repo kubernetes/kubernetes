@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,10 +50,10 @@ func TestCreatePodSandbox(t *testing.T) {
 		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}
-	id, _, err := m.createPodSandbox(pod, 1)
+	id, _, err := m.createPodSandbox(context.Background(), pod, 1)
 	assert.NoError(t, err)
 	assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
-	sandboxes, err := fakeRuntime.ListPodSandbox(&runtimeapi.PodSandboxFilter{Id: id})
+	sandboxes, err := fakeRuntime.ListPodSandbox(context.Background(), &runtimeapi.PodSandboxFilter{Id: id})
 	assert.NoError(t, err)
 	assert.Equal(t, len(sandboxes), 1)
 	// TODO Check pod sandbox configuration
@@ -125,7 +126,7 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 			pod := newTestPod()
 			pod.Spec.RuntimeClassName = test.rcn
 
-			id, _, err := m.createPodSandbox(pod, 1)
+			id, _, err := m.createPodSandbox(context.Background(), pod, 1)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {

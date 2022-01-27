@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -74,12 +75,13 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
 
+	ctx := context.Background()
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
-	mockStatsProvider.EXPECT().ListPodStats().Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage().Return(podStats, nil)
-	mockStatsProvider.EXPECT().ImageFsStats().Return(imageFsStats, nil)
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
 	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
 	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
@@ -91,7 +93,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	kubeletCreationTime := metav1.Now()
 	systemBootTime := metav1.Now()
 	provider := summaryProviderImpl{kubeletCreationTime: kubeletCreationTime, systemBootTime: systemBootTime, provider: mockStatsProvider}
-	summary, err := provider.Get(true)
+	summary, err := provider.Get(ctx, true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")
@@ -162,10 +164,11 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
 
+	ctx := context.Background()
 	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
-	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats().Return(podStats, nil)
+	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/", false).Return(cgroupStatsMap["/"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/runtime", false).Return(cgroupStatsMap["/runtime"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/misc", false).Return(cgroupStatsMap["/misc"].cs, nil)
@@ -173,7 +176,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubepods", false).Return(cgroupStatsMap["/pods"].cs, nil)
 
 	provider := NewSummaryProvider(mockStatsProvider)
-	summary, err := provider.GetCPUAndMemoryStats()
+	summary, err := provider.GetCPUAndMemoryStats(ctx)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")

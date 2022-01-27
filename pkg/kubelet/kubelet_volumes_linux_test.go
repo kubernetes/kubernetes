@@ -20,6 +20,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -169,7 +170,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kubelet := testKubelet.kubelet
 
 			if tc.prepareFunc != nil {
@@ -291,7 +292,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kubelet := testKubelet.kubelet
 
 			if tc.prepareFunc != nil {

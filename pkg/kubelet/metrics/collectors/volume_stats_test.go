@@ -17,6 +17,7 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -133,9 +134,10 @@ func TestVolumeStatsCollector(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	ctx := context.Background()
 
-	mockStatsProvider.EXPECT().ListPodStats().Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage().Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).AnyTimes()
 	if err := testutil.CustomCollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
 	}

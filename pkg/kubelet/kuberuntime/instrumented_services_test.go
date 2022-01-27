@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"testing"
@@ -72,7 +73,7 @@ func TestRecordOperation(t *testing.T) {
 func TestInstrumentedVersion(t *testing.T) {
 	fakeRuntime, _, _, _ := createTestRuntimeManager()
 	irs := newInstrumentedRuntimeService(fakeRuntime)
-	vr, err := irs.Version("1")
+	vr, err := irs.Version(context.Background(), "1")
 	assert.NoError(t, err)
 	assert.Equal(t, kubeRuntimeAPIVersion, vr.Version)
 }
@@ -86,7 +87,7 @@ func TestStatus(t *testing.T) {
 		},
 	}
 	irs := newInstrumentedRuntimeService(fakeRuntime)
-	actural, err := irs.Status(false)
+	actural, err := irs.Status(context.Background(), false)
 	assert.NoError(t, err)
 	expected := &runtimeapi.RuntimeStatus{
 		Conditions: []*runtimeapi.RuntimeCondition{

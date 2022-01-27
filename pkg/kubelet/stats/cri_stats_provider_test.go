@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -239,7 +240,7 @@ func TestCRIListPodStats(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ListPodStats()
+	stats, err := provider.ListPodStats(context.Background())
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Equal(4, len(stats))
@@ -400,7 +401,7 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ListPodStats()
+	stats, err := provider.ListPodStats(context.Background())
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Equal(1, len(stats))
@@ -546,7 +547,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ListPodCPUAndMemoryStats()
+	stats, err := provider.ListPodCPUAndMemoryStats(context.Background())
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Equal(5, len(stats))
@@ -677,7 +678,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ImageFsStats()
+	stats, err := provider.ImageFsStats(context.Background())
 	assert := assert.New(t)
 	assert.NoError(err)
 

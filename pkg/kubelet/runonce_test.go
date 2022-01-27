@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -168,7 +169,7 @@ func TestRunOnce(t *testing.T) {
 			},
 		},
 	}
-	results, err := kb.runOnce(pods, time.Millisecond)
+	results, err := kb.runOnce(context.Background(), pods, time.Millisecond)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

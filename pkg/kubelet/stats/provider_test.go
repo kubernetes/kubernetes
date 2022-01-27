@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -717,9 +718,11 @@ type fakeResourceAnalyzer struct {
 	podVolumeStats serverstats.PodVolumeStats
 }
 
-func (o *fakeResourceAnalyzer) Start()                                           {}
-func (o *fakeResourceAnalyzer) Get(bool) (*statsapi.Summary, error)              { return nil, nil }
-func (o *fakeResourceAnalyzer) GetCPUAndMemoryStats() (*statsapi.Summary, error) { return nil, nil }
+func (o *fakeResourceAnalyzer) Start()                                               {}
+func (o *fakeResourceAnalyzer) Get(context.Context, bool) (*statsapi.Summary, error) { return nil, nil }
+func (o *fakeResourceAnalyzer) GetCPUAndMemoryStats(context.Context) (*statsapi.Summary, error) {
+	return nil, nil
+}
 func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.PodVolumeStats, bool) {
 	return o.podVolumeStats, true
 }
@@ -728,22 +731,22 @@ type fakeContainerStatsProvider struct {
 	device string
 }
 
-func (p fakeContainerStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
+func (p fakeContainerStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (p fakeContainerStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+func (p fakeContainerStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
+func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (p fakeContainerStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
+func (p fakeContainerStatsProvider) ImageFsStats(ctx context.Context) (*statsapi.FsStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (p fakeContainerStatsProvider) ImageFsDevice() (string, error) {
+func (p fakeContainerStatsProvider) ImageFsDevice(ctx context.Context) (string, error) {
 	return p.device, nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -128,7 +129,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.LinuxContainerResources) error {
 	return rt.err
 }
 

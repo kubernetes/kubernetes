@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -295,7 +296,7 @@ fd00::6	podFoo.domainFoo	podFoo
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeRuntime.PodList = []*containertest.FakePod{}
@@ -304,6 +305,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
+		context.Background(),
 		kubecontainer.GetPodFullName(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
@@ -315,7 +317,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 func TestRunInContainer(t *testing.T) {
 	for _, testError := range []error{nil, errors.New("bar")} {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
+		defer testKubelet.Cleanup(context.Background())
 		kubelet := testKubelet.kubelet
 		fakeRuntime := testKubelet.fakeRuntime
 		fakeCommandRunner := containertest.FakeContainerCommandRunner{
@@ -338,7 +340,7 @@ func TestRunInContainer(t *testing.T) {
 			}},
 		}
 		cmd := []string{"ls"}
-		actualOutput, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
+		actualOutput, err := kubelet.RunInContainer(context.Background(), "podFoo_nsFoo", "", "containerFoo", cmd)
 		assert.Equal(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
 		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
 		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
@@ -1672,7 +1674,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			fakeRecorder := record.NewFakeRecorder(1)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			testKubelet.kubelet.recorder = fakeRecorder
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kl := testKubelet.kubelet
 			kl.masterServiceNamespace = tc.masterServiceNs
 			if tc.nilLister {
@@ -2452,7 +2454,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kl := testKubelet.kubelet
 			containerStatuses := kl.convertToAPIContainerStatuses(
 				test.pod,
@@ -2822,7 +2824,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kl := testKubelet.kubelet
 			kl.statusManager.SetPodStatus(test.pod, test.previousStatus)
 			for _, name := range test.unreadyContainer {
@@ -2891,7 +2893,7 @@ func TestGetExec(t *testing.T) {
 
 	for _, tc := range testcases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
+		defer testKubelet.Cleanup(context.Background())
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
 			{Pod: &kubecontainer.Pod{
@@ -2911,7 +2913,7 @@ func TestGetExec(t *testing.T) {
 		kubelet.containerRuntime = fakeRuntime
 		kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
+		redirect, err := kubelet.GetExec(context.Background(), tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
 		if tc.expectError {
 			assert.Error(t, err, description)
 		} else {
@@ -2944,7 +2946,7 @@ func TestGetPortForward(t *testing.T) {
 
 	for _, tc := range testcases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
+		defer testKubelet.Cleanup(context.Background())
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
 			{Pod: &kubecontainer.Pod{
@@ -2964,7 +2966,7 @@ func TestGetPortForward(t *testing.T) {
 		kubelet.containerRuntime = fakeRuntime
 		kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
+		redirect, err := kubelet.GetPortForward(context.Background(), tc.podName, podNamespace, podUID, portforward.V4Options{})
 		if tc.expectError {
 			assert.Error(t, err, description)
 		} else {
@@ -3014,7 +3016,7 @@ func TestHasHostMountPVC(t *testing.T) {
 
 	run := func(t *testing.T, v testcase) {
 		testKubelet := newTestKubelet(t, false)
-		defer testKubelet.Cleanup()
+		defer testKubelet.Cleanup(context.Background())
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{},
 		}
@@ -3317,7 +3319,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kl := testKubelet.kubelet
 
 			kl.nodeLister = testNodeLister{nodes: []*v1.Node{
@@ -3421,7 +3423,7 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kl := testKubelet.kubelet
 			for _, ip := range tc.nodeIPs {
 				kl.nodeIPs = append(kl.nodeIPs, netutils.ParseIPSloppy(ip))
@@ -3570,7 +3572,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kl := testKubelet.kubelet
 			if tc.nodeIP != "" {
 				kl.nodeIPs = []net.IP{netutils.ParseIPSloppy(tc.nodeIP)}
@@ -3674,7 +3676,7 @@ func TestSortPodIPs(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
+			defer testKubelet.Cleanup(context.Background())
 			kl := testKubelet.kubelet
 			if tc.nodeIP != "" {
 				kl.nodeIPs = []net.IP{netutils.ParseIPSloppy(tc.nodeIP)}
@@ -3704,7 +3706,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	}
 
 	testKubelet := newTestKubelet(t, false)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kl := testKubelet.kubelet
 
 	// convertToAPIContainerStatuses is purely transformative and shouldn't alter the state of the kubelet

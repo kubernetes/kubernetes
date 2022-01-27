@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -25,7 +26,7 @@ import (
 
 func TestKubeletDirs(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
+	defer testKubelet.Cleanup(context.Background())
 	kubelet := testKubelet.kubelet
 	root := kubelet.rootDirectory
 

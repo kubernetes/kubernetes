@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -287,7 +288,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 
-		images, _ := fakeRuntime.ListImages()
+		images, _ := fakeRuntime.ListImages(context.Background())
 		assert.Equal(t, 1, len(images), "ListImages() count")
 
 		image := images[0]

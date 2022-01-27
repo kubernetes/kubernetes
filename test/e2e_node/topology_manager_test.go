@@ -381,12 +381,14 @@ func waitForAllContainerRemoval(podName, podNS string) {
 	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
 	gomega.Eventually(func() bool {
-		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
-			LabelSelector: map[string]string{
-				types.KubernetesPodNameLabel:      podName,
-				types.KubernetesPodNamespaceLabel: podNS,
-			},
-		})
+		containers, err := rs.ListContainers(
+			context.Background(),
+			&runtimeapi.ContainerFilter{
+				LabelSelector: map[string]string{
+					types.KubernetesPodNameLabel:      podName,
+					types.KubernetesPodNamespaceLabel: podNS,
+				},
+			})
 		if err != nil {
 			return false
 		}

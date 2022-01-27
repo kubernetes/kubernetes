@@ -142,7 +142,7 @@ func (fk *fakeKubelet) GetHostname() string {
 	return fk.hostnameFunc()
 }
 
-func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
+func (fk *fakeKubelet) RunInContainer(ctx context.Context, podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 	return fk.runFunc(podFullName, uid, containerName, cmd)
 }
 
@@ -152,15 +152,15 @@ type fakeRuntime struct {
 	portForwardFunc func(string, int32, io.ReadWriteCloser) error
 }
 
-func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Exec(ctx context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return f.execFunc(containerID, cmd, stdin, stdout, stderr, tty, resize)
 }
 
-func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Attach(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return f.attachFunc(containerID, stdin, stdout, stderr, tty, resize)
 }
 
-func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (f *fakeRuntime) PortForward(ctx context.Context, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 	return f.portForwardFunc(podSandboxID, port, stream)
 }
 
@@ -199,7 +199,7 @@ func newTestStreamingServer(streamIdleTimeout time.Duration) (s *testStreamingSe
 	return s, nil
 }
 
-func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	if fk.getExecCheck != nil {
 		fk.getExecCheck(podFullName, podUID, containerName, cmd, streamOpts)
 	}
@@ -218,7 +218,7 @@ func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerNa
 	return url.Parse(resp.GetUrl())
 }
 
-func (fk *fakeKubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	if fk.getAttachCheck != nil {
 		fk.getAttachCheck(podFullName, podUID, containerName, streamOpts)
 	}
@@ -236,7 +236,7 @@ func (fk *fakeKubelet) GetAttach(podFullName string, podUID types.UID, container
 	return url.Parse(resp.GetUrl())
 }
 
-func (fk *fakeKubelet) GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
 	if fk.getPortForwardCheck != nil {
 		fk.getPortForwardCheck(podName, podNamespace, podUID, portForwardOpts)
 	}
@@ -262,14 +262,16 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 func (*fakeKubelet) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
 	return map[string]volume.BlockVolume{}, true
 }
-func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)    { return nil, nil }
-func (*fakeKubelet) ListPodStats() ([]statsapi.PodStats, error) { return nil, nil }
-func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                       { return nil, nil }
+func (*fakeKubelet) ListPodStats(ctx context.Context) ([]statsapi.PodStats, error) { return nil, nil }
+func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error) {
 	return nil, nil
 }
-func (*fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
-func (*fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
-func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
+func (*fakeKubelet) ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error) {
+	return nil, nil
+}
+func (*fakeKubelet) ImageFsStats(ctx context.Context) (*statsapi.FsStats, error) { return nil, nil }
+func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)                 { return nil, nil }
 func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
