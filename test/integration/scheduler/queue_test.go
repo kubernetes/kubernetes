@@ -37,6 +37,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -176,6 +178,7 @@ func TestSchedulingGates(t *testing.T) {
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
 func TestCoreResourceEnqueue(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
 	// Use zero backoff seconds to bypass backoffQ.
 	// It's intended to not start the scheduler's queue, and hence to
 	// not start any flushing logic. We will pop and schedule the Pods manually later.
@@ -233,7 +236,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		if fitError == nil {
 			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 		}
-		testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
+		testCtx.Scheduler.FailureHandler(logger, ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
 	}
 
 	// Trigger a NodeTaintChange event.
@@ -376,6 +379,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -409,11 +413,11 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
+	testCtx.Scheduler.FailureHandler(logger, ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
+	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
 
 	// Trigger a Custom Resource event.
 	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.

@@ -36,6 +36,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2/ktesting"
 	kubeschedulerconfigv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -328,6 +329,7 @@ func TestPostFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			// index the potential victim pods in the fake client so that the victims deletion logic does not fail
 			podItems := []v1.Pod{}
 			for _, pod := range tt.pods {
@@ -360,6 +362,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1039,6 +1042,7 @@ func TestDryRunPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			fakeFilterRCMap := make(map[string]framework.Code, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
@@ -1094,6 +1098,7 @@ func TestDryRunPreemption(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1323,6 +1328,7 @@ func TestSelectBestCandidate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			rand.Seed(4)
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
@@ -1349,6 +1355,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1380,7 +1387,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pe.DryRunPreemption(ctx, tt.pod, nodeInfos, nil, offset, numCandidates)
-			s := pe.SelectCandidate(candidates)
+			s := pe.SelectCandidate(logger, candidates)
 			if s == nil || len(s.Name()) == 0 {
 				return
 			}
@@ -1478,6 +1485,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			var nodes []*v1.Node
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
@@ -1490,6 +1498,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			defer close(stopCh)
 			f, err := st.NewFramework(registeredPlugins, "", stopCh,
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1668,6 +1677,9 @@ func TestPreempt(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods().Informer()
@@ -1687,12 +1699,12 @@ func TestPreempt(t *testing.T) {
 				return true, nil, nil
 			})
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(context.Background())
 			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
-				cache.AddPod(pod)
+				cache.AddPod(logger, pod)
 			}
 			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodes := make([]*v1.Node, len(test.nodeNames))
@@ -1705,7 +1717,7 @@ func TestPreempt(t *testing.T) {
 					node.ObjectMeta.Labels[labelKeys[i]] = label
 				}
 				node.Name = node.ObjectMeta.Labels["hostname"]
-				cache.AddNode(node)
+				cache.AddNode(logger, node)
 				nodes[i] = node
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
@@ -1733,6 +1745,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)

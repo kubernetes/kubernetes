@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -338,5 +339,6 @@ func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Po
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	return f.score(pod, nodeInfo)
+	logger := klog.FromContext(ctx)
+	return f.score(logger, pod, nodeInfo)
 }

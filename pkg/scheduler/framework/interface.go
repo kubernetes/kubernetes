@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 )
@@ -632,6 +633,10 @@ type Handle interface {
 
 	// Parallelizer returns a parallelizer holding parallelism for scheduler.
 	Parallelizer() parallelize.Parallelizer
+
+	// Logger returns a logger that can be used for background activities when
+	// the caller does not provide a context-specific logger.
+	Logger() klog.Logger
 }
 
 // PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
@@ -701,13 +706,13 @@ func (ni *NominatingInfo) Mode() NominatingMode {
 type PodNominator interface {
 	// AddNominatedPod adds the given pod to the nominator or
 	// updates it if it already exists.
-	AddNominatedPod(pod *PodInfo, nominatingInfo *NominatingInfo)
+	AddNominatedPod(logger klog.Logger, pod *PodInfo, nominatingInfo *NominatingInfo)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
-	DeleteNominatedPodIfExists(pod *v1.Pod)
+	DeleteNominatedPodIfExists(logger klog.Logger, pod *v1.Pod)
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
-	UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *PodInfo)
+	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo *PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
-	NominatedPodsForNode(nodeName string) []*PodInfo
+	NominatedPodsForNode(logger klog.Logger, nodeName string) []*PodInfo
 }
 
 // PluginsRunner abstracts operations to run some plugins.

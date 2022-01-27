@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -82,9 +81,9 @@ func (mp *MultipointExample) PreBind(ctx context.Context, state *framework.Cycle
 }
 
 // New initializes a new plugin and returns it.
-func New(config *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
+func New(config *runtime.Unknown, fh framework.Handle) (framework.Plugin, error) {
 	if config == nil {
-		klog.ErrorS(nil, "MultipointExample configuration cannot be empty")
+		fh.Logger().Error(nil, "MultipointExample configuration cannot be empty")
 		return nil, fmt.Errorf("MultipointExample configuration cannot be empty")
 	}
 	mp := MultipointExample{}

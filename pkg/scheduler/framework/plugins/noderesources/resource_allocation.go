@@ -39,6 +39,7 @@ type resourceAllocationScorer struct {
 
 // score will use `scorer` function to calculate the score.
 func (r *resourceAllocationScorer) score(
+	logger klog.Logger,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
@@ -53,7 +54,7 @@ func (r *resourceAllocationScorer) score(
 	requested := make([]int64, len(r.resources))
 	allocatable := make([]int64, len(r.resources))
 	for i := range r.resources {
-		alloc, req := r.calculateResourceAllocatableRequest(nodeInfo, pod, v1.ResourceName(r.resources[i].Name))
+		alloc, req := r.calculateResourceAllocatableRequest(logger, nodeInfo, pod, v1.ResourceName(r.resources[i].Name))
 		// Only fill the extended resource entry when it's non-zero.
 		if alloc == 0 {
 			continue
@@ -64,12 +65,10 @@ func (r *resourceAllocationScorer) score(
 
 	score := r.scorer(requested, allocatable)
 
-	if klogV := klog.V(10); klogV.Enabled() { // Serializing these maps is costly.
-		klogV.InfoS("Listing internal info for allocatable resources, requested resources and score", "pod",
-			klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
-			"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
-		)
-	}
+	logger.V(10).Info("Listing internal info for allocatable resources, requested resources and score", "pod",
+		klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
+		"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
+	)
 
 	return score, nil
 }
@@ -78,7 +77,7 @@ func (r *resourceAllocationScorer) score(
 // - 1st param: quantity of allocatable resource on the node.
 // - 2nd param: aggregated quantity of requested resource on the node.
 // Note: if it's an extended resource, and the pod doesn't request it, (0, 0) is returned.
-func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
+func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger klog.Logger, nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
 	requested := nodeInfo.NonZeroRequested
 	if r.useRequested {
 		requested = nodeInfo.Requested
@@ -102,7 +101,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo 
 			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
 		}
 	}
-	klog.V(10).InfoS("Requested resource is omitted for node score calculation", "resourceName", resource)
+	logger.V(10).Info("Requested resource is omitted for node score calculation", "resourceName", resource)
 	return 0, 0
 }
 

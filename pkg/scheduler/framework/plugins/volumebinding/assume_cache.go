@@ -87,6 +87,10 @@ func (e *errObjectName) Error() string {
 // Restore() sets the latest object pointer back to the informer object.
 // Get/List() always returns the latest object pointer.
 type assumeCache struct {
+	// The logger that was chosen when setting up the cache.
+	// Will be used for all operations.
+	logger klog.Logger
+
 	// Synchronizes updates to store
 	rwMutex sync.RWMutex
 
@@ -129,8 +133,9 @@ func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // NewAssumeCache creates an assume cache for general objects.
-func NewAssumeCache(informer cache.SharedIndexInformer, description, indexName string, indexFunc cache.IndexFunc) AssumeCache {
+func NewAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer, description, indexName string, indexFunc cache.IndexFunc) AssumeCache {
 	c := &assumeCache{
+		logger:      logger,
 		description: description,
 		indexFunc:   indexFunc,
 		indexName:   indexName,
@@ -161,7 +166,7 @@ func (c *assumeCache) add(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		klog.ErrorS(&errObjectName{err}, "Add failed")
+		c.logger.Error(&errObjectName{err}, "Add failed")
 		return
 	}
 
@@ -171,29 +176,29 @@ func (c *assumeCache) add(obj interface{}) {
 	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
 		newVersion, err := c.getObjVersion(name, obj)
 		if err != nil {
-			klog.ErrorS(err, "Add failed: couldn't get object version")
+			c.logger.Error(err, "Add failed: couldn't get object version")
 			return
 		}
 
 		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
 		if err != nil {
-			klog.ErrorS(err, "Add failed: couldn't get stored object version")
+			c.logger.Error(err, "Add failed: couldn't get stored object version")
 			return
 		}
 
 		// Only update object if version is newer.
 		// This is so we don't override assumed objects due to informer resync.
 		if newVersion <= storedVersion {
-			klog.V(10).InfoS("Skip adding object to assume cache because version is not newer than storedVersion", "description", c.description, "cacheKey", name, "newVersion", newVersion, "storedVersion", storedVersion)
+			c.logger.V(10).Info("Skip adding object to assume cache because version is not newer than storedVersion", "description", c.description, "cacheKey", name, "newVersion", newVersion, "storedVersion", storedVersion)
 			return
 		}
 	}
 
 	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
 	if err = c.store.Update(objInfo); err != nil {
-		klog.InfoS("Error occurred while updating stored object", "err", err)
+		c.logger.Info("Error occurred while updating stored object", "err", err)
 	} else {
-		klog.V(10).InfoS("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
+		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
 	}
 }
 
@@ -208,7 +213,7 @@ func (c *assumeCache) delete(obj interface{}) {
 
 	name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		klog.ErrorS(&errObjectName{err}, "Failed to delete")
+		c.logger.Error(&errObjectName{err}, "Failed to delete")
 		return
 	}
 
@@ -218,7 +223,7 @@ func (c *assumeCache) delete(obj interface{}) {
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
 	if err != nil {
-		klog.ErrorS(err, "Failed to delete", "description", c.description, "cacheKey", name)
+		c.logger.Error(err, "Failed to delete", "description", c.description, "cacheKey", name)
 	}
 }
 
@@ -280,14 +285,14 @@ func (c *assumeCache) List(indexObj interface{}) []interface{} {
 	allObjs := []interface{}{}
 	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
 	if err != nil {
-		klog.ErrorS(err, "List index error")
+		c.logger.Error(err, "List index error")
 		return nil
 	}
 
 	for _, obj := range objs {
 		objInfo, ok := obj.(*objInfo)
 		if !ok {
-			klog.ErrorS(&errWrongType{"objInfo", obj}, "List error")
+			c.logger.Error(&errWrongType{"objInfo", obj}, "List error")
 			continue
 		}
 		allObjs = append(allObjs, objInfo.latestObj)
@@ -325,7 +330,7 @@ func (c *assumeCache) Assume(obj interface{}) error {
 
 	// Only update the cached object
 	objInfo.latestObj = obj
-	klog.V(4).InfoS("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
+	c.logger.V(4).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
 	return nil
 }
 
@@ -336,10 +341,10 @@ func (c *assumeCache) Restore(objName string) {
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
 		// This could be expected if object got deleted
-		klog.V(5).InfoS("Restore object", "description", c.description, "cacheKey", objName, "err", err)
+		c.logger.V(5).Info("Restore object", "description", c.description, "cacheKey", objName, "err", err)
 	} else {
 		objInfo.latestObj = objInfo.apiObj
-		klog.V(4).InfoS("Restored object", "description", c.description, "cacheKey", objName)
+		c.logger.V(4).Info("Restored object", "description", c.description, "cacheKey", objName)
 	}
 }
 
@@ -354,6 +359,7 @@ type PVAssumeCache interface {
 
 type pvAssumeCache struct {
 	AssumeCache
+	logger klog.Logger
 }
 
 func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
@@ -364,8 +370,12 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // NewPVAssumeCache creates a PV assume cache.
-func NewPVAssumeCache(informer cache.SharedIndexInformer) PVAssumeCache {
-	return &pvAssumeCache{NewAssumeCache(informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc)}
+func NewPVAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer) PVAssumeCache {
+	logger = klog.LoggerWithName(logger, "PV Cache")
+	return &pvAssumeCache{
+		AssumeCache: NewAssumeCache(logger, informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc),
+		logger:      logger,
+	}
 }
 
 func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
@@ -403,7 +413,7 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 	for _, obj := range objs {
 		pv, ok := obj.(*v1.PersistentVolume)
 		if !ok {
-			klog.ErrorS(&errWrongType{"v1.PersistentVolume", obj}, "ListPVs")
+			c.logger.Error(&errWrongType{"v1.PersistentVolume", obj}, "ListPVs")
 			continue
 		}
 		pvs = append(pvs, pv)
@@ -423,11 +433,16 @@ type PVCAssumeCache interface {
 
 type pvcAssumeCache struct {
 	AssumeCache
+	logger klog.Logger
 }
 
 // NewPVCAssumeCache creates a PVC assume cache.
-func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
-	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "", nil)}
+func NewPVCAssumeCache(logger klog.Logger, informer cache.SharedIndexInformer) PVCAssumeCache {
+	logger = klog.LoggerWithName(logger, "PVC Cache")
+	return &pvcAssumeCache{
+		AssumeCache: NewAssumeCache(logger, informer, "v1.PersistentVolumeClaim", "", nil),
+		logger:      logger,
+	}
 }
 
 func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {

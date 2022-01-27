@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -186,7 +187,8 @@ func (pl *InterPodAffinity) PreScore(
 			return framework.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
 		}
 	}
-	state.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
+	logger := klog.FromContext(pCtx)
+	state.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
 
 	topoScores := make([]scoreMap, len(allNodes))
 	index := int32(-1)

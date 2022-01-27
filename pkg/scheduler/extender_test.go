@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -271,6 +272,9 @@ func TestSchedulerWithExtenders(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -278,33 +282,34 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, name := range test.nodes {
-				cache.AddNode(createNode(name))
+				cache.AddNode(logger, createNode(name))
 			}
 			fwk, err := st.NewFramework(
 				test.registerPlugins, "", ctx.Done(),
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				runtime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			sched := &Scheduler{
-				Cache:                    cache,
-				nodeInfoSnapshot:         emptySnapshot,
-				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-				Extenders:                extenders,
-			}
-			sched.applyDefaultHandlers()
-
+			scheduler := newScheduler(
+				logger,
+				cache,
+				extenders,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				emptySnapshot,
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
-			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
+			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

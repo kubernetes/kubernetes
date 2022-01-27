@@ -92,6 +92,7 @@ type frameworkImpl struct {
 	kubeConfig      *restclient.Config
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
+	logger          klog.Logger
 
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
@@ -149,6 +150,7 @@ type frameworkOptions struct {
 	captureProfile         CaptureProfile
 	clusterEventMap        map[framework.ClusterEvent]sets.String
 	parallelizer           parallelize.Parallelizer
+	logger                 *klog.Logger
 }
 
 // Option for the frameworkImpl.
@@ -230,6 +232,13 @@ func WithCaptureProfile(c CaptureProfile) Option {
 	}
 }
 
+// WithLogger overrides the default logger from k8s.io/klog.
+func WithLogger(logger klog.Logger) Option {
+	return func(o *frameworkOptions) {
+		o.logger = &logger
+	}
+}
+
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
@@ -254,6 +263,11 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		opt(&options)
 	}
 
+	logger := klog.TODO()
+	if options.logger != nil {
+		logger = *options.logger
+	}
+
 	f := &frameworkImpl{
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
@@ -267,6 +281,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
 		parallelizer:         options.parallelizer,
+		logger:               logger,
 	}
 
 	if profile == nil {
@@ -318,7 +333,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		pluginsMap[name] = p
 
 		// Update ClusterEventMap in place.
-		fillEventToPluginMap(p, options.clusterEventMap)
+		fillEventToPluginMap(logger, p, options.clusterEventMap)
 	}
 
 	// initialize plugins per individual extension points
@@ -330,7 +345,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 
 	// initialize multiPoint plugins to their expanded extension points
 	if len(profile.Plugins.MultiPoint.Enabled) > 0 {
-		if err := f.expandMultiPointPlugins(profile, pluginsMap); err != nil {
+		if err := f.expandMultiPointPlugins(logger, profile, pluginsMap); err != nil {
 			return nil, err
 		}
 	}
@@ -432,7 +447,7 @@ func (os *orderedSet) delete(s string) {
 	}
 }
 
-func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerProfile, pluginsMap map[string]framework.Plugin) error {
+func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *config.KubeSchedulerProfile, pluginsMap map[string]framework.Plugin) error {
 	// initialize MultiPoint plugins
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
 		plugins := reflect.ValueOf(e.slicePtr).Elem()
@@ -449,7 +464,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 			disabledSet.Insert(disabledPlugin.Name)
 		}
 		if disabledSet.Has("*") {
-			klog.V(4).InfoS("all plugins disabled for extension point, skipping MultiPoint expansion", "extension", pluginType)
+			logger.V(4).Info("all plugins disabled for extension point, skipping MultiPoint expansion", "extension", pluginType)
 			continue
 		}
 
@@ -470,7 +485,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 
 			// a plugin that's enabled via MultiPoint can still be disabled for specific extension points
 			if disabledSet.Has(ep.Name) {
-				klog.V(4).InfoS("plugin disabled for extension point", "plugin", ep.Name, "extension", pluginType)
+				logger.V(4).Info("plugin disabled for extension point", "plugin", ep.Name, "extension", pluginType)
 				continue
 			}
 
@@ -480,7 +495,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 			// This maintains expected behavior for overriding default plugins (see https://github.com/kubernetes/kubernetes/pull/99582)
 			if enabledSet.has(ep.Name) {
 				overridePlugins.insert(ep.Name)
-				klog.InfoS("MultiPoint plugin is explicitly re-configured; overriding", "plugin", ep.Name)
+				logger.Info("MultiPoint plugin is explicitly re-configured; overriding", "plugin", ep.Name)
 				continue
 			}
 
@@ -519,7 +534,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 	return nil
 }
 
-func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
+func fillEventToPluginMap(logger klog.Logger, p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
 	ext, ok := p.(framework.EnqueueExtensions)
 	if !ok {
 		// If interface EnqueueExtensions is not implemented, register the default events
@@ -533,7 +548,7 @@ func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.Clust
 	// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
 	// cannot be moved by any regular cluster event.
 	if len(events) == 0 {
-		klog.InfoS("Plugin's EventsToRegister() returned nil", "plugin", p.Name())
+		logger.Info("Plugin's EventsToRegister() returned nil")
 		return
 	}
 	// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
@@ -660,6 +675,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	podInfoToAdd *framework.PodInfo,
 	nodeInfo *framework.NodeInfo,
 ) (status *framework.Status) {
+	logger := klog.FromContext(ctx)
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil || state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
@@ -667,7 +683,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 		status = f.runPreFilterExtensionAddPod(ctx, pl, state, podToSchedule, podInfoToAdd, nodeInfo)
 		if !status.IsSuccess() {
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running AddPod on PreFilter plugin", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
+			logger.Error(err, "Plugin failed")
 			return framework.AsStatus(fmt.Errorf("running AddPod on PreFilter plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -695,6 +711,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	podInfoToRemove *framework.PodInfo,
 	nodeInfo *framework.NodeInfo,
 ) (status *framework.Status) {
+	logger := klog.FromContext(ctx)
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil || state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
@@ -702,7 +719,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 		status = f.runPreFilterExtensionRemovePod(ctx, pl, state, podToSchedule, podInfoToRemove, nodeInfo)
 		if !status.IsSuccess() {
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running RemovePod on PreFilter plugin", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
+			logger.Error(err, "Plugin failed")
 			return framework.AsStatus(fmt.Errorf("running RemovePod on PreFilter plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -866,7 +883,8 @@ func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, sta
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPodInfos := fh.NominatedPodsForNode(nodeInfo.Node().Name)
+	logger := klog.FromContext(ctx)
+	nominatedPodInfos := fh.NominatedPodsForNode(logger, nodeInfo.Node().Name)
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -1051,6 +1069,7 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preBind, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	logger := klog.FromContext(ctx)
 	for _, pl := range f.preBindPlugins {
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
@@ -1060,7 +1079,7 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.
 				return status
 			}
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running PreBind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
+			logger.Error(err, "Failed running PreBind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
 			return framework.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -1086,20 +1105,21 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 	if len(f.bindPlugins) == 0 {
 		return framework.NewStatus(framework.Skip, "")
 	}
-	for _, pl := range f.bindPlugins {
-		status = f.runBindPlugin(ctx, pl, state, pod, nodeName)
+	logger := klog.FromContext(ctx)
+	for _, bp := range f.bindPlugins {
+		status = f.runBindPlugin(ctx, bp, state, pod, nodeName)
 		if status.IsSkip() {
 			continue
 		}
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				klog.V(4).InfoS("Pod rejected by Bind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
-				status.SetFailedPlugin(pl.Name())
+				klog.V(4).InfoS("Pod rejected by Bind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", bp.Name(), "status", status.Message())
+				status.SetFailedPlugin(bp.Name())
 				return status
 			}
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running Bind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
-			return framework.AsStatus(fmt.Errorf("running Bind plugin %q: %w", pl.Name(), err))
+			logger.Error(err, "Failed running Bind plugin", "plugin", bp.Name(), "pod", klog.KObj(pod), "node", nodeName)
+			return framework.AsStatus(fmt.Errorf("running Bind plugin %q: %w", bp.Name(), err))
 		}
 		return status
 	}
@@ -1147,11 +1167,12 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *fra
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	logger := klog.FromContext(ctx)
 	for _, pl := range f.reservePlugins {
 		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running Reserve plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+			logger.Error(err, "Plugin failed")
 			return framework.AsStatus(fmt.Errorf("running Reserve plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -1205,11 +1226,12 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 	}()
 	pluginsWaitTime := make(map[string]time.Duration)
 	statusCode := framework.Success
+	logger := klog.FromContext(ctx)
 	for _, pl := range f.permitPlugins {
 		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				klog.V(4).InfoS("Pod rejected by permit plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				logger.V(4).Info("Pod rejected by plugin", "status", status.Message())
 				status.SetFailedPlugin(pl.Name())
 				return status
 			}
@@ -1222,7 +1244,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 				statusCode = framework.Wait
 			} else {
 				err := status.AsError()
-				klog.ErrorS(err, "Failed running Permit plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+				logger.Error(err, "Plugin failed")
 				return framework.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithFailedPlugin(pl.Name())
 			}
 		}
@@ -1231,7 +1253,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 		waitingPod := newWaitingPod(pod, pluginsWaitTime)
 		f.waitingPods.add(waitingPod)
 		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
-		klog.V(4).InfoS("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
+		logger.V(4).Info("One or more plugins asked to wait and no plugin rejected pod")
 		return framework.NewStatus(framework.Wait, msg)
 	}
 	return nil
@@ -1254,7 +1276,9 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 		return nil
 	}
 	defer f.waitingPods.remove(pod.UID)
-	klog.V(4).InfoS("Pod waiting on permit", "pod", klog.KObj(pod))
+
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Pod waiting on permit", "pod", klog.KObj(pod))
 
 	startTime := time.Now()
 	s := <-waitingPod.s
@@ -1262,11 +1286,10 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 
 	if !s.IsSuccess() {
 		if s.IsUnschedulable() {
-			klog.V(4).InfoS("Pod rejected while waiting on permit", "pod", klog.KObj(pod), "status", s.Message())
-			return s
+			logger.V(4).Info("Pod rejected while waiting on permit", "pod", klog.KObj(pod), "status", s.Message())
 		}
 		err := s.AsError()
-		klog.ErrorS(err, "Failed waiting on permit for pod", "pod", klog.KObj(pod))
+		logger.Error(err, "Failed waiting on permit for pod", "pod", klog.KObj(pod))
 		return framework.AsStatus(fmt.Errorf("waiting on permit for pod: %w", err)).WithFailedPlugin(s.FailedPlugin())
 	}
 	return nil
@@ -1398,4 +1421,9 @@ func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 	return f.parallelizer
+}
+
+// Logger returns a logger for background activities.
+func (f *frameworkImpl) Logger() klog.Logger {
+	return f.logger
 }

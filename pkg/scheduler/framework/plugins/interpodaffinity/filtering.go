@@ -159,7 +159,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 		nodeInfo := nodes[i]
 		node := nodeInfo.Node()
 		if node == nil {
-			klog.ErrorS(nil, "Node not found")
+			klog.FromContext(ctx).Error(nil, "Node not found")
 			return
 		}
 		topoMap := make(topologyToMatchedTermCount)
@@ -198,7 +198,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 		if node == nil {
-			klog.ErrorS(nil, "Node not found")
+			klog.FromContext(ctx).Error(nil, "Node not found")
 			return
 		}
 		affinity := make(topologyToMatchedTermCount)
@@ -254,7 +254,8 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 			return nil, framework.AsStatus(err)
 		}
 	}
-	s.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
+	logger := klog.FromContext(ctx)
+	s.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
 
 	s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
 	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo, allNodes)

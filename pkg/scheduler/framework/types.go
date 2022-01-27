@@ -630,11 +630,11 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
 }
 
-func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
+func removeFromSlice(logger klog.Logger, s []*PodInfo, k string) []*PodInfo {
 	for i := range s {
 		k2, err := GetPodKey(s[i].Pod)
 		if err != nil {
-			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
+			logger.Error(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
 			continue
 		}
 		if k == k2 {
@@ -648,22 +648,22 @@ func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
-func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
+func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 	k, err := GetPodKey(pod)
 	if err != nil {
 		return err
 	}
 	if podWithAffinity(pod) {
-		n.PodsWithAffinity = removeFromSlice(n.PodsWithAffinity, k)
+		n.PodsWithAffinity = removeFromSlice(logger, n.PodsWithAffinity, k)
 	}
 	if podWithRequiredAntiAffinity(pod) {
-		n.PodsWithRequiredAntiAffinity = removeFromSlice(n.PodsWithRequiredAntiAffinity, k)
+		n.PodsWithRequiredAntiAffinity = removeFromSlice(logger, n.PodsWithRequiredAntiAffinity, k)
 	}
 
 	for i := range n.Pods {
 		k2, err := GetPodKey(n.Pods[i].Pod)
 		if err != nil {
-			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(n.Pods[i].Pod))
+			logger.Error(err, "Cannot get pod key", "pod", klog.KObj(n.Pods[i].Pod))
 			continue
 		}
 		if k == k2 {

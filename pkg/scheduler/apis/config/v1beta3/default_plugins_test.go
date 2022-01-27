@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -101,11 +102,12 @@ func TestApplyFeatureGates(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			for k, v := range test.features {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
 			}
 
-			gotConfig := getDefaultPlugins()
+			gotConfig := getDefaultPlugins(logger)
 			if diff := cmp.Diff(test.wantConfig, gotConfig); diff != "" {
 				t.Errorf("unexpected config diff (-want, +got): %s", diff)
 			}
@@ -548,7 +550,8 @@ func TestMergePlugins(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gotPlugins := mergePlugins(test.defaultPlugins, test.customPlugins)
+			logger, _ := ktesting.NewTestContext(t)
+			gotPlugins := mergePlugins(logger, test.defaultPlugins, test.customPlugins)
 			if d := cmp.Diff(test.expectedPlugins, gotPlugins); d != "" {
 				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
 			}

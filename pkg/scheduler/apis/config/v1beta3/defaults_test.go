@@ -30,6 +30,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -116,6 +117,7 @@ var pluginConfigs = []v1beta3.PluginConfig{
 }
 
 func TestSchedulerDefaults(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	enable := true
 	tests := []struct {
 		name     string
@@ -150,7 +152,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
-						Plugins:       getDefaultPlugins(),
+						Plugins:       getDefaultPlugins(logger),
 						PluginConfig:  pluginConfigs,
 						SchedulerName: pointer.String("default-scheduler"),
 					},
@@ -187,8 +189,8 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
-						SchedulerName: pointer.String("default-scheduler"),
-						Plugins:       getDefaultPlugins(),
+						SchedulerName: pointer.StringPtr("default-scheduler"),
+						Plugins:       getDefaultPlugins(logger),
 						PluginConfig:  pluginConfigs},
 				},
 			},
@@ -243,7 +245,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
-						Plugins: getDefaultPlugins(),
+						Plugins: getDefaultPlugins(logger),
 						PluginConfig: []v1beta3.PluginConfig{
 							{Name: "FooPlugin"},
 							{
@@ -394,7 +396,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
-						Plugins:       getDefaultPlugins(),
+						Plugins:       getDefaultPlugins(logger),
 						PluginConfig:  pluginConfigs,
 						SchedulerName: pointer.String("default-scheduler"),
 					},
@@ -431,7 +433,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
-						Plugins:       getDefaultPlugins(),
+						Plugins:       getDefaultPlugins(logger),
 						PluginConfig:  pluginConfigs,
 						SchedulerName: pointer.String("default-scheduler"),
 					},
