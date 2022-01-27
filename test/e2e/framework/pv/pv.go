@@ -136,6 +136,8 @@ type PersistentVolumeClaimConfig struct {
 	// VolumeMode defaults to nil if unspecified or specified as the empty
 	// string
 	VolumeMode *v1.PersistentVolumeMode
+	// VolumeName defaults to "" if unspecified
+	VolumeName string
 }
 
 // PVPVCCleanup cleans up a pv and pvc in a single pv/pvc test case.
@@ -654,6 +656,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 			},
 			StorageClassName: cfg.StorageClassName,
 			VolumeMode:       cfg.VolumeMode,
+			VolumeName:       cfg.VolumeName,
 		},
 	}
 }
