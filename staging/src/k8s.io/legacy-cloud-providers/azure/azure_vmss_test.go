@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
@@ -1407,14 +1406,12 @@ func TestGetAgentPoolScaleSets(t *testing.T) {
 
 	testCases := []struct {
 		description       string
-		excludeLBNodes    []string
 		nodes             []*v1.Node
 		expectedVMSSNames *[]string
 		expectedErr       error
 	}{
 		{
-			description:    "getAgentPoolScaleSets should return the correct vmss names",
-			excludeLBNodes: []string{"vmss-vm-000000", "vmss-vm-000001"},
+			description: "getAgentPoolScaleSets should return the correct vmss names",
 			nodes: []*v1.Node{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1436,30 +1433,11 @@ func TestGetAgentPoolScaleSets(t *testing.T) {
 			},
 			expectedVMSSNames: &[]string{"vmss"},
 		},
-		{
-			description:    "getAgentPoolScaleSets should return the correct vmss names",
-			excludeLBNodes: []string{"vmss-vm-000001"},
-			nodes: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "vmss-vm-000001",
-						Labels: map[string]string{v1.LabelNodeExcludeBalancers: "true"},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "vmss-vm-000002",
-					},
-				},
-			},
-			expectedVMSSNames: &[]string{"vmss"},
-		},
 	}
 
 	for _, test := range testCases {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
-		ss.excludeLoadBalancerNodes = sets.NewString(test.excludeLBNodes...)
 
 		expectedVMSS := buildTestVMSS(testVMSSName, "vmss-vm-")
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
@@ -2493,7 +2471,7 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
 		mockVMSSVMClient.EXPECT().UpdateVMs(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any(), gomock.Any()).Return(test.vmClientErr).Times(test.expectedVMSSVMPutTimes)
 
-		err = ss.EnsureBackendPoolDeleted(&v1.Service{}, test.backendpoolID, testVMSSName, test.backendAddressPools, true)
+		err = ss.EnsureBackendPoolDeleted(&v1.Service{}, test.backendpoolID, testVMSSName, test.backendAddressPools)
 		assert.Equal(t, test.expectedErr, err != nil, test.description+", but an error occurs")
 	}
 }
@@ -2573,7 +2551,7 @@ func TestEnsureBackendPoolDeletedConcurrently(t *testing.T) {
 		i := i
 		id := id
 		testFunc = append(testFunc, func() error {
-			return ss.EnsureBackendPoolDeleted(&v1.Service{}, id, testVMSSNames[i], backendAddressPools, true)
+			return ss.EnsureBackendPoolDeleted(&v1.Service{}, id, testVMSSNames[i], backendAddressPools)
 		})
 	}
 	errs := utilerrors.AggregateGoroutines(testFunc...)
