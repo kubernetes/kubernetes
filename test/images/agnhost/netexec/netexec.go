@@ -63,6 +63,9 @@ var CmdNetexec = &cobra.Command{
 
 - /: Returns the request's timestamp.
 - /clientip: Returns the request's IP address.
+- /header: Returns the request's header value corresponding to the key provided or the entire 
+  header marshalled as json, if no form value (key) is provided.
+  ("/header?key=X-Forwarded-For" or /header)
 - /dial: Creates a given number of requests to the given host and port using the given protocol,
   and returns a JSON with the fields "responses" (successful request responses) and "errors" (
   failed request responses). Returns "200 OK" status code if the last request succeeded,
@@ -198,6 +201,7 @@ func main(cmd *cobra.Command, args []string) {
 func addRoutes(mux *http.ServeMux, exitCh chan shutdownRequest) {
 	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/clientip", clientIPHandler)
+	mux.HandleFunc("/header", headerHandler)
 	mux.HandleFunc("/dial", dialHandler)
 	mux.HandleFunc("/echo", echoHandler)
 	mux.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
@@ -254,6 +258,21 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 func clientIPHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /clientip")
 	fmt.Fprintf(w, r.RemoteAddr)
+}
+func headerHandler(w http.ResponseWriter, r *http.Request) {
+	key := r.FormValue("key")
+	if key != "" {
+		log.Printf("GET /header?key=%s", key)
+		fmt.Fprintf(w, "%s", r.Header.Get(key))
+	} else {
+		log.Printf("GET /header")
+		data, err := json.Marshal(r.Header)
+		if err != nil {
+			fmt.Fprintf(w, "error marshalling header, err: %v", err)
+			return
+		}
+		fmt.Fprintf(w, "%s", string(data))
+	}
 }
 
 type shutdownRequest struct {
