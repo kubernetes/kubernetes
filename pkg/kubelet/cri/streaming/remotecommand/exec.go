@@ -35,7 +35,7 @@ import (
 type Executor interface {
 	// ExecInContainer executes a command in a container in the pod, copying data
 	// between in/out/err and the container's stdin/stdout/stderr.
-	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
+	ExecInContainer(ctx context.Context, name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 }
 
 // ServeExec handles requests to execute a command in a container. After

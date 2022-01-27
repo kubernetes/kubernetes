@@ -34,7 +34,7 @@ type RuntimeCache interface {
 }
 
 type podsGetter interface {
-	GetPods(bool) ([]*Pod, error)
+	GetPods(ctx context.Context, all bool) ([]*Pod, error)
 }
 
 // NewRuntimeCache creates a container runtime cache.

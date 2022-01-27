@@ -90,11 +90,11 @@ type Provider struct {
 // containerStatsProvider is an interface that provides the stats of the
 // containers managed by pods.
 type containerStatsProvider interface {
-	ListPodStats() ([]statsapi.PodStats, error)
-	ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error)
-	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
-	ImageFsStats() (*statsapi.FsStats, error)
-	ImageFsDevice() (string, error)
+	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
+	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
+	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
+	ImageFsDevice(ctx context.Context) (string, error)
 }
 
 type rlimitStatsProvider interface {

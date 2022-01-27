@@ -39,18 +39,18 @@ type Provider interface {
 	// The following stats are provided by either CRI or cAdvisor.
 	//
 	// ListPodStats returns the stats of all the containers managed by pods.
-	ListPodStats() ([]statsapi.PodStats, error)
+	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
 	// ListPodStatsAndUpdateCPUNanoCoreUsage updates the cpu nano core usage for
 	// the containers and returns the stats for all the pod-managed containers.
-	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
+	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
 	// ListPodStatsAndUpdateCPUNanoCoreUsage returns the stats of all the
 	// containers managed by pods and force update the cpu usageNanoCores.
 	// This is a workaround for CRI runtimes that do not integrate with
 	// cadvisor. See https://github.com/kubernetes/kubernetes/issues/72788
 	// for more details.
-	ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error)
+	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	// ImageFsStats returns the stats of the image filesystem.
-	ImageFsStats() (*statsapi.FsStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
 
 	// The following stats are provided by cAdvisor.
 	//

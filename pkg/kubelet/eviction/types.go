@@ -77,13 +77,13 @@ type DiskInfoProvider interface {
 // ImageGC is responsible for performing garbage collection of unused images.
 type ImageGC interface {
 	// DeleteUnusedImages deletes unused images.
-	DeleteUnusedImages() error
+	DeleteUnusedImages(ctx context.Context) error
 }
 
 // ContainerGC is responsible for performing garbage collection of unused containers.
 type ContainerGC interface {
 	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
-	DeleteAllUnusedContainers() error
+	DeleteAllUnusedContainers(ctx context.Context) error
 }
 
 // KillPodFunc kills a pod.
@@ -131,7 +131,7 @@ type thresholdsObservedAt map[evictionapi.Threshold]time.Time
 type nodeConditionsObservedAt map[v1.NodeConditionType]time.Time
 
 // nodeReclaimFunc is a function that knows how to reclaim a resource from the node without impacting pods.
-type nodeReclaimFunc func() error
+type nodeReclaimFunc func(context.Context) error
 
 // nodeReclaimFuncs is an ordered list of nodeReclaimFunc
 type nodeReclaimFuncs []nodeReclaimFunc

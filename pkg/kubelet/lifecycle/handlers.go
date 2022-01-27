@@ -44,7 +44,7 @@ type handlerRunner struct {
 }
 
 type podStatusProvider interface {
-	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
 // NewHandlerRunner returns a configured lifecycle handler for a container.

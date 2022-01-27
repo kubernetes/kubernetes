@@ -41,7 +41,7 @@ import (
 // collection.
 type StatsProvider interface {
 	// ImageFsStats returns the stats of the image filesystem.
-	ImageFsStats() (*statsapi.FsStats, error)
+	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
 }
 
 // ImageGCManager is an interface for managing lifecycle of all images.
@@ -49,15 +49,15 @@ type StatsProvider interface {
 type ImageGCManager interface {
 	// Applies the garbage collection policy. Errors include being unable to free
 	// enough space as per the garbage collection policy.
-	GarbageCollect() error
+	GarbageCollect(ctx context.Context) error
 
 	// Start async garbage collection of images.
 	Start()
 
-	GetImageList() ([]container.Image, error)
+	GetImageList(ctx context.Context) ([]container.Image, error)
 
 	// Delete all unused images.
-	DeleteUnusedImages() error
+	DeleteUnusedImages(ctx context.Context) error
 }
 
 // ImageGCPolicy is a policy for garbage collecting images. Policy defines an allowed band in

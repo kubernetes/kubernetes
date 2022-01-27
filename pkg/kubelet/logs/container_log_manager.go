@@ -58,7 +58,7 @@ type ContainerLogManager interface {
 	// Start container log manager.
 	Start()
 	// Clean removes all logs of specified container.
-	Clean(containerID string) error
+	Clean(ctx context.Context, containerID string) error
 }
 
 // LogRotatePolicy is a policy for container log rotation. The policy applies to all

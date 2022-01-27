@@ -91,7 +91,7 @@ func (fv *FakeVersion) Compare(other string) (int, error) {
 }
 
 type podsGetter interface {
-	GetPods(bool) ([]*kubecontainer.Pod, error)
+	GetPods(context.Context, bool) ([]*kubecontainer.Pod, error)
 }
 
 type FakeRuntimeCache struct {

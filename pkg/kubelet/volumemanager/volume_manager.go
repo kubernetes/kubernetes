@@ -103,14 +103,14 @@ type VolumeManager interface {
 	// actual state of the world).
 	// An error is returned if all volumes are not attached and mounted within
 	// the duration defined in podAttachAndMountTimeout.
-	WaitForAttachAndMount(pod *v1.Pod) error
+	WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error
 
 	// WaitForUnmount processes the volumes referenced in the specified
 	// pod and blocks until they are all unmounted (reflected in the actual
 	// state of the world).
 	// An error is returned if all volumes are not unmounted within
 	// the duration defined in podAttachAndMountTimeout.
-	WaitForUnmount(pod *v1.Pod) error
+	WaitForUnmount(ctx context.Context, pod *v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
 	// referenced by the specified pod that are successfully attached and

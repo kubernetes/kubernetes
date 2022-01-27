@@ -41,9 +41,9 @@ type GCPolicy struct {
 // Implementation is thread-compatible.
 type GC interface {
 	// Garbage collect containers.
-	GarbageCollect() error
+	GarbageCollect(ctx context.Context) error
 	// Deletes all unused containers, including containers belonging to pods that are terminated but not deleted
-	DeleteAllUnusedContainers() error
+	DeleteAllUnusedContainers(ctx context.Context) error
 }
 
 // SourcesReadyProvider knows how to determine if configuration sources are ready

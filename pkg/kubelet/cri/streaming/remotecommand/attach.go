@@ -33,7 +33,7 @@ import (
 type Attacher interface {
 	// AttachContainer attaches to the running container in the pod, copying data between in/out/err
 	// and the container's stdin/stdout/stderr.
-	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
+	AttachContainer(ctx context.Context, name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 }
 
 // ServeAttach handles requests to attach to a container. After creating/receiving the required

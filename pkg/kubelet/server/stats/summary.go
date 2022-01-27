@@ -31,9 +31,9 @@ import (
 type SummaryProvider interface {
 	// Get provides a new Summary with the stats from Kubelet,
 	// and will update some stats if updateStats is true
-	Get(updateStats bool) (*statsapi.Summary, error)
+	Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error)
 	// GetCPUAndMemoryStats provides a new Summary with the CPU and memory stats from Kubelet,
-	GetCPUAndMemoryStats() (*statsapi.Summary, error)
+	GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error)
 }
 
 // summaryProviderImpl implements the SummaryProvider interface.

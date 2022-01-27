@@ -40,7 +40,7 @@ var (
 type logMetricsCollector struct {
 	metrics.BaseStableCollector
 
-	podStats func() ([]statsapi.PodStats, error)
+	podStats func(context.Context) ([]statsapi.PodStats, error)
 }
 
 // Check if logMetricsCollector implements necessary interface

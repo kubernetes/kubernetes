@@ -70,7 +70,7 @@ type Runtime interface {
 	Type() string
 
 	// Version returns the version information of the container runtime.
-	Version() (Version, error)
+	Version(ctx context.Context) (Version, error)
 
 	// APIVersion returns the cached API version information of the container
 	// runtime. Implementation is expected to update this cache periodically.
@@ -79,11 +79,11 @@ type Runtime interface {
 	APIVersion() (Version, error)
 	// Status returns the status of the runtime. An error is returned if the Status
 	// function itself fails, nil otherwise.
-	Status() (*RuntimeStatus, error)
+	Status(ctx context.Context) (*RuntimeStatus, error)
 	// GetPods returns a list of containers grouped by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
-	GetPods(all bool) ([]*Pod, error)
+	GetPods(ctx context.Context, all bool) ([]*Pod, error)
 	// GarbageCollect removes dead containers using the specified container gc policy
 	// If allSourcesReady is not true, it means that kubelet doesn't have the
 	// complete list of pods from all available sources (e.g., apiserver, http,
@@ -93,18 +93,18 @@ type Runtime interface {
 	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods
 	// will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
-	GarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
+	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
-	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
 	// only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 	// it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-	KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
+	KillPod(ctx context.Context, pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visible in Runtime.
-	GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error)
+	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*PodStatus, error)
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
@@ -112,50 +112,50 @@ type Runtime interface {
 	// "100" or "all") to tail the log.
 	GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// DeleteContainer deletes a container. If the container is still running, an error is returned.
-	DeleteContainer(containerID ContainerID) error
+	DeleteContainer(ctx context.Context, containerID ContainerID) error
 	// ImageService provides methods to image-related methods.
 	ImageService
 	// UpdatePodCIDR sends a new podCIDR to the runtime.
 	// This method just proxies a new runtimeConfig with the updated
 	// CIDR value down to the runtime shim.
-	UpdatePodCIDR(podCIDR string) error
+	UpdatePodCIDR(ctx context.Context, podCIDR string) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
 // streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
 // the runtime server.
 type StreamingRuntime interface {
-	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
-	GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
-	GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
+	GetExec(ctx context.Context, id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
+	GetAttach(ctx context.Context, id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
+	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
 }
 
 // ImageService interfaces allows to work with image service.
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	PullImage(ctx context.Context, image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
-	GetImageRef(image ImageSpec) (string, error)
+	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
 	// ListImages gets all images currently on the machine.
-	ListImages() ([]Image, error)
+	ListImages(ctx context.Context) ([]Image, error)
 	// RemoveImage removes the specified image.
-	RemoveImage(image ImageSpec) error
+	RemoveImage(ctx context.Context, image ImageSpec) error
 	// ImageStats returns Image statistics.
-	ImageStats() (*ImageStats, error)
+	ImageStats(ctx context.Context) (*ImageStats, error)
 }
 
 // Attacher interface allows to attach a container.
 type Attacher interface {
-	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) (err error)
+	AttachContainer(ctx context.Context, id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) (err error)
 }
 
 // CommandRunner interface allows to run command in a container.
 type CommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
 	// If the command completes with a non-0 exit code, a k8s.io/utils/exec.ExitError will be returned.
-	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
+	RunInContainer(ctx context.Context, id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
 }
 
 // Pod is a group of containers.
