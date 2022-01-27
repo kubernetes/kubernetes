@@ -462,7 +462,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 					// we log the error here, but do not do anything as if minMatchNum is 0
 					// this may lead to pod failing to schedule when skew is in fact less than maxSkew
 					// but this is ok in most cases
-					klog.Errorf("internal error: fail to calculate per-node min match count for pod %s: %s", pod.Name, err)
+					klog.ErrorS(err, "internal error: fail to calculate per-node min match count for pod", "pod", pod.Name)
 				}
 				skew -= minMatchNum
 			}
