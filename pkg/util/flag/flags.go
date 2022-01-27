@@ -188,47 +188,46 @@ func (v *ReservedMemoryVar) Set(s string) error {
 		return nil
 	}
 
-	numaNodeReservation := strings.Split(s, ":")
-	if len(numaNodeReservation) != 2 {
-		return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", s)
-	}
-
-	memoryTypeReservations := strings.Split(numaNodeReservation[1], ",")
-	if len(memoryTypeReservations) < 1 {
-		return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", s)
-	}
-
-	numaNodeID, err := strconv.Atoi(numaNodeReservation[0])
-	if err != nil {
-		return fmt.Errorf("failed to convert the NUMA node ID, exptected integer, got %s", numaNodeReservation[0])
-	}
-
-	memoryReservation := kubeletconfig.MemoryReservation{
-		NumaNode: int32(numaNodeID),
-		Limits:   map[v1.ResourceName]resource.Quantity{},
-	}
-
-	for _, reservation := range memoryTypeReservations {
-		limit := strings.Split(reservation, "=")
-		if len(limit) != 2 {
-			return fmt.Errorf("the reserved limit has incorrect value, expected type=quantatity, got %s", reservation)
+	numaNodeReservations := strings.Split(s, ";")
+	for _, reservation := range numaNodeReservations {
+		numaNodeReservation := strings.Split(reservation, ":")
+		if len(numaNodeReservation) != 2 {
+			return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", reservation)
 		}
-
-		resourceName := v1.ResourceName(limit[0])
-		if resourceName != v1.ResourceMemory && !corev1helper.IsHugePageResourceName(resourceName) {
-			return fmt.Errorf("memory type conversion error, unknown type: %q", resourceName)
+		memoryTypeReservations := strings.Split(numaNodeReservation[1], ",")
+		if len(memoryTypeReservations) < 1 {
+			return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", reservation)
 		}
-
-		q, err := resource.ParseQuantity(limit[1])
+		numaNodeID, err := strconv.Atoi(numaNodeReservation[0])
 		if err != nil {
-			return fmt.Errorf("failed to parse the quantatity, expected quantatity, got %s", limit[1])
+			return fmt.Errorf("failed to convert the NUMA node ID, exptected integer, got %s", numaNodeReservation[0])
 		}
 
-		memoryReservation.Limits[v1.ResourceName(limit[0])] = q
+		memoryReservation := kubeletconfig.MemoryReservation{
+			NumaNode: int32(numaNodeID),
+			Limits:   map[v1.ResourceName]resource.Quantity{},
+		}
+
+		for _, memoryTypeReservation := range memoryTypeReservations {
+			limit := strings.Split(memoryTypeReservation, "=")
+			if len(limit) != 2 {
+				return fmt.Errorf("the reserved limit has incorrect value, expected type=quantatity, got %s", memoryTypeReservation)
+			}
+
+			resourceName := v1.ResourceName(limit[0])
+			if resourceName != v1.ResourceMemory && !corev1helper.IsHugePageResourceName(resourceName) {
+				return fmt.Errorf("memory type conversion error, unknown type: %q", resourceName)
+			}
+
+			q, err := resource.ParseQuantity(limit[1])
+			if err != nil {
+				return fmt.Errorf("failed to parse the quantatity, expected quantatity, got %s", limit[1])
+			}
+
+			memoryReservation.Limits[v1.ResourceName(limit[0])] = q
+		}
+		*v.Value = append(*v.Value, memoryReservation)
 	}
-
-	*v.Value = append(*v.Value, memoryReservation)
-
 	return nil
 }
 
