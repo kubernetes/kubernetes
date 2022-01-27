@@ -18,9 +18,10 @@ package ipvs
 
 import (
 	"fmt"
-	netutils "k8s.io/utils/net"
 	"reflect"
 	"testing"
+
+	netutils "k8s.io/utils/net"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilipvstest "k8s.io/kubernetes/pkg/util/ipvs/testing"
@@ -403,18 +404,28 @@ func Test_GracefulDeleteRS(t *testing.T) {
 }
 
 func Test_RaceTerminateRSList(t *testing.T) {
-	ipvs := &utilipvstest.FakeIPVS{}
+	ipvs := utilipvstest.NewFake()
 	gracefulTerminationManager := NewGracefulTerminationManager(ipvs)
 
+	// run in parallel to cause the race
 	go func() {
 		for i := 1; i <= 10; i++ {
-			for j := 1; i <= 100; j++ {
-				gracefulTerminationManager.rsList.add(makeListItem(i, j))
+			for j := 1; j <= 100; j++ {
+				item := makeListItem(i, j)
+				gracefulTerminationManager.rsList.add(item)
 			}
 		}
 	}()
 
-	if !gracefulTerminationManager.rsList.flushList(gracefulTerminationManager.deleteRsFunc) {
+	// wait until the list has some elements
+	for gracefulTerminationManager.rsList.len() < 20 {
+	}
+
+	// fake the handler to avoid the check against the IPVS virtual servers
+	fakeHandler := func(rsToDelete *listItem) (bool, error) {
+		return true, nil
+	}
+	if !gracefulTerminationManager.rsList.flushList(fakeHandler) {
 		t.Error("failed to flush entries")
 	}
 }

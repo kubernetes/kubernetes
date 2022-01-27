@@ -80,6 +80,14 @@ func (q *graceTerminateRSList) remove(rs *listItem) bool {
 	return false
 }
 
+// return the size of the list
+func (q *graceTerminateRSList) len() int {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	return len(q.list)
+}
+
 func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (bool, error)) bool {
 	q.lock.Lock()
 	defer q.lock.Unlock()
