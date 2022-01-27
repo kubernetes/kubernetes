@@ -131,7 +131,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 			},
 			expVol: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "#secretname#sharename#name",
+					Name: "#secretname#sharename#name#default",
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
@@ -143,7 +143,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 							},
 							ReadOnly:         true,
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "#secretname#sharename#name",
+							VolumeHandle:     "#secretname#sharename#name#default",
 						},
 					},
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
@@ -165,7 +165,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 			podNamespace: "test",
 			expVol: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "#secretname#sharename#name",
+					Name: "#secretname#sharename#name#test",
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
@@ -177,7 +177,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 							},
 							ReadOnly:         true,
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "#secretname#sharename#name",
+							VolumeHandle:     "#secretname#sharename#name#test",
 						},
 					},
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
@@ -254,7 +254,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 								Namespace: secretNamespace,
 							},
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "#secretname#sharename#uuid",
+							VolumeHandle:     "#secretname#sharename#uuid#secretnamespace",
 						},
 					},
 				},
@@ -293,7 +293,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 								Namespace: secretNamespace,
 							},
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
-							VolumeHandle:     "rg#secretname#sharename#uuid",
+							VolumeHandle:     "rg#secretname#sharename#uuid#secretnamespace",
 						},
 					},
 				},
