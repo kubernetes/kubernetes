@@ -126,7 +126,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 
 				nodeIPTypes := make(map[v1.NodeAddressType]bool)
 				for _, nodeAddress := range cloudNodeAddresses {
-					if nodeAddress.Address == nodeIP.String() {
+					if netutils.ParseIPSloppy(nodeAddress.Address).Equal(nodeIP) {
 						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
 						nodeIPTypes[nodeAddress.Type] = true
 					}
