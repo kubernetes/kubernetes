@@ -262,6 +262,8 @@ API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSIStorageCapac
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,StorageClass,MountOptions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,ConversionRequest,Objects
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,ConversionResponse,ConvertedObjects
+API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionFeatureGate,FieldPaths
+API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionFeatureGates,FeatureGates
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionNames,Categories
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionNames,ShortNames
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionSpec,Versions
@@ -281,6 +283,8 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,ConversionRequest,Objects
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,ConversionResponse,ConvertedObjects
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceConversion,ConversionReviewVersions
+API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionFeatureGate,FieldPaths
+API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionFeatureGates,FeatureGates
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionNames,Categories
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionNames,ShortNames
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionSpec,AdditionalPrinterColumns

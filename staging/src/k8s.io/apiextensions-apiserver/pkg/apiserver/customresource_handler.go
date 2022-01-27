@@ -799,6 +799,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				structuralSchemas,
 				statusSpec,
 				scaleSpec,
+				crd.Spec.CustomFeatureGates,
 			),
 			crdConversionRESTOptionsGetter{
 				RESTOptionsGetter:     r.restOptionsGetter,

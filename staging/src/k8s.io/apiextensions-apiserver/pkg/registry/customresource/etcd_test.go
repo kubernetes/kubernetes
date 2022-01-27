@@ -104,6 +104,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 			nil,
 			status,
 			scale,
+			nil, // TODO(MadhavJivrajani): nil for now, need to update tests
 		),
 		restOptions,
 		[]string{"all"},

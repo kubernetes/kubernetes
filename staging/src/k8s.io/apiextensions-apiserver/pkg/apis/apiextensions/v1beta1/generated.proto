@@ -167,6 +167,43 @@ message CustomResourceDefinitionCondition {
   optional string message = 5;
 }
 
+// CustomResourceDefinitionFeatureGate describes the information conveyed
+// by a feature gate.
+message CustomResourceDefinitionFeatureGate {
+  // name is the name of the feature gate being defined.
+  optional string name = 1;
+
+  // enabled signifies whether the feature gatea is enabled or not.
+  // +optional
+  optional bool enabled = 2;
+
+  // default is the default enablement state for the feature.
+  // +optional
+  optional bool default = 3;
+
+  // preRelease indicates the stage of development that the field/fields
+  // it is guarding is in. Acceptable values are Alpha, Beta, GA, Deprecated.
+  optional string preRelease = 4;
+
+  // fieldPaths defines the fields in JSON path format that this feature gate
+  // aims to guard.
+  repeated string fieldPaths = 5;
+}
+
+// CustomResourceDefinitionFeatureGates defines feature gates for specific
+// fields to enable field level versioning for custom resource definitions.
+message CustomResourceDefinitionFeatureGates {
+  // featureGates is a list of gates defined for fields of a custom
+  // resource definition. No two feature gates may guard the same field.
+  repeated CustomResourceDefinitionFeatureGate featureGates = 1;
+
+  // component is meant to indicate the entity that is responsible for
+  // the creation of these feature gates when the feature gate information
+  // is published to OpenAPI.
+  // +optional
+  optional string component = 2;
+}
+
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 message CustomResourceDefinitionList {
   // Standard object's metadata
@@ -280,6 +317,10 @@ message CustomResourceDefinitionSpec {
   // See https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#pruning-versus-preserving-unknown-fields for details.
   // +optional
   optional bool preserveUnknownFields = 10;
+
+  // customFeatureGates defines feature gates that guard specific fields of the CRD.
+  // +optional
+  optional CustomResourceDefinitionFeatureGates customFeatureGates = 11;
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition

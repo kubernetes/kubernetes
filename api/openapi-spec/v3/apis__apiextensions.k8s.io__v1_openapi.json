@@ -130,6 +130,54 @@
         ],
         "type": "object"
       },
+      "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionFeatureGate": {
+        "description": "CustomResourceDefinitionFeatureGate describes the information conveyed by a feature gate.",
+        "properties": {
+          "default": {
+            "description": "default is the default enablement state for the feature.",
+            "type": "boolean"
+          },
+          "enabled": {
+            "description": "enabled signifies whether the feature gatea is enabled or not.",
+            "type": "boolean"
+          },
+          "fieldPaths": {
+            "description": "fieldPaths defines the fields in JSON path format that this feature gate aims to guard.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "description": "name is the name of the feature gate being defined.",
+            "type": "string"
+          },
+          "preRelease": {
+            "description": "preRelease indicates the stage of development that the field/fields it is guarding is in. Acceptable values are Alpha, Beta, GA, Deprecated.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionFeatureGates": {
+        "description": "CustomResourceDefinitionFeatureGates defines feature gates for specific fields to enable field level versioning for custom resource definitions.",
+        "properties": {
+          "component": {
+            "description": "component is meant to indicate the entity that is responsible for the creation of these feature gates when the feature gate information is published to OpenAPI.",
+            "type": "string"
+          },
+          "featureGates": {
+            "description": "featureGates is a list of gates defined for fields of a custom resource definition. No two feature gates may guard the same field.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionFeatureGate",
+              "default": {}
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionList": {
         "description": "CustomResourceDefinitionList is a list of CustomResourceDefinition objects.",
         "properties": {
@@ -217,6 +265,10 @@
           "conversion": {
             "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceConversion",
             "description": "conversion defines conversion settings for the CRD."
+          },
+          "customFeatureGates": {
+            "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionFeatureGates",
+            "description": "customFeatureGates defines feature gates that guard specific fields of the CRD."
           },
           "group": {
             "default": "",

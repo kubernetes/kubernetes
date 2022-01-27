@@ -79,6 +79,41 @@ type CustomResourceDefinitionSpec struct {
 	// fields inside metadata are always preserved.
 	// Defaults to true in v1beta and will default to false in v1.
 	PreserveUnknownFields *bool
+	// customFeatureGates defines feature gates that guard specific fields of the CRD.
+	// +optional
+	CustomFeatureGates *CustomResourceDefinitionFeatureGates
+}
+
+// CustomResourceDefinitionFeatureGates defines feature gates for specific
+// fields to enable field level versioning for custom resource definitions.
+type CustomResourceDefinitionFeatureGates struct {
+	// featureGates is a list of gates defined for fields of a custom
+	// resource definition. No two feature gates may guard the same field.
+	FeatureGates []CustomResourceDefinitionFeatureGate
+	// component is meant to indicate the entity that is responsible for
+	// the creation of these feature gates when the feature gate information
+	// is published to OpenAPI.
+	// +optional
+	Component *string
+}
+
+// CustomResourceDefinitionFeatureGate describes the information conveyed
+// by a feature gate.
+type CustomResourceDefinitionFeatureGate struct {
+	// name is the name of the feature gate being defined.
+	Name string
+	// enabled signifies whether the feature gatea is enabled or not.
+	// +optional
+	Enabled *bool
+	// default is the default enablement state for the feature.
+	// +optional
+	Default *bool
+	// preRelease indicates the stage of development that the field/fields
+	// it is guarding is in. Acceptable values are Alpha, Beta, GA, Deprecated.
+	PreRelease string
+	// fieldPaths defines the fields in JSON path format that this feature gate
+	// aims to guard.
+	FieldPaths []string
 }
 
 // CustomResourceConversion describes how to convert different versions of a CR.

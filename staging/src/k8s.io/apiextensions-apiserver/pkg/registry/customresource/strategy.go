@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
@@ -47,16 +48,26 @@ type customResourceStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 
-	namespaceScoped   bool
-	validator         customResourceValidator
-	structuralSchemas map[string]*structuralschema.Structural
-	celValidators     map[string]*cel.Validator
-	status            *apiextensions.CustomResourceSubresourceStatus
-	scale             *apiextensions.CustomResourceSubresourceScale
-	kind              schema.GroupVersionKind
+	namespaceScoped    bool
+	validator          customResourceValidator
+	structuralSchemas  map[string]*structuralschema.Structural
+	celValidators      map[string]*cel.Validator
+	status             *apiextensions.CustomResourceSubresourceStatus
+	scale              *apiextensions.CustomResourceSubresourceScale
+	kind               schema.GroupVersionKind
+	customFeatureGates *apiextensionsv1.CustomResourceDefinitionFeatureGates
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+func NewStrategy(
+	typer runtime.ObjectTyper,
+	namespaceScoped bool,
+	kind schema.GroupVersionKind,
+	schemaValidator, statusSchemaValidator *validate.SchemaValidator,
+	structuralSchemas map[string]*structuralschema.Structural,
+	status *apiextensions.CustomResourceSubresourceStatus,
+	scale *apiextensions.CustomResourceSubresourceScale,
+	customFeatureGates *apiextensionsv1.CustomResourceDefinitionFeatureGates,
+) customResourceStrategy {
 	celValidators := map[string]*cel.Validator{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
 		for name, s := range structuralSchemas {
@@ -79,9 +90,10 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			schemaValidator:       schemaValidator,
 			statusSchemaValidator: statusSchemaValidator,
 		},
-		structuralSchemas: structuralSchemas,
-		celValidators:     celValidators,
-		kind:              kind,
+		structuralSchemas:  structuralSchemas,
+		celValidators:      celValidators,
+		kind:               kind,
+		customFeatureGates: customFeatureGates,
 	}
 }
 
@@ -105,12 +117,31 @@ func (a customResourceStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 
 // PrepareForCreate clears the status of a CustomResource before creation.
 func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	customResourceObject := obj.(*unstructured.Unstructured)
+	customResource := customResourceObject.UnstructuredContent()
 	if a.status != nil {
-		customResourceObject := obj.(*unstructured.Unstructured)
-		customResource := customResourceObject.UnstructuredContent()
-
 		// create cannot set status
 		delete(customResource, "status")
+	}
+
+	// Check if feature gates are defined in the CRD corresponding
+	// to this CR, and subsequently check if the fields being created
+	// are allowed by the feature gates set.
+	if a.customFeatureGates != nil {
+		fieldPathStates := constructFieldPathTracker(a.customFeatureGates)
+		for _, featureGate := range a.customFeatureGates.FeatureGates {
+			if !fieldPathStates.shouldConsiderFeatureGate(featureGate) {
+				continue
+			}
+			if isFeatureGateEnabled(featureGate) {
+				continue
+			}
+			// If feature gate is disabled, drop the fields that are
+			// guarded by this gate (provided they exist).
+			for _, fieldPath := range featureGate.FieldPaths {
+				attemptDroppingField(customResource, fieldPath)
+			}
+		}
 	}
 
 	accessor, _ := meta.Accessor(obj)
@@ -134,6 +165,36 @@ func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 			newCustomResource["status"] = oldCustomResource["status"]
 		case ok1:
 			delete(newCustomResource, "status")
+		}
+	}
+
+	// Check if feature gates are defined in the CRD corresponding
+	// to this CR.
+	//
+	// Provided that feature gates are defined and that the fields that
+	// they gate exist in the storage version, then if the feature gate
+	// is disabled, we drop the field in `obj` because by virtue of the
+	// the feature gate being disabled, `old` would not have this field.
+	if a.customFeatureGates != nil {
+		fieldPathStates := constructFieldPathTracker(a.customFeatureGates)
+		for _, featureGate := range a.customFeatureGates.FeatureGates {
+			if !fieldPathStates.shouldConsiderFeatureGate(featureGate) {
+				continue
+			}
+			if isFeatureGateEnabled(featureGate) {
+				continue
+			}
+			for _, fieldPath := range featureGate.FieldPaths {
+				// If the object in its storage version form
+				// has the field at fieldPath and the feature
+				// gate is diabled, ensure no update is done
+				// to the field.
+				if hasField(oldCustomResource, fieldPath) {
+					ensureNoUpdateToField(oldCustomResource, newCustomResource, fieldPath)
+					continue
+				}
+				attemptDroppingField(newCustomResource, fieldPath)
+			}
 		}
 	}
 
