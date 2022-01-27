@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -45,20 +46,14 @@ type TestServer struct {
 	TmpDir               string       // Temp Dir used, by the apiserver
 }
 
-// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
-type Logger interface {
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
-}
-
 // StartTestServer starts a kube-controller-manager. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // 		 enough time to remove temporary files.
-func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
+func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
+	logger := klog.FromContext(ctx)
 	stopCh := make(chan struct{})
 	tearDown := func() {
 		close(stopCh)
@@ -97,7 +92,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 		s.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
-		t.Logf("kube-controller-manager will listen securely on port %d...", s.SecureServing.BindPort)
+		logger.Info("kube-controller-manager will listen securely", "port", s.SecureServing.BindPort)
 	}
 
 	config, err := s.Config(all, disabled)
@@ -112,7 +107,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 	}(stopCh)
 
-	t.Logf("Waiting for /healthz to be ok...")
+	logger.Info("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
@@ -146,14 +141,13 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t Logger, flags []string) *TestServer {
-	result, err := StartTestServer(t, flags)
+func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
+	result, err := StartTestServer(ctx, flags)
 	if err == nil {
 		return &result
 	}
 
-	t.Fatalf("failed to launch server: %v", err)
-	return nil
+	panic(fmt.Errorf("failed to launch server: %v", err))
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

@@ -16,7 +16,10 @@ limitations under the License.
 
 package volumebinding
 
-import v1 "k8s.io/api/core/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+)
 
 // FakeVolumeBinderConfig holds configurations for fake volume binder.
 type FakeVolumeBinderConfig struct {
@@ -43,26 +46,26 @@ type FakeVolumeBinder struct {
 }
 
 // GetPodVolumes implements SchedulerVolumeBinder.GetPodVolumes.
-func (b *FakeVolumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
+func (b *FakeVolumeBinder) GetPodVolumes(_ klog.Logger, pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
 	return nil, nil, nil, nil
 }
 
 // FindPodVolumes implements SchedulerVolumeBinder.FindPodVolumes.
-func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, _, _ []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
+func (b *FakeVolumeBinder) FindPodVolumes(_ klog.Logger, pod *v1.Pod, _, _ []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
 	return nil, b.config.FindReasons, b.config.FindErr
 }
 
 // AssumePodVolumes implements SchedulerVolumeBinder.AssumePodVolumes.
-func (b *FakeVolumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, podVolumes *PodVolumes) (bool, error) {
+func (b *FakeVolumeBinder) AssumePodVolumes(_ klog.Logger, assumedPod *v1.Pod, nodeName string, podVolumes *PodVolumes) (bool, error) {
 	b.AssumeCalled = true
 	return b.config.AllBound, b.config.AssumeErr
 }
 
 // RevertAssumedPodVolumes implements SchedulerVolumeBinder.RevertAssumedPodVolumes
-func (b *FakeVolumeBinder) RevertAssumedPodVolumes(_ *PodVolumes) {}
+func (b *FakeVolumeBinder) RevertAssumedPodVolumes(_ klog.Logger, _ *PodVolumes) {}
 
 // BindPodVolumes implements SchedulerVolumeBinder.BindPodVolumes.
-func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) error {
+func (b *FakeVolumeBinder) BindPodVolumes(_ klog.Logger, assumedPod *v1.Pod, podVolumes *PodVolumes) error {
 	b.BindCalled = true
 	return b.config.BindErr
 }

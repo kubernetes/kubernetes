@@ -25,7 +25,7 @@ import (
 )
 
 // getDefaultPlugins returns the default set of plugins.
-func getDefaultPlugins() *v1beta3.Plugins {
+func getDefaultPlugins(logger klog.Logger) *v1beta3.Plugins {
 	plugins := &v1beta3.Plugins{
 		MultiPoint: v1beta3.PluginSet{
 			Enabled: []v1beta3.Plugin{
@@ -57,23 +57,23 @@ func getDefaultPlugins() *v1beta3.Plugins {
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.
-func mergePlugins(defaultPlugins, customPlugins *v1beta3.Plugins) *v1beta3.Plugins {
+func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1beta3.Plugins) *v1beta3.Plugins {
 	if customPlugins == nil {
 		return defaultPlugins
 	}
 
-	defaultPlugins.MultiPoint = mergePluginSet(defaultPlugins.MultiPoint, customPlugins.MultiPoint)
-	defaultPlugins.QueueSort = mergePluginSet(defaultPlugins.QueueSort, customPlugins.QueueSort)
-	defaultPlugins.PreFilter = mergePluginSet(defaultPlugins.PreFilter, customPlugins.PreFilter)
-	defaultPlugins.Filter = mergePluginSet(defaultPlugins.Filter, customPlugins.Filter)
-	defaultPlugins.PostFilter = mergePluginSet(defaultPlugins.PostFilter, customPlugins.PostFilter)
-	defaultPlugins.PreScore = mergePluginSet(defaultPlugins.PreScore, customPlugins.PreScore)
-	defaultPlugins.Score = mergePluginSet(defaultPlugins.Score, customPlugins.Score)
-	defaultPlugins.Reserve = mergePluginSet(defaultPlugins.Reserve, customPlugins.Reserve)
-	defaultPlugins.Permit = mergePluginSet(defaultPlugins.Permit, customPlugins.Permit)
-	defaultPlugins.PreBind = mergePluginSet(defaultPlugins.PreBind, customPlugins.PreBind)
-	defaultPlugins.Bind = mergePluginSet(defaultPlugins.Bind, customPlugins.Bind)
-	defaultPlugins.PostBind = mergePluginSet(defaultPlugins.PostBind, customPlugins.PostBind)
+	defaultPlugins.MultiPoint = mergePluginSet(logger, defaultPlugins.MultiPoint, customPlugins.MultiPoint)
+	defaultPlugins.QueueSort = mergePluginSet(logger, defaultPlugins.QueueSort, customPlugins.QueueSort)
+	defaultPlugins.PreFilter = mergePluginSet(logger, defaultPlugins.PreFilter, customPlugins.PreFilter)
+	defaultPlugins.Filter = mergePluginSet(logger, defaultPlugins.Filter, customPlugins.Filter)
+	defaultPlugins.PostFilter = mergePluginSet(logger, defaultPlugins.PostFilter, customPlugins.PostFilter)
+	defaultPlugins.PreScore = mergePluginSet(logger, defaultPlugins.PreScore, customPlugins.PreScore)
+	defaultPlugins.Score = mergePluginSet(logger, defaultPlugins.Score, customPlugins.Score)
+	defaultPlugins.Reserve = mergePluginSet(logger, defaultPlugins.Reserve, customPlugins.Reserve)
+	defaultPlugins.Permit = mergePluginSet(logger, defaultPlugins.Permit, customPlugins.Permit)
+	defaultPlugins.PreBind = mergePluginSet(logger, defaultPlugins.PreBind, customPlugins.PreBind)
+	defaultPlugins.Bind = mergePluginSet(logger, defaultPlugins.Bind, customPlugins.Bind)
+	defaultPlugins.PostBind = mergePluginSet(logger, defaultPlugins.PostBind, customPlugins.PostBind)
 	return defaultPlugins
 }
 
@@ -82,7 +82,7 @@ type pluginIndex struct {
 	plugin v1beta3.Plugin
 }
 
-func mergePluginSet(defaultPluginSet, customPluginSet v1beta3.PluginSet) v1beta3.PluginSet {
+func mergePluginSet(logger klog.Logger, defaultPluginSet, customPluginSet v1beta3.PluginSet) v1beta3.PluginSet {
 	disabledPlugins := sets.NewString()
 	enabledCustomPlugins := make(map[string]pluginIndex)
 	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
@@ -114,7 +114,7 @@ func mergePluginSet(defaultPluginSet, customPluginSet v1beta3.PluginSet) v1beta3
 			}
 			// The default plugin is explicitly re-configured, update the default plugin accordingly.
 			if customPlugin, ok := enabledCustomPlugins[defaultEnabledPlugin.Name]; ok {
-				klog.InfoS("Default plugin is explicitly re-configured; overriding", "plugin", defaultEnabledPlugin.Name)
+				logger.Info("Default plugin is explicitly re-configured; overriding", "plugin", defaultEnabledPlugin.Name)
 				// Update the default plugin in place to preserve order.
 				defaultEnabledPlugin = customPlugin.plugin
 				replacedPluginIndex.Insert(customPlugin.index)

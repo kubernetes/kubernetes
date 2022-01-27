@@ -40,6 +40,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -74,7 +75,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(tl ktesting.TL, config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 	apiURL, apiShutdown := util.StartApiserver()
@@ -102,7 +103,7 @@ func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.Shutdow
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	_, podInformer, schedulerShutdown := util.StartScheduler(client, cfg, config)
+	_, podInformer, schedulerShutdown := util.StartScheduler(tl, client, cfg, config)
 	fakePVControllerShutdown := util.StartFakePVController(client)
 
 	shutdownFunc := func() {

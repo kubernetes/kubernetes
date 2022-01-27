@@ -80,9 +80,9 @@ func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error)
 }
 
 // LogOrWriteConfig logs the completed component config and writes it into the given file name as YAML, if either is enabled
-func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, completedProfiles []config.KubeSchedulerProfile) error {
-	klogV := klog.V(2)
-	if !klogV.Enabled() && len(fileName) == 0 {
+func LogOrWriteConfig(logger klog.Logger, fileName string, cfg *config.KubeSchedulerConfiguration, completedProfiles []config.KubeSchedulerProfile) error {
+	loggerV := logger.V(2)
+	if !loggerV.Enabled() && len(fileName) == 0 {
 		return nil
 	}
 	cfg.Profiles = completedProfiles
@@ -92,8 +92,8 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 		return err
 	}
 
-	if klogV.Enabled() {
-		klogV.InfoS("Using component config", "config", buf.String())
+	if loggerV.Enabled() {
+		loggerV.Info("Using component config", "config", buf.String())
 	}
 
 	if len(fileName) > 0 {
@@ -105,7 +105,7 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 		if _, err := io.Copy(configFile, buf); err != nil {
 			return err
 		}
-		klog.InfoS("Wrote configuration", "file", fileName)
+		logger.Info("Wrote configuration", "file", fileName)
 		os.Exit(0)
 	}
 	return nil

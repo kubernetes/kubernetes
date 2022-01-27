@@ -81,11 +81,11 @@ func setup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *d
 	})
 
 	sched, err := scheduler.New(
+		ctx,
 		clientSet,
 		informers,
 		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
-		ctx.Done(),
 	)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)

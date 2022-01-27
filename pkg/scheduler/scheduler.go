@@ -76,7 +76,7 @@ type Scheduler struct {
 
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
-	Error func(*framework.QueuedPodInfo, error)
+	Error func(context.Context, *framework.QueuedPodInfo, error)
 
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
@@ -99,6 +99,11 @@ type Scheduler struct {
 	percentageOfNodesToScore int32
 
 	nextStartNodeIndex int
+
+	// logger *must* be initialized when creating a Scheduler,
+	// otherwise logging functions will access a nil sink and
+	// panic.
+	logger klog.Logger
 }
 
 type schedulerOptions struct {
@@ -231,17 +236,15 @@ var defaultSchedulerOptions = schedulerOptions{
 }
 
 // New returns a Scheduler
-func New(client clientset.Interface,
+func New(ctx context.Context,
+	client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
-	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
-	stopEverything := stopCh
-	if stopEverything == nil {
-		stopEverything = wait.NeverStop
-	}
+	logger := klog.FromContext(ctx)
+	stopEverything := ctx.Done()
 
 	options := defaultSchedulerOptions
 	for _, opt := range opts {
@@ -265,7 +268,7 @@ func New(client clientset.Interface,
 
 	metrics.Register()
 
-	extenders, err := buildExtenders(options.extenders, options.profiles)
+	extenders, err := buildExtenders(logger, options.extenders, options.profiles)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't build extenders: %w", err)
 	}
@@ -278,7 +281,7 @@ func New(client clientset.Interface,
 	snapshot := internalcache.NewEmptySnapshot()
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
-	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory, stopCh,
+	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory, stopEverything,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithKubeConfig(options.kubeConfig),
@@ -308,16 +311,17 @@ func New(client clientset.Interface,
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 	)
 
-	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
+	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod)
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
-	debugger.ListenForSignal(stopEverything)
+	debugger.ListenForSignal(ctx)
 
 	sched := newScheduler(
+		logger,
 		schedulerCache,
 		extenders,
-		internalqueue.MakeNextPodFunc(podQueue),
+		internalqueue.MakeNextPodFunc(logger, podQueue),
 		MakeDefaultErrorFunc(client, podLister, podQueue, schedulerCache),
 		stopEverything,
 		podQueue,
@@ -334,7 +338,8 @@ func New(client clientset.Interface,
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
-	sched.SchedulingQueue.Run()
+	logger := klog.FromContext(ctx)
+	sched.SchedulingQueue.Run(logger)
 
 	// We need to start scheduleOne loop in a dedicated goroutine,
 	// because scheduleOne function hangs on getting the next item
@@ -349,17 +354,18 @@ func (sched *Scheduler) Run(ctx context.Context) {
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
-	return func(podInfo *framework.QueuedPodInfo, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(context.Context, *framework.QueuedPodInfo, error) {
+	return func(ctx context.Context, podInfo *framework.QueuedPodInfo, err error) {
+		logger := klog.FromContext(ctx)
 		pod := podInfo.Pod
 		if err == ErrNoNodesAvailable {
-			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
+			logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
 		} else if fitError, ok := err.(*framework.FitError); ok {
 			// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 			podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
-			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
+			logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
 		} else if apierrors.IsNotFound(err) {
-			klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)
+			logger.V(2).Info("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)
 			if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 				nodeName := errStatus.Status().Details.Name
 				// when node is not found, We do not remove the node right away. Trying again to get
@@ -367,33 +373,33 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 				_, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 				if err != nil && apierrors.IsNotFound(err) {
 					node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-					if err := schedulerCache.RemoveNode(&node); err != nil {
-						klog.V(4).InfoS("Node is not found; failed to remove it from the cache", "node", node.Name)
+					if err := schedulerCache.RemoveNode(logger, &node); err != nil {
+						logger.V(4).Info("Node is not found; failed to remove it from the cache", "node", node.Name)
 					}
 				}
 			}
 		} else {
-			klog.ErrorS(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
+			logger.Error(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
 		}
 
 		// Check if the Pod exists in informer cache.
 		cachedPod, err := podLister.Pods(pod.Namespace).Get(pod.Name)
 		if err != nil {
-			klog.InfoS("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", err)
+			logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", err)
 			return
 		}
 
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		if len(cachedPod.Spec.NodeName) != 0 {
-			klog.InfoS("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			return
 		}
 
 		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 		podInfo.PodInfo = framework.NewPodInfo(cachedPod.DeepCopy())
-		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {
-			klog.ErrorS(err, "Error occurred")
+		if err := podQueue.AddUnschedulableIfNotPresent(logger, podInfo, podQueue.SchedulingCycle()); err != nil {
+			logger.Error(err, "Error occurred")
 		}
 	}
 }
@@ -406,7 +412,7 @@ func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) info
 	return informerFactory
 }
 
-func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.KubeSchedulerProfile) ([]framework.Extender, error) {
+func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profiles []schedulerapi.KubeSchedulerProfile) ([]framework.Extender, error) {
 	var fExtenders []framework.Extender
 	if len(extenders) == 0 {
 		return nil, nil
@@ -415,7 +421,7 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 	var ignoredExtendedResources []string
 	var ignorableExtenders []framework.Extender
 	for i := range extenders {
-		klog.V(2).InfoS("Creating extender", "extender", extenders[i])
+		logger.V(2).Info("Creating extender", "extender", extenders[i])
 		extender, err := NewHTTPExtender(&extenders[i])
 		if err != nil {
 			return nil, err
@@ -466,10 +472,11 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 
 // newScheduler creates a Scheduler object.
 func newScheduler(
+	logger klog.Logger,
 	cache internalcache.Cache,
 	extenders []framework.Extender,
 	nextPod func() *framework.QueuedPodInfo,
-	Error func(*framework.QueuedPodInfo, error),
+	Error func(context.Context, *framework.QueuedPodInfo, error),
 	stopEverything <-chan struct{},
 	schedulingQueue internalqueue.SchedulingQueue,
 	profiles profile.Map,
@@ -487,6 +494,7 @@ func newScheduler(
 		client:                   client,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		percentageOfNodesToScore: percentageOfNodesToScore,
+		logger:                   logger,
 	}
 	sched.SchedulePod = sched.schedulePod
 	return &sched

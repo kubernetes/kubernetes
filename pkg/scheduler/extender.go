@@ -28,6 +28,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -163,6 +164,7 @@ func (h *HTTPExtender) SupportsPreemption() bool {
 
 // ProcessPreemption returns filtered candidate nodes and victims after running preemption logic in extender.
 func (h *HTTPExtender) ProcessPreemption(
+	logger klog.Logger,
 	pod *v1.Pod,
 	nodeNameToVictims map[string]*extenderv1.Victims,
 	nodeInfos framework.NodeInfoLister,

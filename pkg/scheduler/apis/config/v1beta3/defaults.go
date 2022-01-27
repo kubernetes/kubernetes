@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -64,9 +65,9 @@ func pluginsNames(p *v1beta3.Plugins) []string {
 	return n.List()
 }
 
-func setDefaults_KubeSchedulerProfile(prof *v1beta3.KubeSchedulerProfile) {
+func setDefaults_KubeSchedulerProfile(logger klog.Logger, prof *v1beta3.KubeSchedulerProfile) {
 	// Set default plugins.
-	prof.Plugins = mergePlugins(getDefaultPlugins(), prof.Plugins)
+	prof.Plugins = mergePlugins(logger, getDefaultPlugins(logger), prof.Plugins)
 	// Set default plugin configs.
 	scheme := GetPluginArgConversionScheme()
 	existingConfigs := sets.NewString()
@@ -101,6 +102,7 @@ func setDefaults_KubeSchedulerProfile(prof *v1beta3.KubeSchedulerProfile) {
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *v1beta3.KubeSchedulerConfiguration) {
+	logger := klog.TODO() // called by generated code which doesn't pass a logger
 	if obj.Parallelism == nil {
 		obj.Parallelism = pointer.Int32Ptr(16)
 	}
@@ -117,7 +119,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta3.KubeSchedulerConfigurat
 	// Add the default set of plugins and apply the configuration.
 	for i := range obj.Profiles {
 		prof := &obj.Profiles[i]
-		setDefaults_KubeSchedulerProfile(prof)
+		setDefaults_KubeSchedulerProfile(logger, prof)
 	}
 
 	if obj.PercentageOfNodesToScore == nil {

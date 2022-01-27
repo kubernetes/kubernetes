@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -1590,6 +1591,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			registry := Registry{}
 			cfgPls := &config.Plugins{}
 
@@ -1621,6 +1623,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			podNominator := internalqueue.NewPodNominator(nil)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(
+					logger,
 					framework.NewPodInfo(tt.nominatedPod),
 					&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: nodeName})
 			}

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestNewResource(t *testing.T) {
@@ -1081,10 +1082,11 @@ func TestNodeInfoRemovePod(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			ni := fakeNodeInfo(pods...)
 
 			gen := ni.Generation
-			err := ni.RemovePod(test.pod)
+			err := ni.RemovePod(logger, test.pod)
 			if err != nil {
 				if test.errExpected {
 					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)

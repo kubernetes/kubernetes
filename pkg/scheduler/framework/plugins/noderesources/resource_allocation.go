@@ -45,6 +45,7 @@ type resourceToValueMap map[v1.ResourceName]int64
 
 // score will use `scorer` function to calculate the score.
 func (r *resourceAllocationScorer) score(
+	logger klog.Logger,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
@@ -58,7 +59,7 @@ func (r *resourceAllocationScorer) score(
 	requested := make(resourceToValueMap)
 	allocatable := make(resourceToValueMap)
 	for resource := range r.resourceToWeightMap {
-		alloc, req := r.calculateResourceAllocatableRequest(nodeInfo, pod, resource)
+		alloc, req := r.calculateResourceAllocatableRequest(logger, nodeInfo, pod, resource)
 		if alloc != 0 {
 			// Only fill the extended resource entry when it's non-zero.
 			allocatable[resource], requested[resource] = alloc, req
@@ -67,7 +68,7 @@ func (r *resourceAllocationScorer) score(
 
 	score := r.scorer(requested, allocatable)
 
-	klog.V(10).InfoS("Listing internal info for allocatable resources, requested resources and score", "pod",
+	logger.V(10).Info("Listing internal info for allocatable resources, requested resources and score", "pod",
 		klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
 		"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
 	)
@@ -79,7 +80,7 @@ func (r *resourceAllocationScorer) score(
 // - 1st param: quantity of allocatable resource on the node.
 // - 2nd param: aggregated quantity of requested resource on the node.
 // Note: if it's an extended resource, and the pod doesn't request it, (0, 0) is returned.
-func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
+func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger klog.Logger, nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
 	requested := nodeInfo.NonZeroRequested
 	if r.useRequested {
 		requested = nodeInfo.Requested
@@ -103,7 +104,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(nodeInfo 
 			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
 		}
 	}
-	klog.V(10).InfoS("Requested resource is omitted for node score calculation", "resourceName", resource)
+	logger.V(10).Info("Requested resource is omitted for node score calculation", "resourceName", resource)
 	return 0, 0
 }
 

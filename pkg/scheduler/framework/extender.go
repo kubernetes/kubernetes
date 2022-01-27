@@ -18,6 +18,7 @@ package framework
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
 
@@ -58,6 +59,7 @@ type Extender interface {
 	//   1. Subset of given candidate nodes after preemption phase of extender.
 	//   2. A different set of victim pod for every given candidate node after preemption phase of extender.
 	ProcessPreemption(
+		logger klog.Logger,
 		pod *v1.Pod,
 		nodeNameToVictims map[string]*extenderv1.Victims,
 		nodeInfos NodeInfoLister,

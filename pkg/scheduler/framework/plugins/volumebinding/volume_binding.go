@@ -173,7 +173,8 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		state.Write(stateKey, &stateData{skip: true})
 		return nil, nil
 	}
-	boundClaims, claimsToBind, unboundClaimsImmediate, err := pl.Binder.GetPodVolumes(pod)
+	logger := klog.FromContext(ctx)
+	boundClaims, claimsToBind, unboundClaimsImmediate, err := pl.Binder.GetPodVolumes(logger, pod)
 	if err != nil {
 		return nil, framework.AsStatus(err)
 	}
@@ -222,6 +223,7 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
@@ -236,7 +238,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return nil
 	}
 
-	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node)
+	podVolumes, reasons, err := pl.Binder.FindPodVolumes(logger, pod, state.boundClaims, state.claimsToBind, node)
 
 	if err != nil {
 		return framework.AsStatus(err)
@@ -301,7 +303,8 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, 
 	// we don't need to hold the lock as only one node will be reserved for the given pod
 	podVolumes, ok := state.podVolumesByNode[nodeName]
 	if ok {
-		allBound, err := pl.Binder.AssumePodVolumes(pod, nodeName, podVolumes)
+		logger := klog.FromContext(ctx)
+		allBound, err := pl.Binder.AssumePodVolumes(logger, pod, nodeName, podVolumes)
 		if err != nil {
 			return framework.AsStatus(err)
 		}
@@ -332,13 +335,14 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 	if !ok {
 		return framework.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
 	}
-	klog.V(5).InfoS("Trying to bind volumes for pod", "pod", klog.KObj(pod))
-	err = pl.Binder.BindPodVolumes(pod, podVolumes)
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Trying to bind volumes for pod")
+	err = pl.Binder.BindPodVolumes(logger, pod, podVolumes)
 	if err != nil {
-		klog.V(1).InfoS("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
+		logger.V(1).Info("Failed to bind volumes for pod", "err", err)
 		return framework.AsStatus(err)
 	}
-	klog.V(5).InfoS("Success binding volumes for pod", "pod", klog.KObj(pod))
+	logger.V(5).Info("Success binding volumes for pod")
 	return nil
 }
 
@@ -354,7 +358,8 @@ func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState
 	if !ok {
 		return
 	}
-	pl.Binder.RevertAssumedPodVolumes(podVolumes)
+	logger := klog.FromContext(ctx)
+	pl.Binder.RevertAssumedPodVolumes(logger, podVolumes)
 	return
 }
 
@@ -379,7 +384,7 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
 		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1().CSIStorageCapacities(),
 	}
-	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	binder := NewVolumeBinder(fh.Logger(), fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 	// build score function
 	var scorer volumeCapacityScorer

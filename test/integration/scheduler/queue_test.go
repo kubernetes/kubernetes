@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -105,7 +106,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		if fitError == nil {
 			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 		}
-		testCtx.Scheduler.Error(podInfo, fitError)
+		testCtx.Scheduler.Error(ctx, podInfo, fitError)
 	}
 
 	// Trigger a NodeTaintChange event.
@@ -248,6 +249,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -280,11 +282,11 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.Error(podInfo, fitError)
+	testCtx.Scheduler.Error(ctx, podInfo, fitError)
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
+	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
 
 	// Trigger a Custom Resource event.
 	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.

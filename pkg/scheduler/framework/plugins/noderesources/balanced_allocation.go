@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -54,12 +55,13 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
+	logger := klog.FromContext(ctx)
 	// ba.score favors nodes with balanced resource usage rate.
 	// It calculates the standard deviation for those resources and prioritizes the node based on how close the usage of those resources is to each other.
 	// Detail: score = (1 - std) * MaxNodeScore, where std is calculated by the root square of Σ((fraction(i)-mean)^2)/len(resources)
 	// The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-	return ba.score(pod, nodeInfo)
+	return ba.score(logger, pod, nodeInfo)
 }
 
 // ScoreExtensions of the Score plugin.

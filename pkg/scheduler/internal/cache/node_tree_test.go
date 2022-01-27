@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 )
 
 var allNodes = []*v1.Node{
@@ -199,9 +200,10 @@ func TestNodeTree_AddNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nt := newNodeTree(nil)
+			logger, _ := ktesting.NewTestContext(t)
+			nt := newNodeTree(logger, nil)
 			for _, n := range test.nodesToAdd {
-				nt.addNode(n)
+				nt.addNode(logger, n)
 			}
 			verifyNodeTree(t, nt, test.expectedTree)
 		})
@@ -256,9 +258,10 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nt := newNodeTree(test.existingNodes)
+			logger, _ := ktesting.NewTestContext(t)
+			nt := newNodeTree(logger, test.existingNodes)
 			for _, n := range test.nodesToRemove {
-				err := nt.removeNode(n)
+				err := nt.removeNode(logger, n)
 				if test.expectError == (err == nil) {
 					t.Errorf("unexpected returned error value: %v", err)
 				}
@@ -332,7 +335,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nt := newNodeTree(test.existingNodes)
+			logger, _ := ktesting.NewTestContext(t)
+			nt := newNodeTree(logger, test.existingNodes)
 			var oldNode *v1.Node
 			for _, n := range allNodes {
 				if n.Name == test.nodeToUpdate.Name {
@@ -343,7 +347,7 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 			if oldNode == nil {
 				oldNode = &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nonexisting-node"}}
 			}
-			nt.updateNode(oldNode, test.nodeToUpdate)
+			nt.updateNode(logger, oldNode, test.nodeToUpdate)
 			verifyNodeTree(t, nt, test.expectedTree)
 		})
 	}
@@ -379,7 +383,8 @@ func TestNodeTree_List(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nt := newNodeTree(test.nodesToAdd)
+			logger, _ := ktesting.NewTestContext(t)
+			nt := newNodeTree(logger, test.nodesToAdd)
 
 			output, err := nt.list()
 			if err != nil {
@@ -393,7 +398,8 @@ func TestNodeTree_List(t *testing.T) {
 }
 
 func TestNodeTree_List_Exhausted(t *testing.T) {
-	nt := newNodeTree(allNodes[:9])
+	logger, _ := ktesting.NewTestContext(t)
+	nt := newNodeTree(logger, allNodes[:9])
 	nt.numNodes++
 	_, err := nt.list()
 	if err == nil {
@@ -448,7 +454,8 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nt := newNodeTree(nil)
+			logger, _ := ktesting.NewTestContext(t)
+			nt := newNodeTree(logger, nil)
 			addIndex := 0
 			removeIndex := 0
 			for _, op := range test.operations {
@@ -457,14 +464,14 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 					if addIndex >= len(test.nodesToAdd) {
 						t.Error("more add operations than nodesToAdd")
 					} else {
-						nt.addNode(test.nodesToAdd[addIndex])
+						nt.addNode(logger, test.nodesToAdd[addIndex])
 						addIndex++
 					}
 				case "remove":
 					if removeIndex >= len(test.nodesToRemove) {
 						t.Error("more remove operations than nodesToRemove")
 					} else {
-						nt.removeNode(test.nodesToRemove[removeIndex])
+						nt.removeNode(logger, test.nodesToRemove[removeIndex])
 						removeIndex++
 					}
 				default:

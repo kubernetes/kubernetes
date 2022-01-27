@@ -108,6 +108,7 @@ for more information about scheduling and the kube-scheduler component.`,
 	cliflag.SetUsageAndHelpFunc(cmd, *nfs, cols)
 
 	if err := cmd.MarkFlagFilename("config", "yaml", "yml", "json"); err != nil {
+		// nolint:logcheck // TODO (?): return error instead of logging it here
 		klog.ErrorS(err, "Failed to mark flag filename")
 	}
 
@@ -144,10 +145,12 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 
 // Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
 func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *scheduler.Scheduler) error {
-	// To help debugging, immediately log version
-	klog.InfoS("Starting Kubernetes Scheduler", "version", version.Get())
+	logger := klog.FromContext(ctx)
 
-	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+	// To help debugging, immediately log version
+	logger.Info("Starting Kubernetes Scheduler", "version", version.Get())
+
+	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
@@ -213,11 +216,11 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				select {
 				case <-ctx.Done():
 					// We were asked to terminate. Exit 0.
-					klog.InfoS("Requested to terminate, exiting")
+					logger.Info("Requested to terminate, exiting")
 					os.Exit(0)
 				default:
 					// We lost the lock.
-					klog.ErrorS(nil, "Leaderelection lost")
+					logger.Error(nil, "Leaderelection lost")
 					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 				}
 			},
@@ -326,11 +329,12 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	recorderFactory := getRecorderFactory(&cc)
 	completedProfiles := make([]kubeschedulerconfig.KubeSchedulerProfile, 0)
 	// Create the scheduler.
-	sched, err := scheduler.New(cc.Client,
+	sched, err := scheduler.New(
+		ctx,
+		cc.Client,
 		cc.InformerFactory,
 		cc.DynInformerFactory,
 		recorderFactory,
-		ctx.Done(),
 		scheduler.WithComponentConfigVersion(cc.ComponentConfig.TypeMeta.APIVersion),
 		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
@@ -349,7 +353,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := options.LogOrWriteConfig(opts.WriteConfigTo, &cc.ComponentConfig, completedProfiles); err != nil {
+	if err := options.LogOrWriteConfig(klog.FromContext(ctx), opts.WriteConfigTo, &cc.ComponentConfig, completedProfiles); err != nil {
 		return nil, nil, err
 	}
 

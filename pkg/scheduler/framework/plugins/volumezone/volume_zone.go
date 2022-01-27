@@ -104,6 +104,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	for i := range pod.Spec.Volumes {
 		volume := pod.Spec.Volumes[i]
 		if volume.PersistentVolumeClaim == nil {
@@ -152,12 +153,12 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			nodeV := nodeConstraints[k]
 			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 			if err != nil {
-				klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
+				logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
 				continue
 			}
 
 			if !volumeVSet.Has(nodeV) {
-				klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvName), "PVLabelKey", k)
+				logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvName), "PVLabelKey", k)
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 			}
 		}
