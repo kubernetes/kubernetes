@@ -3603,3 +3603,27 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 		}()
 	}
 }
+
+func TestGetPullSecretsForPod(t *testing.T) {
+	fakeRecorder := record.NewFakeRecorder(1)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.recorder = fakeRecorder
+	defer testKubelet.Cleanup()
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "test1",
+			Name:        "image-pull-secrets-test-pod",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			ImagePullSecrets: []v1.LocalObjectReference{
+				{Name: "secret1"},
+			},
+		},
+	}
+
+	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(testPod)
+
+	assert.Equal(t, 0, len(pullSecrets))
+}
