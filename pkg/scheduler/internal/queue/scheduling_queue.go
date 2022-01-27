@@ -428,7 +428,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		}
 		p.activeQ.Add(rawPodInfo)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
-		defer p.cond.Broadcast()
+		p.cond.Broadcast()
 	}
 }
 
