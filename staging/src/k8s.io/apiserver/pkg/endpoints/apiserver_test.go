@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -212,6 +213,10 @@ func init() {
 type defaultAPIServer struct {
 	http.Handler
 	container *restful.Container
+}
+
+func handleWithWarnings(storage map[string]rest.Storage) http.Handler {
+	return genericapifilters.WithWarningRecorder(handle(storage))
 }
 
 // uses the default settings
@@ -3988,6 +3993,7 @@ func TestCreateYAML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	fmt.Printf("bytes.NewBuffer(data) = %+v\n", bytes.NewBuffer(data).String())
 	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -4354,6 +4360,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 // runRequest is used by TestDryRun since it runs the test twice in a
 // row with a slightly different URL (one has ?dryRun, one doesn't).
 func runRequest(t *testing.T, path, verb string, data []byte, contentType string) *http.Response {
+	fmt.Printf("data = %+v\n", bytes.NewBuffer(data).String())
 	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -4386,6 +4393,95 @@ type SimpleRESTStorageWithDeleteCollection struct {
 func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	return nil, nil
+}
+
+func TestFieldValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
+	strictDecodingErr := `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
+	strictDecodingWarns := []string{`duplicate field "other"`, `unknown field "unknown"`}
+	strictDecodingErrYAML := `strict decoding error: yaml: unmarshal errors:\n  line 6: key \"other\" already set in map, unknown field \"unknown\"`
+	strictFieldValidation := "?fieldValidation=Strict"
+	warnFieldValidation := "?fieldValidation=Warn"
+	ignoreFieldValidation := "?fieldValidation=Ignore"
+
+	invalidJSONData := []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+	invalidYAML := `apiVersion: test.group/version
+kind: Simple
+metadata:
+  creationTimestamp: null
+other: foo
+other: bar
+unknown: baz`
+	invalidYAMLData := []byte(invalidYAML)
+
+	tests := []struct {
+		name               string
+		path               string
+		verb               string
+		data               []byte
+		queryParams        string
+		contentType        string
+		expectedErr        string
+		expectedWarns      []string
+		expectedStatusCode int
+	}{
+		{name: "post-unknown-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONData, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
+		{name: "post-unknown-warn-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONData, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarns},
+		{name: "post-unknown-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONData, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
+		{name: "post-unknown-strict-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLData, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAML},
+	}
+
+	server := httptest.NewServer(handleWithWarnings(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		// TODO: is this subsimple stuff necessary?
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+			response := runRequest(t, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(response.Body)
+			fmt.Printf("response = %+v\n", response)
+			fmt.Printf("response.Header = %+v\n", response.Header)
+			fmt.Printf("buf.String() = %+v\n", buf.String())
+			fmt.Printf("test.expectedErr = %+v\n", test.expectedErr)
+			fmt.Printf("strings.Contains(buf.String(), test.expectedErr) = %+v\n", strings.Contains(buf.String(), test.expectedErr))
+
+			if response.StatusCode != test.expectedStatusCode || !strings.Contains(buf.String(), test.expectedErr) {
+				t.Fatalf("unexpected response: %#v, expected err: %#v", response, test.expectedErr)
+			}
+
+			warnings, ok := net.ParseWarningHeaders(response.Header["Warning"])
+			fmt.Printf("warnings = %+v\n", warnings)
+			fmt.Printf("ok = %+v\n", ok)
+			if len(warnings) != len(test.expectedWarns) {
+				t.Fatalf("unexpected warnings: %#v", warnings)
+			}
+			for i, warn := range warnings {
+				if warn.Text != test.expectedWarns[i] {
+					t.Fatalf("unexpected warning: %#v, expected warning: %#v", warn.Text, test.expectedWarns[i])
+				}
+			}
+		})
+	}
 }
 
 func TestDryRunDisabled(t *testing.T) {

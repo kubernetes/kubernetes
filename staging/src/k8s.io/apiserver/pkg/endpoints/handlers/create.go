@@ -129,6 +129,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			strictError, isStrictError := runtime.AsStrictDecodingError(err)
 			switch {
 			case isStrictError && obj != nil && validationDirective == metav1.FieldValidationWarn:
+				fmt.Println("adding warning")
+				fmt.Printf("strictError.Errors() = %+v\n", strictError.Errors())
 				addStrictDecodingWarnings(req.Context(), strictError.Errors())
 			case isStrictError && validationDirective == metav1.FieldValidationIgnore:
 				klog.Warningf("unexpected strict error when field validation is set to ignore")
