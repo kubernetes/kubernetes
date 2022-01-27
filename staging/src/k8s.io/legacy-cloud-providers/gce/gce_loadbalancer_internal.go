@@ -626,9 +626,9 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	var igLinks []string
 	for zone, nodes := range zonedNodes {
 		if g.AlphaFeatureGate.Enabled(AlphaFeatureSkipIGsManagement) {
-			igs, err := g.FilterInstanceGroupsByName(name, zone)
+			igs, err := g.FilterInstanceGroupsByNamePrefix(name, zone)
 			if err != nil {
-				return []string{}, err
+				return nil, err
 			}
 			for _, ig := range igs {
 				igLinks = append(igLinks, ig.SelfLink)
@@ -636,7 +636,7 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 		} else {
 			igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
 			if err != nil {
-				return []string{}, err
+				return nil, err
 			}
 			igLinks = append(igLinks, igLink)
 		}
