@@ -232,6 +232,7 @@ type Dependencies struct {
 	OOMAdjuster          *oom.OOMAdjuster
 	OSInterface          kubecontainer.OSInterface
 	PodConfig            *config.PodConfig
+	ProbeManager         prober.Manager
 	Recorder             record.EventRecorder
 	Subpather            subpath.Interface
 	VolumePlugins        []volume.VolumePlugin
@@ -731,13 +732,17 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
-	klet.probeManager = prober.NewManager(
-		klet.statusManager,
-		klet.livenessManager,
-		klet.readinessManager,
-		klet.startupManager,
-		klet.runner,
-		kubeDeps.Recorder)
+	if kubeDeps.ProbeManager != nil {
+		klet.probeManager = kubeDeps.ProbeManager
+	} else {
+		klet.probeManager = prober.NewManager(
+			klet.statusManager,
+			klet.livenessManager,
+			klet.readinessManager,
+			klet.startupManager,
+			klet.runner,
+			kubeDeps.Recorder)
+	}
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 

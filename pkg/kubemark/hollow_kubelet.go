@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
@@ -103,6 +104,7 @@ func NewHollowKubelet(
 	d := &kubelet.Dependencies{
 		KubeClient:           client,
 		HeartbeatClient:      heartbeatClient,
+		ProbeManager:         probetest.FakeManager{},
 		RemoteRuntimeService: runtimeService,
 		RemoteImageService:   imageService,
 		CAdvisorInterface:    cadvisorInterface,
