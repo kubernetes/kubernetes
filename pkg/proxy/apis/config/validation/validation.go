@@ -102,6 +102,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
+	allErrs = append(allErrs, validateInterfacePrefix(config.InterfacePrefix, newPath.Child("InterfacePrefix"))...)
 
 	return allErrs
 }
@@ -315,5 +316,14 @@ func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field
 		allErrs = append(allErrs, field.Invalid(fldPath, version, e.Error()))
 	}
 
+	return allErrs
+}
+
+func validateInterfacePrefix(interfacePrefix string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	const maxIfNameSize = 16 // linux/if.h
+	if len(interfacePrefix)+1 > maxIfNameSize {
+		allErrs = append(allErrs, field.Invalid(fldPath, interfacePrefix, "must be less than 16 bytes long"))
+	}
 	return allErrs
 }

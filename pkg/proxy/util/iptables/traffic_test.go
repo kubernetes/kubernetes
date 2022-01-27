@@ -177,11 +177,11 @@ func TestNewDetectLocalByInterface(t *testing.T) {
 			errExpected: false,
 		},
 		{
-			ifaceName:   "2002::1234:abcd:ffff:c0a8:101/64",
-			errExpected: true,
+			ifaceName:   "crb0",
+			errExpected: false,
 		},
 		{
-			ifaceName:   "crb0",
+			ifaceName:   "azv", // Azure CNI
 			errExpected: false,
 		},
 		{

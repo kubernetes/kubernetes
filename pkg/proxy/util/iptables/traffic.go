@@ -98,9 +98,8 @@ type detectLocalByInterface struct {
 // NewDetectLocalByInterface implements the LocalTrafficDetector interface using an interface or a bridge.
 // This can be used when a pod interface name/prefix can be used to capture the notion of local traffic.
 func NewDetectLocalByInterface(ifaceName string) (LocalTrafficDetector, error) {
-	maxIfNameSize := 16 // linux/if.h
-	if len(ifaceName)+1 > maxIfNameSize || ifaceName == "" {
-		return nil, fmt.Errorf("invalid interface name")
+	if ifaceName == "" {
+		return nil, fmt.Errorf("no interface set")
 	}
 	return &detectLocalByInterface{ifaceName: ifaceName}, nil
 }

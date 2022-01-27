@@ -471,8 +471,14 @@ func Test_getLocalDetector(t *testing.T) {
 		{
 			mode:        proxyconfigapi.LocalModeInterface,
 			config:      &proxyconfigapi.KubeProxyConfiguration{InterfacePrefix: "1234567890123456789"},
-			expected:    nil,
-			errExpected: true,
+			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByInterface("1234567890123456789")),
+			errExpected: false,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeInterface,
+			config:      &proxyconfigapi.KubeProxyConfiguration{InterfacePrefix: "azv"}, // Azure CNI
+			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByInterface("azv")),
+			errExpected: false,
 		},
 	}
 	for i, c := range cases {

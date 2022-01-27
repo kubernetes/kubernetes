@@ -175,6 +175,27 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
+		{
+			BindAddress:        "10.10.12.11",
+			HealthzBindAddress: "0.0.0.0:12345",
+			MetricsBindAddress: "127.0.0.1:10249",
+			ClusterCIDR:        "192.168.59.0/24",
+			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore:            pointer.Int32Ptr(1),
+				Min:                   pointer.Int32Ptr(1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+			DetectLocalMode: kubeproxyconfig.LocalModeInterface,
+			InterfacePrefix: "abc",
+		},
 	}
 
 	for _, successCase := range successCases {
@@ -365,6 +386,30 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 0}, "must be greater than 0")},
+		},
+		"interfacePrefix is too long": {
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "10.10.12.11",
+				HealthzBindAddress: "0.0.0.0:12345",
+				MetricsBindAddress: "127.0.0.1:10249",
+				ClusterCIDR:        "192.168.59.0/24",
+				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            pointer.Int32Ptr(1),
+					Min:                   pointer.Int32Ptr(1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+				// InterfacePrefix is too long (16 bytes)
+				InterfacePrefix: "abcdefghijklmnop",
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("InterfacePrefix"), "abcdefghijklmnop", "must be less than 16 bytes long")},
 		},
 	}
 
