@@ -34,7 +34,7 @@ const (
 	AzureFileInTreePluginName = "kubernetes.io/azure-file"
 
 	separator        = "#"
-	volumeIDTemplate = "%s#%s#%s#%s"
+	volumeIDTemplate = "%s#%s#%s#%s#%s"
 	// Parameter names defined in azure file CSI driver, refer to
 	// https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
 	shareNameField          = "sharename"
@@ -81,7 +81,7 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	if podNamespace != "" {
 		secretNamespace = podNamespace
 	}
-	volumeID := fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, volume.Name)
+	volumeID := fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, volume.Name, secretNamespace)
 
 	var (
 		pv = &v1.PersistentVolume{
@@ -129,7 +129,12 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 			resourceGroup = v
 		}
 	}
-	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, pv.ObjectMeta.Name)
+	namespace := defaultSecretNamespace
+	if azureSource.SecretNamespace != nil {
+		namespace = *azureSource.SecretNamespace
+	}
+
+	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, pv.ObjectMeta.Name, namespace)
 
 	var (
 		// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
@@ -137,17 +142,13 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 			Driver: AzureFileDriverName,
 			NodeStageSecretRef: &v1.SecretReference{
 				Name:      azureSource.SecretName,
-				Namespace: defaultSecretNamespace,
+				Namespace: namespace,
 			},
 			ReadOnly:         azureSource.ReadOnly,
 			VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
 			VolumeHandle:     volumeID,
 		}
 	)
-
-	if azureSource.SecretNamespace != nil {
-		csiSource.NodeStageSecretRef.Namespace = *azureSource.SecretNamespace
-	}
 
 	pv.Spec.PersistentVolumeSource.AzureFile = nil
 	pv.Spec.PersistentVolumeSource.CSI = csiSource
