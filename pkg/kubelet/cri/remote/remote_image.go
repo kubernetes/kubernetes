@@ -80,8 +80,8 @@ func (r *remoteImageService) useV1API() bool {
 // being upgraded, then the container runtime must also support the initially
 // selected version or the redial is expected to fail, which requires a restart
 // of kubelet.
-func (r *remoteImageService) determineAPIVersion(conn *grpc.ClientConn) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+func (r *remoteImageService) determineAPIVersion(ctx context.Context, conn *grpc.ClientConn) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	klog.V(4).InfoS("Finding the CRI API image version")
@@ -102,8 +102,8 @@ func (r *remoteImageService) determineAPIVersion(conn *grpc.ClientConn) error {
 }
 
 // ListImages lists available images.
-func (r *remoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+func (r *remoteImageService) ListImages(ctx context.Context, filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	if r.useV1API() {
@@ -137,8 +137,8 @@ func (r *remoteImageService) listImagesV1(ctx context.Context, filter *runtimeap
 }
 
 // ImageStatus returns the status of the image.
-func (r *remoteImageService) ImageStatus(image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+func (r *remoteImageService) ImageStatus(ctx context.Context, image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	// TODO: for refactoring common code blocks between the cri versions into
@@ -197,10 +197,7 @@ func (r *remoteImageService) imageStatusV1(ctx context.Context, image *runtimeap
 }
 
 // PullImage pulls an image with authentication config.
-func (r *remoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
-
+func (r *remoteImageService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	if r.useV1API() {
 		return r.pullImageV1(ctx, image, auth, podSandboxConfig)
 	}
@@ -249,10 +246,7 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 }
 
 // RemoveImage removes the image.
-func (r *remoteImageService) RemoveImage(image *runtimeapi.ImageSpec) (err error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
+func (r *remoteImageService) RemoveImage(ctx context.Context, image *runtimeapi.ImageSpec) (err error) {
 	if r.useV1API() {
 		_, err = r.imageClient.RemoveImage(ctx, &runtimeapi.RemoveImageRequest{
 			Image: image,
@@ -271,11 +265,9 @@ func (r *remoteImageService) RemoveImage(image *runtimeapi.ImageSpec) (err error
 }
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (r *remoteImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+func (r *remoteImageService) ImageFsInfo(ctx context.Context) ([]*runtimeapi.FilesystemUsage, error) {
 	// Do not set timeout, because `ImageFsInfo` takes time.
 	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
 
 	if r.useV1API() {
 		return r.imageFsInfoV1(ctx)
