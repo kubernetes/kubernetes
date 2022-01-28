@@ -52,6 +52,56 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
+			testName:      "existing endpoints satisfy, no endpointslice",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			initialState: []runtime.Object{
+				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+		},
+		{
+			testName:      "existing endpointslice satisfies, no endpoints",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			initialState: []runtime.Object{
+				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+		},
+		{
+			testName:      "existing endpoints satisfy, endpointslice is wrong",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			initialState: []runtime.Object{
+				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+			expectUpdate: []runtime.Object{
+				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+		},
+		{
+			testName:      "existing endpointslice satisfies, endpoints is wrong",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			initialState: []runtime.Object{
+				makeEndpoints("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+			expectUpdate: []runtime.Object{
+				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			},
+		},
+		{
 			testName:      "existing endpoints satisfy but too many",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",

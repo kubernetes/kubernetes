@@ -32,7 +32,7 @@ import (
 )
 
 func TestEndpointsAdapterGet(t *testing.T) {
-	endpoints1, _ := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
+	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 
 	testCases := map[string]struct {
 		expectedError     error
@@ -44,21 +44,35 @@ func TestEndpointsAdapterGet(t *testing.T) {
 		"single-existing-endpoints": {
 			expectedError:     nil,
 			expectedEndpoints: endpoints1,
+			initialState:      []runtime.Object{endpoints1, epSlice1},
+			namespaceParam:    "testing",
+			nameParam:         "foo",
+		},
+		"endpoints exists, endpointslice does not": {
+			expectedError:     nil,
+			expectedEndpoints: endpoints1,
 			initialState:      []runtime.Object{endpoints1},
+			namespaceParam:    "testing",
+			nameParam:         "foo",
+		},
+		"endpointslice exists, endpoints does not": {
+			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
+			expectedEndpoints: nil,
+			initialState:      []runtime.Object{epSlice1},
 			namespaceParam:    "testing",
 			nameParam:         "foo",
 		},
 		"wrong-namespace": {
 			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
 			expectedEndpoints: nil,
-			initialState:      []runtime.Object{endpoints1},
+			initialState:      []runtime.Object{endpoints1, epSlice1},
 			namespaceParam:    "foo",
 			nameParam:         "foo",
 		},
 		"wrong-name": {
 			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
 			expectedEndpoints: nil,
-			initialState:      []runtime.Object{endpoints1},
+			initialState:      []runtime.Object{endpoints1, epSlice1},
 			namespaceParam:    "testing",
 			nameParam:         "bar",
 		},
@@ -128,7 +142,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			namespaceParam: endpoints3.Namespace,
 			endpointsParam: endpoints3,
 		},
-		"existing-endpoint": {
+		"existing-endpoints": {
 			expectedError:  errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
 			expectedResult: nil,
 			initialState:   []runtime.Object{endpoints1, epSlice1},
@@ -137,6 +151,27 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 
 			// We expect the create to be attempted, we just also expect it to fail
 			expectCreate: []runtime.Object{endpoints1},
+		},
+		"existing-endpointslice-incorrect": {
+			// No error when we need to create the Endpoints but the correct
+			// EndpointSlice already exists
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			expectCreate:   []runtime.Object{endpoints1},
+			initialState:   []runtime.Object{epSlice1},
+			namespaceParam: endpoints1.Namespace,
+			endpointsParam: endpoints1,
+		},
+		"existing-endpointslice-correct": {
+			// No error when we need to create the Endpoints but an incorrect
+			// EndpointSlice already exists
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectCreate:   []runtime.Object{endpoints2},
+			expectUpdate:   []runtime.Object{epSlice2},
+			initialState:   []runtime.Object{epSlice1},
+			namespaceParam: endpoints2.Namespace,
+			endpointsParam: endpoints2,
 		},
 	}
 
@@ -155,7 +190,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedResult, endpoints)
 			}
 
-			err = verifyCreatesAndUpdates(client, testCase.expectCreate, nil)
+			err = verifyCreatesAndUpdates(client, testCase.expectCreate, testCase.expectUpdate)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
@@ -216,6 +251,30 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			namespaceParam: "testing",
 			endpointsParam: endpoints2,
 		},
+		"endpoints-correct-endpointslice-wrong": {
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+			initialState:   []runtime.Object{endpoints2, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints2,
+		},
+		"endpointslice-correct-endpoints-wrong": {
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2},
+			initialState:   []runtime.Object{endpoints1, epSlice2},
+			namespaceParam: "testing",
+			endpointsParam: endpoints2,
+		},
+		"wrong-endpoints": {
+			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
+			expectedResult: nil,
+			expectUpdate:   []runtime.Object{endpoints3},
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints3,
+		},
 		"missing-endpoints": {
 			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
 			expectedResult: nil,
@@ -225,6 +284,17 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 
 			// We expect the update to be attempted, we just also expect it to fail
 			expectUpdate: []runtime.Object{endpoints3},
+		},
+		"missing-endpointslice": {
+			// No error when we need to update the Endpoints but the
+			// EndpointSlice doesn't exist
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			expectUpdate:   []runtime.Object{endpoints1},
+			expectCreate:   []runtime.Object{epSlice1},
+			initialState:   []runtime.Object{endpoints2},
+			namespaceParam: "testing",
+			endpointsParam: endpoints1,
 		},
 	}
 
@@ -252,10 +322,12 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 }
 
 func generateEndpointsAndSlice(name, namespace string, ports []int, addresses []string) (*corev1.Endpoints, *discovery.EndpointSlice) {
-	objectMeta := metav1.ObjectMeta{Name: name, Namespace: namespace}
 	trueBool := true
 
-	epSlice := &discovery.EndpointSlice{ObjectMeta: objectMeta, AddressType: discovery.AddressTypeIPv4}
+	epSlice := &discovery.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Name: name, Namespace: namespace},
+		AddressType: discovery.AddressTypeIPv4,
+	}
 	epSlice.Labels = map[string]string{discovery.LabelServiceName: name}
 	subset := corev1.EndpointSubset{}
 
@@ -292,12 +364,18 @@ func generateEndpointsAndSlice(name, namespace string, ports []int, addresses []
 	}
 
 	return &corev1.Endpoints{
-		ObjectMeta: objectMeta,
-		Subsets:    []corev1.EndpointSubset{subset},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				discovery.LabelSkipMirror: "true",
+			},
+		},
+		Subsets: []corev1.EndpointSubset{subset},
 	}, epSlice
 }
 
-func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
+func TestEndpointManagerEnsureEndpointSliceFromEndpoints(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 	endpoints2, epSlice2 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
