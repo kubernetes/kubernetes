@@ -297,7 +297,7 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 		klog.ErrorS(nil, "Error: pod is already in the podBackoff queue", "pod", klog.KObj(pod))
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", PodAdd).Inc()
-	p.PodNominator.AddNominatedPod(pInfo.PodInfo, "")
+	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
 	p.cond.Broadcast()
 
 	return nil
@@ -351,7 +351,7 @@ func (p *PriorityQueue) activate(pod *v1.Pod) bool {
 	p.unschedulableQ.delete(pod)
 	p.podBackoffQ.Delete(pInfo)
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", ForceActivate).Inc()
-	p.PodNominator.AddNominatedPod(pInfo.PodInfo, "")
+	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
 	return true
 }
 
@@ -403,7 +403,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", ScheduleAttemptFailure).Inc()
 	}
 
-	p.PodNominator.AddNominatedPod(pInfo.PodInfo, "")
+	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
 	return nil
 }
 
@@ -546,7 +546,7 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 	if err := p.activeQ.Add(pInfo); err != nil {
 		return err
 	}
-	p.PodNominator.AddNominatedPod(pInfo.PodInfo, "")
+	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
 	p.cond.Broadcast()
 	return nil
 }
@@ -692,9 +692,9 @@ func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
 // This is called during the preemption process after a node is nominated to run
 // the pod. We update the structure before sending a request to update the pod
 // object to avoid races with the following scheduling cycles.
-func (npm *nominator) AddNominatedPod(pi *framework.PodInfo, nodeName string) {
+func (npm *nominator) AddNominatedPod(pi *framework.PodInfo, nominatingInfo *framework.NominatingInfo) {
 	npm.Lock()
-	npm.add(pi, nodeName)
+	npm.add(pi, nominatingInfo)
 	npm.Unlock()
 }
 
@@ -831,17 +831,19 @@ type nominator struct {
 	sync.RWMutex
 }
 
-func (npm *nominator) add(pi *framework.PodInfo, nodeName string) {
-	// always delete the pod if it already exist, to ensure we never store more than
+func (npm *nominator) add(pi *framework.PodInfo, nominatingInfo *framework.NominatingInfo) {
+	// Always delete the pod if it already exists, to ensure we never store more than
 	// one instance of the pod.
 	npm.delete(pi.Pod)
 
-	nnn := nodeName
-	if len(nnn) == 0 {
-		nnn = NominatedNodeName(pi.Pod)
-		if len(nnn) == 0 {
+	var nodeName string
+	if nominatingInfo.Mode() == framework.ModeOverride {
+		nodeName = nominatingInfo.NominatedNodeName
+	} else if nominatingInfo.Mode() == framework.ModeNoop {
+		if pi.Pod.Status.NominatedNodeName == "" {
 			return
 		}
+		nodeName = pi.Pod.Status.NominatedNodeName
 	}
 
 	if npm.podLister != nil {
@@ -852,14 +854,14 @@ func (npm *nominator) add(pi *framework.PodInfo, nodeName string) {
 		}
 	}
 
-	npm.nominatedPodToNode[pi.Pod.UID] = nnn
-	for _, npi := range npm.nominatedPods[nnn] {
+	npm.nominatedPodToNode[pi.Pod.UID] = nodeName
+	for _, npi := range npm.nominatedPods[nodeName] {
 		if npi.Pod.UID == pi.Pod.UID {
 			klog.V(4).InfoS("Pod already exists in the nominator", "pod", klog.KObj(npi.Pod))
 			return
 		}
 	}
-	npm.nominatedPods[nnn] = append(npm.nominatedPods[nnn], pi)
+	npm.nominatedPods[nodeName] = append(npm.nominatedPods[nodeName], pi)
 }
 
 func (npm *nominator) delete(p *v1.Pod) {
@@ -886,7 +888,7 @@ func (npm *nominator) UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *framework.P
 	// In some cases, an Update event with no "NominatedNode" present is received right
 	// after a node("NominatedNode") is reserved for this pod in memory.
 	// In this case, we need to keep reserving the NominatedNode when updating the pod pointer.
-	nodeName := ""
+	var nominatingInfo *framework.NominatingInfo
 	// We won't fall into below `if` block if the Update event represents:
 	// (1) NominatedNode info is added
 	// (2) NominatedNode info is updated
@@ -894,13 +896,16 @@ func (npm *nominator) UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *framework.P
 	if NominatedNodeName(oldPod) == "" && NominatedNodeName(newPodInfo.Pod) == "" {
 		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok {
 			// This is the only case we should continue reserving the NominatedNode
-			nodeName = nnn
+			nominatingInfo = &framework.NominatingInfo{
+				NominatingMode:    framework.ModeOverride,
+				NominatedNodeName: nnn,
+			}
 		}
 	}
 	// We update irrespective of the nominatedNodeName changed or not, to ensure
 	// that pod pointer is updated.
 	npm.delete(oldPod)
-	npm.add(newPodInfo, nodeName)
+	npm.add(newPodInfo, nominatingInfo)
 }
 
 // NewPodNominator creates a nominator as a backing of framework.PodNominator.

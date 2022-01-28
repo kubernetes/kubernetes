@@ -88,7 +88,8 @@ func TestPrune(t *testing.T) {
      "unspecified": "bar",
      "unspecifiedObject": {"unspecified": "bar"},
      "pruning": {"unspecified": "bar"},
-     "preserving": {"unspecified": "bar"}
+     "preserving": {"unspecified": "bar"},
+     "preservingUnknownType": [{"foo":true},{"bar":true}]
   },
   "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields": {
      "foo": {
@@ -127,6 +128,10 @@ func TestPrune(t *testing.T) {
 					Properties: map[string]structuralschema.Structural{
 						"preserving": {
 							Generic:    structuralschema.Generic{Type: "object"},
+							Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
+						},
+						"preservingUnknownType": {
+							Generic:    structuralschema.Generic{Type: ""},
 							Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
 						},
 						"pruning": {
@@ -177,7 +182,8 @@ func TestPrune(t *testing.T) {
      "unspecified": "bar",
      "unspecifiedObject": {"unspecified": "bar"},
      "pruning": {},
-     "preserving": {"unspecified": "bar"}
+     "preserving": {"unspecified": "bar"},
+     "preservingUnknownType": [{"foo":true},{"bar":true}]
   },
   "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields": {
      "foo": {

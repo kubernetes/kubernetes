@@ -255,7 +255,6 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 
 	for nsn, count := range newEndpoints {
 		if hcs.services[nsn] == nil {
-			klog.V(3).InfoS("Not saving endpoints for unknown healthcheck", "service", nsn)
 			continue
 		}
 		klog.V(3).InfoS("Reporting endpoints for healthcheck", "endpointCount", count, "service", nsn)

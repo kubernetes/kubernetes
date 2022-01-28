@@ -21,6 +21,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -932,98 +933,211 @@ func TestPreemptionRaces(t *testing.T) {
 	}
 }
 
-// TestNominatedNodeCleanUp checks that when there are nominated pods on a
-// node and a higher priority pod is nominated to run on the node, the nominated
-// node name of the lower priority pods is cleared.
-// Test scenario:
-// 1. Create a few low priority pods with long grade period that fill up a node.
-// 2. Create a medium priority pod that preempt some of those pods.
-// 3. Check that nominated node name of the medium priority pod is set.
-// 4. Create a high priority pod that preempts some pods on that node.
-// 5. Check that nominated node name of the high priority pod is set and nominated
-//    node name of the medium priority pod is cleared.
+const (
+	alwaysFailPlugin = "alwaysFailPlugin"
+	doNotFailMe      = "do-not-fail-me"
+)
+
+// A fake plugin implements PreBind extension point.
+// It always fails with an Unschedulable status, unless the pod contains a `doNotFailMe` string.
+type alwaysFail struct{}
+
+func (af *alwaysFail) Name() string {
+	return alwaysFailPlugin
+}
+
+func (af *alwaysFail) PreBind(_ context.Context, _ *framework.CycleState, p *v1.Pod, _ string) *framework.Status {
+	if strings.Contains(p.Name, doNotFailMe) {
+		return nil
+	}
+	return framework.NewStatus(framework.Unschedulable)
+}
+
+func newAlwaysFail(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return &alwaysFail{}, nil
+}
+
+// TestNominatedNodeCleanUp verifies if a pod's nominatedNodeName is set and unset
+// properly in different scenarios.
 func TestNominatedNodeCleanUp(t *testing.T) {
-	// Initialize scheduler.
-	testCtx := initTest(t, "preemption")
-	defer testutils.CleanupTest(t, testCtx)
+	tests := []struct {
+		name         string
+		nodeCapacity map[v1.ResourceName]string
+		// A slice of pods to be created in batch.
+		podsToCreate [][]*v1.Pod
+		// Each postCheck function is run after each batch of pods' creation.
+		postChecks []func(cs clientset.Interface, pod *v1.Pod) error
+		// Delete the fake node or not. Optional.
+		deleteNode bool
+		// Pods to be deleted. Optional.
+		podNamesToDelete []string
 
-	cs := testCtx.ClientSet
-
-	defer cleanupPodsInNamespace(cs, t, testCtx.NS.Name)
-
-	// Create a node with some resources
-	nodeRes := map[v1.ResourceName]string{
-		v1.ResourcePods:   "32",
-		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
-	}
-	_, err := createNode(testCtx.ClientSet, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
-	if err != nil {
-		t.Fatalf("Error creating nodes: %v", err)
-	}
-
-	// Step 1. Create a few low priority pods.
-	lowPriPods := make([]*v1.Pod, 4)
-	for i := 0; i < len(lowPriPods); i++ {
-		lowPriPods[i], err = createPausePod(cs, mkPriorityPodWithGrace(testCtx, fmt.Sprintf("lpod-%v", i), lowPriority, 60))
-		if err != nil {
-			t.Fatalf("Error creating pause pod: %v", err)
-		}
-	}
-	// make sure that the pods are all scheduled.
-	for _, p := range lowPriPods {
-		if err := testutils.WaitForPodToSchedule(cs, p); err != nil {
-			t.Fatalf("Pod %v/%v didn't get scheduled: %v", p.Namespace, p.Name, err)
-		}
-	}
-	// Step 2. Create a medium priority pod.
-	podConf := initPausePod(&pausePodConfig{
-		Name:      "medium-priority",
-		Namespace: testCtx.NS.Name,
-		Priority:  &mediumPriority,
-		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI)},
+		// Register dummy plugin to simulate particular scheduling failures. Optional.
+		customPlugins     *v1beta3.Plugins
+		outOfTreeRegistry frameworkruntime.Registry
+	}{
+		{
+			name:         "mid-priority pod preempts low-priority pod, followed by a high-priority pod with another preemption",
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "5"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low-1").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+					st.MakePod().Name("low-2").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+					st.MakePod().Name("low-3").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+					st.MakePod().Name("low-4").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+				},
+				{
+					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
+				},
+			},
+			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				waitForNominatedNodeName,
+				waitForNominatedNodeName,
+			},
 		},
-	})
-	medPriPod, err := createPausePod(cs, podConf)
-	if err != nil {
-		t.Errorf("Error while creating the medium priority pod: %v", err)
-	}
-	// Step 3. Check if .status.nominatedNodeName of the medium priority pod is set.
-	if err := waitForNominatedNodeName(cs, medPriPod); err != nil {
-		t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", medPriPod.Namespace, medPriPod.Name, err)
-	}
-	// Step 4. Create a high priority pod.
-	podConf = initPausePod(&pausePodConfig{
-		Name:      "high-priority",
-		Namespace: testCtx.NS.Name,
-		Priority:  &highPriority,
-		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+		{
+			name:         "mid-priority pod preempts low-priority pod, followed by a high-priority pod without additional preemption",
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "2"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+				},
+				{
+					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				waitForNominatedNodeName,
+				testutils.WaitForPodToSchedule,
+			},
+			podNamesToDelete: []string{"low"},
 		},
-	})
-	highPriPod, err := createPausePod(cs, podConf)
-	if err != nil {
-		t.Errorf("Error while creating the high priority pod: %v", err)
+		{
+			name:         "mid-priority pod preempts low-priority pod, followed by a node deletion",
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "1"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				waitForNominatedNodeName,
+			},
+			// Delete the node to simulate an ErrNoNodesAvailable error.
+			deleteNode:       true,
+			podNamesToDelete: []string{"low"},
+		},
+		{
+			name:         "mid-priority pod preempts low-priority pod, but failed the scheduling unexpectedly",
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "1"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name(fmt.Sprintf("low-%v", doNotFailMe)).Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				waitForNominatedNodeName,
+			},
+			podNamesToDelete: []string{fmt.Sprintf("low-%v", doNotFailMe)},
+			customPlugins: &v1beta3.Plugins{
+				PreBind: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: alwaysFailPlugin},
+					},
+				},
+			},
+			outOfTreeRegistry: frameworkruntime.Registry{alwaysFailPlugin: newAlwaysFail},
+		},
 	}
-	// Step 5. Check if .status.nominatedNodeName of the high priority pod is set.
-	if err := waitForNominatedNodeName(cs, highPriPod); err != nil {
-		t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", highPriPod.Namespace, highPriPod.Name, err)
-	}
-	// And .status.nominatedNodeName of the medium priority pod is cleared.
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		pod, err := cs.CoreV1().Pods(medPriPod.Namespace).Get(context.TODO(), medPriPod.Name, metav1.GetOptions{})
-		if err != nil {
-			t.Errorf("Error getting the medium priority pod info: %v", err)
-		}
-		if len(pod.Status.NominatedNodeName) == 0 {
-			return true, nil
-		}
-		return false, err
-	}); err != nil {
-		t.Errorf(".status.nominatedNodeName of the medium priority pod was not cleared: %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+				Profiles: []v1beta3.KubeSchedulerProfile{{
+					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+					Plugins:       tt.customPlugins,
+				}},
+			})
+			testCtx := initTest(
+				t,
+				"preemption",
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(tt.outOfTreeRegistry),
+			)
+			t.Cleanup(func() {
+				testutils.CleanupTest(t, testCtx)
+			})
+
+			cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			// Create a node with the specified capacity.
+			nodeName := "fake-node"
+			if _, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(tt.nodeCapacity).Obj()); err != nil {
+				t.Fatalf("Error creating node %v: %v", nodeName, err)
+			}
+
+			// Create pods and run post check if necessary.
+			for i, pods := range tt.podsToCreate {
+				for _, p := range pods {
+					p.Namespace = ns
+					if _, err := createPausePod(cs, p); err != nil {
+						t.Fatalf("Error creating pod %v: %v", p.Name, err)
+					}
+				}
+				// If necessary, run the post check function.
+				if len(tt.postChecks) > i && tt.postChecks[i] != nil {
+					for _, p := range pods {
+						if err := tt.postChecks[i](cs, p); err != nil {
+							t.Fatalf("Pod %v didn't pass the postChecks[%v]: %v", p.Name, i, err)
+						}
+					}
+				}
+			}
+
+			// Delete the node if necessary.
+			if tt.deleteNode {
+				if err := cs.CoreV1().Nodes().Delete(context.TODO(), nodeName, *metav1.NewDeleteOptions(0)); err != nil {
+					t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
+				}
+			}
+
+			// Force deleting the terminating pods if necessary.
+			// This is required if we demand to delete terminating Pods physically.
+			for _, podName := range tt.podNamesToDelete {
+				if err := deletePod(cs, podName, ns); err != nil {
+					t.Fatalf("Pod %v cannot be deleted: %v", podName, err)
+				}
+			}
+
+			// Verify if .status.nominatedNodeName is cleared.
+			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				pod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), "medium", metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("Error getting the medium pod: %v", err)
+				}
+				if len(pod.Status.NominatedNodeName) == 0 {
+					return true, nil
+				}
+				return false, err
+			}); err != nil {
+				t.Errorf(".status.nominatedNodeName of the medium pod was not cleared: %v", err)
+			}
+		})
 	}
 }
 
@@ -1344,7 +1458,7 @@ func TestPreferNominatedNode(t *testing.T) {
 		nodeNames    []string
 		existingPods []*v1.Pod
 		pod          *v1.Pod
-		runnningNode string
+		runningNode  string
 	}{
 		{
 			name:      "nominated node released all resource, preemptor is scheduled to the nominated node",
@@ -1365,7 +1479,7 @@ func TestPreferNominatedNode(t *testing.T) {
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
 			}),
-			runnningNode: "node-1",
+			runningNode: "node-1",
 		},
 		{
 			name:      "nominated node cannot pass all the filters, preemptor should find a different node",
@@ -1386,7 +1500,7 @@ func TestPreferNominatedNode(t *testing.T) {
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
 			}),
-			runnningNode: "node-2",
+			runningNode: "node-2",
 		},
 	}
 
@@ -1435,8 +1549,8 @@ func TestPreferNominatedNode(t *testing.T) {
 				t.Errorf("Cannot schedule Pod %v/%v, error: %v", test.pod.Namespace, test.pod.Name, err)
 			}
 			// Make sure the pod has been scheduled to the right node.
-			if preemptor.Spec.NodeName != test.runnningNode {
-				t.Errorf("Expect pod running on %v, got %v.", test.runnningNode, preemptor.Spec.NodeName)
+			if preemptor.Spec.NodeName != test.runningNode {
+				t.Errorf("Expect pod running on %v, got %v.", test.runningNode, preemptor.Spec.NodeName)
 			}
 		})
 	}
