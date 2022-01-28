@@ -385,7 +385,7 @@ func TestSetConfigExecEnvNew(t *testing.T) {
 					Env: []clientcmdapi.ExecEnvVar{
 						{
 							Name:  "test",
-							Value: "value",
+							Value: "val1",
 						},
 					},
 				},
@@ -402,10 +402,10 @@ func TestSetConfigExecEnvNew(t *testing.T) {
 	}
 	expectedConfig.Extensions = map[string]runtime.Object{}
 	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.env.test to value",
+		description:    "Testing for kubectl config set users.foo.exec.env.name.test to value:val1",
 		config:         conf,
-		args:           []string{"users.foo.exec.env.test", "value"},
-		expected:       `Property "users.foo.exec.env.test" set.` + "\n",
+		args:           []string{"users.foo.exec.env.name.test", "value:val1"},
+		expected:       `Property "users.foo.exec.env.name.test" set.` + "\n",
 		expectedConfig: expectedConfig,
 	}
 	test.run(t)
@@ -458,10 +458,10 @@ func TestSetConfigExecEnvUpdate(t *testing.T) {
 	}
 	expectedConfig.Extensions = map[string]runtime.Object{}
 	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.env.test to value2",
+		description:    "Testing for kubectl config set users.foo.exec.env.name.test to value:value2",
 		config:         conf,
-		args:           []string{"users.foo.exec.env.test", "value2"},
-		expected:       `Property "users.foo.exec.env.test" set.` + "\n",
+		args:           []string{"users.foo.exec.env.name.test", "value:value2"},
+		expected:       `Property "users.foo.exec.env.name.test" set.` + "\n",
 		expectedConfig: expectedConfig,
 	}
 	test.run(t)
