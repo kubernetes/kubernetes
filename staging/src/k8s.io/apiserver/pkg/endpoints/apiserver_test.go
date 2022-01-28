@@ -4400,19 +4400,45 @@ func TestFieldValidation(t *testing.T) {
 	strictDecodingErr := `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
 	strictDecodingWarns := []string{`duplicate field "other"`, `unknown field "unknown"`}
 	strictDecodingErrYAML := `strict decoding error: yaml: unmarshal errors:\n  line 6: key \"other\" already set in map, unknown field \"unknown\"`
+	strictDecodingWarnsYAML := []string{`line 6: key "other" already set in map`, `unknown field "unknown"`}
+	strictDecodingErrYAMLPut := `strict decoding error: yaml: unmarshal errors:\n  line 7: key \"other\" already set in map, unknown field \"unknown\"`
+	strictDecodingWarnsYAMLPut := []string{`line 7: key "other" already set in map`, `unknown field "unknown"`}
 	strictFieldValidation := "?fieldValidation=Strict"
 	warnFieldValidation := "?fieldValidation=Warn"
 	ignoreFieldValidation := "?fieldValidation=Ignore"
 
-	invalidJSONData := []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
-	invalidYAML := `apiVersion: test.group/version
+	invalidJSONDataPost := []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+	invalidYAMLDataPost := []byte(`apiVersion: test.group/version
 kind: Simple
 metadata:
   creationTimestamp: null
 other: foo
 other: bar
-unknown: baz`
-	invalidYAMLData := []byte(invalidYAML)
+unknown: baz`)
+
+	invalidJSONDataPut := []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id", "creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+	invalidYAMLDataPut := []byte(`apiVersion: test.group/version
+kind: Simple
+metadata:
+  name: id
+  creationTimestamp: null
+other: foo
+other: bar
+unknown: baz`)
+
+	invalidMergePatch := []byte(`{"labels":{"foo":"bar"}, "unknown": "foo", "other": "foo", "other": "bar"}`)
+	invalidJSONPatch := []byte(`
+[
+	{"op": "add", "path": "/unknown", "value": "foo"},
+	{"op": "add", "path": "/other", "value": "foo"},
+	{"op": "add", "path": "/other", "value": "bar"}
+	]
+	`)
+	// note: duplicate fields in the patch itself
+	// are dropped by the
+	// evanphx/json-patch library and is expected.
+	jsonPatchStrictDecodingErr := `strict decoding error: unknown field \"unknown\"`
+	jsonPatchStrictDecodingWarns := []string{`unknown field "unknown"`}
 
 	tests := []struct {
 		name               string
@@ -4425,10 +4451,37 @@ unknown: baz`
 		expectedWarns      []string
 		expectedStatusCode int
 	}{
-		{name: "post-unknown-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONData, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
-		{name: "post-unknown-warn-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONData, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarns},
-		{name: "post-unknown-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONData, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
-		{name: "post-unknown-strict-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLData, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAML},
+		// Create
+		{name: "post-unknown-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
+		{name: "post-unknown-warn-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarns},
+		{name: "post-unknown-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
+
+		{name: "post-unknown-strict-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAML},
+		{name: "post-unknown-warn-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarnsYAML},
+		{name: "post-unknown-ignore-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+
+		// Update
+		{name: "put-unknown-strict-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
+		{name: "put-unknown-warn-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: warnFieldValidation, expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+		{name: "put-unknown-ignore-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusOK},
+
+		{name: "put-unknown-strict-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAMLPut},
+		{name: "put-unknown-warn-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarnsYAMLPut},
+		{name: "put-unknown-ignore-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+
+		// MergePatch
+		{name: "merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: strictFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
+		{name: "merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: warnFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+		{name: "merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: ignoreFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+
+		// JSON Patch
+		{name: "json-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: strictFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: jsonPatchStrictDecodingErr},
+		{name: "json-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: warnFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: jsonPatchStrictDecodingWarns},
+		{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+
+		// SMP
+		// Apply (Create)
+		// Apply (Update)
 	}
 
 	server := httptest.NewServer(handleWithWarnings(map[string]rest.Storage{
