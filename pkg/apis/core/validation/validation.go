@@ -3323,8 +3323,8 @@ func validateTaintEffect(effect *core.TaintEffect, allowEmpty bool, fldPath *fie
 	return allErrors
 }
 
-// validateOnlyAddedTolerations validates updated pod tolerations.
-func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldTolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
+// ValidateOnlyAddedTolerations validates updated pod tolerations. For k8s-operator developers, it can validate Tolerations embedded inside operators CRDs
+func ValidateOnlyAddedTolerations(newTolerations []core.Toleration, oldTolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, old := range oldTolerations {
 		found := false
@@ -4328,7 +4328,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Allow only additions to tolerations updates.
-	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
+	allErrs = append(allErrs, ValidateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
 
 	// the last thing to check is pod spec equality.  If the pod specs are equal, then we can simply return the errors we have
 	// so far and save the cost of a deep copy.
