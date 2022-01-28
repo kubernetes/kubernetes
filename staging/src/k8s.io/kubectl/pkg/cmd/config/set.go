@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -191,26 +193,76 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 	case reflect.Slice:
 		if steps.moreStepsRemaining() {
-			return fmt.Errorf("can't have more steps after bytes. %v", steps)
-		}
-		innerKind := actualCurrValue.Type().Elem().Kind()
-		if innerKind != reflect.Uint8 {
-			return fmt.Errorf("unrecognized slice type. %v", innerKind)
-		}
-
-		if unset {
-			actualCurrValue.Set(reflect.Zero(actualCurrValue.Type()))
-			return nil
+			return fmt.Errorf("can't have more steps after slice. %v", steps)
 		}
 
 		if setRawBytes {
 			actualCurrValue.SetBytes([]byte(propertyValue))
 		} else {
-			val, err := base64.StdEncoding.DecodeString(propertyValue)
-			if err != nil {
-				return fmt.Errorf("error decoding input value: %v", err)
+			innerKind := actualCurrValue.Type().Elem().Kind()
+			if innerKind == reflect.String {
+				currentSliceValue := actualCurrValue.Interface().([]string)
+				newSliceValue := editStringSlice(currentSliceValue, propertyValue)
+				actualCurrValue.Set(reflect.ValueOf(newSliceValue))
+			} else if innerKind == reflect.Struct {
+				// The only struct slices we should be getting into here are ExecEnvVars
+				structName := currStep.stepValue
+
+				// If the existing env var config is empty set it and we aren't unsetting create the new value and return
+				if actualCurrValue.IsNil() && !unset {
+					newSlice := reflect.MakeSlice(reflect.TypeOf([]clientcmdapi.ExecEnvVar{}), 1, 1)
+					newStructValue := newSlice.Index(0)
+					newStructValue.Set(reflect.ValueOf(clientcmdapi.ExecEnvVar{
+						Name:  structName,
+						Value: propertyValue,
+					}))
+					actualCurrValue.Set(newSlice)
+					return nil
+				}
+
+				// Find the ExecEnvVar by name, stop if can't find and we're trying to unset because nothing needs to happen
+				existingStructIndex := getExecConfigEnvByName(actualCurrValue, structName)
+				if existingStructIndex < 0 && unset {
+					return nil
+				}
+
+				// If we found the array index and we're unsetting then unset and return
+				if existingStructIndex >= 0 && unset {
+					maxSliceIndex := actualCurrValue.Len()
+					firstSlice := actualCurrValue.Slice(0, existingStructIndex)
+					secondSlice := actualCurrValue.Slice(existingStructIndex+1, maxSliceIndex)
+					for i := 0; i < secondSlice.Len(); i++ {
+						firstSlice = reflect.Append(firstSlice, secondSlice.Index(i))
+					}
+					actualCurrValue.Set(firstSlice)
+					return nil
+				}
+
+				// If key exists set new value, else create new ExecEnvVar struct with specified values, else create new key/value
+				if existingStructIndex >= 0 {
+					existingStructVal := actualCurrValue.Index(existingStructIndex)
+					existingStructVal.Set(reflect.ValueOf(clientcmdapi.ExecEnvVar{
+						Name:  structName,
+						Value: propertyValue,
+					}))
+					return nil
+				} else {
+					newSlice := reflect.MakeSlice(reflect.TypeOf([]clientcmdapi.ExecEnvVar{}), 1, 1)
+					newStructValue := newSlice.Index(0)
+					newStructValue.Set(reflect.ValueOf(clientcmdapi.ExecEnvVar{
+						Name:  structName,
+						Value: propertyValue,
+					}))
+					actualCurrValue.Set(reflect.Append(actualCurrValue, newStructValue))
+					return nil
+				}
+			} else {
+				val, err := base64.StdEncoding.DecodeString(propertyValue)
+				if err != nil {
+					return fmt.Errorf("error decoding input value: %v", err)
+				}
+				actualCurrValue.SetBytes(val)
 			}
-			actualCurrValue.SetBytes(val)
 		}
 		return nil
 
@@ -255,7 +307,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			}
 		}
 
-		return fmt.Errorf("unable to locate path %#v under %v", currStep, actualCurrValue)
+		return fmt.Errorf("unable to locate path %v", currStep.stepValue)
 
 	case reflect.Ptr:
 		newActualCurrValue := actualCurrValue.Elem()
@@ -273,4 +325,74 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 	}
 
 	panic(fmt.Errorf("unrecognized type: %v\nwanted: %v", actualCurrValue, actualCurrValue.Kind()))
+}
+
+// getExecConfigEnvByName returns the value
+func getExecConfigEnvByName(v reflect.Value, name string) int {
+	if v.Type() != reflect.SliceOf(reflect.TypeOf(clientcmdapi.ExecEnvVar{})) {
+		return -1
+	}
+
+	// Pull slice value out of value object
+	slice, ok := v.Interface().([]clientcmdapi.ExecEnvVar)
+	if !ok {
+		return -1
+	}
+
+	// Iterate through slice of ExecEnvVars and check for a matching Name key, return when found
+	for i, envVar := range slice {
+		if envVar.Name == name {
+			return i
+		}
+	}
+
+	// If we never find the Name key return false
+	return -1
+}
+
+func dedupeStringSlice(slice []string) []string {
+	sliceMap := make(map[string]struct{})
+	for i := 0; i < len(slice); i++ {
+		sliceMap[slice[i]] = struct{}{}
+	}
+	var dedupeSlice []string
+	for k := range sliceMap {
+		dedupeSlice = append(dedupeSlice, k)
+	}
+	sort.Strings(dedupeSlice)
+	return dedupeSlice
+}
+
+func editStringSlice(slice []string, input string) []string {
+	function := string(input[len(input)-1])
+	switch function {
+	case "-":
+		// Remove an argument
+		// Remove last character defining function type
+		input = string(input[:len(input)-1])
+		argSlice := strings.Split(input, ",")
+
+		for _, arg := range argSlice {
+			for j, existingArgs := range slice {
+				if existingArgs == arg {
+					slice = append(slice[:j], slice[j+1:]...)
+					break
+				}
+			}
+		}
+
+		return slice
+
+	case "+":
+		// Add new argument
+		// Remove last character defining function type
+		input = string(input[:len(input)-1])
+		argSlice := strings.Split(input, ",")
+		slice = append(slice, argSlice...)
+		return dedupeStringSlice(slice)
+
+	default:
+		argSlice := strings.Split(input, ",")
+		return dedupeStringSlice(argSlice)
+	}
 }
