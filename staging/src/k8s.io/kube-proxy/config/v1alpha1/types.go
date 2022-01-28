@@ -167,7 +167,7 @@ type KubeProxyConfiguration struct {
 	// InterfacePrefix is a string argument which represents the interface prefix name of the pods in the node.
 	// This could be an iface prefix name where all pod interfaces start with same prefix, or a bridge name, or
 	// a single interface name. Kube-proxy considers traffic as local if originating from an interface or a
-	// bridge which matches the given prefix. This argument should be set if DetectLocateMode is set to
+	// bridge which matches the given prefix. This argument should be set if DetectLocalMode is set to
 	// LocalModeInterface.
 	InterfacePrefix string `json:"interfacePrefix"`
 }
