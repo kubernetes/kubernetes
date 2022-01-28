@@ -29,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
 	applyconfigurationseventsv1 "k8s.io/client-go/applyconfigurations/events/v1"
 	testing "k8s.io/client-go/testing"
 )
@@ -62,14 +63,19 @@ func (c *FakeEvents) List(ctx context.Context, opts v1.ListOptions) (result *eve
 	if obj == nil {
 		return nil, err
 	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
+	_, flagSet, err := storage.DefaultNamespaceScopedAttr(obj)
+	if err != nil {
+		return nil, err
+	}
+
 	list := &eventsv1.EventList{ListMeta: obj.(*eventsv1.EventList).ListMeta}
 	for _, item := range obj.(*eventsv1.EventList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if label.Matches(labels.Set(item.Labels)) || field.Matches(flagSet) {
 			list.Items = append(list.Items, item)
 		}
 	}

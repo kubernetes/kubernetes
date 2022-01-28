@@ -29,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
 	batchv1beta1 "k8s.io/client-go/applyconfigurations/batch/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
@@ -62,14 +63,19 @@ func (c *FakeCronJobs) List(ctx context.Context, opts v1.ListOptions) (result *v
 	if obj == nil {
 		return nil, err
 	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
+	_, flagSet, err := storage.DefaultNamespaceScopedAttr(obj)
+	if err != nil {
+		return nil, err
+	}
+
 	list := &v1beta1.CronJobList{ListMeta: obj.(*v1beta1.CronJobList).ListMeta}
 	for _, item := range obj.(*v1beta1.CronJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if label.Matches(labels.Set(item.Labels)) || field.Matches(flagSet) {
 			list.Items = append(list.Items, item)
 		}
 	}

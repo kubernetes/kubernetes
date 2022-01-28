@@ -27,6 +27,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
 	testing "k8s.io/client-go/testing"
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 )
@@ -57,14 +58,19 @@ func (c *FakeClusterTestTypes) List(ctx context.Context, opts v1.ListOptions) (r
 	if obj == nil {
 		return nil, err
 	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
+	_, flagSet, err := storage.DefaultClusterScopedAttr(obj)
+	if err != nil {
+		return nil, err
+	}
+
 	list := &examplev1.ClusterTestTypeList{ListMeta: obj.(*examplev1.ClusterTestTypeList).ListMeta}
 	for _, item := range obj.(*examplev1.ClusterTestTypeList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if label.Matches(labels.Set(item.Labels)) || field.Matches(flagSet) {
 			list.Items = append(list.Items, item)
 		}
 	}

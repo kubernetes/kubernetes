@@ -25,6 +25,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
 	testing "k8s.io/client-go/testing"
 	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
@@ -55,14 +56,19 @@ func (c *FakeNodeMetricses) List(ctx context.Context, opts v1.ListOptions) (resu
 	if obj == nil {
 		return nil, err
 	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
+	_, flagSet, err := storage.DefaultClusterScopedAttr(obj)
+	if err != nil {
+		return nil, err
+	}
+
 	list := &v1beta1.NodeMetricsList{ListMeta: obj.(*v1beta1.NodeMetricsList).ListMeta}
 	for _, item := range obj.(*v1beta1.NodeMetricsList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if label.Matches(labels.Set(item.Labels)) || field.Matches(flagSet) {
 			list.Items = append(list.Items, item)
 		}
 	}
