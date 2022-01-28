@@ -105,10 +105,23 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 			g.generateClientgenExtract(sw, typeParams, !typeParams.Tags.NoStatus)
 		}
 	} else {
-		sw.Do(constructor, typeParams)
+		if hasTypeMetaField(t) {
+			sw.Do(constructorWithTypeMeta, typeParams)
+		} else {
+			sw.Do(constructor, typeParams)
+		}
 	}
 	g.generateWithFuncs(t, typeParams, sw, nil)
 	return sw.Error()
+}
+
+func hasTypeMetaField(t *types.Type) bool {
+	for _, member := range t.Members {
+		if typeMeta.Name == member.Type.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func blocklisted(t *types.Type, member types.Member) bool {
@@ -303,6 +316,17 @@ var clientgenTypeConstructorNonNamespaced = `
 func $.ApplyConfig.Type|public$(name string) *$.ApplyConfig.ApplyConfiguration|public$ {
   b := &$.ApplyConfig.ApplyConfiguration|public${}
   b.WithName(name)
+  b.WithKind("$.ApplyConfig.Type|singularKind$")
+  b.WithAPIVersion("$.APIVersion$")
+  return b
+}
+`
+
+var constructorWithTypeMeta = `
+// $.ApplyConfig.ApplyConfiguration|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// apply.
+func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
+  b := &$.ApplyConfig.ApplyConfiguration|public${}
   b.WithKind("$.ApplyConfig.Type|singularKind$")
   b.WithAPIVersion("$.APIVersion$")
   return b
