@@ -309,7 +309,7 @@ replace (
 	github.com/heketi/heketi => github.com/heketi/heketi v10.3.0+incompatible
 	github.com/heketi/tests => github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6
 	github.com/ianlancetaylor/demangle => github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639
-	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.12
 	github.com/inconshreveable/mousetrap => github.com/inconshreveable/mousetrap v1.0.0
 	github.com/ishidawataru/sctp => github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.4.0

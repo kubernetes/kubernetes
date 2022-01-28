@@ -224,8 +224,8 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	// first merge all of our maps
 	mapConfig := clientcmdapi.NewConfig()
 
-	for _, kubeconfig := range kubeconfigs {
-		mergo.Merge(mapConfig, kubeconfig, mergo.WithOverride)
+	for i := len(kubeconfigs) - 1; i >= 0; i-- {
+		mergo.Merge(mapConfig, kubeconfigs[i], mergo.WithOverwriteWithEmptyValue)
 	}
 
 	// merge all of the struct values in the reverse order so that priority is given correctly
@@ -239,7 +239,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
 	// get the values we expect.
 	config := clientcmdapi.NewConfig()
-	mergo.Merge(config, mapConfig, mergo.WithOverride)
+	mergo.Merge(config, mapConfig, mergo.WithOverwriteWithEmptyValue)
 	mergo.Merge(config, nonMapConfig, mergo.WithOverride)
 
 	if rules.ResolvePaths() {
