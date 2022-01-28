@@ -959,6 +959,13 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 	results := []*ec2.Instance{}
 	var nextToken *string
 	requestTime := time.Now()
+
+	if request.MaxResults == nil && request.InstanceIds == nil {
+		// MaxResults must be set in order for pagination to work
+		// MaxResults cannot be set with InstanceIds
+		request.MaxResults = aws.Int64(1000)
+	}
+
 	for {
 		response, err := s.ec2.DescribeInstances(request)
 		if err != nil {
