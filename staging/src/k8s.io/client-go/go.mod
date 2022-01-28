@@ -5,16 +5,13 @@ module k8s.io/client-go
 go 1.16
 
 require (
-	cloud.google.com/go v0.81.0 // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18
 	github.com/Azure/go-autorest/autorest/adal v0.9.13
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.12.0+incompatible
-	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.2
-	github.com/google/btree v1.0.1 // indirect
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
@@ -24,7 +21,6 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
@@ -32,6 +28,7 @@ require (
 	google.golang.org/protobuf v1.27.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
+	k8s.io/apiserver v0.0.0
 	k8s.io/klog/v2 v2.40.1
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
 	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
@@ -42,5 +39,7 @@ require (
 replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
+	k8s.io/component-base => ../component-base
 )

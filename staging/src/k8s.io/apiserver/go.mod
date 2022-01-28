@@ -5,15 +5,12 @@ module k8s.io/apiserver
 go 1.16
 
 require (
-	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/go-openapi/jsonreference v0.19.5 // indirect
-	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
@@ -21,8 +18,7 @@ require (
 	github.com/googleapis/gnostic v0.5.5
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
-	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/pquerna/cachecontrol v0.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	go.etcd.io/etcd/api/v3 v3.5.0

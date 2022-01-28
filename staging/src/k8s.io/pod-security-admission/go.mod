@@ -5,11 +5,18 @@ module k8s.io/pod-security-admission
 go 1.16
 
 require (
+	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/go-openapi/jsonreference v0.19.5 // indirect
+	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/google/go-cmp v0.5.5
+	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
+	golang.org/x/tools v0.1.8 // indirect
+	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
@@ -21,6 +28,7 @@ require (
 )
 
 replace (
+	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

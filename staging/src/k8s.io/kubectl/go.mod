@@ -31,6 +31,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 	gopkg.in/yaml.v2 v2.4.0
+	gotest.tools/v3 v3.0.3 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/cli-runtime v0.0.0
@@ -47,8 +48,10 @@ require (
 )
 
 replace (
+	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator

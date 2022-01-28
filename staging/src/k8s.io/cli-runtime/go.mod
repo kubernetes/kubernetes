@@ -7,8 +7,6 @@ go 1.16
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.12.0+incompatible
-	github.com/go-openapi/jsonreference v0.19.5 // indirect
-	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -29,6 +27,8 @@ require (
 replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	k8s.io/component-base => ../component-base
 )
