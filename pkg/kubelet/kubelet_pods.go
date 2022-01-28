@@ -1635,12 +1635,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
 		case cs.State == kubecontainer.ContainerStateCreated:
-			// Treat containers in the "created" state as if they are exited.
-			// The pod workers are supposed start all containers it creates in
-			// one sync (syncPod) iteration. There should not be any normal
-			// "created" containers when the pod worker generates the status at
-			// the beginning of a sync iteration.
-			fallthrough
+			// containers that are created but not running are "waiting to be running"
+			status.State.Waiting = &v1.ContainerStateWaiting{}
 		case cs.State == kubecontainer.ContainerStateExited:
 			status.State.Terminated = &v1.ContainerStateTerminated{
 				ExitCode:    int32(cs.ExitCode),
