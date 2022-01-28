@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	clienttesting "k8s.io/client-go/testing"
@@ -54,6 +55,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -390,13 +392,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		},
 	}
 
-	stop := make(chan struct{})
-	defer close(stop)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-	informerFactory.Start(stop)
-	informerFactory.WaitForCacheSync(stop)
-
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
 			var gotError error
@@ -440,6 +435,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			s := &Scheduler{
 				SchedulerCache: sCache,
 				Algorithm:      item.algo,
@@ -647,15 +643,13 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	pod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
-	client := clientsetfake.NewSimpleClientset(&node)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(nodeports.Name, nodeports.New, "Filter", "PreFilter"),
 	}
-	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, queuedPodStore, scache, informerFactory, pod, &node, fns...)
+	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, queuedPodStore, scache, pod, &node, fns...)
 
 	waitPodExpireChan := make(chan struct{})
 	timeout := make(chan struct{})
@@ -714,14 +708,12 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	firstPod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
-	client := clientsetfake.NewSimpleClientset(&node)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(nodeports.Name, nodeports.New, "Filter", "PreFilter"),
 	}
-	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, queuedPodStore, scache, informerFactory, firstPod, &node, fns...)
+	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(ctx, t, queuedPodStore, scache, firstPod, &node, fns...)
 
 	// We use conflicted pod ports to incur fit predicate failure.
 	secondPod := podWithPort("bar", "", 8080)
@@ -780,12 +772,9 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
-	informerFactory informers.SharedInformerFactory, pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
+	pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 
-	scheduler, bindingChan, errChan := setupTestScheduler(ctx, queuedPodStore, scache, informerFactory, nil, fns...)
-
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	scheduler, bindingChan, errChan := setupTestScheduler(ctx, queuedPodStore, scache, nil, nil, fns...)
 
 	queuedPodStore.Add(pod)
 	// queuedPodStore: [foo:8080]
@@ -850,8 +839,6 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		nodes = append(nodes, &node)
 		objects = append(objects, &node)
 	}
-	client := clientsetfake.NewSimpleClientset(objects...)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	// Create expected failure reasons for all the nodes. Hopefully they will get rolled up into a non-spammy summary.
 	failedNodeStatues := framework.NodeToStatusMap{}
@@ -867,10 +854,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit), "Filter", "PreFilter"),
 	}
-	scheduler, _, errChan := setupTestScheduler(ctx, queuedPodStore, scache, informerFactory, nil, fns...)
-
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	scheduler, _, errChan := setupTestScheduler(ctx, queuedPodStore, scache, nil, nil, fns...)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
 	scheduler.scheduleOne(ctx)
@@ -916,6 +900,14 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, s
 		recorder = &events.FakeRecorder{}
 	}
 
+	var schedulingQueue *queue.PriorityQueue
+	if informerFactory == nil {
+		informerFactory = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
+		schedulingQueue = internalqueue.NewTestQueue(ctx, nil)
+	} else {
+		schedulingQueue = internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
+	}
+
 	fwk, _ := st.NewFramework(
 		fns,
 		testSchedulerName,
@@ -945,7 +937,7 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, s
 			testSchedulerName: fwk,
 		},
 		client:          client,
-		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+		SchedulingQueue: schedulingQueue,
 	}
 
 	return sched, bindingChan, errChan
