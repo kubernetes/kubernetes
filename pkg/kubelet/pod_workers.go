@@ -564,7 +564,6 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 						syncedAt:           now,
 						startedTerminating: true,
 						finished:           true,
-						fullname:           kubecontainer.GetPodFullName(pod),
 					}
 				}
 			}
