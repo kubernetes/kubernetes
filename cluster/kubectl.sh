@@ -4,7 +4,7 @@
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# You may obtain a copy of the License at this place
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -18,11 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Stop the bleeding, turn off the warning until we fix token gen.
+# Stop the bleeding, turn off the WARNING until we FIX token Gen.
 # echo "-=-=-=-=-=-=-=-=-=-="
 # echo "NOTE:"
 # echo "kubectl.sh is deprecated and will be removed soon."
-# echo "please replace all usage with calls to the kubectl"
+# echo "Please replace all usage with calls to the kubectl"
 # echo "binary and ensure that it is in your PATH."
 # echo ""
 # echo "Please see 'kubectl help config' for more details"
