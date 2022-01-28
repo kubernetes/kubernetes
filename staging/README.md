@@ -34,8 +34,8 @@ Repositories currently staged here:
 - [`k8s.io/sample-cli-plugin`](https://github.com/kubernetes/sample-cli-plugin)
 - [`k8s.io/sample-controller`](https://github.com/kubernetes/sample-controller)
 
-The code in the staging/ directory is authoritative, i.e. the only copy of the
-code. You can directly modify such code.
+The code in the staging/ directory is authoritative, i.e the only copy of the
+code. You can directly modify such codes.
 
 ## Using staged repositories from Kubernetes code
 
@@ -77,19 +77,19 @@ to add the list of other staging repos that this new repo can import.
 https://github.com/kubernetes/kubernetes-template-project.
 
 6. Make sure that the `.github/PULL_REQUEST_TEMPLATE.md` and
-`CONTRIBUTING.md` files mention that PRs are not directly accepted to the repo.
+`CONTRIBUTING.md` files mention that PRs are not directly accepted to the repository.
 
 ### Creating the published repository
 
 1. Create an [issue](https://github.com/kubernetes/org/issues/new?template=repo-create.md)
-in the `kubernetes/org` repo to request creation of the respective published
+in the `kubernetes/org` repository to request creation of the respective published
 repository in the Kubernetes org. The published repository **must** have an
 initial empty commit. It also needs specific access rules and branch settings.
 See [#kubernetes/org#58](https://github.com/kubernetes/org/issues/58)
 for an example.
 
 2. Setup branch protection and enable access to the `stage-bots` team
-by adding the repo in
+by adding the repository in:
 [`prow/config.yaml`](https://github.com/kubernetes/test-infra/blob/master/config/prow/config.yaml).
 See [#kubernetes/test-infra#9292](https://github.com/kubernetes/test-infra/pull/9292)
 for an example.
@@ -104,7 +104,7 @@ update the publishing-bot to publish the staging repository by updating:
     Add the staging repo in the list of repos to be published.
 
 4. Add the staging and published repositories as a subproject for the
-SIG that owns the repos in
+SIG that owns the repository in:
 [`sigs.yaml`](https://github.com/kubernetes/community/blob/master/sigs.yaml).
 
 5. Add the repo to the list of staging repos in this `README.md` file.
