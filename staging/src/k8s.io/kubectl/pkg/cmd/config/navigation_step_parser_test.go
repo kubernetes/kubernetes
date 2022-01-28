@@ -72,18 +72,6 @@ func TestParseWithBadValue(t *testing.T) {
 	test.run(t)
 }
 
-func TestParseWithNoMatchingValue(t *testing.T) {
-	test := stepParserTest{
-		path: "users.jheiss.exec.command",
-		expectedNavigationSteps: navigationSteps{
-			steps: []navigationStep{},
-		},
-		expectedError: "found exec, kubectl config set does not currently support manipulating exec settings",
-	}
-
-	test.run(t)
-}
-
 func (test stepParserTest) run(t *testing.T) {
 	actualSteps, err := newNavigationSteps(test.path)
 	if len(test.expectedError) != 0 {
