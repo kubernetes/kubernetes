@@ -18,16 +18,20 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -137,5 +141,58 @@ var _ = common.SIGDescribe("Dual Stack Host IP [Feature:PodHostIPs]", func() {
 			err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err, "failed to delete pod")
 		})
+
+		ginkgo.It("should provide hostIPs as an env var", func() {
+			podName := "downward-api-" + string(uuid.NewUUID())
+			env := []v1.EnvVar{
+				{
+					Name: "HOST_IPS",
+					ValueFrom: &v1.EnvVarSource{
+						FieldRef: &v1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  "status.hostIPs",
+						},
+					},
+				},
+			}
+
+			expectations := []string{
+				fmt.Sprintf("HOST_IPS=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
+			}
+
+			testDownwardAPI(f, podName, env, expectations)
+		})
 	})
 })
+
+func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   podName,
+			Labels: map[string]string{"name": podName},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    "dapi-container",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sh", "-c", "env"},
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("250m"),
+							v1.ResourceMemory: resource.MustParse("32Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1250m"),
+							v1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+					Env: env,
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+
+	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
+}
