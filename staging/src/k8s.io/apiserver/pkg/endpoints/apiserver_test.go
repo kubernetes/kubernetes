@@ -4440,6 +4440,8 @@ unknown: baz`)
 	jsonPatchStrictDecodingErr := `strict decoding error: unknown field \"unknown\"`
 	jsonPatchStrictDecodingWarns := []string{`unknown field "unknown"`}
 
+	invalidSMP := []byte(`{"unknown": "foo", "other":"foo", "other": "bar"}`)
+
 	tests := []struct {
 		name               string
 		path               string
@@ -4480,6 +4482,10 @@ unknown: baz`)
 		{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 
 		// SMP
+		{name: "strategic-merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: strictFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
+		{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+		{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+
 		// Apply (Create)
 		// Apply (Update)
 	}
