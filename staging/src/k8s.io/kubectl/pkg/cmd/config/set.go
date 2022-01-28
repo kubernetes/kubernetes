@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -153,7 +152,8 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 	switch actualCurrValue.Kind() {
 	case reflect.Map:
 		if !steps.moreStepsRemaining() && !unset {
-			return fmt.Errorf("can't set a map to a value: %v", actualCurrValue)
+			actualCurrValue.SetMapIndex(reflect.ValueOf(currStep.stepValue), reflect.ValueOf(propertyValue))
+			return nil
 		}
 
 		mapKey := reflect.ValueOf(currStep.stepValue)
@@ -258,76 +258,17 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 		return fmt.Errorf("unable to locate path %#v under %v", currStep, actualCurrValue)
 
 	case reflect.Ptr:
-		// Similar to the navigation step parser, because we can't easily work with the AuthProviderConfig or ExecConfig structs we work with them manually
-		switch actualCurrValue.Type() {
-		case reflect.TypeOf(&clientcmdapi.AuthProviderConfig{}):
-			// Check and see if we need to create a new auth-provider config or not
-			newActualCurrValue := actualCurrValue.Elem()
-			if actualCurrValue.IsNil() {
-				newValue := reflect.New(reflect.TypeOf(clientcmdapi.AuthProviderConfig{}))
-				actualCurrValue.Set(newValue)
-				newActualCurrValue = actualCurrValue.Elem()
-
-				if !steps.moreStepsRemaining() && unset {
-					return nil
-				}
+		newActualCurrValue := actualCurrValue.Elem()
+		if actualCurrValue.IsNil() {
+			newValue := reflect.New(actualCurrValue.Type().Elem())
+			actualCurrValue.Set(newValue)
+			newActualCurrValue = actualCurrValue.Elem()
+			if !steps.moreStepsRemaining() && unset {
+ 				return nil
 			}
-
-			switch steps.steps[steps.currentStepIndex-1].stepValue {
-			case "name":
-				// Since unsetting just the name of the auth-provider is pointless return error
-				if !steps.moreStepsRemaining() && unset {
-					return fmt.Errorf("cannot unset the name of auth-provider, must update or unset auth-provider itself")
-				}
-
-				currFieldValue := newActualCurrValue.FieldByName("Name")
-				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
-
-			case "config":
-				currFieldValue := newActualCurrValue.FieldByName("Config")
-
-				// If we're unsetting values in the config branch we need to check if there are more steps. If so, we want to continue to unset the value itself, if not we want to unset the entire config.
-				if steps.moreStepsRemaining() && unset {
-					return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
-				} else if !steps.moreStepsRemaining() && unset {
-					currFieldValue.Set(reflect.ValueOf(map[string]string{}))
-					return nil
-				}
-
-				// Assuming we're unsetting a specific config value we will need to pop the next step for the key we want to set.
-				currStep := steps.pop()
-				actualCurrValue = curr
-				mapKey := reflect.ValueOf(currStep.stepValue)
-				if currStep.stepValue == "" {
-					return fmt.Errorf("can not set config to value, must specify key, e.g. users.foo.auth-provider.config.refresh-token")
-				}
-				newMapValue := reflect.ValueOf(propertyValue)
-
-				if currFieldValue.IsNil() {
-					currFieldValue.Set(reflect.ValueOf(map[string]string{}))
-				}
-
-				currFieldValue.SetMapIndex(mapKey, newMapValue)
-
-				return nil
-
-			case "auth-provider":
-				return fmt.Errorf("can not set auth-provider, must set name or config key, e.g. users.foo.auth-provider.name or users.foo.auth-provider.config.refresh-token")
-
-			default:
-				path := []string{}
-				for _, step := range steps.steps {
-					path = append(path, step.stepValue)
-				}
-				return fmt.Errorf("unrecognized step in path %v", strings.Join(path, "."))
-			}
-
-		case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
-			return fmt.Errorf("found exec, kubectl config set does not currently support manipulating exec settings")
-
-		default:
-			return fmt.Errorf("unable to parse one or more field types of %v", actualCurrValue.Type())
 		}
+		steps.currentStepIndex = steps.currentStepIndex - 1
+		return modifyConfig(newActualCurrValue.Addr(), steps, propertyValue, unset, setRawBytes)
 
 	}
 
