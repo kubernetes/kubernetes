@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -128,20 +129,20 @@ func newApfServerWithSingleRequest(t *testing.T, decision mockDecision) *httptes
 			t.Errorf("execute should not be invoked")
 		}
 		// atomicReadOnlyExecuting can be either 0 or 1 as we test one request at a time.
-		if decision != decisionSkipFilter && atomicReadOnlyExecuting != 1 {
-			t.Errorf("Wanted %d requests executing, got %d", 1, atomicReadOnlyExecuting)
+		if want, got := int32(1), atomic.LoadInt32(&atomicReadOnlyExecuting); decision != decisionSkipFilter && want != got {
+			t.Errorf("Wanted %d requests executing, got %d", want, got)
 		}
 	}
 	postExecuteFunc := func() {}
 	// atomicReadOnlyWaiting can be either 0 or 1 as we test one request at a time.
 	postEnqueueFunc := func() {
-		if atomicReadOnlyWaiting != 1 {
-			t.Errorf("Wanted %d requests in queue, got %d", 1, atomicReadOnlyWaiting)
+		if want, got := int32(1), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 		}
 	}
 	postDequeueFunc := func() {
-		if atomicReadOnlyWaiting != 0 {
-			t.Errorf("Wanted %d requests in queue, got %d", 0, atomicReadOnlyWaiting)
+		if want, got := int32(0), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 		}
 	}
 	return newApfServerWithHooks(t, decision, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc)
@@ -179,8 +180,8 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 		}))
 		apfHandler.ServeHTTP(w, r)
 		postExecute()
-		if atomicReadOnlyExecuting != 0 {
-			t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting)
+		if want, got := int32(0), atomic.LoadInt32(&atomicReadOnlyExecuting); want != got {
+			t.Errorf("Wanted %d requests executing, got %d", want, got)
 		}
 	}), requestInfoFactory)
 
@@ -270,8 +271,8 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	onExecuteFunc := func() {
 		preStartExecute.Done()
 		preStartExecute.Wait()
-		if int(atomicReadOnlyExecuting) != concurrentRequests {
-			t.Errorf("Wanted %d requests executing, got %d", concurrentRequests, atomicReadOnlyExecuting)
+		if want, got := int32(concurrentRequests), atomic.LoadInt32(&atomicReadOnlyExecuting); want != got {
+			t.Errorf("Wanted %d requests executing, got %d", want, got)
 		}
 		postStartExecute.Done()
 		postStartExecute.Wait()
@@ -280,8 +281,8 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	postEnqueueFunc := func() {
 		preEnqueue.Done()
 		preEnqueue.Wait()
-		if int(atomicReadOnlyWaiting) != concurrentRequests {
-			t.Errorf("Wanted %d requests in queue, got %d", 1, atomicReadOnlyWaiting)
+		if want, got := int32(concurrentRequests), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 
 		}
 		postEnqueue.Done()
@@ -291,8 +292,8 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	postDequeueFunc := func() {
 		preDequeue.Done()
 		preDequeue.Wait()
-		if atomicReadOnlyWaiting != 0 {
-			t.Errorf("Wanted %d requests in queue, got %d", 0, atomicReadOnlyWaiting)
+		if want, got := int32(0), atomic.LoadInt32(&atomicReadOnlyWaiting); want != got {
+			t.Errorf("Wanted %d requests in queue, got %d", want, got)
 		}
 		postDequeue.Done()
 		postDequeue.Wait()
