@@ -1244,6 +1244,9 @@ func (test setConfigTest) run(t *testing.T) {
 		propertyName:  test.args[0],
 		propertyValue: test.args[1],
 	}
+	if len(test.args) > 2 {
+		opts.setRawBytes = 1
+	}
 
 	// Must use opts.run to get error outputs
 	err = opts.run()
