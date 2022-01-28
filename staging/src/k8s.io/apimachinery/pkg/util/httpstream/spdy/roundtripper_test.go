@@ -438,7 +438,6 @@ func (i *Interceptor) Rewrite(ctx context.Context, req *socks5.Request) (context
 
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
 func TestRoundTripSocks5AndNewConnection(t *testing.T) {
-	t.Skip("Flake https://issues.k8s.io/107708")
 	localhostPool := localhostCertPool(t)
 
 	for _, redirect := range []bool{false, true} {
@@ -568,10 +567,7 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 					if err != nil {
 						t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
 					}
-					defer func() {
-						close(closed)
-						l.Close()
-					}()
+					defer l.Close()
 
 					go func(shoulderror bool) {
 						conn, err := l.Accept()
@@ -584,6 +580,10 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 						}
 
 						if err := proxyHandler.ServeConn(conn); err != nil && !shoulderror {
+							// If the connection request is closed before the channel is closed
+							// the test will fail with a ServeConn error. Since the test only return
+							// early if expects shouldError=true, the channel is closed at the end of
+							// the test, just before all the deferred connections Close() are executed.
 							if isClosed() {
 								return
 							}
@@ -684,6 +684,9 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 							t.Fatalf("unexpected proxy user: %v", authUser)
 						}
 					}
+
+					// The channel must be closed before any of the connections are closed
+					close(closed)
 				})
 			}
 		})
