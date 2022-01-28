@@ -59,7 +59,7 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 	select {
 	case u := <-updates:
 		klog.InfoS("Processing manifest with pods", "numPods", len(u.Pods))
-		result, err := kl.runOnce(u.Pods, runOnceRetryDelay)
+		result, err := kl.runOnce(context.Background(), u.Pods, runOnceRetryDelay)
 		klog.InfoS("Finished processing pods", "numPods", len(u.Pods))
 		return result, err
 	case <-time.After(runOnceManifestDelay):

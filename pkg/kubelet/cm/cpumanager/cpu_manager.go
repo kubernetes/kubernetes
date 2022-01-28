@@ -504,6 +504,7 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
 	return m.containerRuntime.UpdateContainerResources(
+		context.TODO(),
 		containerID,
 		&runtimeapi.LinuxContainerResources{
 			CpusetCpus: cpus.String(),

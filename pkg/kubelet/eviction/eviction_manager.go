@@ -176,7 +176,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
 	thresholdHandler := func(message string) {
 		klog.InfoS(message)
-		m.synchronize(diskInfoProvider, podFunc)
+		m.synchronize(context.Background(), diskInfoProvider, podFunc)
 	}
 	if m.config.KernelMemcgNotification {
 		for _, threshold := range m.config.Thresholds {
@@ -194,7 +194,7 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 	// start the eviction manager monitoring
 	go func() {
 		for {
-			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
+			if evictedPods := m.synchronize(context.Background(), diskInfoProvider, podFunc); evictedPods != nil {
 				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjs(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {

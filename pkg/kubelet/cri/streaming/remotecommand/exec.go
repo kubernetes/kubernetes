@@ -49,7 +49,7 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 	}
 	defer ctx.conn.Close()
 
-	err := executor.ExecInContainer(podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan, 0)
+	err := executor.ExecInContainer(req.Context(), podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan, 0)
 	if err != nil {
 		if exitErr, ok := err.(utilexec.ExitError); ok && exitErr.Exited() {
 			rc := exitErr.ExitStatus()

@@ -152,11 +152,11 @@ func (h *handler) handleSummary(request *restful.Request, response *restful.Resp
 	}
 	var summary *statsapi.Summary
 	if onlyCPUAndMemory {
-		summary, err = h.summaryProvider.GetCPUAndMemoryStats()
+		summary, err = h.summaryProvider.GetCPUAndMemoryStats(request.Request.Context())
 	} else {
 		// external calls to the summary API use cached stats
 		forceStatsUpdate := false
-		summary, err = h.summaryProvider.Get(forceStatsUpdate)
+		summary, err = h.summaryProvider.Get(request.Request.Context(), forceStatsUpdate)
 	}
 	if err != nil {
 		handleError(response, "/stats/summary", err)

@@ -46,7 +46,7 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 
 func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	go func() {
-		imageRef, err := pip.imageService.PullImage(spec, pullSecrets, podSandboxConfig)
+		imageRef, err := pip.imageService.PullImage(context.Background(), spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{
 			imageRef: imageRef,
 			err:      err,
@@ -86,7 +86,7 @@ func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecret
 
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
-		imageRef, err := sip.imageService.PullImage(pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
+		imageRef, err := sip.imageService.PullImage(context.Background(), pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
 		pullRequest.pullChan <- pullResult{
 			imageRef: imageRef,
 			err:      err,

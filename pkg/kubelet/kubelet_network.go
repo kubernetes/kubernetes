@@ -68,7 +68,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
 
 	// kubelet -> generic runtime -> runtime shim -> network plugin
 	// docker/non-cri implementations have a passthrough UpdatePodCIDR
-	if err := kl.getRuntime().UpdatePodCIDR(cidr); err != nil {
+	if err := kl.getRuntime().UpdatePodCIDR(context.Background(), cidr); err != nil {
 		// If updatePodCIDR would fail, theoretically pod CIDR could not change.
 		// But it is better to be on the safe side to still return true here.
 		return true, fmt.Errorf("failed to update pod CIDR: %v", err)

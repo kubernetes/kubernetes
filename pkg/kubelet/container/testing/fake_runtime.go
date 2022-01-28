@@ -103,7 +103,7 @@ func NewFakeRuntimeCache(getter podsGetter) kubecontainer.RuntimeCache {
 }
 
 func (f *FakeRuntimeCache) GetPods() ([]*kubecontainer.Pod, error) {
-	return f.getter.GetPods(false)
+	return f.getter.GetPods(context.Background(), false)
 }
 
 func (f *FakeRuntimeCache) ForceUpdateIfOlder(time.Time) error {

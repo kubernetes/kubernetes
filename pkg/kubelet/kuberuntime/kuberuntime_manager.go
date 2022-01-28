@@ -218,7 +218,7 @@ func NewKubeGenericRuntimeManager(
 		memoryThrottlingFactor: memoryThrottlingFactor,
 	}
 
-	typedVersion, err := kubeRuntimeManager.getTypedVersion()
+	typedVersion, err := kubeRuntimeManager.getTypedVersion(context.Background())
 	if err != nil {
 		klog.ErrorS(err, "Get runtime version failed")
 		return nil, err
@@ -274,7 +274,7 @@ func NewKubeGenericRuntimeManager(
 
 	kubeRuntimeManager.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
-			return kubeRuntimeManager.getTypedVersion()
+			return kubeRuntimeManager.getTypedVersion(context.Background())
 		},
 		versionCacheTTL,
 	)

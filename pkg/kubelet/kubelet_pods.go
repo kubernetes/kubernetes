@@ -1041,6 +1041,8 @@ func (kl *Kubelet) deleteOrphanedMirrorPods() {
 // NOTE: This function is executed by the main sync loop, so it
 // should not contain any blocking calls.
 func (kl *Kubelet) HandlePodCleanups() error {
+	ctx := context.Background()
+
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
@@ -1142,7 +1144,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// in the cache. We need to bypass the cache to get the latest set of
 	// running pods to clean up the volumes.
 	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningRuntimePods, err = kl.containerRuntime.GetPods(false)
+	runningRuntimePods, err = kl.containerRuntime.GetPods(ctx, false)
 	if err != nil {
 		klog.ErrorS(err, "Error listing containers")
 		return err

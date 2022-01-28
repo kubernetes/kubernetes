@@ -179,7 +179,7 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 func (c *containerLogManager) Start() {
 	// Start a goroutine periodically does container log rotation.
 	go wait.Forever(func() {
-		if err := c.rotateLogs(); err != nil {
+		if err := c.rotateLogs(context.TODO()); err != nil {
 			klog.ErrorS(err, "Failed to rotate container logs")
 		}
 	}, logMonitorPeriod)

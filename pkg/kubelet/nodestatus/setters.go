@@ -423,7 +423,7 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 		node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
 
 		runtimeVersion := "Unknown"
-		if runtimeVer, err := runtimeVersionFunc(); err == nil {
+		if runtimeVer, err := runtimeVersionFunc(context.Background()); err == nil {
 			runtimeVersion = runtimeVer.String()
 		}
 		node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", runtimeTypeFunc(), runtimeVersion)
@@ -452,7 +452,7 @@ func Images(nodeStatusMaxImages int32,
 	return func(node *v1.Node) error {
 		// Update image list of this node
 		var imagesOnNode []v1.ContainerImage
-		containerImages, err := imageListFunc()
+		containerImages, err := imageListFunc(context.Background())
 		if err != nil {
 			node.Status.Images = imagesOnNode
 			return fmt.Errorf("error getting image list: %v", err)

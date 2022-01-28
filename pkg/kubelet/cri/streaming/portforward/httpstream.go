@@ -247,7 +247,7 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
 	klog.V(5).InfoS("Connection request invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
-	err := h.forwarder.PortForward(h.pod, h.uid, int32(port), p.dataStream)
+	err := h.forwarder.PortForward(context.Background(), h.pod, h.uid, int32(port), p.dataStream)
 	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
 
 	if err != nil {

@@ -202,7 +202,7 @@ func (p *Provider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.
 
 // HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
 func (p *Provider) HasDedicatedImageFs() (bool, error) {
-	device, err := p.containerStatsProvider.ImageFsDevice()
+	device, err := p.containerStatsProvider.ImageFsDevice(context.TODO())
 	if err != nil {
 		return false, err
 	}

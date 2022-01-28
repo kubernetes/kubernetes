@@ -184,7 +184,7 @@ func (im *realImageGCManager) Start() {
 		if im.initialized {
 			ts = time.Now()
 		}
-		_, err := im.detectImages(ts)
+		_, err := im.detectImages(context.Background(), ts)
 		if err != nil {
 			klog.InfoS("Failed to monitor images", "err", err)
 		} else {
@@ -194,7 +194,7 @@ func (im *realImageGCManager) Start() {
 
 	// Start a goroutine periodically updates image cache.
 	go wait.Until(func() {
-		images, err := im.runtime.ListImages()
+		images, err := im.runtime.ListImages(context.Background())
 		if err != nil {
 			klog.InfoS("Failed to update image list", "err", err)
 		} else {

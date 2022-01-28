@@ -107,7 +107,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		memoryThrottlingFactor: 0.8,
 	}
 
-	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
+	typedVersion, err := runtimeService.Version(context.Background(), kubeRuntimeAPIVersion)
 	if err != nil {
 		return nil, err
 	}

@@ -89,7 +89,7 @@ func (collector *volumeStatsCollector) DescribeWithStability(ch chan<- *metrics.
 
 // CollectWithStability implements the metrics.StableCollector interface.
 func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	podStats, err := collector.statsProvider.ListPodStats()
+	podStats, err := collector.statsProvider.ListPodStats(context.Background())
 	if err != nil {
 		return
 	}

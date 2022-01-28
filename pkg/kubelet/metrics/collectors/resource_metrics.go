@@ -120,7 +120,7 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 	defer func() {
 		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
 	}()
-	statsSummary, err := rc.provider.GetCPUAndMemoryStats()
+	statsSummary, err := rc.provider.GetCPUAndMemoryStats(context.Background())
 	if err != nil {
 		errorCount = 1
 		klog.ErrorS(err, "Error getting summary for resourceMetric prometheus endpoint")

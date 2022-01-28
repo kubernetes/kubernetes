@@ -113,7 +113,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		Image:       image,
 		Annotations: podAnnotations,
 	}
-	imageRef, err := m.imageService.GetImageRef(spec)
+	imageRef, err := m.imageService.GetImageRef(context.Background(), spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
