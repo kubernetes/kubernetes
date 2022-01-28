@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -208,70 +207,79 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 		return nil
 
 	case reflect.Slice:
-		if steps.moreStepsRemaining() {
-			return fmt.Errorf("can't have more steps after slice. %v", steps)
-		}
-
 		if setRawBytes {
 			actualCurrValue.SetBytes([]byte(propertyValue))
 		} else {
-			innerKind := actualCurrValue.Type().Elem().Kind()
-			if innerKind == reflect.String {
+			innerType := actualCurrValue.Type().Elem()
+			if innerType.Kind() == reflect.String {
 				currentSliceValue := actualCurrValue.Interface().([]string)
 				newSliceValue := editStringSlice(currentSliceValue, propertyValue)
 				actualCurrValue.Set(reflect.ValueOf(newSliceValue))
-			} else if innerKind == reflect.Struct {
-				// The only struct slices we should be getting into here are ExecEnvVars
-				structName := currStep.stepValue
+			} else if innerType.Kind() == reflect.Struct {
+				// Note this only works for attempting to set struct fields of type string
+				// Set struct field we are searching on and value we will be searching for
+				stepSearchValue := steps.pop()
+				searchField := currStep.stepValue
+				searchValue := stepSearchValue.stepValue
 
-				// If the existing env var config is empty set it and we aren't unsetting create the new value and return
-				if actualCurrValue.IsNil() && !unset {
-					newSlice := reflect.MakeSlice(reflect.TypeOf([]clientcmdapi.ExecEnvVar{}), 1, 1)
-					newStructValue := newSlice.Index(0)
-					newStructValue.Set(reflect.ValueOf(clientcmdapi.ExecEnvVar{
-						Name:  structName,
-						Value: propertyValue,
-					}))
-					actualCurrValue.Set(newSlice)
-					return nil
+				if reflect.ValueOf(searchField).Kind() != reflect.String {
+					return fmt.Errorf("can not search for fields with non string values")
 				}
 
-				// Find the ExecEnvVar by name, stop if can't find and we're trying to unset because nothing needs to happen
-				existingStructIndex := getExecConfigEnvByName(actualCurrValue, structName)
-				if existingStructIndex < 0 && unset {
-					return nil
-				}
+				// Set struct field and value we will be setting
+				setField := strings.Split(propertyValue, ":")[0]
+				setValue := strings.Split(propertyValue, ":")[1]
 
-				// If we found the array index and we're unsetting then unset and return
-				if existingStructIndex >= 0 && unset {
-					maxSliceIndex := actualCurrValue.Len()
-					firstSlice := actualCurrValue.Slice(0, existingStructIndex)
-					secondSlice := actualCurrValue.Slice(existingStructIndex+1, maxSliceIndex)
-					for i := 0; i < secondSlice.Len(); i++ {
-						firstSlice = reflect.Append(firstSlice, secondSlice.Index(i))
+				targetStructIndex := getStructByFieldName(actualCurrValue, searchField, searchValue)
+
+				if targetStructIndex < 0 {
+					// Set new inner struct value, then outer slice value, then set
+					// new struct into new slice and pass to actual curr value
+					newSliceValue := reflect.MakeSlice(actualCurrValue.Type(), 0, 0)
+					actualCurrValue.Set(reflect.Indirect(newSliceValue))
+					targetStructIndex = 0
+					newValue := reflect.New(innerType)
+					actualCurrValue.Set(reflect.Append(actualCurrValue, reflect.Indirect(newValue)))
+					if !steps.moreStepsRemaining() && unset {
+						return nil
 					}
-					actualCurrValue.Set(firstSlice)
-					return nil
 				}
 
-				// If key exists set new value, else create new ExecEnvVar struct with specified values, else create new key/value
-				if existingStructIndex >= 0 {
-					existingStructVal := actualCurrValue.Index(existingStructIndex)
-					existingStructVal.Set(reflect.ValueOf(clientcmdapi.ExecEnvVar{
-						Name:  structName,
-						Value: propertyValue,
-					}))
-					return nil
-				} else {
-					newSlice := reflect.MakeSlice(reflect.TypeOf([]clientcmdapi.ExecEnvVar{}), 1, 1)
-					newStructValue := newSlice.Index(0)
-					newStructValue.Set(reflect.ValueOf(clientcmdapi.ExecEnvVar{
-						Name:  structName,
-						Value: propertyValue,
-					}))
-					actualCurrValue.Set(reflect.Append(actualCurrValue, newStructValue))
-					return nil
+				targetStruct := actualCurrValue.Index(targetStructIndex)
+				fieldIndex := 0
+				for fieldIndex < targetStruct.NumField() {
+					currFieldType := targetStruct.Type().Field(fieldIndex)
+					currYamlTag := currFieldType.Tag.Get("json")
+					currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+
+					if currFieldTypeYamlName == searchField {
+						break
+					}
+					fieldIndex++
 				}
+				if fieldIndex > targetStruct.NumField() {
+					return fmt.Errorf("could not find field in struct with name %v", searchField)
+				}
+				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{fieldIndex}).Set(reflect.ValueOf(searchValue))
+
+				fieldIndex = 0
+				for fieldIndex < targetStruct.NumField() {
+					currFieldType := targetStruct.Type().Field(fieldIndex)
+					currYamlTag := currFieldType.Tag.Get("json")
+					currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+
+					if currFieldTypeYamlName == setField {
+						break
+					}
+					fieldIndex++
+				}
+				if fieldIndex > targetStruct.NumField() {
+					return fmt.Errorf("could not find field in struct with name %v", setField)
+				}
+				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{fieldIndex}).Set(reflect.ValueOf(setValue))
+
+				return nil
+
 			} else {
 				val, err := base64.StdEncoding.DecodeString(propertyValue)
 				if err != nil {
@@ -343,22 +351,30 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 	panic(fmt.Errorf("unrecognized type: %v\nwanted: %v", actualCurrValue, actualCurrValue.Kind()))
 }
 
-// getExecConfigEnvByName returns the value
-func getExecConfigEnvByName(v reflect.Value, name string) int {
-	if v.Type() != reflect.SliceOf(reflect.TypeOf(clientcmdapi.ExecEnvVar{})) {
+// getStructFromSliceByFieldName gets the index of the struct in a slice that has the given field name set to the given value
+func getStructByFieldName(v reflect.Value, name string, value string) int {
+	if v.Kind() != reflect.Slice {
 		return -1
 	}
 
 	// Pull slice value out of value object
-	slice, ok := v.Interface().([]clientcmdapi.ExecEnvVar)
+	slice, ok := v.Interface().([]interface{})
 	if !ok {
 		return -1
 	}
 
 	// Iterate through slice of ExecEnvVars and check for a matching Name key, return when found
-	for i, envVar := range slice {
-		if envVar.Name == name {
-			return i
+	for i, obj := range slice {
+		objValue := reflect.ValueOf(obj)
+		for fieldIndex := 0; fieldIndex < objValue.NumField(); fieldIndex++ {
+			currFieldValue := objValue.Field(fieldIndex)
+			currFieldType := objValue.Type().Field(fieldIndex)
+			currYamlTag := currFieldType.Tag.Get("json")
+			currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+
+			if currFieldTypeYamlName == name && currFieldValue.String() == value {
+				return i
+			}
 		}
 	}
 
