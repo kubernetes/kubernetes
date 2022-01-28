@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	"context"
 	"fmt"
 	"time"
 

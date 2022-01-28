@@ -17,6 +17,7 @@ limitations under the License.
 package nodestatus
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net"
@@ -411,7 +412,7 @@ func MachineInfo(nodeName string,
 // VersionInfo returns a Setter that updates version-related information on the node.
 func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // typically Kubelet.cadvisor.VersionInfo
 	runtimeTypeFunc func() string, // typically Kubelet.containerRuntime.Type
-	runtimeVersionFunc func() (kubecontainer.Version, error), // typically Kubelet.containerRuntime.Version
+	runtimeVersionFunc func(ctx context.Context) (kubecontainer.Version, error), // typically Kubelet.containerRuntime.Version
 ) Setter {
 	return func(node *v1.Node) error {
 		verinfo, err := versionInfoFunc()
@@ -447,7 +448,7 @@ func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
 // imageListFunc is expected to return a list of images sorted in descending order by image size.
 // nodeStatusMaxImages is ignored if set to -1.
 func Images(nodeStatusMaxImages int32,
-	imageListFunc func() ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
+	imageListFunc func(ctx context.Context) ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
 ) Setter {
 	return func(node *v1.Node) error {
 		// Update image list of this node

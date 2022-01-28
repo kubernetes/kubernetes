@@ -17,6 +17,7 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/component-base/metrics"

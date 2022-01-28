@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	"context"
 	goerrors "errors"
 	"fmt"
 	"math"
@@ -24,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -205,24 +206,24 @@ func (im *realImageGCManager) Start() {
 }
 
 // Get a list of images on this node
-func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
+func (im *realImageGCManager) GetImageList(ctx context.Context) ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 
-func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, error) {
+func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.Time) (sets.String, error) {
 	imagesInUse := sets.NewString()
 
 	// Always consider the container runtime pod sandbox image in use
-	imageRef, err := im.runtime.GetImageRef(container.ImageSpec{Image: im.sandboxImage})
+	imageRef, err := im.runtime.GetImageRef(ctx, container.ImageSpec{Image: im.sandboxImage})
 	if err == nil && imageRef != "" {
 		imagesInUse.Insert(imageRef)
 	}
 
-	images, err := im.runtime.ListImages()
+	images, err := im.runtime.ListImages(ctx)
 	if err != nil {
 		return imagesInUse, err
 	}
-	pods, err := im.runtime.GetPods(true)
+	pods, err := im.runtime.GetPods(ctx, true)
 	if err != nil {
 		return imagesInUse, err
 	}
@@ -276,9 +277,9 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 	return imagesInUse, nil
 }
 
-func (im *realImageGCManager) GarbageCollect() error {
+func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 	// Get disk usage on disk holding images.
-	fsStats, err := im.statsProvider.ImageFsStats()
+	fsStats, err := im.statsProvider.ImageFsStats(ctx)
 	if err != nil {
 		return err
 	}
@@ -308,7 +309,7 @@ func (im *realImageGCManager) GarbageCollect() error {
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		klog.InfoS("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
-		freed, err := im.freeSpace(amountToFree, time.Now())
+		freed, err := im.freeSpace(ctx, amountToFree, time.Now())
 		if err != nil {
 			return err
 		}
@@ -323,9 +324,9 @@ func (im *realImageGCManager) GarbageCollect() error {
 	return nil
 }
 
-func (im *realImageGCManager) DeleteUnusedImages() error {
+func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 	klog.InfoS("Attempting to delete unused images")
-	_, err := im.freeSpace(math.MaxInt64, time.Now())
+	_, err := im.freeSpace(ctx, math.MaxInt64, time.Now())
 	return err
 }
 
@@ -335,8 +336,8 @@ func (im *realImageGCManager) DeleteUnusedImages() error {
 // bytes freed is always returned.
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
-func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (int64, error) {
-	imagesInUse, err := im.detectImages(freeTime)
+func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, freeTime time.Time) (int64, error) {
+	imagesInUse, err := im.detectImages(ctx, freeTime)
 	if err != nil {
 		return 0, err
 	}
@@ -385,7 +386,7 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 
 		// Remove image. Continue despite errors.
 		klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size)
-		err := im.runtime.RemoveImage(container.ImageSpec{Image: image.id})
+		err := im.runtime.RemoveImage(ctx, container.ImageSpec{Image: image.id})
 		if err != nil {
 			deletionErrors = append(deletionErrors, err)
 			continue

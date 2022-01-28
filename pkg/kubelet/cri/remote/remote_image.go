@@ -59,7 +59,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 
 	service := &remoteImageService{timeout: connectionTimeout}
 
-	if err := service.determineAPIVersion(conn); err != nil {
+	if err := service.determineAPIVersion(ctx, conn); err != nil {
 		return nil, err
 	}
 

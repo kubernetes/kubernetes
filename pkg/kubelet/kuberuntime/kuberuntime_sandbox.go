@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"runtime"
@@ -36,7 +37,7 @@ import (
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
-func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32) (string, string, error) {
+func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
 	if err != nil {
 		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
@@ -64,7 +65,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 		}
 	}
 
-	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig, runtimeHandler)
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(ctx, podSandboxConfig, runtimeHandler)
 	if err != nil {
 		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
 		klog.ErrorS(err, "Failed to create sandbox for pod", "pod", klog.KObj(pod))
@@ -269,7 +270,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod)
 }
 
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
-func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi.PodSandbox, error) {
+func (m *kubeGenericRuntimeManager) getKubeletSandboxes(ctx context.Context, all bool) ([]*runtimeapi.PodSandbox, error) {
 	var filter *runtimeapi.PodSandboxFilter
 	if !all {
 		readyState := runtimeapi.PodSandboxState_SANDBOX_READY
@@ -280,7 +281,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 		}
 	}
 
-	resp, err := m.runtimeService.ListPodSandbox(filter)
+	resp, err := m.runtimeService.ListPodSandbox(ctx, filter)
 	if err != nil {
 		klog.ErrorS(err, "Failed to list pod sandboxes")
 		return nil, err
@@ -323,7 +324,7 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(podNamespace, podName
 
 // getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).
 // Param state could be nil in order to get all sandboxes belonging to same pod.
-func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, state *runtimeapi.PodSandboxState) ([]string, error) {
+func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(ctx context.Context, podUID kubetypes.UID, state *runtimeapi.PodSandboxState) ([]string, error) {
 	filter := &runtimeapi.PodSandboxFilter{
 		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(podUID)},
 	}
@@ -332,7 +333,7 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, s
 			State: *state,
 		}
 	}
-	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
+	sandboxes, err := m.runtimeService.ListPodSandbox(ctx, filter)
 	if err != nil {
 		klog.ErrorS(err, "Failed to list sandboxes for pod", "podUID", podUID)
 		return nil, err
@@ -353,8 +354,8 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, s
 }
 
 // GetPortForward gets the endpoint the runtime will serve the port-forward request from.
-func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string, podUID kubetypes.UID, ports []int32) (*url.URL, error) {
-	sandboxIDs, err := m.getSandboxIDByPodUID(podUID, nil)
+func (m *kubeGenericRuntimeManager) GetPortForward(ctx context.Context, podName, podNamespace string, podUID kubetypes.UID, ports []int32) (*url.URL, error) {
+	sandboxIDs, err := m.getSandboxIDByPodUID(ctx, podUID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandboxID for pod %s: %v", format.PodDesc(podName, podNamespace, podUID), err)
 	}
@@ -365,7 +366,7 @@ func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string,
 		PodSandboxId: sandboxIDs[0],
 		Port:         ports,
 	}
-	resp, err := m.runtimeService.PortForward(req)
+	resp, err := m.runtimeService.PortForward(ctx, req)
 	if err != nil {
 		return nil, err
 	}

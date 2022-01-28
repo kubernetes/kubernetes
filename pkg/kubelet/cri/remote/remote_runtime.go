@@ -87,7 +87,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 		logReduction: logreduction.NewLogReduction(identicalErrorDelay),
 	}
 
-	if err := service.determineAPIVersion(conn); err != nil {
+	if err := service.determineAPIVersion(ctx, conn); err != nil {
 		return nil, err
 	}
 

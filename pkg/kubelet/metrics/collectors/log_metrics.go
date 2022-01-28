@@ -17,6 +17,8 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -48,7 +50,7 @@ var _ metrics.StableCollector = &logMetricsCollector{}
 
 // NewLogMetricsCollector implements the metrics.StableCollector interface and
 // exposes metrics about container's log volume size.
-func NewLogMetricsCollector(podStats func() ([]statsapi.PodStats, error)) metrics.StableCollector {
+func NewLogMetricsCollector(podStats func(context.Context) ([]statsapi.PodStats, error)) metrics.StableCollector {
 	return &logMetricsCollector{
 		podStats: podStats,
 	}

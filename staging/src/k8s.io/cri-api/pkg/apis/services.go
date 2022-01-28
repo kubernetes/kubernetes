@@ -17,6 +17,7 @@ limitations under the License.
 package cri
 
 import (
+	"context"
 	"time"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"

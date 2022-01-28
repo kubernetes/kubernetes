@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"

@@ -21,6 +21,9 @@ limitations under the License.
 package testing
 
 import (
+	"context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	v1 "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
@@ -29,7 +32,6 @@ import (
 	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	cm "k8s.io/kubernetes/pkg/kubelet/cm"
 	volume "k8s.io/kubernetes/pkg/volume"
-	reflect "reflect"
 )
 
 // MockProvider is a mock of Provider interface
@@ -56,7 +58,7 @@ func (m *MockProvider) EXPECT() *MockProviderMockRecorder {
 }
 
 // ListPodStats mocks base method
-func (m *MockProvider) ListPodStats() ([]v1alpha1.PodStats, error) {
+func (m *MockProvider) ListPodStats(ctx context.Context) ([]v1alpha1.PodStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListPodStats")
 	ret0, _ := ret[0].([]v1alpha1.PodStats)
@@ -71,7 +73,7 @@ func (mr *MockProviderMockRecorder) ListPodStats() *gomock.Call {
 }
 
 // ListPodCPUAndMemoryStats mocks base method
-func (m *MockProvider) ListPodCPUAndMemoryStats() ([]v1alpha1.PodStats, error) {
+func (m *MockProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]v1alpha1.PodStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListPodCPUAndMemoryStats")
 	ret0, _ := ret[0].([]v1alpha1.PodStats)
@@ -86,7 +88,7 @@ func (mr *MockProviderMockRecorder) ListPodCPUAndMemoryStats() *gomock.Call {
 }
 
 // ListPodStatsAndUpdateCPUNanoCoreUsage mocks base method
-func (m *MockProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]v1alpha1.PodStats, error) {
+func (m *MockProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]v1alpha1.PodStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListPodStatsAndUpdateCPUNanoCoreUsage")
 	ret0, _ := ret[0].([]v1alpha1.PodStats)
@@ -101,7 +103,7 @@ func (mr *MockProviderMockRecorder) ListPodStatsAndUpdateCPUNanoCoreUsage() *gom
 }
 
 // ImageFsStats mocks base method
-func (m *MockProvider) ImageFsStats() (*v1alpha1.FsStats, error) {
+func (m *MockProvider) ImageFsStats(ctx context.Context) (*v1alpha1.FsStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageFsStats")
 	ret0, _ := ret[0].(*v1alpha1.FsStats)

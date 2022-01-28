@@ -21,6 +21,7 @@ package cm
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"

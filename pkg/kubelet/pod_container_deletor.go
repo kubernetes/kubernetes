@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/util/wait"

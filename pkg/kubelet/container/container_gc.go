@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -77,11 +78,11 @@ func NewContainerGC(runtime Runtime, policy GCPolicy, sourcesReadyProvider Sourc
 	}, nil
 }
 
-func (cgc *realContainerGC) GarbageCollect() error {
-	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
+func (cgc *realContainerGC) GarbageCollect(ctx context.Context) error {
+	return cgc.runtime.GarbageCollect(ctx, cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
 }
 
-func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
+func (cgc *realContainerGC) DeleteAllUnusedContainers(ctx context.Context) error {
 	klog.InfoS("Attempting to delete unused containers")
-	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
+	return cgc.runtime.GarbageCollect(ctx, cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }

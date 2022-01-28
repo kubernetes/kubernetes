@@ -17,6 +17,8 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"

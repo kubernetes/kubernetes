@@ -24,7 +24,7 @@ import (
 
 // ListImages lists existing images.
 func (f *RemoteRuntime) ListImages(ctx context.Context, req *kubeapi.ListImagesRequest) (*kubeapi.ListImagesResponse, error) {
-	images, err := f.ImageService.ListImages(req.Filter)
+	images, err := f.ImageService.ListImages(ctx, req.Filter)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (f *RemoteRuntime) ListImages(ctx context.Context, req *kubeapi.ListImagesR
 // present, returns a response with ImageStatusResponse.Image set to
 // nil.
 func (f *RemoteRuntime) ImageStatus(ctx context.Context, req *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
-	resp, err := f.ImageService.ImageStatus(req.Image, false)
+	resp, err := f.ImageService.ImageStatus(ctx, req.Image, false)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (f *RemoteRuntime) ImageStatus(ctx context.Context, req *kubeapi.ImageStatu
 
 // PullImage pulls an image with authentication config.
 func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	image, err := f.ImageService.PullImage(req.Image, req.Auth, req.SandboxConfig)
+	image, err := f.ImageService.PullImage(ctx, req.Image, req.Auth, req.SandboxConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 // This call is idempotent, and must not return an error if the image has
 // already been removed.
 func (f *RemoteRuntime) RemoveImage(ctx context.Context, req *kubeapi.RemoveImageRequest) (*kubeapi.RemoveImageResponse, error) {
-	err := f.ImageService.RemoveImage(req.Image)
+	err := f.ImageService.RemoveImage(ctx, req.Image)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (f *RemoteRuntime) RemoveImage(ctx context.Context, req *kubeapi.RemoveImag
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
 func (f *RemoteRuntime) ImageFsInfo(ctx context.Context, req *kubeapi.ImageFsInfoRequest) (*kubeapi.ImageFsInfoResponse, error) {
-	fsUsage, err := f.ImageService.ImageFsInfo()
+	fsUsage, err := f.ImageService.ImageFsInfo(ctx)
 	if err != nil {
 		return nil, err
 	}

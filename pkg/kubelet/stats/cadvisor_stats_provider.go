@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"sort"
@@ -75,7 +76,7 @@ func newCadvisorStatsProvider(
 }
 
 // ListPodStats returns the stats of all the pod-managed containers.
-func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
+func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	// Gets node root filesystem information and image filesystem stats, which
 	// will be used to populate the available and capacity bytes/inodes in
 	// container stats.
@@ -175,12 +176,12 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 // the containers and returns the stats for all the pod-managed containers.
 // For cadvisor, cpu nano core usages are pre-computed and cached, so this
 // function simply calls ListPodStats.
-func (p *cadvisorStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
-	return p.ListPodStats()
+func (p *cadvisorStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error) {
+	return p.ListPodStats(ctx)
 }
 
 // ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.
-func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
+func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	infos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
@@ -240,12 +241,12 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats,
 }
 
 // ImageFsStats returns the stats of the filesystem for storing images.
-func (p *cadvisorStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
+func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (*statsapi.FsStats, error) {
 	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
-	imageStats, err := p.imageService.ImageStats()
+	imageStats, err := p.imageService.ImageStats(ctx)
 	if err != nil || imageStats == nil {
 		return nil, fmt.Errorf("failed to get image stats: %v", err)
 	}
@@ -269,7 +270,7 @@ func (p *cadvisorStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 
 // ImageFsDevice returns name of the device where the image filesystem locates,
 // e.g. /dev/sda1.
-func (p *cadvisorStatsProvider) ImageFsDevice() (string, error) {
+func (p *cadvisorStatsProvider) ImageFsDevice(ctx context.Context) (string, error) {
 	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
 	if err != nil {
 		return "", err

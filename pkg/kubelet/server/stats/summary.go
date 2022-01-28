@@ -18,6 +18,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -65,7 +66,7 @@ func NewSummaryProvider(statsProvider Provider) SummaryProvider {
 	}
 }
 
-func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) {
+func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.
 	node, err := sp.provider.GetNode()
@@ -81,15 +82,15 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rootFs stats: %v", err)
 	}
-	imageFsStats, err := sp.provider.ImageFsStats()
+	imageFsStats, err := sp.provider.ImageFsStats(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs stats: %v", err)
 	}
 	var podStats []statsapi.PodStats
 	if updateStats {
-		podStats, err = sp.provider.ListPodStatsAndUpdateCPUNanoCoreUsage()
+		podStats, err = sp.provider.ListPodStatsAndUpdateCPUNanoCoreUsage(ctx)
 	} else {
-		podStats, err = sp.provider.ListPodStats()
+		podStats, err = sp.provider.ListPodStats(ctx)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
@@ -118,7 +119,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	return &summary, nil
 }
 
-func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error) {
 	// TODO(timstclair): Consider returning a best-effort response if any of
 	// the following errors occur.
 	node, err := sp.provider.GetNode()
@@ -131,7 +132,7 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error)
 		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 	}
 
-	podStats, err := sp.provider.ListPodCPUAndMemoryStats()
+	podStats, err := sp.provider.ListPodCPUAndMemoryStats(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
 	}

@@ -70,7 +70,7 @@ func writeChannel(real bool) wsstream.ChannelType {
 
 // createWebSocketStreams returns a context containing the websocket connection and
 // streams needed to perform an exec or an attach.
-func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Options, idleTimeout time.Duration) (*context, bool) {
+func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Options, idleTimeout time.Duration) (*remoteContext, bool) {
 	channels := createChannels(opts)
 	conn := wsstream.NewConn(map[string]wsstream.ChannelProtocolConfig{
 		"": {
@@ -112,7 +112,7 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 		streams[errorChannel].Write([]byte{})
 	}
 
-	ctx := &context{
+	ctx := &remoteContext{
 		conn:         conn,
 		stdinStream:  streams[stdinChannel],
 		stdoutStream: streams[stdoutChannel],

@@ -18,6 +18,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -26,7 +27,7 @@ import (
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"

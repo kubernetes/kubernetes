@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"

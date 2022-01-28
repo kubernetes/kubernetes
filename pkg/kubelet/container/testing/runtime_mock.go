@@ -125,7 +125,7 @@ func (mr *MockRuntimeMockRecorder) Type() *gomock.Call {
 }
 
 // Version mocks base method
-func (m *MockRuntime) Version() (container.Version, error) {
+func (m *MockRuntime) Version(ctx context.Context) (container.Version, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Version")
 	ret0, _ := ret[0].(container.Version)
@@ -155,7 +155,7 @@ func (mr *MockRuntimeMockRecorder) APIVersion() *gomock.Call {
 }
 
 // Status mocks base method
-func (m *MockRuntime) Status() (*container.RuntimeStatus, error) {
+func (m *MockRuntime) Status(ctx context.Context) (*container.RuntimeStatus, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
 	ret0, _ := ret[0].(*container.RuntimeStatus)
@@ -170,7 +170,7 @@ func (mr *MockRuntimeMockRecorder) Status() *gomock.Call {
 }
 
 // GetPods mocks base method
-func (m *MockRuntime) GetPods(all bool) ([]*container.Pod, error) {
+func (m *MockRuntime) GetPods(ctx context.Context, all bool) ([]*container.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPods", all)
 	ret0, _ := ret[0].([]*container.Pod)
@@ -185,7 +185,7 @@ func (mr *MockRuntimeMockRecorder) GetPods(all interface{}) *gomock.Call {
 }
 
 // GarbageCollect mocks base method
-func (m *MockRuntime) GarbageCollect(gcPolicy container.GCPolicy, allSourcesReady, evictNonDeletedPods bool) error {
+func (m *MockRuntime) GarbageCollect(ctx context.Context, gcPolicy container.GCPolicy, allSourcesReady, evictNonDeletedPods bool) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GarbageCollect", gcPolicy, allSourcesReady, evictNonDeletedPods)
 	ret0, _ := ret[0].(error)
@@ -199,7 +199,7 @@ func (mr *MockRuntimeMockRecorder) GarbageCollect(gcPolicy, allSourcesReady, evi
 }
 
 // SyncPod mocks base method
-func (m *MockRuntime) SyncPod(pod *v1.Pod, podStatus *container.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) container.PodSyncResult {
+func (m *MockRuntime) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *container.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) container.PodSyncResult {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SyncPod", pod, podStatus, pullSecrets, backOff)
 	ret0, _ := ret[0].(container.PodSyncResult)
@@ -213,7 +213,7 @@ func (mr *MockRuntimeMockRecorder) SyncPod(pod, podStatus, pullSecrets, backOff 
 }
 
 // KillPod mocks base method
-func (m *MockRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
+func (m *MockRuntime) KillPod(ctx context.Context, pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "KillPod", pod, runningPod, gracePeriodOverride)
 	ret0, _ := ret[0].(error)
@@ -227,7 +227,7 @@ func (mr *MockRuntimeMockRecorder) KillPod(pod, runningPod, gracePeriodOverride 
 }
 
 // GetPodStatus mocks base method
-func (m *MockRuntime) GetPodStatus(uid types.UID, name, namespace string) (*container.PodStatus, error) {
+func (m *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*container.PodStatus, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPodStatus", uid, name, namespace)
 	ret0, _ := ret[0].(*container.PodStatus)
@@ -256,7 +256,7 @@ func (mr *MockRuntimeMockRecorder) GetContainerLogs(ctx, pod, containerID, logOp
 }
 
 // DeleteContainer mocks base method
-func (m *MockRuntime) DeleteContainer(containerID container.ContainerID) error {
+func (m *MockRuntime) DeleteContainer(ctx context.Context, containerID container.ContainerID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteContainer", containerID)
 	ret0, _ := ret[0].(error)
@@ -270,7 +270,7 @@ func (mr *MockRuntimeMockRecorder) DeleteContainer(containerID interface{}) *gom
 }
 
 // PullImage mocks base method
-func (m *MockRuntime) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
+func (m *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PullImage", image, pullSecrets, podSandboxConfig)
 	ret0, _ := ret[0].(string)
@@ -285,7 +285,7 @@ func (mr *MockRuntimeMockRecorder) PullImage(image, pullSecrets, podSandboxConfi
 }
 
 // GetImageRef mocks base method
-func (m *MockRuntime) GetImageRef(image container.ImageSpec) (string, error) {
+func (m *MockRuntime) GetImageRef(ctx context.Context, image container.ImageSpec) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetImageRef", image)
 	ret0, _ := ret[0].(string)
@@ -300,7 +300,7 @@ func (mr *MockRuntimeMockRecorder) GetImageRef(image interface{}) *gomock.Call {
 }
 
 // ListImages mocks base method
-func (m *MockRuntime) ListImages() ([]container.Image, error) {
+func (m *MockRuntime) ListImages(ctx context.Context) ([]container.Image, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListImages")
 	ret0, _ := ret[0].([]container.Image)
@@ -315,7 +315,7 @@ func (mr *MockRuntimeMockRecorder) ListImages() *gomock.Call {
 }
 
 // RemoveImage mocks base method
-func (m *MockRuntime) RemoveImage(image container.ImageSpec) error {
+func (m *MockRuntime) RemoveImage(ctx context.Context, image container.ImageSpec) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoveImage", image)
 	ret0, _ := ret[0].(error)
@@ -329,7 +329,7 @@ func (mr *MockRuntimeMockRecorder) RemoveImage(image interface{}) *gomock.Call {
 }
 
 // ImageStats mocks base method
-func (m *MockRuntime) ImageStats() (*container.ImageStats, error) {
+func (m *MockRuntime) ImageStats(ctx context.Context) (*container.ImageStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageStats")
 	ret0, _ := ret[0].(*container.ImageStats)
@@ -344,7 +344,7 @@ func (mr *MockRuntimeMockRecorder) ImageStats() *gomock.Call {
 }
 
 // UpdatePodCIDR mocks base method
-func (m *MockRuntime) UpdatePodCIDR(podCIDR string) error {
+func (m *MockRuntime) UpdatePodCIDR(ctx context.Context, podCIDR string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdatePodCIDR", podCIDR)
 	ret0, _ := ret[0].(error)
@@ -381,7 +381,7 @@ func (m *MockStreamingRuntime) EXPECT() *MockStreamingRuntimeMockRecorder {
 }
 
 // GetExec mocks base method
-func (m *MockStreamingRuntime) GetExec(id container.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (m *MockStreamingRuntime) GetExec(ctx context.Context, id container.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetExec", id, cmd, stdin, stdout, stderr, tty)
 	ret0, _ := ret[0].(*url.URL)
@@ -396,7 +396,7 @@ func (mr *MockStreamingRuntimeMockRecorder) GetExec(id, cmd, stdin, stdout, stde
 }
 
 // GetAttach mocks base method
-func (m *MockStreamingRuntime) GetAttach(id container.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (m *MockStreamingRuntime) GetAttach(ctx context.Context, id container.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAttach", id, stdin, stdout, stderr, tty)
 	ret0, _ := ret[0].(*url.URL)
@@ -411,7 +411,7 @@ func (mr *MockStreamingRuntimeMockRecorder) GetAttach(id, stdin, stdout, stderr,
 }
 
 // GetPortForward mocks base method
-func (m *MockStreamingRuntime) GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error) {
+func (m *MockStreamingRuntime) GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPortForward", podName, podNamespace, podUID, ports)
 	ret0, _ := ret[0].(*url.URL)
@@ -449,7 +449,7 @@ func (m *MockImageService) EXPECT() *MockImageServiceMockRecorder {
 }
 
 // PullImage mocks base method
-func (m *MockImageService) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
+func (m *MockImageService) PullImage(ctx context.Context, image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PullImage", image, pullSecrets, podSandboxConfig)
 	ret0, _ := ret[0].(string)
@@ -464,7 +464,7 @@ func (mr *MockImageServiceMockRecorder) PullImage(image, pullSecrets, podSandbox
 }
 
 // GetImageRef mocks base method
-func (m *MockImageService) GetImageRef(image container.ImageSpec) (string, error) {
+func (m *MockImageService) GetImageRef(ctx context.Context, image container.ImageSpec) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetImageRef", image)
 	ret0, _ := ret[0].(string)
@@ -479,7 +479,7 @@ func (mr *MockImageServiceMockRecorder) GetImageRef(image interface{}) *gomock.C
 }
 
 // ListImages mocks base method
-func (m *MockImageService) ListImages() ([]container.Image, error) {
+func (m *MockImageService) ListImages(ctx context.Context) ([]container.Image, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListImages")
 	ret0, _ := ret[0].([]container.Image)
@@ -494,7 +494,7 @@ func (mr *MockImageServiceMockRecorder) ListImages() *gomock.Call {
 }
 
 // RemoveImage mocks base method
-func (m *MockImageService) RemoveImage(image container.ImageSpec) error {
+func (m *MockImageService) RemoveImage(ctx context.Context, image container.ImageSpec) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoveImage", image)
 	ret0, _ := ret[0].(error)
@@ -508,7 +508,7 @@ func (mr *MockImageServiceMockRecorder) RemoveImage(image interface{}) *gomock.C
 }
 
 // ImageStats mocks base method
-func (m *MockImageService) ImageStats() (*container.ImageStats, error) {
+func (m *MockImageService) ImageStats(ctx context.Context) (*container.ImageStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageStats")
 	ret0, _ := ret[0].(*container.ImageStats)
@@ -546,7 +546,7 @@ func (m *MockAttacher) EXPECT() *MockAttacherMockRecorder {
 }
 
 // AttachContainer mocks base method
-func (m *MockAttacher) AttachContainer(id container.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (m *MockAttacher) AttachContainer(ctx context.Context, id container.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AttachContainer", id, stdin, stdout, stderr, tty, resize)
 	ret0, _ := ret[0].(error)
@@ -583,7 +583,7 @@ func (m *MockCommandRunner) EXPECT() *MockCommandRunnerMockRecorder {
 }
 
 // RunInContainer mocks base method
-func (m *MockCommandRunner) RunInContainer(id container.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+func (m *MockCommandRunner) RunInContainer(ctx context.Context, id container.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RunInContainer", id, cmd, timeout)
 	ret0, _ := ret[0].([]byte)
