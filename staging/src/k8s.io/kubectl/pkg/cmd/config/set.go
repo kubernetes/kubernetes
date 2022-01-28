@@ -332,7 +332,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			actualCurrValue.Set(newValue)
 			newActualCurrValue = actualCurrValue.Elem()
 			if !steps.moreStepsRemaining() && unset {
- 				return nil
+				return nil
 			}
 		}
 		steps.currentStepIndex = steps.currentStepIndex - 1
