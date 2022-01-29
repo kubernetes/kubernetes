@@ -327,7 +327,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
-			if svc, updated := reconcilers.GetMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
+			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
 				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
 				return err
@@ -358,4 +358,35 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}
 	return err
+}
+
+// getMasterServiceUpdateIfNeeded sets service attributes for the given apiserver service.
+func getMasterServiceUpdateIfNeeded(svc *corev1.Service, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType) (s *corev1.Service, updated bool) {
+	// Determine if the service is in the format we expect
+	// (servicePorts are present and service type matches)
+	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
+	if formatCorrect {
+		return svc, false
+	}
+	svc.Spec.Ports = servicePorts
+	svc.Spec.Type = serviceType
+	return svc, true
+}
+
+// Determine if the service is in the correct format
+// getMasterServiceUpdateIfNeeded expects (servicePorts are correct
+// and service type matches).
+func checkServiceFormat(s *corev1.Service, ports []corev1.ServicePort, serviceType corev1.ServiceType) (formatCorrect bool) {
+	if s.Spec.Type != serviceType {
+		return false
+	}
+	if len(ports) != len(s.Spec.Ports) {
+		return false
+	}
+	for i, port := range ports {
+		if port != s.Spec.Ports[i] {
+			return false
+		}
+	}
+	return true
 }
