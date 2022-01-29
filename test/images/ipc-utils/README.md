@@ -11,3 +11,10 @@ from them directly.
 
 Using `ipcs` from util-linux makes these tests pass, even when running
 under SELinux enabled, so let's use them here.
+
+Description:
+
+ipcs shows information on System V inter-process communication
+facilities. By default it shows information about all three
+resources: shared memory segments, message queues, and semaphore
+arrays.
