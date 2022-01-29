@@ -101,6 +101,18 @@ type KubeProxyWinkernelConfiguration struct {
 	EnableDSR bool
 }
 
+// DetectLocalConfiguration contains optional settings related to DetectLocalMode option
+type DetectLocalConfiguration struct {
+	// BridgeInterface is a string argument which represents a single bridge interface name.
+	// Kube-proxy considers traffic as local if originating from this given bridge.
+	// This argument should be set if DetectLocalMode is set to BridgeInterface.
+	BridgeInterface string
+	// InterfaceNamePrefix is a string argument which represents a single interface prefix name.
+	// Kube-proxy considers traffic as local if originating from one or more interfaces which match
+	// the given prefix. This argument should be set if DetectLocalMode is set to InterfaceNamePrefix.
+	InterfaceNamePrefix string
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeProxyConfiguration contains everything necessary to configure the
@@ -168,6 +180,8 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode
+	// DetectLocal contains optional configuration settings related to DetectLocalMode.
+	DetectLocal DetectLocalConfiguration
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server. Currently, three modes of proxy are available in
@@ -198,8 +212,10 @@ type LocalMode string
 
 // Currently supported modes for LocalMode
 const (
-	LocalModeClusterCIDR LocalMode = "ClusterCIDR"
-	LocalModeNodeCIDR    LocalMode = "NodeCIDR"
+	LocalModeClusterCIDR         LocalMode = "ClusterCIDR"
+	LocalModeNodeCIDR            LocalMode = "NodeCIDR"
+	LocalModeBridgeInterface     LocalMode = "BridgeInterface"
+	LocalModeInterfaceNamePrefix LocalMode = "InterfaceNamePrefix"
 )
 
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
