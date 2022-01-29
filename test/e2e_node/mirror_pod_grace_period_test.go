@@ -129,6 +129,35 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 
+		ginkgo.It("should update a static pod when the static pod is updated multiple times during the graceful termination period [NodeConformance]", func() {
+			ginkgo.By("get mirror pod uid")
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			uid := pod.UID
+
+			ginkgo.By("update the pod manifest multiple times during the graceful termination period")
+			for i := 0; i < 300; i++ {
+				err = createStaticPod(podPath, staticPodName, ns,
+					fmt.Sprintf("image-%d", i), v1.RestartPolicyAlways)
+				framework.ExpectNoError(err)
+				time.Sleep(100 * time.Millisecond)
+			}
+			image := imageutils.GetPauseImageName()
+			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to be updated")
+			gomega.Eventually(func() error {
+				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("check the mirror pod container image is updated")
+			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pod.Spec.Containers), 1)
+			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
+		})
+
 		ginkgo.AfterEach(func() {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
