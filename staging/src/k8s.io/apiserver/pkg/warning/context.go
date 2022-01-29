@@ -18,7 +18,6 @@ package warning
 
 import (
 	"context"
-	"fmt"
 )
 
 // The key type is unexported to prevent collisions
@@ -54,7 +53,6 @@ func warningRecorderFrom(ctx context.Context) (Recorder, bool) {
 func AddWarning(ctx context.Context, agent string, text string) {
 	recorder, ok := warningRecorderFrom(ctx)
 	if !ok {
-		fmt.Println("no recorder")
 		return
 	}
 	recorder.AddWarning(agent, text)
