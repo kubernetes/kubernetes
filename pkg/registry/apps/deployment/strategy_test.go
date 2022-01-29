@@ -99,7 +99,7 @@ func TestSelectorImmutability(t *testing.T) {
 		{
 			genericapirequest.RequestInfo{
 				APIGroup:   "apps",
-				APIVersion: "v1beta2",
+				APIVersion: "v1",
 				Resource:   "deployments",
 			},
 			map[string]string{"a": "b"},
@@ -119,21 +119,22 @@ func TestSelectorImmutability(t *testing.T) {
 		{
 			genericapirequest.RequestInfo{
 				APIGroup:   "apps",
-				APIVersion: "v1beta1",
+				APIVersion: "v1",
 				Resource:   "deployments",
 			},
 			map[string]string{"a": "b"},
-			map[string]string{"c": "d"},
-			field.ErrorList{},
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "extensions",
-				APIVersion: "v1beta1",
+			map[string]string{"a": "c"},
+			field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: field.NewPath("spec").Child("selector").String(),
+					BadValue: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"a": "c"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+					Detail: "field is immutable",
+				},
 			},
-			map[string]string{"a": "b"},
-			map[string]string{"c": "d"},
-			field.ErrorList{},
 		},
 	}
 
