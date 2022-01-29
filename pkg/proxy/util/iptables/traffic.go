@@ -90,3 +90,62 @@ func (d *detectLocalByCIDR) JumpIfNotLocal(args []string, toChain string) []stri
 	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpNotLocal", line)
 	return line
 }
+
+type detectLocalByBridgeInterface struct {
+	ifLocal    []string
+	ifNotLocal []string
+}
+
+// NewDetectLocalByBridgeInterface implements the LocalTrafficDetector interface using a bridge interface name.
+// This can be used when a bridge can be used to capture the notion of local traffic from pods.
+func NewDetectLocalByBridgeInterface(interfaceName string) (LocalTrafficDetector, error) {
+	if len(interfaceName) == 0 {
+		return nil, fmt.Errorf("no bridge interface name set")
+	}
+	return &detectLocalByBridgeInterface{
+		ifLocal:    []string{"-i", interfaceName},
+		ifNotLocal: []string{"!", "-i", interfaceName},
+	}, nil
+}
+
+func (d *detectLocalByBridgeInterface) IsImplemented() bool {
+	return true
+}
+
+func (d *detectLocalByBridgeInterface) IfLocal() []string {
+	return d.ifLocal
+}
+
+func (d *detectLocalByBridgeInterface) IfNotLocal() []string {
+	return d.ifNotLocal
+}
+
+type detectLocalByInterfaceNamePrefix struct {
+	ifLocal    []string
+	ifNotLocal []string
+}
+
+// NewDetectLocalByInterfaceNamePrefix implements the LocalTrafficDetector interface using an interface name prefix.
+// This can be used when a pod interface name prefix can be used to capture the notion of local traffic. Note
+// that this will match on all interfaces that start with the given prefix.
+func NewDetectLocalByInterfaceNamePrefix(interfacePrefix string) (LocalTrafficDetector, error) {
+	if len(interfacePrefix) == 0 {
+		return nil, fmt.Errorf("no interface prefix set")
+	}
+	return &detectLocalByInterfaceNamePrefix{
+		ifLocal:    []string{"-i", interfacePrefix + "+"},
+		ifNotLocal: []string{"!", "-i", interfacePrefix + "+"},
+	}, nil
+}
+
+func (d *detectLocalByInterfaceNamePrefix) IsImplemented() bool {
+	return true
+}
+
+func (d *detectLocalByInterfaceNamePrefix) IfLocal() []string {
+	return d.ifLocal
+}
+
+func (d *detectLocalByInterfaceNamePrefix) IfNotLocal() []string {
+	return d.ifNotLocal
+}
