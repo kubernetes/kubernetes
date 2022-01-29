@@ -525,6 +525,11 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			}
 		}
 
+		// Stored objects might not be complete yet.
+		if e.Decorator != nil {
+			e.Decorator(existing)
+		}
+
 		// Given the existing object, get the new object
 		obj, err := objInfo.UpdatedObject(ctx, existing)
 		if err != nil {
