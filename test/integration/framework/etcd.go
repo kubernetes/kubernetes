@@ -129,8 +129,17 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 	cmd.Stderr = os.Stderr
 	stop := func() {
 		cancel()
-		err := cmd.Wait()
-		klog.Infof("etcd exit status: %v", err)
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- cmd.Wait()
+		}()
+		select {
+		case err := <-errCh:
+			klog.Infof("etcd exit status: %v", err)
+		case <-time.After(60 * time.Second):
+			err := cmd.Process.Kill()
+			klog.Infof("etcd didn't exit on time, killing it: %v", err)
+		}
 		err = os.RemoveAll(etcdDataDir)
 		if err != nil {
 			klog.Warningf("error during etcd cleanup: %v", err)
