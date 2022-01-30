@@ -171,7 +171,9 @@ func (ns *Namespace) Spec() *v1.Namespace {
 // LabelSelector returns the default labels that should be placed on a namespace
 // in order for it to be uniquely selectable by label selectors
 func (ns *Namespace) LabelSelector() map[string]string {
-	return map[string]string{"ns": ns.Name}
+	return map[string]string{
+		"ns": ns.Name,
+	}
 }
 
 // Pod is the abstract representation of what matters to network policy tests for

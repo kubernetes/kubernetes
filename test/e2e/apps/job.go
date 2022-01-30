@@ -35,6 +35,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -43,6 +44,7 @@ import (
 
 var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	parallelism := int32(2)
 	completions := int32(4)
 	backoffLimit := int32(6) // default value

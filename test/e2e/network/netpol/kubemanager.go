@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // kubeManager provides a convenience interface to kube functionality that we leverage for polling NetworkPolicy connections.
@@ -164,6 +165,7 @@ func (k *kubeManager) executeRemoteCommand(namespace string, pod string, contain
 
 // createNamespace is a convenience function for namespace setup.
 func (k *kubeManager) createNamespace(ns *v1.Namespace) (*v1.Namespace, error) {
+	enforcePodSecurityBaseline(ns)
 	createdNamespace, err := k.clientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to update namespace %s: %w", ns.Name, err)
@@ -252,6 +254,7 @@ func (k *kubeManager) setNamespaceLabels(ns string, labels map[string]string) er
 		return err
 	}
 	selectedNameSpace.ObjectMeta.Labels = labels
+	enforcePodSecurityBaseline(selectedNameSpace)
 	_, err = k.clientSet.CoreV1().Namespaces().Update(context.TODO(), selectedNameSpace, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to update namespace %s: %w", ns, err)
@@ -268,4 +271,12 @@ func (k *kubeManager) deleteNamespaces(namespaces []string) error {
 		}
 	}
 	return nil
+}
+
+func enforcePodSecurityBaseline(ns *v1.Namespace) {
+	if len(ns.ObjectMeta.Labels) == 0 {
+		ns.ObjectMeta.Labels = make(map[string]string)
+	}
+	// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace
+	ns.ObjectMeta.Labels[admissionapi.EnforceLevelLabel] = string(admissionapi.LevelBaseline)
 }

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -100,6 +101,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		ginkgo.By("constructing the pod")

@@ -36,12 +36,14 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = common.SIGDescribe("EndpointSlice", func() {
 	f := framework.NewDefaultFramework("endpointslice")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	var cs clientset.Interface
 	var podClient *framework.PodClient

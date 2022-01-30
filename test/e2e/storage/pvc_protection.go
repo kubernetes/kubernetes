@@ -35,6 +35,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -69,6 +70,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	)
 
 	f := framework.NewDefaultFramework("pvc-protection")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.BeforeEach(func() {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
