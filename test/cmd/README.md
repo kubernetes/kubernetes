@@ -41,4 +41,4 @@ source "${KUBE_ROOT}/test/cmd/batch.sh"
 ...
 ```
 
-Please keep the source list in alphabetical order.
+Please keep the source list in alphabetical order..
