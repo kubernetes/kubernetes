@@ -367,6 +367,11 @@ func (r *REST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, opti
 	newSvc := obj.(*api.Service)
 	oldSvc := oldObj.(*api.Service)
 
+	// Make sure the existing object has all fields we expect to be defaulted.
+	// This might not be true if the saved object predates these fields (the
+	// Decorator hook is not called on 'old' in the update path.
+	r.defaultOnReadService(oldSvc)
+
 	// Fix up allocated values that the client may have not specified (for
 	// idempotence).
 	patchAllocatedValues(After{newSvc}, Before{oldSvc})
