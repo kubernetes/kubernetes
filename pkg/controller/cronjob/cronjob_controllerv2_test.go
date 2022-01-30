@@ -26,7 +26,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -565,6 +565,36 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "bar-ns"}},
 			},
 			expected: []*batchv1.Job{},
+		},
+		{
+			name: "test getting jobs whose labels do not match job template",
+			cronJob: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
+				Spec: batchv1.CronJobSpec{JobTemplate: batchv1.JobTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
+				}},
+			},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+					Namespace:       "foo-ns",
+					Name:            "foo-fooer-owner-ref",
+					Labels:          map[string]string{"key": "different-value"},
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}},
+				},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+					Namespace:       "foo-ns",
+					Name:            "foo-other-owner-ref",
+					Labels:          map[string]string{"key": "different-value"},
+					OwnerReferences: []metav1.OwnerReference{{Name: "another-cronjob", Controller: &trueRef}}},
+				},
+			},
+			expected: []*batchv1.Job{{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:       "foo-ns",
+					Name:            "foo-fooer-owner-ref",
+					Labels:          map[string]string{"key": "different-value"},
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}},
+			}},
 		},
 	}
 	for _, tt := range tests {
