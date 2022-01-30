@@ -143,13 +143,13 @@ var _ = common.SIGDescribe("Feature:Topology Hints", func() {
 					framework.Failf("Expected endpoint in %s to have zone: %v", slice.Name, ep)
 				}
 				if ep.Hints == nil || len(ep.Hints.ForZones) == 0 {
-					framework.Failf("Expected endpoint in %s to have hints: %v", slice.Name, ep)
+					framework.Failf("Expected endpoint in %s to have exactly 1 zone hint, got 0: %s", slice.Name, framework.FormatJSON(ep))
 				}
 				if len(ep.Hints.ForZones) > 1 {
-					framework.Failf("Expected endpoint in %s to have exactly 1 zone hint, got %d: %v", slice.Name, len(ep.Hints.ForZones), ep)
+					framework.Failf("Expected endpoint in %s to have exactly 1 zone hint, got %d: %s", slice.Name, len(ep.Hints.ForZones), framework.FormatJSON(ep))
 				}
 				if *ep.Zone != ep.Hints.ForZones[0].Name {
-					framework.Failf("Expected endpoint in %s to have same zone hint, got %s: %v", slice.Name, *ep.Zone, ep)
+					framework.Failf("Expected endpoint in %s to have same zone hint, got %s: %v", slice.Name, *ep.Zone, framework.FormatJSON(ep))
 				}
 			}
 		}
