@@ -318,7 +318,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"ServiceAccount tokens. The specified file can contain multiple keys, and the flag can "+
 			"be specified multiple times with different files. If unspecified, "+
 			"--tls-private-key-file is used. Must be specified when "+
-			"--service-account-signing-key is provided")
+			"--service-account-signing-key-file is provided")
 
 		fs.BoolVar(&o.ServiceAccounts.Lookup, "service-account-lookup", o.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
