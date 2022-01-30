@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -78,11 +79,12 @@ type Framework struct {
 
 	ScalesGetter scaleclient.ScalesGetter
 
-	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
-	Namespace                *v1.Namespace   // Every test has at least one namespace unless creation is skipped
-	namespacesToDelete       []*v1.Namespace // Some tests have more than one.
-	NamespaceDeletionTimeout time.Duration
-	SkipPrivilegedPSPBinding bool // Whether to skip creating a binding to the privileged PSP in the test namespace
+	SkipNamespaceCreation            bool            // Whether to skip creating a namespace
+	Namespace                        *v1.Namespace   // Every test has at least one namespace unless creation is skipped
+	namespacesToDelete               []*v1.Namespace // Some tests have more than one.
+	NamespaceDeletionTimeout         time.Duration
+	SkipPrivilegedPSPBinding         bool               // Whether to skip creating a binding to the privileged PSP in the test namespace
+	NamespacePodSecurityEnforceLevel admissionapi.Level // The pod security enforcement level for namespaces to be applied.
 
 	gatherer *ContainerResourceGatherer
 	// Constraints that passed to a check which is executed after data is gathered to
@@ -521,6 +523,24 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	if createTestingNS == nil {
 		createTestingNS = CreateTestingNS
 	}
+
+	if labels == nil {
+		labels = make(map[string]string)
+	} else {
+		labelsCopy := make(map[string]string)
+		for k, v := range labels {
+			labelsCopy[k] = v
+		}
+		labels = labelsCopy
+	}
+
+	// TODO(sur): set to restricted before 1.24 test freeze
+	enforceLevel := admissionapi.LevelPrivileged
+	if f.NamespacePodSecurityEnforceLevel != "" {
+		enforceLevel = f.NamespacePodSecurityEnforceLevel
+	}
+	labels[admissionapi.EnforceLevelLabel] = string(enforceLevel)
+
 	ns, err := createTestingNS(baseName, f.ClientSet, labels)
 	// check ns instead of err to see if it's nil as we may
 	// fail to create serviceAccount in it.
