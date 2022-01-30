@@ -33,13 +33,15 @@ import (
 )
 
 var (
-	verbose    = flag.Bool("verbose", false, "print more information")
-	cross      = flag.Bool("cross", true, "build for all platforms")
-	platforms  = flag.String("platform", "", "comma-separated list of platforms to typecheck")
-	timings    = flag.Bool("time", false, "output times taken for each phase")
-	defuses    = flag.Bool("defuse", false, "output defs/uses")
-	serial     = flag.Bool("serial", false, "don't type check platforms in parallel (equivalent to --parallel=1)")
-	parallel   = flag.Int("parallel", 2, "limits how many platforms can be checked in parallel. 0 means no limit.")
+	verbose   = flag.Bool("verbose", false, "print more information")
+	cross     = flag.Bool("cross", true, "build for all platforms")
+	platforms = flag.String("platform", "", "comma-separated list of platforms to typecheck")
+	timings   = flag.Bool("time", false, "output times taken for each phase")
+	defuses   = flag.Bool("defuse", false, "output defs/uses")
+	serial    = flag.Bool("serial", false, "don't type check platforms in parallel (equivalent to --parallel=1)")
+	// Consider increasing the default parallelism once the Go 1.17 memory issue has been addressed
+	// https://github.com/kubernetes/test-infra/issues/23374
+	parallel   = flag.Int("parallel", 1, "limits how many platforms can be checked in parallel. 0 means no limit.")
 	skipTest   = flag.Bool("skip-test", false, "don't type check test code")
 	tags       = flag.String("tags", "", "comma-separated list of build tags to apply in addition to go's defaults")
 	ignoreDirs = flag.String("ignore-dirs", "", "comma-separated list of directories to ignore in addition to the default hardcoded list including staging, vendor, and hidden dirs")
