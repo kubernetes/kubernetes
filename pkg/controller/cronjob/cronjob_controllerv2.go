@@ -225,13 +225,9 @@ func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *me
 }
 
 func (jm *ControllerV2) getJobsToBeReconciled(cronJob *batchv1.CronJob) ([]*batchv1.Job, error) {
-	var jobSelector labels.Selector
-	if len(cronJob.Spec.JobTemplate.Labels) == 0 {
-		jobSelector = labels.Everything()
-	} else {
-		jobSelector = labels.Set(cronJob.Spec.JobTemplate.Labels).AsSelector()
-	}
-	jobList, err := jm.jobLister.Jobs(cronJob.Namespace).List(jobSelector)
+	// list all jobs: there may be jobs with labels that don't match the template anymore,
+	// but that still have a ControllerRef to the given cronjob
+	jobList, err := jm.jobLister.Jobs(cronJob.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
