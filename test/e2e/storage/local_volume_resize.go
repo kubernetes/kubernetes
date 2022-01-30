@@ -36,10 +36,12 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-expansion")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("loopback local block volume", func() {
 		var (
 			config *localTestConfig

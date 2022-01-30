@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 
@@ -45,6 +46,7 @@ import (
 
 var _ = SIGDescribe("ServerSideApply", func() {
 	f := framework.NewDefaultFramework("apply")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	var client clientset.Interface
 	var ns string

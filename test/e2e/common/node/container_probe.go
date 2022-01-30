@@ -37,6 +37,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -50,6 +51,7 @@ const (
 
 var _ = SIGDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *framework.PodClient
 	probe := webserverProbeBuilder{}
 

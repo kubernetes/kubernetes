@@ -47,6 +47,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	"k8s.io/kubernetes/test/e2e/scheduling"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -67,6 +68,7 @@ type watchEventConfig struct {
 
 var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	parallelism := int32(2)
 	completions := int32(4)
 

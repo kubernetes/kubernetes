@@ -28,10 +28,12 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("pod-os-rejection")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func() {
 			linuxNode, err := findLinuxNode(f)

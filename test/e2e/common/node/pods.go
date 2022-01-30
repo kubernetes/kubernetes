@@ -52,6 +52,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -183,6 +184,7 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 
 var _ = SIGDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *framework.PodClient
 	var dc dynamic.Interface
 

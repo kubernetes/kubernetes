@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
 )
 
@@ -72,6 +73,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 	)
 
 	f := framework.NewDefaultFramework("funny-ips")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		if framework.TestContext.ClusterIsIPv6() {

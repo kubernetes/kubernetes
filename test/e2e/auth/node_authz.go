@@ -29,6 +29,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -41,6 +42,7 @@ const (
 var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 
 	f := framework.NewDefaultFramework("node-authz")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	// client that will impersonate a node
 	var c clientset.Interface
 	var ns string
