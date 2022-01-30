@@ -39,7 +39,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = common.SIGDescribe("Feature:Topology Hints", func() {
+var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 	f := framework.NewDefaultFramework("topology-hints")
 
 	// filled in BeforeEach
