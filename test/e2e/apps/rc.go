@@ -41,12 +41,14 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	var ns string
 	var dc dynamic.Interface

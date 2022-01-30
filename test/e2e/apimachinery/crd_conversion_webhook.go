@@ -38,6 +38,7 @@ import (
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -117,6 +118,7 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	servicePort := int32(9443)
 	containerPort := int32(9444)
 

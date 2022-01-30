@@ -37,10 +37,12 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var zoneCount int
 	var err error
 	var cleanUp func()

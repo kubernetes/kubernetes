@@ -45,6 +45,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -100,6 +101,7 @@ func newPodQuota(name, number string) *v1.ResourceQuota {
 
 var _ = SIGDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9

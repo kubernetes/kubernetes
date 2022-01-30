@@ -29,6 +29,7 @@ import (
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type disruptiveTestSuite struct {
@@ -89,6 +90,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("disruptive", storageframework.GetDriverTimeouts(driver))
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	init := func() {
 		l = local{}
