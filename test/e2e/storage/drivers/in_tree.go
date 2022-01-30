@@ -1367,7 +1367,7 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 
 func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
-	if volType == storageframework.InlineVolume {
+	if volType == storageframework.InlineVolume || volType == storageframework.PreprovisionedPV {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
@@ -1376,6 +1376,8 @@ func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 			},
 		}
 	}
+	framework.Logf("volume type %q: config.ClientNodeSelection.Selector = %v", volType, config.ClientNodeSelection.Selector)
+
 	ginkgo.By("creating a test gce pd volume")
 	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
@@ -1781,7 +1783,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 
 func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
-	if volType == storageframework.InlineVolume {
+	if volType == storageframework.InlineVolume || volType == storageframework.PreprovisionedPV {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
@@ -1790,6 +1792,8 @@ func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 			},
 		}
 	}
+	framework.Logf("volume type %q: config.ClientNodeSelection.Selector = %v", volType, config.ClientNodeSelection.Selector)
+
 	ginkgo.By("creating a test aws volume")
 	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
