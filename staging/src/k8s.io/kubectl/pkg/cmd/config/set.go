@@ -49,6 +49,10 @@ var (
 
 	PROPERTY_VALUE is the new value you want to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.
 
+	When configuring lists you can insert new or remove existing keys by appending a + or - to the comma separated list of values respectively, e.g. value1,value2+ or value1,value2-
+
+	When configuring a list of dictrionaries, you will need to specify a dictionary field and value pair to search for in the dot notation in form of field.value. The value will need to be set by specifying the field you are editing and the value to set it to, separated by a :. e.g. kubectl config set users.foo.exec.env.name.test value:val1
+
 	Specifying an attribute name that already exists will merge new fields on top of existing values.`))
 
 	setExample = templates.Examples(`
@@ -62,7 +66,16 @@ var (
 	kubectl config set contexts.my-context.cluster my-cluster
 
 	# Set the client-key-data field in the cluster-admin user using --set-raw-bytes option
-	kubectl config set users.cluster-admin.client-key-data cert_data_here --set-raw-bytes=true`)
+	kubectl config set users.cluster-admin.client-key-data cert_data_here --set-raw-bytes=true
+	
+	# Set a new act-as-group for an existing list of groups
+	kubectl config set users.foo.act-as-groups newGroup+
+	
+	# Remove existing group from list of groups under act-as-group
+	kubectl config set users.foo.act-as-groups existingGroup-
+	
+	# Set an exec environment variable with the name test and the value val1
+	kubectl config set users.foo.exec.env.name.test value:val1`)
 )
 
 // NewCmdConfigSet returns a Command instance for 'config set' sub command
