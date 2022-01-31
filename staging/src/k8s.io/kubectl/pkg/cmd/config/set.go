@@ -258,33 +258,17 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				}
 
 				targetStruct := actualCurrValue.Index(targetStructIndex)
-				fieldIndex := 0
-				for fieldIndex < targetStruct.NumField() {
-					currFieldTypeYamlName := getMapFieldTypeYamlName(targetStruct, fieldIndex)
-
-					if currFieldTypeYamlName == searchField {
-						break
-					}
-					fieldIndex++
-				}
-				if fieldIndex > targetStruct.NumField() {
+				searchFieldIndex := getStructFieldIndexByName(targetStruct, searchField)
+				if searchFieldIndex < 0 {
 					return fmt.Errorf("could not find field in struct with name %v", searchField)
 				}
-				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{fieldIndex}).Set(reflect.ValueOf(searchValue))
+				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{searchFieldIndex}).Set(reflect.ValueOf(searchValue))
 
-				fieldIndex = 0
-				for fieldIndex < targetStruct.NumField() {
-					currFieldTypeYamlName := getMapFieldTypeYamlName(targetStruct, fieldIndex)
-
-					if currFieldTypeYamlName == setField {
-						break
-					}
-					fieldIndex++
-				}
-				if fieldIndex > targetStruct.NumField() {
+				setFieldIndex := getStructFieldIndexByName(targetStruct, setField)
+				if setFieldIndex < 0 {
 					return fmt.Errorf("could not find field in struct with name %v", setField)
 				}
-				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{fieldIndex}).Set(reflect.ValueOf(setValue))
+				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{setFieldIndex}).Set(reflect.ValueOf(setValue))
 
 				return nil
 
@@ -379,6 +363,20 @@ func getStructByFieldName(v reflect.Value, name string, value string) int {
 			if currFieldTypeYamlName == name && currFieldValue.String() == value {
 				return i
 			}
+		}
+	}
+
+	// If we never find the Name key return false
+	return -1
+}
+
+// getStructFieldIndexByName returns the index number of a field with a name
+func getStructFieldIndexByName(objValue reflect.Value, name string) int {
+	// Iterate through fields until we find the field we're looking for and return the index
+	for fieldIndex := 0; fieldIndex < objValue.NumField(); fieldIndex++ {
+		currFieldTypeYamlName := getMapFieldTypeYamlName(objValue, fieldIndex)
+		if currFieldTypeYamlName == name {
+			return fieldIndex
 		}
 	}
 
