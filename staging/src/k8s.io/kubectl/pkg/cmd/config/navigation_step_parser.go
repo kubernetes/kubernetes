@@ -85,36 +85,16 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			currType = fieldType
 
 		case reflect.Ptr:
-			// Similar to the modifyConfig function, because we can't easily walk the AuthProviderConfig or ExecConfig types we must manually work with them
-			switch currType {
-			case reflect.TypeOf(&clientcmdapi.AuthProviderConfig{}):
+			steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
+			currPartIndex += 1
+
+			// To help users know if they've provided a malformed path, check length
+			nextPart := strings.Join(individualParts[currPartIndex:], ".")
+			if len(strings.Split(nextPart, ".")) > 2 {
+				return nil, fmt.Errorf("too many steps in path %v", path)
+			} else if len(strings.Split(nextPart, ".")) > 1 {
 				steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
 				currPartIndex += 1
-
-				// If we have a part after the auth provider name we need to add it. There should only ever be at most one part after this.
-				nextPart := strings.Join(individualParts[currPartIndex:], ".")
-				if len(strings.Split(nextPart, ".")) > 2 {
-					return nil, fmt.Errorf("too many steps in path %v", path)
-				} else if len(strings.Split(nextPart, ".")) > 1 {
-					steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
-					currPartIndex += 1
-				}
-
-			case reflect.TypeOf(&clientcmdapi.ExecConfig{}):
-				steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
-				currPartIndex += 1
-
-				// If we have a part after the auth provider name we need to add it. There should only ever be at most one part after this.
-				nextPart := strings.Join(individualParts[currPartIndex:], ".")
-				if len(strings.Split(nextPart, ".")) > 2 {
-					return nil, fmt.Errorf("too many steps in path %v", path)
-				} else if len(strings.Split(nextPart, ".")) > 1 {
-					steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
-					currPartIndex += 1
-				}
-
-			default:
-				return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
 			}
 
 		default:
