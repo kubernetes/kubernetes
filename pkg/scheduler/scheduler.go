@@ -468,6 +468,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				if status.Code() == framework.Error {
 					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				} else {
+					fitError.Diagnosis.PostFilterMsg = status.Message()
 					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				}
 				if result != nil {

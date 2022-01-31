@@ -76,8 +76,8 @@ func (pl *FakePostFilterPlugin) CandidatesToVictimsMap(candidates []Candidate) m
 	return nil
 }
 
-func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) bool {
-	return true
+func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string) {
+	return true, ""
 }
 
 func TestNodesWherePreemptionMightHelp(t *testing.T) {
