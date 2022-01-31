@@ -230,6 +230,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				}
 
 				// Set struct field and value we will be setting
+				if len(strings.Split(propertyValue, ":")) != 2 {
+					return fmt.Errorf("error parsing field name for value, should be of format fieldName:fieldValue")
+				}
 				setField := strings.Split(propertyValue, ":")[0]
 				setValue := strings.Split(propertyValue, ":")[1]
 
