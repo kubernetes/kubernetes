@@ -2243,7 +2243,7 @@ func TestConflictingData(t *testing.T) {
 			eventRecorder := record.NewFakeRecorder(100)
 			eventRecorder.IncludeObject = true
 
-			metadataClient := fakemetadata.NewSimpleMetadataClient(legacyscheme.Scheme)
+			metadataClient := fakemetadata.NewSimpleMetadataClient(fakemetadata.NewTestScheme())
 
 			tweakableRM := meta.NewDefaultRESTMapper(nil)
 			tweakableRM.AddSpecific(
