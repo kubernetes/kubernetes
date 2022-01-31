@@ -481,10 +481,10 @@ func TestSetConfigExecEnvUpdate(t *testing.T) {
 func TestSetConfigExecEnvMalformedValue(t *testing.T) {
 	conf := *clientcmdapi.NewConfig()
 	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.env.name.test to value2",
-		config:         conf,
-		args:           []string{"users.foo.exec.env.name.test", "value2"},
-		expectedErr:       `error parsing field name for value, should be of format fieldName:fieldValue`,
+		description: "Testing for kubectl config set users.foo.exec.env.name.test to value2",
+		config:      conf,
+		args:        []string{"users.foo.exec.env.name.test", "value2"},
+		expectedErr: `error parsing field name for value, should be of format fieldName:fieldValue`,
 	}
 	test.run(t)
 }
