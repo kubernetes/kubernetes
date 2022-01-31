@@ -120,6 +120,17 @@ func TestSetConfigAuthProviderConfigRefreshToken(t *testing.T) {
 	test.run(t)
 }
 
+func TestSetConfigAuthProviderConfigEmptyKey(t *testing.T) {
+	conf := *clientcmdapi.NewConfig()
+	test := setConfigTest{
+		description: "Testing for kubectl config set users.foo.auth-provider.config to test",
+		config:      conf,
+		args:        []string{"users.foo.auth-provider.config", "test"},
+		expectedErr: `empty key provided for map`,
+	}
+	test.run(t)
+}
+
 func TestSetConfigExecConfigCommand(t *testing.T) {
 	conf := *clientcmdapi.NewConfig()
 	expectedConfig := clientcmdapi.Config{

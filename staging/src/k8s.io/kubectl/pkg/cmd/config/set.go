@@ -159,6 +159,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 		if !steps.moreStepsRemaining() && !unset {
 			switch mapValueType.Kind() {
 			case reflect.String:
+				if currStep.stepValue == "" {
+					return fmt.Errorf("empty key provided for map")
+				}
 				actualCurrValue.SetMapIndex(reflect.ValueOf(currStep.stepValue), reflect.ValueOf(propertyValue))
 
 			case reflect.Slice:
