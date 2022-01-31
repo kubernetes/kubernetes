@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -31,6 +30,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -391,19 +391,6 @@ func getMapFieldTypeYamlName(objValue reflect.Value, fieldIndex int) string {
 	return currFieldTypeYamlName
 }
 
-func dedupeStringSlice(slice []string) []string {
-	sliceMap := make(map[string]struct{})
-	for i := 0; i < len(slice); i++ {
-		sliceMap[slice[i]] = struct{}{}
-	}
-	var dedupeSlice []string
-	for k := range sliceMap {
-		dedupeSlice = append(dedupeSlice, k)
-	}
-	sort.Strings(dedupeSlice)
-	return dedupeSlice
-}
-
 func editStringSlice(slice []string, input string) []string {
 	function := string(input[len(input)-1])
 	switch function {
@@ -430,10 +417,10 @@ func editStringSlice(slice []string, input string) []string {
 		input = string(input[:len(input)-1])
 		argSlice := strings.Split(input, ",")
 		slice = append(slice, argSlice...)
-		return dedupeStringSlice(slice)
+		return sets.NewString(slice...).List()
 
 	default:
 		argSlice := strings.Split(input, ",")
-		return dedupeStringSlice(argSlice)
+		return sets.NewString(argSlice...).List()
 	}
 }
