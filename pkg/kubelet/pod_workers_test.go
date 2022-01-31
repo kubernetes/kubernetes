@@ -570,6 +570,70 @@ func TestSyncKnownPods(t *testing.T) {
 	}
 }
 
+func Test_removeTerminatedWorker(t *testing.T) {
+	podUID := types.UID("pod-uid")
+
+	testCases := []struct {
+		desc                               string
+		podSyncStatus                      *podSyncStatus
+		startedStaticPodsByFullname        map[string]types.UID
+		waitingToStartStaticPodsByFullname map[string][]types.UID
+		removed                            bool
+	}{
+		{
+			desc: "finished worker",
+			podSyncStatus: &podSyncStatus{
+				finished: true,
+			},
+			removed: true,
+		},
+		{
+			desc: "waiting to start worker because of another started pod with the same fullname",
+			podSyncStatus: &podSyncStatus{
+				finished: false,
+				fullname: "fake-fullname",
+			},
+			startedStaticPodsByFullname: map[string]types.UID{
+				"fake-fullname": "another-pod-uid",
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"fake-fullname": {podUID},
+			},
+			removed: true,
+		},
+		{
+			desc: "not yet started worker",
+			podSyncStatus: &podSyncStatus{
+				finished: false,
+				fullname: "fake-fullname",
+			},
+			startedStaticPodsByFullname: make(map[string]types.UID),
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"fake-fullname": {podUID},
+			},
+			removed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			podWorkers, _ := createPodWorkers()
+			podWorkers.podSyncStatuses[podUID] = tc.podSyncStatus
+			podWorkers.startedStaticPodsByFullname = tc.startedStaticPodsByFullname
+			podWorkers.waitingToStartStaticPodsByFullname = tc.waitingToStartStaticPodsByFullname
+
+			podWorkers.removeTerminatedWorker(podUID)
+			_, exists := podWorkers.podSyncStatuses[podUID]
+			if tc.removed && exists {
+				t.Errorf("Expected pod worker to be removed")
+			}
+			if !tc.removed && !exists {
+				t.Errorf("Expected pod worker to not be removed")
+			}
+		})
+	}
+}
+
 type simpleFakeKubelet struct {
 	pod       *v1.Pod
 	mirrorPod *v1.Pod
@@ -848,6 +912,35 @@ func Test_allowPodStart(t *testing.T) {
 			waitingToStartStaticPodsByFullname: map[string][]types.UID{
 				"foo_": {
 					types.UID("uid-2"),
+					types.UID("uid-2"),
+					types.UID("uid-3"),
+					types.UID("uid-0"),
+					types.UID("uid-1"),
+				},
+			},
+			allowed: true,
+		},
+		{
+			desc: "static pod if the static pod is the first pod that is not termination requested and waiting to start",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-1": {
+					fullname: "foo_",
+				},
+				"uid-2": {
+					fullname:      "foo_",
+					terminatingAt: time.Now(),
+				},
+				"uid-3": {
+					fullname:     "foo_",
+					terminatedAt: time.Now(),
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
 					types.UID("uid-2"),
 					types.UID("uid-3"),
 					types.UID("uid-0"),

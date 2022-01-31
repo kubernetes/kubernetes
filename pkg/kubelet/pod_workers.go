@@ -820,7 +820,8 @@ func (p *podWorkers) allowStaticPodStart(fullname string, uid types.UID) bool {
 	waitingPods := p.waitingToStartStaticPodsByFullname[fullname]
 	for i, waitingUID := range waitingPods {
 		// has pod already terminated or been deleted?
-		if _, ok := p.podSyncStatuses[waitingUID]; !ok {
+		status, ok := p.podSyncStatuses[waitingUID]
+		if !ok || status.IsTerminationRequested() || status.IsTerminated() {
 			continue
 		}
 		// another pod is next in line
@@ -1149,10 +1150,10 @@ func (p *podWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorke
 	return workers
 }
 
-// removeTerminatedWorker cleans up and removes the worker status for a worker that
-// has reached a terminal state of "finished" - has successfully exited
-// syncTerminatedPod. This "forgets" a pod by UID and allows another pod to be recreated
-// with the same UID.
+// removeTerminatedWorker cleans up and removes the worker status for a worker
+// that has reached a terminal state of "finished" - has successfully exited
+// syncTerminatedPod or a worker that does not start yet. This "forgets" a pod
+// by UID and allows another pod to be recreated with the same UID.
 func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 	status, ok := p.podSyncStatuses[uid]
 	if !ok {
@@ -1161,9 +1162,13 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 		return
 	}
 
-	if startedUID, started := p.startedStaticPodsByFullname[status.fullname]; started && startedUID != uid {
-		klog.V(4).InfoS("Pod cannot start yet but is no longer known to the kubelet, finish it", "podUID", uid)
-		status.finished = true
+	_, waiting := p.waitingToStartStaticPodsByFullname[status.fullname]
+	startedUID, started := p.startedStaticPodsByFullname[status.fullname]
+	if waiting || started {
+		if !started || (started && startedUID != uid) {
+			klog.V(4).InfoS("Pod does not start yet but is no longer known to the kubelet, finish it", "podUID", uid)
+			status.finished = true
+		}
 	}
 
 	if !status.finished {
@@ -1177,6 +1182,9 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 		klog.V(4).InfoS("Pod has been terminated and is no longer known to the kubelet, remove all history", "podUID", uid)
 	}
 	delete(p.podSyncStatuses, uid)
+	if ch, ok := p.podUpdates[uid]; ok {
+		close(ch)
+	}
 	delete(p.podUpdates, uid)
 	delete(p.lastUndeliveredWorkUpdate, uid)
 
