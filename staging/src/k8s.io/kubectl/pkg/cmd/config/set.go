@@ -360,7 +360,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 	}
 
-	panic(fmt.Errorf("unrecognized type: %v\nwanted: %v", actualCurrValue, actualCurrValue.Kind()))
+	return fmt.Errorf("unrecognized type: %v\nwanted: %v", actualCurrValue, actualCurrValue.Kind())
 }
 
 // getStructFromSliceByFieldName gets the index of the struct in a slice that has the given field name set to the given value
