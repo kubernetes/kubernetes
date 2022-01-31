@@ -215,6 +215,8 @@ type WeightedAffinityTerm struct {
 type Diagnosis struct {
 	NodeToStatusMap      NodeToStatusMap
 	UnschedulablePlugins sets.String
+	// PostFilterMsg records the messages returned from PostFilterPlugins.
+	PostFilterMsg string
 }
 
 // FitError describes a fit error of a pod.
@@ -247,6 +249,10 @@ func (f *FitError) Error() string {
 		return reasonStrings
 	}
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	postFilterMsg := f.Diagnosis.PostFilterMsg
+	if postFilterMsg != "" {
+		reasonMsg += " " + postFilterMsg
+	}
 	return reasonMsg
 }
 
