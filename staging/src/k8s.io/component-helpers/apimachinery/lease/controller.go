@@ -177,6 +177,7 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 // retryUpdateLease attempts to update the lease for maxUpdateRetries,
 // call this once you're sure the lease has been created
 func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
+	heartbeatFailure := false
 	for i := 0; i < maxUpdateRetries; i++ {
 		leaseToUpdate, _ := c.newLease(base)
 		lease, err := c.leaseClient.Update(context.TODO(), leaseToUpdate, metav1.UpdateOptions{})
@@ -190,7 +191,8 @@ func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 			base, _ = c.backoffEnsureLease()
 			continue
 		}
-		if i > 0 && c.onRepeatedHeartbeatFailure != nil {
+		if !heartbeatFailure && i > 0 && c.onRepeatedHeartbeatFailure != nil {
+			heartbeatFailure = true
 			c.onRepeatedHeartbeatFailure()
 		}
 	}

@@ -265,6 +265,27 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 			onRepeatedHeartbeatFailure: func() { t.Fatalf("onRepeatedHeartbeatFailure called") },
 			expectErr:                  false,
 		},
+		{
+			desc: "onRepeatedHeartbeatFailure only called once",
+			updateReactor: func() func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return func(action clienttesting.Action) (bool, runtime.Object, error) {
+					return true, nil, noConnectionUpdateErr
+				}
+			}(),
+			getReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, &coordinationv1.Lease{}, nil
+			},
+			onRepeatedHeartbeatFailure: func() func() {
+				i := 0
+				return func() {
+					i++
+					if i > 1 {
+						t.Fatalf("onRepeatedHeartbeatFailure called")
+					}
+				}
+			}(),
+			expectErr: true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
