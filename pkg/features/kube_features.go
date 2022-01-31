@@ -538,6 +538,12 @@ const (
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
 	// owner: @andrewsykim
+	// GA: TODO
+	//
+	// Override the default timeout duration for exec probes to 5s.
+	ExtendDefaultExecProbeTimeout featuregate.Feature = "ExtendDefaultExecProbeTimeout"
+
+	// owner: @andrewsykim
 	// alpha: v1.20
 	//
 	// Enable kubelet exec plugins for image pull credentials.
@@ -912,6 +918,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	SizeMemoryBackedVolumes:                        {Default: true, PreRelease: featuregate.Beta},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
+	ExtendDefaultExecProbeTimeout:                  {Default: true, PreRelease: featuregate.GA},
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: true, PreRelease: featuregate.Beta},
 	GracefulNodeShutdownBasedOnPodPriority:         {Default: false, PreRelease: featuregate.Alpha},
