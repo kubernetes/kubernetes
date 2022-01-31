@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
 	"k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/network/denyserviceexternalips"
+	"k8s.io/kubernetes/plugin/pkg/admission/node/execprobetimeout"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
@@ -94,6 +95,7 @@ var AllOrderedPlugins = []string{
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
+	execprobetimeout.PluginName,             // ExtendDefaultExecProbeTimeout
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -139,6 +141,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	certapproval.Register(plugins)
 	certsigning.Register(plugins)
 	certsubjectrestriction.Register(plugins)
+	execprobetimeout.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
@@ -162,6 +165,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 		defaultingressclass.PluginName,          // DefaultIngressClass
 		podsecurity.PluginName,                  // PodSecurity
+		execprobetimeout.PluginName,             // ExtendDefaultExecProbeTimeout
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
