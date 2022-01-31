@@ -260,9 +260,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				targetStruct := actualCurrValue.Index(targetStructIndex)
 				fieldIndex := 0
 				for fieldIndex < targetStruct.NumField() {
-					currFieldType := targetStruct.Type().Field(fieldIndex)
-					currYamlTag := currFieldType.Tag.Get("json")
-					currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+					currFieldTypeYamlName := getMapFieldTypeYamlName(targetStruct, fieldIndex)
 
 					if currFieldTypeYamlName == searchField {
 						break
@@ -276,9 +274,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 				fieldIndex = 0
 				for fieldIndex < targetStruct.NumField() {
-					currFieldType := targetStruct.Type().Field(fieldIndex)
-					currYamlTag := currFieldType.Tag.Get("json")
-					currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+					currFieldTypeYamlName := getMapFieldTypeYamlName(targetStruct, fieldIndex)
 
 					if currFieldTypeYamlName == setField {
 						break
@@ -316,9 +312,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 	case reflect.Struct:
 		for fieldIndex := 0; fieldIndex < actualCurrValue.NumField(); fieldIndex++ {
 			currFieldValue := actualCurrValue.Field(fieldIndex)
-			currFieldType := actualCurrValue.Type().Field(fieldIndex)
-			currYamlTag := currFieldType.Tag.Get("json")
-			currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+			currFieldTypeYamlName := getMapFieldTypeYamlName(actualCurrValue, fieldIndex)
 
 			if currFieldTypeYamlName == currStep.stepValue {
 				thisMapHasNoValue := (currFieldValue.Kind() == reflect.Map && currFieldValue.IsNil())
@@ -380,9 +374,7 @@ func getStructByFieldName(v reflect.Value, name string, value string) int {
 		objValue := reflect.ValueOf(obj)
 		for fieldIndex := 0; fieldIndex < objValue.NumField(); fieldIndex++ {
 			currFieldValue := objValue.Field(fieldIndex)
-			currFieldType := objValue.Type().Field(fieldIndex)
-			currYamlTag := currFieldType.Tag.Get("json")
-			currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+			currFieldTypeYamlName := getMapFieldTypeYamlName(objValue, fieldIndex)
 
 			if currFieldTypeYamlName == name && currFieldValue.String() == value {
 				return i
@@ -392,6 +384,13 @@ func getStructByFieldName(v reflect.Value, name string, value string) int {
 
 	// If we never find the Name key return false
 	return -1
+}
+
+func getMapFieldTypeYamlName(objValue reflect.Value, fieldIndex int) string {
+	currFieldType := objValue.Type().Field(fieldIndex)
+	currYamlTag := currFieldType.Tag.Get("json")
+	currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
+	return currFieldTypeYamlName
 }
 
 func dedupeStringSlice(slice []string) []string {
