@@ -89,7 +89,7 @@ func (s EgressType) AsNetworkContext() NetworkContext {
 	return NetworkContext{EgressSelectionName: s}
 }
 
-func lookupServiceName(name string) (EgressType, error) {
+func serviceNameToEgressType(name string) (EgressType, error) {
 	switch strings.ToLower(name) {
 	case "controlplane":
 		return ControlPlane, nil
@@ -346,15 +346,15 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		egressToDialer: make(map[EgressType]utilnet.DialFunc),
 	}
 	for _, service := range config.EgressSelections {
-		name, err := lookupServiceName(service.Name)
+		egressType, err := serviceNameToEgressType(service.Name)
 		if err != nil {
 			return nil, err
 		}
 		dialerCreator, err := connectionToDialerCreator(service.Connection)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create dialer for egressSelection %q: %v", name, err)
+			return nil, fmt.Errorf("failed to create dialer for egressSelection %q: %v", egressType, err)
 		}
-		cs.egressToDialer[name] = dialerCreator.createDialer(name)
+		cs.egressToDialer[egressType] = dialerCreator.createDialer(egressType)
 	}
 	return cs, nil
 }
