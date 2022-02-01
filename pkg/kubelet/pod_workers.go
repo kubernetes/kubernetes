@@ -1029,11 +1029,7 @@ func (p *podWorkers) completeTerminatingRuntimePod(pod *v1.Pod) {
 		}
 	}
 
-	ch, ok := p.podUpdates[pod.UID]
-	if ok {
-		close(ch)
-	}
-	delete(p.podUpdates, pod.UID)
+	p.cleanupPodUpdates(pod.UID)
 	delete(p.lastUndeliveredWorkUpdate, pod.UID)
 }
 
@@ -1045,11 +1041,7 @@ func (p *podWorkers) completeTerminated(pod *v1.Pod) {
 
 	klog.V(4).InfoS("Pod is complete and the worker can now stop", "pod", klog.KObj(pod), "podUID", pod.UID)
 
-	ch, ok := p.podUpdates[pod.UID]
-	if ok {
-		close(ch)
-	}
-	delete(p.podUpdates, pod.UID)
+	p.cleanupPodUpdates(pod.UID)
 	delete(p.lastUndeliveredWorkUpdate, pod.UID)
 
 	if status, ok := p.podSyncStatuses[pod.UID]; ok {
@@ -1184,10 +1176,7 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 		klog.V(4).InfoS("Pod has been terminated and is no longer known to the kubelet, remove all history", "podUID", uid)
 	}
 	delete(p.podSyncStatuses, uid)
-	if ch, ok := p.podUpdates[uid]; ok {
-		close(ch)
-	}
-	delete(p.podUpdates, uid)
+	p.cleanupPodUpdates(uid)
 	delete(p.lastUndeliveredWorkUpdate, uid)
 
 	if p.startedStaticPodsByFullname[status.fullname] == uid {
@@ -1238,4 +1227,13 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 			return fmt.Errorf("timeout waiting to kill pod")
 		}
 	}
+}
+
+// cleanupPodUpdates closes the podUpdates channel and removes it from
+// podUpdates map so that the corresponding pod worker can stop
+func (p *podWorkers) cleanupPodUpdates(uid types.UID) {
+	if ch, ok := p.podUpdates[uid]; ok {
+		close(ch)
+	}
+	delete(p.podUpdates, uid)
 }
