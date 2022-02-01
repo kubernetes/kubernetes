@@ -19,7 +19,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -45,7 +44,7 @@ import (
 
 func TestSetup(t *testing.T) {
 	// temp dir
-	tmpDir, err := ioutil.TempDir("", "scheduler-options")
+	tmpDir, err := os.MkdirTemp("", "scheduler-options")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +58,7 @@ func TestSetup(t *testing.T) {
 	defer server.Close()
 
 	configKubeconfig := filepath.Join(tmpDir, "config.kubeconfig")
-	if err := ioutil.WriteFile(configKubeconfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(configKubeconfig, []byte(fmt.Sprintf(`
 apiVersion: v1
 kind: Config
 clusters:
@@ -83,7 +82,7 @@ users:
 
 	// plugin config
 	pluginConfigFilev1beta3 := filepath.Join(tmpDir, "pluginv1beta3.yaml")
-	if err := ioutil.WriteFile(pluginConfigFilev1beta3, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(pluginConfigFilev1beta3, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -121,7 +120,7 @@ profiles:
 
 	// plugin config
 	pluginConfigFilev1beta2 := filepath.Join(tmpDir, "pluginv1beta2.yaml")
-	if err := ioutil.WriteFile(pluginConfigFilev1beta2, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(pluginConfigFilev1beta2, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -158,7 +157,7 @@ profiles:
 
 	// multiple profiles config
 	multiProfilesConfig := filepath.Join(tmpDir, "multi-profiles.yaml")
-	if err := ioutil.WriteFile(multiProfilesConfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(multiProfilesConfig, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -188,7 +187,7 @@ profiles:
 
 	// empty leader-election config
 	emptyLeaderElectionConfig := filepath.Join(tmpDir, "empty-leader-election-config.yaml")
-	if err := ioutil.WriteFile(emptyLeaderElectionConfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(emptyLeaderElectionConfig, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -199,7 +198,7 @@ clientConnection:
 
 	// leader-election config
 	leaderElectionConfig := filepath.Join(tmpDir, "leader-election-config.yaml")
-	if err := ioutil.WriteFile(leaderElectionConfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(leaderElectionConfig, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:

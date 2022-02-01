@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/url"
 	"os"
@@ -219,7 +218,7 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
 
-	if err := ioutil.WriteFile(filename, serialized, 0600); err != nil {
+	if err := os.WriteFile(filename, serialized, 0600); err != nil {
 		return errors.Wrapf(err, "failed to write static pod manifest file for %q (%q)", componentName, filename)
 	}
 
@@ -228,7 +227,7 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 // ReadStaticPodFromDisk reads a static pod file from disk
 func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
-	buf, err := ioutil.ReadFile(manifestPath)
+	buf, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
 	}
@@ -362,11 +361,11 @@ func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int, v1.UR
 
 // ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise
 func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
-	content1, err := ioutil.ReadFile(path1)
+	content1, err := os.ReadFile(path1)
 	if err != nil {
 		return false, err
 	}
-	content2, err := ioutil.ReadFile(path2)
+	content2, err := os.ReadFile(path2)
 	if err != nil {
 		return false, err
 	}

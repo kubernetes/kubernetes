@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -926,7 +925,7 @@ func TestValidateDiscoveryTokenAPIServer(t *testing.T) {
 }
 
 func TestValidateDiscoveryKubeConfigPath(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("/tmp", "test_discovery_file")
+	tmpfile, err := os.CreateTemp("/tmp", "test_discovery_file")
 	if err != nil {
 		t.Errorf("Error creating temporary file: %v", err)
 	}
