@@ -165,24 +165,25 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		deadline          int64
 
 		// cj status
-		ranPreviously              bool
-		stillActive                bool
-		jobPresentInCJActiveStatus bool
-
-		jobCreationTime time.Time
+		ranPreviously bool
+		stillActive   bool
 
 		// environment
-		now time.Time
+		jobCreationTime time.Time
+		now             time.Time
+		jobCreateError  error
+		jobGetErr       error
 
 		// expectations
-		expectCreate             bool
-		expectDelete             bool
-		expectActive             int
-		expectedWarnings         int
-		expectErr                bool
-		expectRequeueAfter       bool
-		jobStillNotFoundInLister bool
-		jobCreateError           error
+		expectCreate               bool
+		expectDelete               bool
+		expectActive               int
+		expectedWarnings           int
+		expectErr                  bool
+		expectRequeueAfter         bool
+		expectUpdateStatus         bool
+		jobStillNotFoundInLister   bool
+		jobPresentInCJActiveStatus bool
 	}{
 		"never ran, not valid schedule, A": {
 			concurrencyPolicy:          "Allow",
@@ -246,6 +247,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"never ran, is time, F": {
@@ -257,6 +259,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"never ran, is time, R": {
@@ -268,6 +271,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"never ran, is time, suspended": {
@@ -297,6 +301,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 
@@ -308,6 +313,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, not time, F": {
@@ -318,6 +324,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, not time, R": {
@@ -328,6 +335,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, is time, A": {
@@ -340,6 +348,19 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, create job failed, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			jobCreateError:             errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
+			expectErr:                  true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, is time, F": {
@@ -352,6 +373,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, is time, R": {
@@ -364,6 +386,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, is time, suspended": {
@@ -374,6 +397,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			ranPreviously:              true,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        *justAfterTheHour(),
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, is time, past deadline": {
@@ -384,6 +408,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        *justAfterTheHour(),
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, is time, not past deadline": {
@@ -396,6 +421,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 
@@ -446,6 +472,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               2,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"still active, is time, F": {
@@ -472,6 +499,20 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectDelete:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, get job failed, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			jobGetErr:                  errors.NewBadRequest("request is invalid"),
+			expectActive:               1,
+			expectedWarnings:           1,
 			jobPresentInCJActiveStatus: true,
 		},
 		"still active, is time, suspended": {
@@ -509,6 +550,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               2,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 
@@ -525,6 +567,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectActive:               1,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, not past deadline, R": {
@@ -538,6 +581,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectActive:               1,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, not past deadline, F": {
@@ -551,6 +595,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectActive:               1,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, no deadline, A": {
@@ -564,6 +609,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectActive:               1,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, no deadline, R": {
@@ -577,6 +623,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectActive:               1,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, no deadline, F": {
@@ -590,6 +637,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectActive:               1,
 			expectedWarnings:           1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 
@@ -603,6 +651,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, past short deadline, A": {
@@ -615,6 +664,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 
@@ -628,6 +678,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, past short deadline, R": {
@@ -640,6 +691,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 
@@ -653,6 +705,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 		"prev ran but done, long overdue, past short deadline, F": {
@@ -665,6 +718,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectCreate:               true,
 			expectActive:               1,
 			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
 
@@ -677,8 +731,10 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			ranPreviously:      true,
 			jobCreationTime:    *justAfterTheHour(),
 			now:                justBeforeTheHour(),
+			jobCreateError:     errors.NewAlreadyExists(schema.GroupResource{Resource: "jobs", Group: "batch"}, ""),
 			expectRequeueAfter: true,
-			jobCreateError:     errors.NewAlreadyExists(schema.GroupResource{Resource: "jobs", Group: "batch"}, "")},
+			expectUpdateStatus: true,
+		},
 
 		// Tests for slow job lister
 		"this started but went missing, not past deadline, A": {
@@ -812,7 +868,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 				}
 			}
 
-			jc := &fakeJobControl{Job: job, CreateErr: tc.jobCreateError}
+			jc := &fakeJobControl{Job: job, CreateErr: tc.jobCreateError, Err: tc.jobGetErr}
 			cjc := &fakeCJControl{CronJob: realCJ}
 			recorder := record.NewFakeRecorder(10)
 
@@ -824,7 +880,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					return tc.now
 				},
 			}
-			cjCopy, requeueAfter, err := jm.syncCronJob(context.TODO(), &cj, js)
+			cjCopy, requeueAfter, updateStatus, err := jm.syncCronJob(context.TODO(), &cj, js)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}
@@ -837,6 +893,9 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 				if !reflect.DeepEqual(requeueAfter, expectedRequeueAfter) {
 					t.Errorf("%s: expected requeueAfter: %+v, got requeueAfter time: %+v", name, expectedRequeueAfter, requeueAfter)
 				}
+			}
+			if updateStatus != tc.expectUpdateStatus {
+				t.Errorf("%s: expected updateStatus: %t, actually: %t", name, tc.expectUpdateStatus, updateStatus)
 			}
 			expectedCreates := 0
 			if tc.expectCreate {
