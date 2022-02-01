@@ -119,7 +119,7 @@ type TestContextType struct {
 	// DumpSystemdJournal controls whether to dump the full systemd journal.
 	DumpSystemdJournal       bool
 	ImageServiceEndpoint     string
-	MasterOSDistro           string
+	ControlPlaneOSDistro     string
 	NodeOSDistro             string
 	NodeOSArch               string
 	VerifyServiceAccount     bool
@@ -342,7 +342,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flags.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flags.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
-	flags.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, ubuntu, gci, coreos, or custom).")
+	flags.StringVar(&TestContext.ControlPlaneOSDistro, "controlPlane-os-distro", "debian", "The OS distribution of cluster controlPlane (debian, ubuntu, gci, coreos, or custom).")
 	flags.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, ubuntu, gci, coreos, windows, or custom), which determines how specific tests are implemented.")
 	flags.StringVar(&TestContext.NodeOSArch, "node-os-arch", "amd64", "The OS architecture of cluster VM instances (amd64, arm64, or custom).")
 	flags.StringVar(&TestContext.ClusterDNSDomain, "dns-domain", "cluster.local", "The DNS Domain of the cluster.")
