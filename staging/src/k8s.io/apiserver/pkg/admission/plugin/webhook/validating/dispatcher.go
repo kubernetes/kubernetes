@@ -232,9 +232,9 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	}
 
 	do := func() { err = r.Do(ctx).Into(response) }
-	if wd, ok := endpointsrequest.WebhookDurationFrom(ctx); ok {
+	if wd, ok := endpointsrequest.LatencyTrackersFrom(ctx); ok {
 		tmp := do
-		do = func() { wd.ValidateTracker.Track(tmp) }
+		do = func() { wd.ValidatingWebhookTracker.Track(tmp) }
 	}
 	do()
 	if err != nil {
