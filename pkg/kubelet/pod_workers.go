@@ -1030,7 +1030,6 @@ func (p *podWorkers) completeTerminatingRuntimePod(pod *v1.Pod) {
 	}
 
 	p.cleanupPodUpdates(pod.UID)
-	delete(p.lastUndeliveredWorkUpdate, pod.UID)
 }
 
 // completeTerminated is invoked after syncTerminatedPod completes successfully and means we
@@ -1042,7 +1041,6 @@ func (p *podWorkers) completeTerminated(pod *v1.Pod) {
 	klog.V(4).InfoS("Pod is complete and the worker can now stop", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	p.cleanupPodUpdates(pod.UID)
-	delete(p.lastUndeliveredWorkUpdate, pod.UID)
 
 	if status, ok := p.podSyncStatuses[pod.UID]; ok {
 		if status.terminatingAt.IsZero() {
@@ -1177,7 +1175,6 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 	}
 	delete(p.podSyncStatuses, uid)
 	p.cleanupPodUpdates(uid)
-	delete(p.lastUndeliveredWorkUpdate, uid)
 
 	if p.startedStaticPodsByFullname[status.fullname] == uid {
 		delete(p.startedStaticPodsByFullname, status.fullname)
@@ -1236,4 +1233,5 @@ func (p *podWorkers) cleanupPodUpdates(uid types.UID) {
 		close(ch)
 	}
 	delete(p.podUpdates, uid)
+	delete(p.lastUndeliveredWorkUpdate, uid)
 }
