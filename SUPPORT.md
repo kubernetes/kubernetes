@@ -26,4 +26,4 @@ people offer support.
 
 ### Forum
 
-* [Kubernetes Official Forum](https://discuss.kubernetes.io)
+* [Kubernetes Official Forum](https://discuss.kubernetes.io):
