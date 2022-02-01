@@ -137,7 +137,7 @@ type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
 type nodeV1AccessModeMapper func(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapability_AccessMode_Mode
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
-// connection set up. It also returns a closer which must to be called to close
+// connection set up. It also returns a closer which must be called to close
 // the gRPC connection when the NodeClient is not used anymore.
 // This is the default implementation for the nodeV1ClientCreator, used in
 // newCsiDriverClient.
