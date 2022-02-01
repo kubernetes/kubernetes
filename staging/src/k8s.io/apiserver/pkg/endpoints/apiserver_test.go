@@ -4358,7 +4358,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 
 // runRequest is used by TestDryRun since it runs the test twice in a
 // row with a slightly different URL (one has ?dryRun, one doesn't).
-func runRequest(t *testing.T, path, verb string, data []byte, contentType string) *http.Response {
+func runRequest(t testing.TB, path, verb string, data []byte, contentType string) *http.Response {
 	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -4393,20 +4393,20 @@ func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx conte
 	return nil, nil
 }
 
-func TestFieldValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
-	strictDecodingErr := `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
-	strictDecodingWarns := []string{`duplicate field "other"`, `unknown field "unknown"`}
-	strictDecodingErrYAML := `strict decoding error: yaml: unmarshal errors:\n  line 6: key \"other\" already set in map, unknown field \"unknown\"`
-	strictDecodingWarnsYAML := []string{`line 6: key "other" already set in map`, `unknown field "unknown"`}
-	strictDecodingErrYAMLPut := `strict decoding error: yaml: unmarshal errors:\n  line 7: key \"other\" already set in map, unknown field \"unknown\"`
-	strictDecodingWarnsYAMLPut := []string{`line 7: key "other" already set in map`, `unknown field "unknown"`}
-	strictFieldValidation := "?fieldValidation=Strict"
-	warnFieldValidation := "?fieldValidation=Warn"
-	ignoreFieldValidation := "?fieldValidation=Ignore"
+// shared vars used by both TestFieldValidation and BenchmarkFieldValidation
+var (
+	strictDecodingErr          = `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
+	strictDecodingWarns        = []string{`duplicate field "other"`, `unknown field "unknown"`}
+	strictDecodingErrYAML      = `strict decoding error: yaml: unmarshal errors:\n  line 6: key \"other\" already set in map, unknown field \"unknown\"`
+	strictDecodingWarnsYAML    = []string{`line 6: key "other" already set in map`, `unknown field "unknown"`}
+	strictDecodingErrYAMLPut   = `strict decoding error: yaml: unmarshal errors:\n  line 7: key \"other\" already set in map, unknown field \"unknown\"`
+	strictDecodingWarnsYAMLPut = []string{`line 7: key "other" already set in map`, `unknown field "unknown"`}
+	strictFieldValidation      = "?fieldValidation=Strict"
+	warnFieldValidation        = "?fieldValidation=Warn"
+	ignoreFieldValidation      = "?fieldValidation=Ignore"
 
-	invalidJSONDataPost := []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
-	invalidYAMLDataPost := []byte(`apiVersion: test.group/version
+	invalidJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+	invalidYAMLDataPost = []byte(`apiVersion: test.group/version
 kind: Simple
 metadata:
   creationTimestamp: null
@@ -4414,8 +4414,8 @@ other: foo
 other: bar
 unknown: baz`)
 
-	invalidJSONDataPut := []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id", "creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
-	invalidYAMLDataPut := []byte(`apiVersion: test.group/version
+	invalidJSONDataPut = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id", "creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+	invalidYAMLDataPut = []byte(`apiVersion: test.group/version
 kind: Simple
 metadata:
   name: id
@@ -4424,8 +4424,8 @@ other: foo
 other: bar
 unknown: baz`)
 
-	invalidMergePatch := []byte(`{"labels":{"foo":"bar"}, "unknown": "foo", "other": "foo", "other": "bar"}`)
-	invalidJSONPatch := []byte(`
+	invalidMergePatch = []byte(`{"labels":{"foo":"bar"}, "unknown": "foo", "other": "foo", "other": "bar"}`)
+	invalidJSONPatch  = []byte(`
 [
 	{"op": "add", "path": "/unknown", "value": "foo"},
 	{"op": "add", "path": "/other", "value": "foo"},
@@ -4435,12 +4435,12 @@ unknown: baz`)
 	// note: duplicate fields in the patch itself
 	// are dropped by the
 	// evanphx/json-patch library and is expected.
-	jsonPatchStrictDecodingErr := `strict decoding error: unknown field \"unknown\"`
-	jsonPatchStrictDecodingWarns := []string{`unknown field "unknown"`}
+	jsonPatchStrictDecodingErr   = `strict decoding error: unknown field \"unknown\"`
+	jsonPatchStrictDecodingWarns = []string{`unknown field "unknown"`}
 
-	invalidSMP := []byte(`{"unknown": "foo", "other":"foo", "other": "bar"}`)
+	invalidSMP = []byte(`{"unknown": "foo", "other":"foo", "other": "bar"}`)
 
-	tests := []struct {
+	fieldValidationTests = []struct {
 		name               string
 		path               string
 		verb               string
@@ -4484,6 +4484,10 @@ unknown: baz`)
 		{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
 		{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 	}
+)
+
+func TestFieldValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 
 	server := httptest.NewServer(handleWithWarnings(map[string]rest.Storage{
 		"simples": &SimpleRESTStorageWithDeleteCollection{
@@ -4506,7 +4510,7 @@ unknown: baz`)
 		},
 	}))
 	defer server.Close()
-	for _, test := range tests {
+	for _, test := range fieldValidationTests {
 		t.Run(test.name, func(t *testing.T) {
 			baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 			response := runRequest(t, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
@@ -4525,6 +4529,40 @@ unknown: baz`)
 				if warn.Text != test.expectedWarns[i] {
 					t.Fatalf("unexpected warning: %#v, expected warning: %#v", warn.Text, test.expectedWarns[i])
 				}
+			}
+		})
+	}
+}
+
+func BenchmarkFieldValidation(b *testing.B) {
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
+
+	server := httptest.NewServer(handleWithWarnings(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+	for _, test := range fieldValidationTests {
+		b.Run(test.name, func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+				_ = runRequest(b, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
 			}
 		})
 	}
