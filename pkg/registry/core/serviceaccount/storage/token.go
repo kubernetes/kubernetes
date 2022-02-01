@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -46,6 +47,7 @@ type TokenREST struct {
 	secrets              getter
 	issuer               token.TokenGenerator
 	auds                 authenticator.Audiences
+	audsSet              sets.String
 	maxExpirationSeconds int64
 	extendExpiration     bool
 }
@@ -129,7 +131,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	// Only perform the extension when token is pod-bound.
 	var warnAfter int64
 	exp := out.Spec.ExpirationSeconds
-	if r.extendExpiration && pod != nil && out.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds {
+	if r.extendExpiration && pod != nil && out.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(out.Spec.Audiences) {
 		warnAfter = exp
 		exp = token.ExpirationExtensionSeconds
 	}
@@ -175,4 +177,10 @@ func newContext(ctx context.Context, resource, name string, gvk schema.GroupVers
 		APIVersion:        gvk.Version,
 	}
 	return genericapirequest.WithRequestInfo(ctx, &newInfo)
+}
+
+// isKubeAudiences returns true if the tokenaudiences is a strict subset of apiserver audiences.
+func (r *TokenREST) isKubeAudiences(tokenAudience []string) bool {
+	// tokenAudiences must be a strict subset of apiserver audiences
+	return r.audsSet.HasAll(tokenAudience...)
 }
