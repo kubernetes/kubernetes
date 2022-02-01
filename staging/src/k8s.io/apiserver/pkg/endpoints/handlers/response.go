@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -134,7 +135,13 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, trace *ut
 		scope.err(err, w, req)
 		return
 	}
-	obj, err := transformObject(ctx, result, options, mediaType, scope, req)
+
+	var obj runtime.Object
+	do := func() {
+		obj, err = transformObject(ctx, result, options, mediaType, scope, req)
+	}
+	endpointsrequest.TrackTransformResponseObjectLatency(ctx, do)
+
 	if err != nil {
 		scope.err(err, w, req)
 		return

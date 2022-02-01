@@ -261,6 +261,9 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		return nil, nil, err
 	}
 
+	// decorate the KV instance so we can track etcd latency per request.
+	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
+
 	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
 	if err != nil {
 		return nil, nil, err
