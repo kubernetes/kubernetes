@@ -37,6 +37,7 @@ const (
 	PodStartDurationKey          = "pod_start_duration_seconds"
 	CgroupManagerOperationsKey   = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey    = "pod_worker_start_duration_seconds"
+	PodStatusSyncDurationKey     = "pod_status_sync_duration_seconds"
 	PLEGRelistDurationKey        = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey         = "pleg_discard_events"
 	PLEGRelistIntervalKey        = "pleg_relist_interval_seconds"
@@ -154,6 +155,18 @@ var (
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+	// PodStatusSyncDuration is a Histogram that tracks the duration (in seconds) in takes from the time a pod
+	// status is generated to the time it is synced with the apiserver.
+	PodStatusSyncDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStatusSyncDurationKey,
+			Help:           "Duration in seconds to sync a pod status update. Measures time from detection to write.",
+			Buckets:        []float64{0.010, 0.050, 0.100, 0.500, 1, 5, 10, 20, 30, 45, 60},
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"priority"},
 	)
 	// PLEGRelistDuration is a Histogram that tracks the duration (in seconds) it takes for relisting pods in the Kubelet's
 	// Pod Lifecycle Event Generator (PLEG).
@@ -475,6 +488,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
+		legacyregistry.MustRegister(PodStatusSyncDuration)
 		legacyregistry.MustRegister(ContainersPerPodCount)
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)
