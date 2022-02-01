@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -340,8 +339,16 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		if event.Stage != auditinternal.StageResponseComplete {
 			t.Errorf("expected event stage to be complete, got: %s", event.Stage)
 		}
-		if diff := cmp.Diff(want, event.Annotations); diff != "" {
-			t.Errorf("event has unexpected annotations (-want +got): %s", diff)
+
+		for wantK, wantV := range want {
+			gotV, ok := event.Annotations[wantK]
+			if !ok {
+				t.Errorf("expected to find annotation key %q in %#v", wantK, event.Annotations)
+				continue
+			}
+			if wantV != gotV {
+				t.Errorf("expected the annotation value to match, key: %q, want: %q got: %q", wantK, wantV, gotV)
+			}
 		}
 	}
 }
