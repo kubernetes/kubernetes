@@ -17,6 +17,8 @@ limitations under the License.
 package windows
 
 import (
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -29,6 +31,18 @@ func SIGDescribe(text string, body func()) bool {
 			// all tests in this package are Windows specific
 			e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		})
+
+		// enable HostProcessContainers by default (it is Beta and on by default in beta in 1.23)
+		// this allows us to use host process containers in some of the tests but allows for
+		// someone that disables it to still run a subset of the tests
+		if framework.TestContext.FeatureGates == nil {
+			framework.TestContext.FeatureGates = map[string]bool{}
+			framework.TestContext.FeatureGates[string(features.WindowsHostProcessContainers)] = true
+		}
+		_, exists := framework.TestContext.FeatureGates[string(features.WindowsHostProcessContainers)]
+		if !exists {
+			framework.TestContext.FeatureGates[string(features.WindowsHostProcessContainers)] = true
+		}
 
 		body()
 	})

@@ -17,12 +17,16 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
+
+	"k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -77,6 +81,87 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 			ginkgo.By("checking connectivity from Windows to Linux")
 			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP))
 
+		})
+
+		ginkgo.It("should have stable networking for Linux and Windows with ClusterIP services", func() {
+			serviceName := "stable-networking"
+			ginkgo.By("creating service " + serviceName + " with type=ClusterIP in namespace " + f.Namespace.Name)
+			jig := e2eservice.NewTestJig(f.ClientSet, f.Namespace.Name, serviceName)
+
+			svc, err := jig.CreateTCPService(func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeClusterIP
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("creating some linux pods in the service")
+			var linuxPod *v1.Pod
+			for i := 0; i < 2; i++ {
+				ginkgo.By("creating a linux pod and waiting for it to be running")
+				linuxPod = createTestPod(f, linuxBusyBoxImage, linuxOS)
+				linuxPod.ObjectMeta.Labels = svc.Labels
+				linuxPod = f.PodClient().CreateSync(linuxPod)
+			}
+
+			ginkgo.By("creating some Windows pods in the service")
+			var windowsPod *v1.Pod
+			for i := 0; i < 2; i++ {
+				ginkgo.By("creating a windows pod and waiting for it to be running")
+				windowsPod = createTestPod(f, windowsBusyBoximage, windowsOS)
+				windowsPod.Spec.Containers[0].Args = []string{"test-webserver"}
+				windowsPod.ObjectMeta.Labels = svc.Labels
+				windowsPod = f.PodClient().CreateSync(windowsPod)
+			}
+
+			ginkgo.By("verifying Service connectivity from pods outside the service")
+
+			ginkgo.By("creating Linux testing Pod")
+			linuxTestPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
+			linuxTestPod = f.PodClient().CreateSync(linuxTestPod)
+
+			ginkgo.By("checking service connectivity from linux pod outside the service")
+			assertConsistentConnectivity(f, linuxTestPod.ObjectMeta.Name, linuxOS, linuxCheck(svc.ObjectMeta.Name, 80))
+			f.PodClient().Delete(context.Background(), linuxTestPod.ObjectMeta.Name, metav1.DeleteOptions{})
+
+			ginkgo.By("creating Windows testing Pod")
+			windowsTestPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+			windowsTestPod = f.PodClient().CreateSync(windowsTestPod)
+
+			ginkgo.By("checking service connectivity from windows pod outside the service")
+			assertConsistentConnectivity(f, windowsTestPod.ObjectMeta.Name, windowsOS, windowsCheck(svc.Spec.ClusterIP))
+			f.PodClient().Delete(context.Background(), windowsTestPod.ObjectMeta.Name, metav1.DeleteOptions{})
+
+			ginkgo.By("verifying Service connectivity from pods within the service")
+			ginkgo.By("checking service connectivity from linux pod in the service")
+			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck(svc.Spec.ClusterIP, 80))
+
+			ginkgo.By("checking service connectivity from windows pod in the service")
+			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(svc.Spec.ClusterIP))
+
+			ginkgo.By("verifying Service connectivity from linux host to service")
+
+			ginkgo.By("creating Linux HostNetwork testing Pod")
+			linuxHostNetworkpod := createTestPod(f, linuxBusyBoxImage, linuxOS)
+			linuxHostNetworkpod.Spec.HostNetwork = true
+			linuxHostNetworkpod = f.PodClient().CreateSync(linuxHostNetworkpod)
+
+			ginkgo.By("checking service connectivity from linux pod with hostnetwork")
+			assertConsistentConnectivity(f, linuxHostNetworkpod.ObjectMeta.Name, linuxOS, linuxCheck(svc.Spec.ClusterIP, 80))
+
+			if framework.TestContext.FeatureGates[string(features.WindowsHostProcessContainers)] {
+				ginkgo.By("verifying Service connectivity from windows host to service")
+
+				ginkgo.By("creating Windows HostProcess testing Pod")
+				windowsHostProcessTestPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+				makeHostProcess(windowsHostProcessTestPod)
+				// need to override the anghost command to point to the hostprocess container mount point on the host when it is hostprocess
+				windowsHostProcessTestPod.Spec.Containers[0].Command = []string{"%CONTAINER_SANDBOX_MOUNT_POINT%/agnhost", "pause"}
+				windowsHostProcessTestPod = f.PodClient().CreateSync(windowsHostProcessTestPod)
+
+				ginkgo.By("checking service connectivity from windows with hostnetwork")
+				assertConsistentConnectivity(f, windowsHostProcessTestPod.ObjectMeta.Name, windowsOS, windowsCheck(svc.Spec.ClusterIP))
+			} else {
+				framework.Logf("Skipping verification of Windows host to service because HostProcess Containers feature is disabled in e2e framework")
+			}
 		})
 
 	})
@@ -147,4 +232,14 @@ func createTestPod(f *framework.Framework, image string, os string) *v1.Pod {
 		}
 	}
 	return pod
+}
+
+func makeHostProcess(pod *v1.Pod) {
+	pod.Spec.SecurityContext = &v1.PodSecurityContext{
+		WindowsOptions: &v1.WindowsSecurityContextOptions{
+			HostProcess:   &trueVar,
+			RunAsUserName: &User_NTAuthorityLocalService,
+		},
+	}
+	pod.Spec.HostNetwork = true
 }
