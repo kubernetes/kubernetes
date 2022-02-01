@@ -57,6 +57,9 @@ type Manager interface {
 	// pod created.
 	AddPod(pod *v1.Pod)
 
+	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
+	StopLivenessAndStartup(pod *v1.Pod)
+
 	// RemovePod handles cleaning up the removed pod state, including terminating probe workers and
 	// deleting cached results.
 	RemovePod(pod *v1.Pod)
@@ -191,6 +194,22 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			w := newWorker(m, liveness, pod, c)
 			m.workers[key] = w
 			go w.run()
+		}
+	}
+}
+
+func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
+	m.workerLock.RLock()
+	defer m.workerLock.RUnlock()
+
+	key := probeKey{podUID: pod.UID}
+	for _, c := range pod.Spec.Containers {
+		key.containerName = c.Name
+		for _, probeType := range [...]probeType{liveness, startup} {
+			key.probeType = probeType
+			if worker, ok := m.workers[key]; ok {
+				worker.stop()
+			}
 		}
 	}
 }
