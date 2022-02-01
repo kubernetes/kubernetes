@@ -196,47 +196,51 @@ func (f *fakeProxier) proxy(_ context.Context, _ string) (net.Conn, error) {
 
 func TestMetrics(t *testing.T) {
 	testcases := map[string]struct {
+		egressType   EgressType
 		connectorErr bool
 		proxierErr   bool
 		metrics      []string
 		want         string
 	}{
 		"connect to proxy server error": {
+			egressType:   Cluster,
 			connectorErr: true,
 			proxierErr:   false,
 			metrics:      []string{"apiserver_egress_dialer_dial_failure_count"},
 			want: `
 	# HELP apiserver_egress_dialer_dial_failure_count [ALPHA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
 	# TYPE apiserver_egress_dialer_dial_failure_count counter
-	apiserver_egress_dialer_dial_failure_count{protocol="fake_protocol",stage="connect",transport="fake_transport"} 1
+	apiserver_egress_dialer_dial_failure_count{egress_type="cluster",protocol="fake_protocol",stage="connect",transport="fake_transport"} 1
 `,
 		},
 		"connect succeeded, proxy failed": {
+			egressType:   Cluster,
 			connectorErr: false,
 			proxierErr:   true,
 			metrics:      []string{"apiserver_egress_dialer_dial_failure_count"},
 			want: `
 	# HELP apiserver_egress_dialer_dial_failure_count [ALPHA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
 	# TYPE apiserver_egress_dialer_dial_failure_count counter
-	apiserver_egress_dialer_dial_failure_count{protocol="fake_protocol",stage="proxy",transport="fake_transport"} 1
+	apiserver_egress_dialer_dial_failure_count{egress_type="cluster",protocol="fake_protocol",stage="proxy",transport="fake_transport"} 1
 `,
 		},
 		"successful": {
+			egressType:   Cluster,
 			connectorErr: false,
 			proxierErr:   false,
 			metrics:      []string{"apiserver_egress_dialer_dial_duration_seconds"},
 			want: `
             # HELP apiserver_egress_dialer_dial_duration_seconds [ALPHA] Dial latency histogram in seconds, labeled by the protocol (http-connect or grpc), transport (tcp or uds)
             # TYPE apiserver_egress_dialer_dial_duration_seconds histogram
-            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.005"} 1
-            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.025"} 1
-            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.1"} 1
-            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.5"} 1
-            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="2.5"} 1
-            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="12.5"} 1
-            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="+Inf"} 1
-            apiserver_egress_dialer_dial_duration_seconds_sum{protocol="fake_protocol",transport="fake_transport"} 0
-            apiserver_egress_dialer_dial_duration_seconds_count{protocol="fake_protocol",transport="fake_transport"} 1
+	    apiserver_egress_dialer_dial_duration_seconds_bucket{egress_type="cluster",protocol="fake_protocol",transport="fake_transport",le="0.005"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{egress_type="cluster",protocol="fake_protocol",transport="fake_transport",le="0.025"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{egress_type="cluster",protocol="fake_protocol",transport="fake_transport",le="0.1"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{egress_type="cluster",protocol="fake_protocol",transport="fake_transport",le="0.5"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{egress_type="cluster",protocol="fake_protocol",transport="fake_transport",le="2.5"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{egress_type="cluster",protocol="fake_protocol",transport="fake_transport",le="12.5"} 1
+	    apiserver_egress_dialer_dial_duration_seconds_bucket{egress_type="cluster",protocol="fake_protocol",transport="fake_transport",le="+Inf"} 1
+            apiserver_egress_dialer_dial_duration_seconds_sum{egress_type="cluster",protocol="fake_protocol",transport="fake_transport"} 0
+            apiserver_egress_dialer_dial_duration_seconds_count{egress_type="cluster",protocol="fake_protocol",transport="fake_transport"} 1
 `,
 		},
 	}
@@ -255,12 +259,11 @@ func TestMetrics(t *testing.T) {
 					protocol:  "fake_protocol",
 				},
 			}
-			dialer := d.createDialer()
+			dialer := d.createDialer(tc.egressType)
 			dialer(context.TODO(), "", "")
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Errorf("Err in comparing metrics %v", err)
 			}
 		})
 	}
-
 }

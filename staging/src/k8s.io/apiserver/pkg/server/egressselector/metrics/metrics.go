@@ -68,7 +68,7 @@ func newDialMetrics() *DialMetrics {
 			Buckets:        latencyBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"protocol", "transport"},
+		[]string{"protocol", "transport", "egress_type"},
 	)
 
 	failures := metrics.NewCounterVec(
@@ -79,7 +79,7 @@ func newDialMetrics() *DialMetrics {
 			Help:           "Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"protocol", "transport", "stage"},
+		[]string{"protocol", "transport", "stage", "egress_type"},
 	)
 
 	legacyregistry.MustRegister(latencies)
@@ -104,11 +104,11 @@ func (m *DialMetrics) Reset() {
 }
 
 // ObserveDialLatency records the latency of a dial, labeled by protocol, transport.
-func (m *DialMetrics) ObserveDialLatency(elapsed time.Duration, protocol, transport string) {
-	m.latencies.WithLabelValues(protocol, transport).Observe(elapsed.Seconds())
+func (m *DialMetrics) ObserveDialLatency(elapsed time.Duration, protocol, transport, egressType string) {
+	m.latencies.WithLabelValues(protocol, transport, egressType).Observe(elapsed.Seconds())
 }
 
 // ObserveDialFailure records a failed dial, labeled by protocol, transport, and the stage the dial failed at.
-func (m *DialMetrics) ObserveDialFailure(protocol, transport, stage string) {
-	m.failures.WithLabelValues(protocol, transport, stage).Inc()
+func (m *DialMetrics) ObserveDialFailure(protocol, transport, stage, egressType string) {
+	m.failures.WithLabelValues(protocol, transport, stage, egressType).Inc()
 }

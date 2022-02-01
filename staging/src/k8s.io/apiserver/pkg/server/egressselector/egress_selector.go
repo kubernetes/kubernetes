@@ -218,7 +218,8 @@ type metricsOptions struct {
 	protocol  string
 }
 
-func (d *dialerCreator) createDialer() utilnet.DialFunc {
+func (d *dialerCreator) createDialer(egressType EgressType) utilnet.DialFunc {
+
 	if d.direct {
 		return directDialer
 	}
@@ -228,15 +229,15 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 		start := egressmetrics.Metrics.Clock().Now()
 		proxier, err := d.connector.connect()
 		if err != nil {
-			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
+			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect, egressType.String())
 			return nil, err
 		}
 		conn, err := proxier.proxy(ctx, addr)
 		if err != nil {
-			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageProxy)
+			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageProxy, egressType.String())
 			return nil, err
 		}
-		egressmetrics.Metrics.ObserveDialLatency(egressmetrics.Metrics.Clock().Now().Sub(start), d.options.protocol, d.options.transport)
+		egressmetrics.Metrics.ObserveDialLatency(egressmetrics.Metrics.Clock().Now().Sub(start), d.options.protocol, d.options.transport, egressType.String())
 		return conn, nil
 	}
 }
@@ -353,7 +354,7 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dialer for egressSelection %q: %v", name, err)
 		}
-		cs.egressToDialer[name] = dialerCreator.createDialer()
+		cs.egressToDialer[name] = dialerCreator.createDialer(name)
 	}
 	return cs, nil
 }
