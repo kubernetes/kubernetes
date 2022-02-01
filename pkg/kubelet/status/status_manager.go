@@ -66,16 +66,21 @@ type podStatusSyncRequest struct {
 // Updates pod statuses in apiserver. Writes only when new status has changed.
 // All methods are thread-safe.
 type manager struct {
-	kubeClient clientset.Interface
-	podManager kubepod.Manager
-	// Map from pod UID to sync status of the corresponding pod.
-	podStatuses      map[types.UID]versionedPodStatus
-	podStatusesLock  sync.RWMutex
-	podStatusChannel chan podStatusSyncRequest
-	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
-	// apiStatusVersions must only be accessed from the sync thread.
-	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
+	kubeClient        clientset.Interface
+	podManager        kubepod.Manager
 	podDeletionSafety PodDeletionSafetyProvider
+
+	// podStatusesLock covers all status related fields
+	podStatusesLock sync.RWMutex
+	// podStatusQueue reports pods that have updated status available
+	podStatusQueue map[types.UID]struct{}
+	// podStatuses is a map from pod UID to sync status of the corresponding pod.
+	podStatuses map[types.UID]versionedPodStatus
+	// podStatusChannel is empty if there are no pending status updates
+	podStatusChannel chan struct{}
+	// apiStatusVersions is a map from (mirror) pod UID to latest status version successfully
+	// sent to the API server.
+	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
 }
 
 // PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
@@ -127,10 +132,12 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podD
 	return &manager{
 		kubeClient:        kubeClient,
 		podManager:        podManager,
-		podStatuses:       make(map[types.UID]versionedPodStatus),
-		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
-		apiStatusVersions: make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety: podDeletionSafety,
+
+		podStatuses:       make(map[types.UID]versionedPodStatus),
+		podStatusChannel:  make(chan struct{}, 1),
+		podStatusQueue:    make(map[types.UID]struct{}),
+		apiStatusVersions: make(map[kubetypes.MirrorPodUID]uint64),
 	}
 }
 
@@ -170,19 +177,10 @@ func (m *manager) Start() {
 	go wait.Forever(func() {
 		for {
 			select {
-			case syncRequest := <-m.podStatusChannel:
-				klog.V(5).InfoS("Status Manager: syncing pod with status from podStatusChannel",
-					"podUID", syncRequest.podUID,
-					"statusVersion", syncRequest.status.version,
-					"status", syncRequest.status.status)
-				m.syncPod(syncRequest.podUID, syncRequest.status)
+			case <-m.podStatusChannel:
+				m.syncBatch(false)
 			case <-syncTicker:
-				klog.V(5).InfoS("Status Manager: syncing batch")
-				// remove any entries in the status channel since the batch will handle them
-				for i := len(m.podStatusChannel); i > 0; i-- {
-					<-m.podStatusChannel
-				}
-				m.syncBatch()
+				m.syncBatch(true)
 			}
 		}
 	}, 0)
@@ -495,23 +493,20 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	m.podStatuses[pod.UID] = newStatus
+	m.podStatusQueue[pod.UID] = struct{}{}
+
+	klog.V(5).InfoS("Status Manager: adding pod with new status to podStatusChannel",
+		"pod", klog.KObj(pod),
+		"podUID", pod.UID,
+		"statusVersion", newStatus.version,
+		"status", newStatus.status,
+	)
 
 	select {
-	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
-		klog.V(5).InfoS("Status Manager: adding pod with new status to podStatusChannel",
-			"pod", klog.KObj(pod),
-			"podUID", pod.UID,
-			"statusVersion", newStatus.version,
-			"status", newStatus.status)
-		return true
+	case m.podStatusChannel <- struct{}{}:
 	default:
-		// Let the periodic syncBatch handle the update if the channel is full.
-		// We can't block, since we hold the mutex lock.
-		klog.V(4).InfoS("Skipping the status update for pod for now because the channel is full",
-			"pod", klog.KObj(pod),
-			"status", status)
-		return false
 	}
+	return true
 }
 
 // updateLastTransitionTime updates the LastTransitionTime of a pod condition.
@@ -549,12 +544,36 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 }
 
 // syncBatch syncs pods statuses with the apiserver.
-func (m *manager) syncBatch() {
+func (m *manager) syncBatch(clean bool) {
 	var updatedStatuses []podStatusSyncRequest
-	podToMirror, mirrorToPod := m.podManager.GetUIDTranslations()
-	func() { // Critical section
-		m.podStatusesLock.RLock()
-		defer m.podStatusesLock.RUnlock()
+	func() {
+		// only statuses known to have changed are updated
+		if !clean {
+			m.podStatusesLock.Lock()
+			defer m.podStatusesLock.Unlock()
+
+			updatedStatuses = make([]podStatusSyncRequest, 0, len(m.podStatusQueue))
+			for uid := range m.podStatusQueue {
+				status, ok := m.podStatuses[uid]
+				if !ok {
+					continue
+				}
+				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
+			}
+			for k := range m.podStatusQueue {
+				delete(m.podStatusQueue, k)
+			}
+
+			return
+		}
+
+		// calculate all status changes
+
+		// load translations and then take the lock
+		updatedStatuses = make([]podStatusSyncRequest, 0, len(m.podStatuses))
+		_, mirrorToPod := m.podManager.GetUIDTranslations()
+		m.podStatusesLock.Lock()
+		defer m.podStatusesLock.Unlock()
 
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
@@ -565,43 +584,48 @@ func (m *manager) syncBatch() {
 			}
 		}
 
+		// Calculate all possible status updates
 		for uid, status := range m.podStatuses {
-			syncedUID := kubetypes.MirrorPodUID(uid)
-			if mirrorUID, ok := podToMirror[kubetypes.ResolvedPodUID(uid)]; ok {
-				if mirrorUID == "" {
-					klog.V(5).InfoS("Static pod does not have a corresponding mirror pod; skipping",
-						"podUID", uid,
-						"pod", klog.KRef(status.podNamespace, status.podName))
-					continue
-				}
-				syncedUID = mirrorUID
-			}
-			if m.needsUpdate(types.UID(syncedUID), status) {
-				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
-			} else if m.needsReconcile(uid, status.status) {
-				// Delete the apiStatusVersions here to force an update on the pod status
-				// In most cases the deleted apiStatusVersions here should be filled
-				// soon after the following syncPod() [If the syncPod() sync an update
-				// successfully].
-				delete(m.apiStatusVersions, syncedUID)
-				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
-			}
+			updatedStatuses = append(updatedStatuses, podStatusSyncRequest{podUID: uid, status: status})
+		}
+
+		for k := range m.podStatusQueue {
+			delete(m.podStatusQueue, k)
 		}
 	}()
 
-	for _, update := range updatedStatuses {
-		klog.V(5).InfoS("Status Manager: syncPod in syncbatch", "podUID", update.podUID)
-		m.syncPod(update.podUID, update.status)
+	// process all pods in priority order
+	var total, update, reconcile int
+	for _, updatedStatus := range updatedStatuses {
+		total++
+		pod, ok := m.podForAPIServer(updatedStatus.podUID)
+		if !ok {
+			continue
+		}
+
+		terminalStatus := m.canBeDeleted(pod, updatedStatus.status.status)
+
+		var reason string
+		switch {
+		case terminalStatus, m.isStatusOutdated(pod.UID, updatedStatus.status):
+			// The pod status has either been updated internally, or the pod can be deleted
+			reason = "Update"
+			update++
+		case m.needsReconcile(pod, updatedStatus.status.status):
+			// The pod status on the pod appears to be out of sync with the expected status
+			reason = "Reconcile"
+			reconcile++
+		default:
+			continue
+		}
+
+		klog.V(3).InfoS("syncBatch will sync pod", "clean", clean, "podUID", updatedStatus.podUID, "mirrorUID", pod.UID, "reason", reason, "terminalStatus", terminalStatus)
+		m.syncPod(updatedStatus.podUID, pod, updatedStatus.status, terminalStatus)
 	}
 }
 
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
-func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
-	if !m.needsUpdate(uid, status) {
-		klog.V(1).InfoS("Status for pod is up-to-date; skipping", "podUID", uid)
-		return
-	}
-
+func (m *manager) syncPod(uid types.UID, pod *v1.Pod, status versionedPodStatus, isTerminal bool) {
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(context.TODO(), status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
@@ -655,10 +679,9 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 	metrics.PodStatusSyncDuration.WithLabelValues(strconv.Itoa(0)).Observe(duration.Seconds())
 
-	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
+	m.rememberAPIStatus(kubetypes.MirrorPodUID(pod.UID), status.version)
 
-	// We don't handle graceful deletion of mirror pods.
-	if m.canBeDeleted(pod, status.status) {
+	if isTerminal {
 		deleteOptions := metav1.DeleteOptions{
 			GracePeriodSeconds: new(int64),
 			// Use the pod UID as the precondition for deletion to prevent deleting a
@@ -675,20 +698,48 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 }
 
-// needsUpdate returns whether the status is stale for the given pod UID.
-// This method is not thread safe, and must only be accessed by the sync thread.
-func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
+// podForAPIServer returns the appropriate API pod (mirror or otherwise) for the given (kubelet) pod UID.
+func (m *manager) podForAPIServer(uid types.UID) (*v1.Pod, bool) {
+	pod, ok := m.podManager.GetPodByUID(types.UID(uid))
+	if !ok {
+		klog.V(4).InfoS("Pod has been deleted, no need to reconcile", "podUID", string(uid))
+		return nil, false
+	}
+	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
+	if kubetypes.IsStaticPod(pod) {
+		mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod)
+		if !ok {
+			klog.V(4).InfoS("Static pod has no corresponding mirror pod, no need to reconcile", "pod", klog.KObj(pod), "podUID", uid)
+			return nil, false
+		}
+		pod = mirrorPod
+	}
+	return pod, true
+}
+
+// rememberAPIStatus records the last version of the pod that we wrote to the API server.
+func (m *manager) rememberAPIStatus(uid kubetypes.MirrorPodUID, version uint64) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	m.apiStatusVersions[uid] = version
+}
+
+// isStatusOutdated is true if the pod status is newer than what was last written
+// to the API server.
+func (m *manager) isStatusOutdated(uid types.UID, status versionedPodStatus) bool {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+
 	latest, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(uid)]
 	if !ok || latest < status.version {
 		return true
 	}
-	pod, ok := m.podManager.GetPodByUID(uid)
-	if !ok {
-		return false
-	}
-	return m.canBeDeleted(pod, status.status)
+	return false
 }
 
+// canBeDeleted returns true if the pod resources have been reclaimed and the pod
+// has started deletion. Mirror pods are never deleted by the status manager.
 func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
 	if pod.DeletionTimestamp == nil || kubetypes.IsMirrorPod(pod) {
 		return false
@@ -701,27 +752,7 @@ func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
 // the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
 // kubelet should forcibly send an update to reconcile the inconsistence, because kubelet
 // should be the source of truth of pod status.
-// NOTE(random-liu): It's simpler to pass in mirror pod uid and get mirror pod by uid, but
-// now the pod manager only supports getting mirror pod by static pod, so we have to pass
-// static pod uid here.
-// TODO(random-liu): Simplify the logic when mirror pod manager is added.
-func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
-	// The pod could be a static pod, so we should translate first.
-	pod, ok := m.podManager.GetPodByUID(uid)
-	if !ok {
-		klog.V(4).InfoS("Pod has been deleted, no need to reconcile", "podUID", string(uid))
-		return false
-	}
-	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
-	if kubetypes.IsStaticPod(pod) {
-		mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod)
-		if !ok {
-			klog.V(4).InfoS("Static pod has no corresponding mirror pod, no need to reconcile", "pod", klog.KObj(pod))
-			return false
-		}
-		pod = mirrorPod
-	}
-
+func (m *manager) needsReconcile(pod *v1.Pod, status v1.PodStatus) bool {
 	podStatus := pod.Status.DeepCopy()
 	normalizeStatus(pod, podStatus)
 
