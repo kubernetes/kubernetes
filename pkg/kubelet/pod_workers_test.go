@@ -766,7 +766,10 @@ func Test_allowPodStart(t *testing.T) {
 		podSyncStatuses                    map[types.UID]*podSyncStatus
 		startedStaticPodsByFullname        map[string]types.UID
 		waitingToStartStaticPodsByFullname map[string][]types.UID
-		allowed                            bool
+
+		expectedStartedStaticPodsByFullname        map[string]types.UID
+		expectedWaitingToStartStaticPodsByFullname map[string][]types.UID
+		allowed                                    bool
 	}{
 		{
 			// TBD: Do we want to allow non-static pods with the same full name?
@@ -799,6 +802,9 @@ func Test_allowPodStart(t *testing.T) {
 			startedStaticPodsByFullname: map[string]types.UID{
 				"test_": types.UID("uid-1"),
 			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
+				"test_": types.UID("uid-1"),
+			},
 			allowed: true,
 		},
 		{
@@ -814,9 +820,6 @@ func Test_allowPodStart(t *testing.T) {
 					fullname: "test_",
 				},
 			},
-			startedStaticPodsByFullname: map[string]types.UID{
-				"test_": types.UID("uid-1"),
-			},
 			allowed: true,
 		},
 		{
@@ -831,6 +834,10 @@ func Test_allowPodStart(t *testing.T) {
 				},
 			},
 			startedStaticPodsByFullname: map[string]types.UID{
+				"bar_": types.UID("uid-1"),
+			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
 				"bar_": types.UID("uid-1"),
 			},
 			allowed: true,
@@ -849,6 +856,9 @@ func Test_allowPodStart(t *testing.T) {
 			startedStaticPodsByFullname: map[string]types.UID{
 				"foo_": types.UID("uid-1"),
 			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-1"),
+			},
 			allowed: false,
 		},
 		{
@@ -860,6 +870,9 @@ func Test_allowPodStart(t *testing.T) {
 				},
 			},
 			startedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
+			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
 				"foo_": types.UID("uid-0"),
 			},
 			allowed: true,
@@ -877,6 +890,10 @@ func Test_allowPodStart(t *testing.T) {
 					types.UID("uid-0"),
 				},
 			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
+			},
+			expectedWaitingToStartStaticPodsByFullname: make(map[string][]types.UID),
 			allowed: true,
 		},
 		{
@@ -891,6 +908,13 @@ func Test_allowPodStart(t *testing.T) {
 				},
 			},
 			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-1"),
+					types.UID("uid-0"),
+				},
+			},
+			expectedStartedStaticPodsByFullname: make(map[string]types.UID),
+			expectedWaitingToStartStaticPodsByFullname: map[string][]types.UID{
 				"foo_": {
 					types.UID("uid-1"),
 					types.UID("uid-0"),
@@ -915,6 +939,14 @@ func Test_allowPodStart(t *testing.T) {
 					types.UID("uid-2"),
 					types.UID("uid-3"),
 					types.UID("uid-0"),
+					types.UID("uid-1"),
+				},
+			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
+			},
+			expectedWaitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
 					types.UID("uid-1"),
 				},
 			},
@@ -947,6 +979,14 @@ func Test_allowPodStart(t *testing.T) {
 					types.UID("uid-1"),
 				},
 			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
+			},
+			expectedWaitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-1"),
+				},
+			},
 			allowed: true,
 		},
 	}
@@ -968,6 +1008,30 @@ func Test_allowPodStart(t *testing.T) {
 					t.Errorf("Pod should be allowed")
 				} else {
 					t.Errorf("Pod should not be allowed")
+				}
+			}
+
+			// if maps are neither nil nor empty
+			if len(podWorkers.startedStaticPodsByFullname) != 0 ||
+				len(podWorkers.startedStaticPodsByFullname) != len(tc.expectedStartedStaticPodsByFullname) {
+				if !reflect.DeepEqual(
+					podWorkers.startedStaticPodsByFullname,
+					tc.expectedStartedStaticPodsByFullname) {
+					t.Errorf("startedStaticPodsByFullname: expected %v, got %v",
+						tc.expectedStartedStaticPodsByFullname,
+						podWorkers.startedStaticPodsByFullname)
+				}
+			}
+
+			// if maps are neither nil nor empty
+			if len(podWorkers.waitingToStartStaticPodsByFullname) != 0 ||
+				len(podWorkers.waitingToStartStaticPodsByFullname) != len(tc.expectedWaitingToStartStaticPodsByFullname) {
+				if !reflect.DeepEqual(
+					podWorkers.waitingToStartStaticPodsByFullname,
+					tc.expectedWaitingToStartStaticPodsByFullname) {
+					t.Errorf("waitingToStartStaticPodsByFullname: expected %v, got %v",
+						tc.expectedWaitingToStartStaticPodsByFullname,
+						podWorkers.waitingToStartStaticPodsByFullname)
 				}
 			}
 		})

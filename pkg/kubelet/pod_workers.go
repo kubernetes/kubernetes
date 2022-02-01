@@ -818,6 +818,8 @@ func (p *podWorkers) allowStaticPodStart(fullname string, uid types.UID) bool {
 	}
 
 	waitingPods := p.waitingToStartStaticPodsByFullname[fullname]
+	// TODO: This is O(N) with respect to the number of updates to static pods
+	// with overlapping full names, and ideally would be O(1).
 	for i, waitingUID := range waitingPods {
 		// has pod already terminated or been deleted?
 		status, ok := p.podSyncStatuses[waitingUID]
