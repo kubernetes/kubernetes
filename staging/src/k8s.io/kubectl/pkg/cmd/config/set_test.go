@@ -31,6 +31,7 @@ import (
 )
 
 type setConfigTest struct {
+	name           string
 	description    string
 	config         clientcmdapi.Config
 	args           []string
@@ -39,394 +40,500 @@ type setConfigTest struct {
 	expectedConfig clientcmdapi.Config
 }
 
-func TestSetConfigCurrentContext(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Kind:           "Config",
-		APIVersion:     "v1",
-		CurrentContext: "minikube",
-	}
-	expectedConfig := *clientcmdapi.NewConfig()
-	expectedConfig.CurrentContext = "my-cluster"
-	test := setConfigTest{
-		description:    "Testing for kubectl config set current-context",
-		config:         conf,
-		args:           []string{"current-context", "my-cluster"},
-		expected:       `Property "current-context" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigAuthProviderName(t *testing.T) {
+func TestFromNewConfig(t *testing.T) {
 	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				AuthProvider: &clientcmdapi.AuthProviderConfig{
-					Name: "oidc",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.auth-provider.name to oidc",
-		config:         conf,
-		args:           []string{"users.foo.auth-provider.name", "oidc"},
-		expected:       `Property "users.foo.auth-provider.name" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigAuthProviderConfigRefreshToken(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				AuthProvider: &clientcmdapi.AuthProviderConfig{
-					Name: "",
-					Config: map[string]string{
-						"refresh-token": "test",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.auth-provider.config.refresh-token to test",
-		config:         conf,
-		args:           []string{"users.foo.auth-provider.config.refresh-token", "test"},
-		expected:       `Property "users.foo.auth-provider.config.refresh-token" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigAuthProviderConfigEmptyKey(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	test := setConfigTest{
-		description: "Testing for kubectl config set users.foo.auth-provider.config to test",
-		config:      conf,
-		args:        []string{"users.foo.auth-provider.config", "test"},
-		expectedErr: `empty key provided for map`,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecConfigCommand(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Command: "test",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.command to test",
-		config:         conf,
-		args:           []string{"users.foo.exec.command", "test"},
-		expected:       `Property "users.foo.exec.command" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecArgsNew(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Args: []string{
-						"test1",
-						"test2",
-						"test3",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.args to test1,test2,test3",
-		config:         conf,
-		args:           []string{"users.foo.exec.args", "test1,test2,test3"},
-		expected:       `Property "users.foo.exec.args" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecArgsAdd(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Args: []string{
-						"test1",
-						"test2",
-						"test3",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Args: []string{
-						"test1",
-						"test2",
-						"test3",
-						"test4",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.args to test4+",
-		config:         conf,
-		args:           []string{"users.foo.exec.args", "test4+"},
-		expected:       `Property "users.foo.exec.args" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecArgsDelete(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Args: []string{
-						"test1",
-						"test2",
-						"test3",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Args: []string{
-						"test1",
-						"test3",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.args to test2-",
-		config:         conf,
-		args:           []string{"users.foo.exec.args", "test2-"},
-		expected:       `Property "users.foo.exec.args" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecArgsUpdate(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Args: []string{
-						"test1",
-						"test2",
-						"test3",
-						"test4",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Args: []string{
-						"test1",
-						"test3",
-					},
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.args to test1,test3",
-		config:         conf,
-		args:           []string{"users.foo.exec.args", "test1,test3"},
-		expected:       `Property "users.foo.exec.args" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecProvideClusterInfo(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					ProvideClusterInfo: true,
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.provideClusterInfo to true",
-		config:         conf,
-		args:           []string{"users.foo.exec.provideClusterInfo", "true"},
-		expected:       `Property "users.foo.exec.provideClusterInfo" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecEnvNew(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Env: []clientcmdapi.ExecEnvVar{
-						{
-							Name:  "test",
-							Value: "val1",
+	tests := []setConfigTest{
+		{
+			name:        "SetAuthProviderName",
+			description: "Testing for kubectl config set users.foo.auth-provider.name to oidc",
+			config:      conf,
+			args:        []string{"users.foo.auth-provider.name", "oidc"},
+			expected:    `Property "users.foo.auth-provider.name" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name: "oidc",
 						},
+						Extensions: map[string]runtime.Object{},
 					},
 				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
 				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
+		{
+			name:        "SetAuthProviderConfigMap",
+			description: "Testing for kubectl config set users.foo.auth-provider.config.refresh-token to test",
+			config:      conf,
+			args:        []string{"users.foo.auth-provider.config.refresh-token", "test"},
+			expected:    `Property "users.foo.auth-provider.config.refresh-token" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name: "",
+							Config: map[string]string{
+								"refresh-token": "test",
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthProviderConfigMapMalformed",
+			description: "Testing for kubectl config set users.foo.auth-provider.config to test",
+			config:      conf,
+			args:        []string{"users.foo.auth-provider.config", "test"},
+			expectedErr: `empty key provided for map`,
+		},
+		{
+			name:        "SetAuthInfoExecCommand",
+			description: "Testing for kubectl config set users.foo.exec.command to test",
+			config:      conf,
+			args:        []string{"users.foo.exec.command", "test"},
+			expected:    `Property "users.foo.exec.command" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command: "test",
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoExecArgs",
+			description: "Testing for kubectl config set users.foo.exec.args to test1,test2,test3",
+			config:      conf,
+			args:        []string{"users.foo.exec.args", "test1,test2,test3"},
+			expected:    `Property "users.foo.exec.args" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoProvideClusterInfo",
+			description: "Testing for kubectl config set users.foo.exec.provideClusterInfo to true",
+			config:      conf,
+			args:        []string{"users.foo.exec.provideClusterInfo", "true"},
+			expected:    `Property "users.foo.exec.provideClusterInfo" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							ProvideClusterInfo: true,
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoExecEnvVar",
+			description: "Testing for kubectl config set users.foo.exec.env.name.test to value:val1",
+			config:      conf,
+			args:        []string{"users.foo.exec.env.name.test", "value:val1"},
+			expected:    `Property "users.foo.exec.env.name.test" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "val1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoExecEnvVarMalformed",
+			description: "Testing for kubectl config set users.foo.exec.env.name.test to value2",
+			config:      conf,
+			args:        []string{"users.foo.exec.env.name.test", "value2"},
+			expectedErr: `error parsing field name for value, should be of format fieldName:fieldValue`,
+		},
+		{
+			name:        "SetAuthInfoExecInstallHint",
+			description: "Testing for kubectl config set users.foo.exec.installHint to test",
+			config:      conf,
+			args:        []string{"users.foo.exec.installHint", "test"},
+			expected:    `Property "users.foo.exec.installHint" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							InstallHint: "test",
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoActAsUser",
+			description: "Testing for kubectl config set users.foo.act-as to test1",
+			config:      conf,
+			args:        []string{"users.foo.act-as", "test1"},
+			expected:    `Property "users.foo.act-as" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Impersonate: "test1",
+						Extensions:  map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoActUid",
+			description: "Testing for kubectl config set users.foo.act-as-uid to 1000",
+			config:      conf,
+			args:        []string{"users.foo.act-as-uid", "1000"},
+			expected:    `Property "users.foo.act-as-uid" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ImpersonateUID: "1000",
+						Extensions:     map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoActAsGroups",
+			description: "Testing for kubectl config set users.foo.act-as-groups to test1,test2,test3",
+			config:      conf,
+			args:        []string{"users.foo.act-as-groups", "test1,test2,test3"},
+			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoActAsUserExtra",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val1,val2,val3",
+			config:      conf,
+			args:        []string{"users.foo.act-as-user-extra.test1", "val1,val2,val3"},
+			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoUsername",
+			description: "Testing for kubectl config set users.foo.username to test1",
+			config:      conf,
+			args:        []string{"users.foo.username", "test1"},
+			expected:    `Property "users.foo.username" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Username:   "test1",
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoPassword",
+			description: "Testing for kubectl config set users.foo.password to abadpassword",
+			config:      conf,
+			args:        []string{"users.foo.password", "abadpassword"},
+			expected:    `Property "users.foo.password" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Password:   "abadpassword",
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoClientCertificate",
+			description: "Testing for kubectl config set users.foo.client-certificate to ./file/path",
+			config:      conf,
+			args:        []string{"users.foo.client-certificate", "./file/path"},
+			expected:    `Property "users.foo.client-certificate" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ClientCertificate: "./file/path",
+						Extensions:        map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoClientCertificateData",
+			description: "Testing for kubectl config set users.foo.client-certificate-data to not real cert data",
+			config:      conf,
+			args:        []string{"users.foo.client-certificate-data", "--set-raw-bytes=true", "not real cert data"},
+			expected:    `Property "users.foo.client-certificate-data" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ClientCertificateData: []byte("not real cert data"),
+						Extensions:            map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoClientKey",
+			description: "Testing for kubectl config set users.foo.client-key to ./file/path",
+			config:      conf,
+			args:        []string{"users.foo.client-key", "./file/path"},
+			expected:    `Property "users.foo.client-key" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ClientKey:  "./file/path",
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoClientKeyData",
+			description: "Testing for kubectl config set users.foo.client-key-data to not real key data",
+			config:      conf,
+			args:        []string{"users.foo.client-key-data", "--set-raw-bytes=true", "not real key data"},
+			expected:    `Property "users.foo.client-key-data" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ClientKeyData: []byte("not real key data"),
+						Extensions:    map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoToken",
+			description: "Testing for kubectl config set users.foo.token to fake token data",
+			config:      conf,
+			args:        []string{"users.foo.token", "fake token data"},
+			expected:    `Property "users.foo.token" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Token:      "fake token data",
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoTokenFile",
+			description: "Testing for kubectl config set users.foo.tokenFile to ./file/path",
+			config:      conf,
+			args:        []string{"users.foo.tokenFile", "./file/path"},
+			expected:    `Property "users.foo.tokenFile" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						TokenFile:  "./file/path",
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthProviderMalformed",
+			description: "Testing for kubectl config set users.foo.auth-provider to test error",
+			config:      conf,
+			args:        []string{"users.foo.auth-provider", "test"},
+			expectedErr: `unable to locate path auth-provider`,
 		},
 	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.env.name.test to value:val1",
-		config:         conf,
-		args:           []string{"users.foo.exec.env.name.test", "value:val1"},
-		expected:       `Property "users.foo.exec.env.name.test" set.` + "\n",
-		expectedConfig: expectedConfig,
+	for _, test := range tests {
+		test.run(t)
 	}
-	test.run(t)
 }
 
-func TestSetConfigExecEnvUpdate(t *testing.T) {
+func TestFromExistingConfig(t *testing.T) {
 	conf := clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"foo": {
 				Exec: &clientcmdapi.ExecConfig{
+					Args: []string{
+						"test1",
+						"test2",
+						"test3",
+					},
 					Env: []clientcmdapi.ExecEnvVar{
 						{
 							Name:  "test",
@@ -435,814 +542,599 @@ func TestSetConfigExecEnvUpdate(t *testing.T) {
 					},
 				},
 				Extensions: map[string]runtime.Object{},
+				ImpersonateGroups: []string{
+					"test1",
+					"test2",
+					"test3",
+				},
+				ImpersonateUserExtra: map[string][]string{
+					"test1": {
+						"val1",
+						"val2",
+						"val3",
+					},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
+		Clusters:       map[string]*clientcmdapi.Cluster{},
+		Contexts:       map[string]*clientcmdapi.Context{},
+		CurrentContext: "minikube",
+		Extensions:     map[string]runtime.Object{},
 		Preferences: clientcmdapi.Preferences{
 			Colors:     false,
 			Extensions: map[string]runtime.Object{},
 		},
 	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					Env: []clientcmdapi.ExecEnvVar{
-						{
-							Name:  "test",
-							Value: "value2",
+	tests := []setConfigTest{
+		{
+			name:        "SetCurrentContext",
+			description: "Testing for kubectl config set current-context",
+			config:      conf,
+			args:        []string{"current-context", "my-cluster"},
+			expected:    `Property "current-context" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
 						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.env.name.test to value:value2",
-		config:         conf,
-		args:           []string{"users.foo.exec.env.name.test", "value:value2"},
-		expected:       `Property "users.foo.exec.env.name.test" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigExecEnvMalformedValue(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	test := setConfigTest{
-		description: "Testing for kubectl config set users.foo.exec.env.name.test to value2",
-		config:      conf,
-		args:        []string{"users.foo.exec.env.name.test", "value2"},
-		expectedErr: `error parsing field name for value, should be of format fieldName:fieldValue`,
-	}
-	test.run(t)
-}
-
-func TestSetConfigInstallHint(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Exec: &clientcmdapi.ExecConfig{
-					InstallHint: "test",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.exec.installHint to test",
-		config:         conf,
-		args:           []string{"users.foo.exec.installHint", "test"},
-		expected:       `Property "users.foo.exec.installHint" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateUser(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Impersonate: "test1",
-				Extensions:  map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as to test1",
-		config:         conf,
-		args:           []string{"users.foo.act-as", "test1"},
-		expected:       `Property "users.foo.act-as" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateUID(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUID: "1000",
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "my-cluster",
 				Extensions:     map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as to 1000",
-		config:         conf,
-		args:           []string{"users.foo.act-as-uid", "1000"},
-		expected:       `Property "users.foo.act-as-uid" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateGroupsNew(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateGroups: []string{
-					"test1",
-					"test2",
-					"test3",
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
 				},
-				Extensions: map[string]runtime.Object{},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-groups to test1,test2,test3",
-		config:         conf,
-		args:           []string{"users.foo.act-as-groups", "test1,test2,test3"},
-		expected:       `Property "users.foo.act-as-groups" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateGroupsAdd(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateGroups: []string{
-					"test1",
-					"test2",
-					"test3",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateGroups: []string{
-					"test1",
-					"test2",
-					"test3",
-					"test4",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-groups to test4+",
-		config:         conf,
-		args:           []string{"users.foo.act-as-groups", "test4+"},
-		expected:       `Property "users.foo.act-as-groups" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateGroupsDelete(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateGroups: []string{
-					"test1",
-					"test2",
-					"test3",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateGroups: []string{
-					"test1",
-					"test2",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-groups to test3-",
-		config:         conf,
-		args:           []string{"users.foo.act-as-groups", "test3-"},
-		expected:       `Property "users.foo.act-as-groups" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateGroupsUpdate(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateGroups: []string{
-					"test1",
-					"test2",
-					"test3",
-					"test4",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateGroups: []string{
-					"test8",
-					"test9",
-				},
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-groups to test8,test9",
-		config:         conf,
-		args:           []string{"users.foo.act-as-groups", "test8,test9"},
-		expected:       `Property "users.foo.act-as-groups" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateUserExtraNew(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
-						"val3",
+		{
+			name:        "AddExecArg",
+			description: "Testing for kubectl config set users.foo.exec.args to test4+",
+			config:      conf,
+			args:        []string{"users.foo.exec.args", "test4+"},
+			expected:    `Property "users.foo.exec.args" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+								"test4",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val1,val2,val3",
-		config:         conf,
-		args:           []string{"users.foo.act-as-user-extra.test1", "val1,val2,val3"},
-		expected:       `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateUserExtraAdd(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
-						"val3",
+		{
+			name:        "DeleteExecArg",
+			description: "Testing for kubectl config set users.foo.exec.args to test2-",
+			config:      conf,
+			args:        []string{"users.foo.exec.args", "test2-"},
+			expected:    `Property "users.foo.exec.args" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
-						"val3",
-						"val4",
+		{
+			name:        "UpdateExecArgs",
+			description: "Testing for kubectl config set users.foo.exec.args to test1,test3",
+			config:      conf,
+			args:        []string{"users.foo.exec.args", "test4,test5"},
+			expected:    `Property "users.foo.exec.args" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test4",
+								"test5",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val4+",
-		config:         conf,
-		args:           []string{"users.foo.act-as-user-extra.test1", "val4+"},
-		expected:       `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateUserExtraDelete(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
-						"val3",
+		{
+			name:        "UpdateExecEnvVar",
+			description: "Testing for kubectl config set users.foo.exec.env.name.test to value:value2",
+			config:      conf,
+			args:        []string{"users.foo.exec.env.name.test", "value:value2"},
+			expected:    `Property "users.foo.exec.env.name.test" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value2",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
+		{
+			name:        "AddActAsGroups",
+			description: "Testing for kubectl config set users.foo.act-as-groups to test4+",
+			config:      conf,
+			args:        []string{"users.foo.act-as-groups", "test4+"},
+			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+							"test4",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val3-",
-		config:         conf,
-		args:           []string{"users.foo.act-as-user-extra.test1", "val3-"},
-		expected:       `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateUserExtraUpdate(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
-						"val3",
+		{
+			name:        "DeleteActAsGroups",
+			description: "Testing for kubectl config set users.foo.act-as-groups to test3-",
+			config:      conf,
+			args:        []string{"users.foo.act-as-groups", "test3-"},
+			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val5",
-						"val6",
-						"val7",
+		{
+			name:        "UpdateActAsGroups",
+			description: "Testing for kubectl config set users.foo.act-as-groups to test8,test9",
+			config:      conf,
+			args:        []string{"users.foo.act-as-groups", "test8,test9"},
+			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test8",
+							"test9",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val5,val6,val7",
-		config:         conf,
-		args:           []string{"users.foo.act-as-user-extra.test1", "val5,val6,val7"},
-		expected:       `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigImpersonateUserExtraNewKey(t *testing.T) {
-	conf := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
-						"val3",
+		{
+			name:        "AddActAsUserExtra",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val4+",
+			config:      conf,
+			args:        []string{"users.foo.act-as-user-extra.test1", "val4+"},
+			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+								"val4",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ImpersonateUserExtra: map[string][]string{
-					"test1": {
-						"val1",
-						"val2",
-						"val3",
-					},
-					"test2": {
-						"val1",
+		{
+			name:        "DeleteActAsUserExtra",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val3-",
+			config:      conf,
+			args:        []string{"users.foo.act-as-user-extra.test1", "val3-"},
+			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+							},
+						},
 					},
 				},
-				Extensions: map[string]runtime.Object{},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.act-as-user-extra.test2 to val1",
-		config:         conf,
-		args:           []string{"users.foo.act-as-user-extra.test2", "val1"},
-		expected:       `Property "users.foo.act-as-user-extra.test2" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigUsername(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Username:   "test1",
-				Extensions: map[string]runtime.Object{},
+		{
+			name:        "UpdateActAsUserExtra",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val5,val6,val7",
+			config:      conf,
+			args:        []string{"users.foo.act-as-user-extra.test1", "val5,val6,val7"},
+			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val5",
+								"val6",
+								"val7",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.username to test1",
-		config:         conf,
-		args:           []string{"users.foo.username", "test1"},
-		expected:       `Property "users.foo.username" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigPassword(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Password:   "abadpassword",
-				Extensions: map[string]runtime.Object{},
+		{
+			name:        "AddNewActAsUserExtra",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test2 to val1",
+			config:      conf,
+			args:        []string{"users.foo.act-as-user-extra.test2", "val1"},
+			expected:    `Property "users.foo.act-as-user-extra.test2" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+							"test2": {
+								"val1",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
 			},
 		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
 	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.password to abadpassword",
-		config:         conf,
-		args:           []string{"users.foo.password", "abadpassword"},
-		expected:       `Property "users.foo.password" set.` + "\n",
-		expectedConfig: expectedConfig,
+	for _, test := range tests {
+		test.run(t)
 	}
-	test.run(t)
-}
-
-func TestSetConfigClientCertificate(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ClientCertificate: "./file/path",
-				Extensions:        map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.client-certificate to ./file/path",
-		config:         conf,
-		args:           []string{"users.foo.client-certificate", "./file/path"},
-		expected:       `Property "users.foo.client-certificate" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigClientCertificateData(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ClientCertificateData: []byte("not real cert data"),
-				Extensions:            map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.client-certificate-data to not real cert data",
-		config:         conf,
-		args:           []string{"users.foo.client-certificate-data", "--set-raw-bytes=true", "not real cert data"},
-		expected:       `Property "users.foo.client-certificate-data" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigClientKey(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ClientKey:  "./file/path",
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.client-key to ./file/path",
-		config:         conf,
-		args:           []string{"users.foo.client-key", "./file/path"},
-		expected:       `Property "users.foo.client-key" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigClientKeyData(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				ClientKeyData: []byte("not real key data"),
-				Extensions:    map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.client-key-data to not real key data",
-		config:         conf,
-		args:           []string{"users.foo.client-key-data", "--set-raw-bytes=true", "not real key data"},
-		expected:       `Property "users.foo.client-key-data" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigToken(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				Token:      "fake token data",
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.token to fake token data",
-		config:         conf,
-		args:           []string{"users.foo.token", "fake token data"},
-		expected:       `Property "users.foo.token" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigTokenFile(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	expectedConfig := clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"foo": {
-				TokenFile:  "./file/path",
-				Extensions: map[string]runtime.Object{},
-			},
-		},
-		Clusters:   map[string]*clientcmdapi.Cluster{},
-		Contexts:   map[string]*clientcmdapi.Context{},
-		Extensions: map[string]runtime.Object{},
-		Preferences: clientcmdapi.Preferences{
-			Colors:     false,
-			Extensions: map[string]runtime.Object{},
-		},
-	}
-	expectedConfig.Extensions = map[string]runtime.Object{}
-	test := setConfigTest{
-		description:    "Testing for kubectl config set users.foo.tokenFile to ./file/path",
-		config:         conf,
-		args:           []string{"users.foo.tokenFile", "./file/path"},
-		expected:       `Property "users.foo.tokenFile" set.` + "\n",
-		expectedConfig: expectedConfig,
-	}
-	test.run(t)
-}
-
-func TestSetConfigAuthProviderError(t *testing.T) {
-	conf := *clientcmdapi.NewConfig()
-	test := setConfigTest{
-		description: "Testing for kubectl config set users.foo.auth-provider to oidc error",
-		config:      conf,
-		args:        []string{"users.foo.auth-provider", "test"},
-		expectedErr: `unable to locate path auth-provider`,
-	}
-	test.run(t)
 }
 
 func (test setConfigTest) run(t *testing.T) {
@@ -1310,6 +1202,6 @@ func (test setConfigTest) run(t *testing.T) {
 		}
 	}
 	if !reflect.DeepEqual(*config, test.expectedConfig) {
-		t.Errorf("config want/got mismatch (-want +got):\n%s", cmp.Diff(test.expectedConfig, *config))
+		t.Errorf("%v\nconfig want/got mismatch (-want +got):\n%s", test.name, cmp.Diff(test.expectedConfig, *config))
 	}
 }
