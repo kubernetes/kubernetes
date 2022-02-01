@@ -260,7 +260,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		var egressDialer utilnet.DialFunc
 		egressDialer, err := r.egressSelector.Lookup(networkContext)
 		if err != nil {
-			klog.Warning(err.Error())
+			klog.Warningf("error dialing with egress selector on network context %q, err: %v", networkContext.EgressSelectionName.String(), err)
 		} else {
 			newInfo.restConfig.Dial = egressDialer
 		}
