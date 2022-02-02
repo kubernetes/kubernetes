@@ -18,12 +18,16 @@ package logs
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
 
@@ -89,7 +93,7 @@ func TestOptions(t *testing.T) {
 			if !assert.Equal(t, tc.want, o) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, o)
 			}
-			err := o.ValidateAndApply()
+			err := o.ValidateAndApply(nil /* We don't care about feature gates here. */)
 			defer klog.StopFlushDaemon()
 
 			if !assert.ElementsMatch(t, tc.errs.ToAggregate(), err) {
@@ -97,5 +101,44 @@ func TestOptions(t *testing.T) {
 
 			}
 		})
+	}
+}
+
+func TestContextualLogging(t *testing.T) {
+	t.Run("enabled", func(t *testing.T) {
+		testContextualLogging(t, true)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		testContextualLogging(t, false)
+	})
+}
+
+func testContextualLogging(t *testing.T, enabled bool) {
+	var err error
+
+	o := NewOptions()
+	featureGate := featuregate.NewFeatureGate()
+	AddFeatureGates(featureGate)
+	err = featureGate.SetFromMap(map[string]bool{string(ContextualLogging): enabled})
+	require.NoError(t, err)
+	err = o.ValidateAndApply(featureGate)
+	require.NoError(t, err)
+	defer klog.StopFlushDaemon()
+	defer klog.EnableContextualLogging(true)
+
+	ctx := context.Background()
+	logger := klog.NewKlogr().WithName("contextual")
+	ctx = logr.NewContext(ctx, logger)
+	if enabled {
+		assert.Equal(t, logger, klog.FromContext(ctx), "FromContext")
+		assert.NotEqual(t, ctx, klog.NewContext(ctx, logger), "NewContext")
+		assert.NotEqual(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
+		assert.NotEqual(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
+	} else {
+		assert.NotEqual(t, logger, klog.FromContext(ctx), "FromContext")
+		assert.Equal(t, ctx, klog.NewContext(ctx, logger), "NewContext")
+		assert.Equal(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
+		assert.Equal(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
 	}
 }
