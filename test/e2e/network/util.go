@@ -143,6 +143,8 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 
 // execHostnameTest executes curl to access "/hostname" endpoint on target address
 // from given Pod to check the hostname of the target destination.
+// It also converts FQDNs to hostnames, so if an FQDN is passed as
+// targetHostname only the hostname part will be considered for comparison.
 func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	var (
 		err     error
@@ -166,8 +168,12 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 		break
 	}
 
+	// Ensure we're comparing hostnames and not FQDNs
+	targetHostname = strings.Split(targetHostname, ".")[0]
+	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
+
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(strings.TrimSpace(stdout), targetHostname)
+	framework.ExpectEqual(hostname, targetHostname)
 }
 
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
