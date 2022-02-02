@@ -160,23 +160,51 @@ const (
 	// SchedulerKubeConfigFileName defines the file name for the scheduler's kubeconfig file
 	SchedulerKubeConfigFileName = "scheduler.conf"
 
-	// Some well-known users and groups in the core Kubernetes authorization system
+	// Some well-known users, groups, roles and clusterrolebindings in the core Kubernetes authorization system
 
 	// ControllerManagerUser defines the well-known user the controller-manager should be authenticated as
 	ControllerManagerUser = "system:kube-controller-manager"
 	// SchedulerUser defines the well-known user the scheduler should be authenticated as
 	SchedulerUser = "system:kube-scheduler"
+	// NodesUserPrefix defines the user name prefix as requested by the Node authorizer.
+	NodesUserPrefix = "system:node:"
 	// SystemPrivilegedGroup defines the well-known group for the apiservers. This group is also superuser by default
 	// (i.e. bound to the cluster-admin ClusterRole)
 	SystemPrivilegedGroup = "system:masters"
 	// NodesGroup defines the well-known group for all nodes.
 	NodesGroup = "system:nodes"
-	// NodesUserPrefix defines the user name prefix as requested by the Node authorizer.
-	NodesUserPrefix = "system:node:"
+	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
+	NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
+	// KubeProxyClusterRoleName sets the name for the kube-proxy ClusterRole
+	KubeProxyClusterRoleName = "system:node-proxier"
+	// NodeBootstrapperClusterRoleName defines the name of the auto-bootstrapped ClusterRole for letting someone post a CSR
+	NodeBootstrapperClusterRoleName = "system:node-bootstrapper"
+	// CSRAutoApprovalClusterRoleName defines the name of the auto-bootstrapped ClusterRole for making the csrapprover controller auto-approve the CSR
+	// Starting from v1.8, CSRAutoApprovalClusterRoleName is automatically created by the API server on startup
+	CSRAutoApprovalClusterRoleName = "system:certificates.k8s.io:certificatesigningrequests:nodeclient"
+	// NodeSelfCSRAutoApprovalClusterRoleName is a role defined in default 1.8 RBAC policies for automatic CSR approvals for automatically rotated node certificates
+	NodeSelfCSRAutoApprovalClusterRoleName = "system:certificates.k8s.io:certificatesigningrequests:selfnodeclient"
 	// NodesClusterRoleBinding defines the well-known ClusterRoleBinding which binds the too permissive system:node
 	// ClusterRole to the system:nodes group. Since kubeadm is using the Node Authorizer, this ClusterRoleBinding's
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
+
+	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
+	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
+	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
+	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
+	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
+	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets post CSRs
+	NodeKubeletBootstrap = "kubeadm:kubelet-bootstrap"
+	// GetNodesClusterRoleName defines the name of the ClusterRole and ClusterRoleBinding to get nodes
+	GetNodesClusterRoleName = "kubeadm:get-nodes"
+	// NodeAutoApproveBootstrapClusterRoleBinding defines the name of the ClusterRoleBinding that makes the csrapprover approve node CSRs
+	NodeAutoApproveBootstrapClusterRoleBinding = "kubeadm:node-autoapprove-bootstrap"
+	// NodeAutoApproveCertificateRotationClusterRoleBinding defines name of the ClusterRoleBinding that makes the csrapprover approve node auto rotated CSRs
+	NodeAutoApproveCertificateRotationClusterRoleBinding = "kubeadm:node-autoapprove-certificate-rotation"
 
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
@@ -269,14 +297,6 @@ const (
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
-	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
-	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
-	// https://github.com/kubernetes/kubeadm/issues/1582
-	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
-
-	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
-	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
-
 	// KubeletRunDirectory specifies the directory where the kubelet runtime information is stored.
 	KubeletRunDirectory = "/var/lib/kubelet"
 
@@ -322,9 +342,6 @@ const (
 
 	// KubeConfigVolumeName specifies the name for the Volume that is used for injecting the kubeconfig to talk securely to the api server for a control plane component if applicable
 	KubeConfigVolumeName = "kubeconfig"
-
-	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
-	NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
 
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci build job
 	DefaultCIImageRepository = "gcr.io/k8s-staging-ci-images"
