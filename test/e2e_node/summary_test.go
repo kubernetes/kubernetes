@@ -68,7 +68,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					}
 				}
 				return nil
-			}, 2*time.Minute, 5*time.Second).Should(gomega.BeNil())
+			}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
@@ -324,7 +324,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 
 			ginkgo.By("Validating /stats/summary")
 			// Give pods a minute to actually start up.
-			gomega.Eventually(getNodeSummary, 90*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Eventually(getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
 			gomega.Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
