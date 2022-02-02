@@ -340,6 +340,7 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	var cpuCap, cpuAlloc int64
 
 	cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
+	ginkgo.By(fmt.Sprintf("checking node CPU capacity (%d) and allocatable CPUs (%d)", cpuCap, cpuAlloc))
 
 	ginkgo.By("running a non-Gu pod")
 	runNonGuPodTest(f, cpuCap)
