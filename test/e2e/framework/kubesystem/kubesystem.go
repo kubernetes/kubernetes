@@ -32,8 +32,8 @@ func RestartControllerManager() error {
 	if !framework.ProviderIs("gce", "aws") {
 		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", framework.TestContext.Provider)
 	}
-	if framework.ProviderIs("gce") && !framework.MasterOSDistroIs("gci") {
-		return fmt.Errorf("unsupported master OS distro: %s", framework.TestContext.MasterOSDistro)
+	if framework.ProviderIs("gce") && !framework.ControlPlaneOSDistroIs("gci") {
+		return fmt.Errorf("unsupported master OS distro: %s", framework.TestContext.ControlPlaneOSDistro)
 	}
 	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	framework.Logf("Restarting controller-manager via ssh, running: %v", cmd)

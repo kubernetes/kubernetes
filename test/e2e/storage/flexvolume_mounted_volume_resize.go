@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce", "local")
-		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
+		e2eskipper.SkipUnlessControlPlaneOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
