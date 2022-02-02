@@ -41,6 +41,11 @@ type MetadataClient interface {
 	UpdateFake(obj *metav1.PartialObjectMetadata, opts metav1.UpdateOptions, subresources ...string) (*metav1.PartialObjectMetadata, error)
 }
 
+// NewTestScheme creates a unique Scheme for each test.
+func NewTestScheme() *runtime.Scheme {
+	return runtime.NewScheme()
+}
+
 // NewSimpleMetadataClient creates a new client that will use the provided scheme and respond with the
 // provided objects when requests are made. It will track actions made to the client which can be checked
 // with GetActions().
