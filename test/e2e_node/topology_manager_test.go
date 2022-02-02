@@ -342,6 +342,12 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 	ginkgo.By(fmt.Sprintf("checking node CPU capacity (%d) and allocatable CPUs (%d)", cpuCap, cpuAlloc))
 
+	// Albeit even the weakest CI machines usually have 2 cpus, let's be extra careful and
+	// check explicitly. We prefer to skip than a false negative (and a failed test).
+	if cpuAlloc < 1 {
+		e2eskipper.Skipf("Skipping basic CPU Manager tests since CPU capacity < 2")
+	}
+
 	ginkgo.By("running a non-Gu pod")
 	runNonGuPodTest(f, cpuCap)
 
