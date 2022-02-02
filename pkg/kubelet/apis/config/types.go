@@ -176,6 +176,8 @@ type KubeletConfiguration struct {
 	// kubelet will configure all containers to use this for DNS resolution
 	// instead of the host's DNS servers.
 	ClusterDNS []string
+	// PLEGRelistThreshold is the threshold for PLEG relisting.
+	PLEGRelistThreshold metav1.Duration
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration

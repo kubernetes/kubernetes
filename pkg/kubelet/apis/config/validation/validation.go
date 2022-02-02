@@ -36,7 +36,8 @@ import (
 )
 
 var (
-	defaultCFSQuota = metav1.Duration{Duration: 100 * time.Millisecond}
+	defaultCFSQuota        = metav1.Duration{Duration: 100 * time.Millisecond}
+	minPLEGRelistThreshold = metav1.Duration{Duration: 30 * time.Second} // +k8s:verify-mutation:reason=clone
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
@@ -169,6 +170,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
+	}
+	if kc.PLEGRelistThreshold.Duration <= minPLEGRelistThreshold.Duration {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: PLEGRelistThreshold must be greater than %s", minPLEGRelistThreshold.Duration))
 	}
 	if localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 		if len(kc.ShutdownGracePeriodByPodPriority) != 0 && (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) {

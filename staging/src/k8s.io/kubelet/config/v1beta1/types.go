@@ -251,6 +251,8 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	ClusterDNS []string `json:"clusterDNS,omitempty"`
+	// PLEGRelistThreshold is the threshold for PLEG relisting.
+	PLEGRelistThreshold metav1.Duration `json:"plegRelistThreshold,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	// Default: "4h"

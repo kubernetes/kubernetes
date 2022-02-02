@@ -54300,6 +54300,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							},
 						},
 					},
+					"plegRelistThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PLEGRelistThreshold is the threshold for PLEG relisting.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 					"streamingConnectionIdleTimeout": {
 						SchemaProps: spec.SchemaProps{
 							Description: "streamingConnectionIdleTimeout is the maximum time a streaming connection can be idle before the connection is automatically closed. Default: \"4h\"",

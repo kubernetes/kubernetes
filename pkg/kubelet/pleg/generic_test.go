@@ -60,11 +60,12 @@ func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
-		relistPeriod: time.Hour,
-		runtime:      fakeRuntime,
-		eventChannel: make(chan *PodLifecycleEvent, eventChannelCap),
-		podRecords:   make(podRecords),
-		clock:        clock,
+		relistThreshold: 3 * time.Minute,
+		relistPeriod:    time.Hour,
+		runtime:         fakeRuntime,
+		eventChannel:    make(chan *PodLifecycleEvent, eventChannelCap),
+		podRecords:      make(podRecords),
+		clock:           clock,
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
@@ -447,7 +448,7 @@ func TestHealthy(t *testing.T) {
 
 	// Advance by relistThreshold without any relisting. pleg should be unhealthy
 	// because it has been longer than relistThreshold since a relist occurred.
-	clock.Step(relistThreshold)
+	clock.Step(pleg.relistThreshold)
 	ok, _ = pleg.Healthy()
 	assert.False(t, ok, "pleg should be unhealthy")
 }

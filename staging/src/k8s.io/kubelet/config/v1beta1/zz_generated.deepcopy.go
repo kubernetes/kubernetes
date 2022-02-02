@@ -233,6 +233,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	out.PLEGRelistThreshold = in.PLEGRelistThreshold
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency

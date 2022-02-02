@@ -33,7 +33,6 @@ import (
 )
 
 func TestSetDefaultsKubeletConfiguration(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		config   *v1beta1.KubeletConfiguration
@@ -71,6 +70,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				HealthzPort:                               utilpointer.Int32Ptr(10248),
 				HealthzBindAddress:                        "127.0.0.1",
 				OOMScoreAdj:                               utilpointer.Int32Ptr(int32(qos.KubeletOOMScoreAdj)),
+				PLEGRelistThreshold:                       metav1.Duration{Duration: 3 * time.Minute},
 				StreamingConnectionIdleTimeout:            metav1.Duration{Duration: 4 * time.Hour},
 				NodeStatusUpdateFrequency:                 metav1.Duration{Duration: 10 * time.Second},
 				NodeStatusReportFrequency:                 metav1.Duration{Duration: 5 * time.Minute},
@@ -169,6 +169,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				OOMScoreAdj:                      utilpointer.Int32(0),
 				ClusterDomain:                    "",
 				ClusterDNS:                       []string{},
+				PLEGRelistThreshold:              zeroDuration,
 				StreamingConnectionIdleTimeout:   zeroDuration,
 				NodeStatusUpdateFrequency:        zeroDuration,
 				NodeStatusReportFrequency:        zeroDuration,
@@ -281,6 +282,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				HealthzBindAddress:               "127.0.0.1",
 				OOMScoreAdj:                      utilpointer.Int32(0),
 				ClusterDNS:                       []string{},
+				PLEGRelistThreshold:              metav1.Duration{Duration: 3 * time.Minute},
 				StreamingConnectionIdleTimeout:   metav1.Duration{Duration: 4 * time.Hour},
 				NodeStatusUpdateFrequency:        metav1.Duration{Duration: 10 * time.Second},
 				NodeStatusReportFrequency:        metav1.Duration{Duration: 5 * time.Minute},
@@ -390,6 +392,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				OOMScoreAdj:                    utilpointer.Int32(1),
 				ClusterDomain:                  "cluster-domain",
 				ClusterDNS:                     []string{"192.168.1.3"},
+				PLEGRelistThreshold:            metav1.Duration{Duration: 60 * time.Second},
 				StreamingConnectionIdleTimeout: metav1.Duration{Duration: 60 * time.Second},
 				NodeStatusUpdateFrequency:      metav1.Duration{Duration: 60 * time.Second},
 				NodeStatusReportFrequency:      metav1.Duration{Duration: 60 * time.Second},
@@ -534,6 +537,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				OOMScoreAdj:                    utilpointer.Int32(1),
 				ClusterDomain:                  "cluster-domain",
 				ClusterDNS:                     []string{"192.168.1.3"},
+				PLEGRelistThreshold:            metav1.Duration{Duration: 60 * time.Second},
 				StreamingConnectionIdleTimeout: metav1.Duration{Duration: 60 * time.Second},
 				NodeStatusUpdateFrequency:      metav1.Duration{Duration: 60 * time.Second},
 				NodeStatusReportFrequency:      metav1.Duration{Duration: 60 * time.Second},
@@ -670,6 +674,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				HealthzPort:                               utilpointer.Int32Ptr(10248),
 				HealthzBindAddress:                        "127.0.0.1",
 				OOMScoreAdj:                               utilpointer.Int32Ptr(int32(qos.KubeletOOMScoreAdj)),
+				PLEGRelistThreshold:                       metav1.Duration{Duration: 3 * time.Minute},
 				StreamingConnectionIdleTimeout:            metav1.Duration{Duration: 4 * time.Hour},
 				NodeStatusUpdateFrequency:                 metav1.Duration{Duration: 1 * time.Minute},
 				NodeStatusReportFrequency:                 metav1.Duration{Duration: 1 * time.Minute},

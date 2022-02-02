@@ -682,7 +682,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI))
 	}
 
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, kubeCfg.PLEGRelistThreshold.Duration, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 	if _, err := klet.updatePodCIDR(kubeCfg.PodCIDR); err != nil {
@@ -1960,7 +1960,8 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  reason,
-		Message: "Pod " + message})
+		Message: "Pod " + message,
+	})
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
