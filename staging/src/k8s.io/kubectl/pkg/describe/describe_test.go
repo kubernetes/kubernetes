@@ -2257,7 +2257,7 @@ func TestDescribeJob(t *testing.T) {
 				if !strings.Contains(out, fmt.Sprintf("Completed Indexes:  %s\n", tc.wantCompletedIndexes)) {
 					t.Errorf("Output didn't contain wanted Completed Indexes:\n%s", out)
 				}
-			} else if strings.Contains(out, fmt.Sprintf("Completed Indexes:")) {
+			} else if strings.Contains(out, "Completed Indexes:") {
 				t.Errorf("Output contains unexpected completed indexes:\n%s", out)
 			}
 		})
