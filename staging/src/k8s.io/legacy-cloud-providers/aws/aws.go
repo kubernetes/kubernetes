@@ -3918,20 +3918,27 @@ func (c *Cloud) buildNLBHealthCheckConfiguration(svc *v1.Service) (healthCheckCo
 func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
 	if isLBExternal(annotations) {
-		return nil, cloudprovider.ImplementedElsewhere
+		err := cloudprovider.ImplementedElsewhere
+		recordAWSMetric("ensure_load_balancer", 0, err)
+		return nil, err
 	}
 	klog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, annotations)
 
 	if apiService.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
-		return nil, fmt.Errorf("unsupported load balancer affinity: %v", apiService.Spec.SessionAffinity)
+		err := fmt.Errorf("unsupported load balancer affinity: %v", apiService.Spec.SessionAffinity)
+		recordAWSMetric("ensure_load_balancer", 0, err)
+		return nil, err
 	}
 
 	if len(apiService.Spec.Ports) == 0 {
-		return nil, fmt.Errorf("requested load balancer with no ports")
+		err := fmt.Errorf("requested load balancer with no ports")
+		recordAWSMetric("ensure_load_balancer", 0, err)
+		return nil, err
 	}
 	if err := checkMixedProtocol(apiService.Spec.Ports); err != nil {
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 	// Figure out what mappings we want on the load balancer
@@ -3941,6 +3948,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	sslPorts := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
 	for _, port := range apiService.Spec.Ports {
 		if err := checkProtocol(port, annotations); err != nil {
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 
@@ -3958,6 +3966,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			}
 			var err error
 			if portMapping.HealthCheckConfig, err = c.buildNLBHealthCheckConfiguration(apiService); err != nil {
+				recordAWSMetric("ensure_load_balancer", 0, err)
 				return nil, err
 			}
 
@@ -3976,6 +3985,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		} else {
 			listener, err := buildListener(port, annotations, sslPorts)
 			if err != nil {
+				recordAWSMetric("ensure_load_balancer", 0, err)
 				return nil, err
 			}
 			listeners = append(listeners, listener)
@@ -3983,16 +3993,20 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	}
 
 	if apiService.Spec.LoadBalancerIP != "" {
-		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
+		err := fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
+		recordAWSMetric("ensure_load_balancer", 0, err)
+		return nil, err
 	}
 
 	instances, err := c.findInstancesForELB(nodes, annotations)
 	if err != nil {
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 
 	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 
@@ -4010,11 +4024,14 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		subnetIDs, err := c.getLoadBalancerSubnets(apiService, internalELB)
 		if err != nil {
 			klog.Errorf("Error listing subnets in VPC: %q", err)
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 		// Bail out early if there are no subnets
 		if len(subnetIDs) == 0 {
-			return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
+			err := fmt.Errorf("could not find any suitable subnets for creating the ELB")
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 
 		loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, apiService)
@@ -4035,12 +4052,14 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			annotations,
 		)
 		if err != nil {
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 
 		subnetCidrs, err := c.getSubnetCidrs(subnetIDs)
 		if err != nil {
 			klog.Errorf("Error getting subnet cidrs: %q", err)
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 
@@ -4055,6 +4074,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		err = c.updateInstanceSecurityGroupsForNLB(loadBalancerName, instances, subnetCidrs, sourceRangeCidrs, v2Mappings)
 		if err != nil {
 			klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 
@@ -4070,7 +4090,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	proxyProtocolAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerProxyProtocol]
 	if proxyProtocolAnnotation != "" {
 		if proxyProtocolAnnotation != "*" {
-			return nil, fmt.Errorf("annotation %q=%q detected, but the only value supported currently is '*'", ServiceAnnotationLoadBalancerProxyProtocol, proxyProtocolAnnotation)
+			err := fmt.Errorf("annotation %q=%q detected, but the only value supported currently is '*'", ServiceAnnotationLoadBalancerProxyProtocol, proxyProtocolAnnotation)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 		proxyProtocol = true
 	}
@@ -4088,10 +4110,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if accessLogEmitIntervalAnnotation != "" {
 		accessLogEmitInterval, err := strconv.ParseInt(accessLogEmitIntervalAnnotation, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+			err := fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerAccessLogEmitInterval,
 				accessLogEmitIntervalAnnotation,
 			)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 		loadBalancerAttributes.AccessLog.EmitInterval = &accessLogEmitInterval
 	}
@@ -4101,10 +4125,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if accessLogEnabledAnnotation != "" {
 		accessLogEnabled, err := strconv.ParseBool(accessLogEnabledAnnotation)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+			err := fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerAccessLogEnabled,
 				accessLogEnabledAnnotation,
 			)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 		loadBalancerAttributes.AccessLog.Enabled = &accessLogEnabled
 	}
@@ -4126,10 +4152,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if connectionDrainingEnabledAnnotation != "" {
 		connectionDrainingEnabled, err := strconv.ParseBool(connectionDrainingEnabledAnnotation)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+			err := fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerConnectionDrainingEnabled,
 				connectionDrainingEnabledAnnotation,
 			)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 		loadBalancerAttributes.ConnectionDraining.Enabled = &connectionDrainingEnabled
 	}
@@ -4139,10 +4167,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if connectionDrainingTimeoutAnnotation != "" {
 		connectionDrainingTimeout, err := strconv.ParseInt(connectionDrainingTimeoutAnnotation, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+			err := fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerConnectionDrainingTimeout,
 				connectionDrainingTimeoutAnnotation,
 			)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 		loadBalancerAttributes.ConnectionDraining.Timeout = &connectionDrainingTimeout
 	}
@@ -4152,10 +4182,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if connectionIdleTimeoutAnnotation != "" {
 		connectionIdleTimeout, err := strconv.ParseInt(connectionIdleTimeoutAnnotation, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+			err := fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerConnectionIdleTimeout,
 				connectionIdleTimeoutAnnotation,
 			)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 		loadBalancerAttributes.ConnectionSettings.IdleTimeout = &connectionIdleTimeout
 	}
@@ -4165,10 +4197,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if crossZoneLoadBalancingEnabledAnnotation != "" {
 		crossZoneLoadBalancingEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
+			err := fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled,
 				crossZoneLoadBalancingEnabledAnnotation,
 			)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 		loadBalancerAttributes.CrossZoneLoadBalancing.Enabled = &crossZoneLoadBalancingEnabled
 	}
@@ -4177,22 +4211,28 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	subnetIDs, err := c.getLoadBalancerSubnets(apiService, internalELB)
 	if err != nil {
 		klog.Errorf("Error listing subnets in VPC: %q", err)
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 
 	// Bail out early if there are no subnets
 	if len(subnetIDs) == 0 {
-		return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
+		err := fmt.Errorf("could not find any suitable subnets for creating the ELB")
+		recordAWSMetric("ensure_load_balancer", 0, err)
+		return nil, err
 	}
 
 	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, apiService)
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 	securityGroupIDs, setupSg, err := c.buildELBSecurityGroupList(serviceName, loadBalancerName, annotations)
 	if err != nil {
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 	if len(securityGroupIDs) == 0 {
-		return nil, fmt.Errorf("[BUG] ELB can't have empty list of Security Groups to be assigned, this is a Kubernetes bug, please report")
+		err := fmt.Errorf("[BUG] ELB can't have empty list of Security Groups to be assigned, this is a Kubernetes bug, please report")
+		recordAWSMetric("ensure_load_balancer", 0, err)
+		return nil, err
 	}
 
 	if setupSg {
@@ -4228,6 +4268,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 		_, err = c.setSecurityGroupIngress(securityGroupIDs[0], permissions)
 		if err != nil {
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 	}
@@ -4245,18 +4286,21 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		annotations,
 	)
 	if err != nil {
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 
 	if sslPolicyName, ok := annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy]; ok {
 		err := c.ensureSSLNegotiationPolicy(loadBalancer, sslPolicyName)
 		if err != nil {
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 
 		for _, port := range c.getLoadBalancerTLSPorts(loadBalancer) {
 			err := c.setSSLNegotiationPolicy(loadBalancerName, sslPolicyName, port)
 			if err != nil {
+				recordAWSMetric("ensure_load_balancer", 0, err)
 				return nil, err
 			}
 		}
@@ -4278,7 +4322,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %q", loadBalancerName, healthCheckNodePort, err)
+			err := fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %q", loadBalancerName, healthCheckNodePort, err)
+			recordAWSMetric("ensure_load_balancer", 0, err)
+			return nil, err
 		}
 	} else {
 		klog.V(4).Infof("service %v does not need custom health checks", apiService.Name)
@@ -4292,6 +4338,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		// there must be no path on TCP health check
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, tcpHealthCheckPort, "", annotations)
 		if err != nil {
+			recordAWSMetric("ensure_load_balancer", 0, err)
 			return nil, err
 		}
 	}
@@ -4299,12 +4346,14 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances, annotations)
 	if err != nil {
 		klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 
 	err = c.ensureLoadBalancerInstances(aws.StringValue(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
 		klog.Warningf("Error registering instances with the load balancer: %q", err)
+		recordAWSMetric("ensure_load_balancer", 0, err)
 		return nil, err
 	}
 
@@ -4326,6 +4375,7 @@ func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service
 	if isNLB(service.Annotations) {
 		lb, err := c.describeLoadBalancerv2(loadBalancerName)
 		if err != nil {
+			recordAWSMetric("get_load_balancer", 0, err)
 			return nil, false, err
 		}
 		if lb == nil {
@@ -4336,6 +4386,7 @@ func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service
 
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
+		recordAWSMetric("get_load_balancer", 0, err)
 		return nil, false, err
 	}
 
