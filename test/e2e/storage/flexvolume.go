@@ -168,7 +168,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "local")
-		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
+		e2eskipper.SkipUnlessControlPlaneOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
