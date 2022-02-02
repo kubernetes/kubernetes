@@ -73,6 +73,10 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+func init() {
+	utilruntime.Must(logs.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
+
 const (
 	// ControllerStartJitter is the Jitter used when starting controller managers
 	ControllerStartJitter = 1.0
@@ -118,7 +122,7 @@ controller, and serviceaccounts controller.`,
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := s.Logs.ValidateAndApply(); err != nil {
+			if err := s.Logs.ValidateAndApply(utilfeature.DefaultFeatureGate); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}

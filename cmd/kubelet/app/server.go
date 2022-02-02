@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -102,6 +103,10 @@ import (
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 )
+
+func init() {
+	utilruntime.Must(logs.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 const (
 	// Kubelet component name
@@ -226,7 +231,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// Config and flags parsed, now we can initialize logging.
 			logs.InitLogs()
 			logOption := &logs.Options{Config: kubeletConfig.Logging}
-			if err := logOption.ValidateAndApply(); err != nil {
+			if err := logOption.ValidateAndApply(utilfeature.DefaultFeatureGate); err != nil {
 				klog.ErrorS(err, "Failed to initialize logging")
 				os.Exit(1)
 			}
