@@ -351,8 +351,8 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	ginkgo.By("running multiple Gu and non-Gu pods")
 	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
 
-	// Skip rest of the tests if CPU capacity < 3.
-	if cpuCap < 3 {
+	// Skip rest of the tests if CPU allocatable < 3.
+	if cpuAlloc < 3 {
 		e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 	}
 
