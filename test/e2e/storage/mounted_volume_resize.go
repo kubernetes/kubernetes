@@ -18,21 +18,16 @@ package storage
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -163,7 +158,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		framework.ExpectNoError(err, "while deleting pod for resizing")
 
 		ginkgo.By("Waiting for deployment to create new pod")
-		pod, err = waitForDeploymentToRecreatePod(c, deployment)
+		pod, err = testsuites.waitForDeploymentToRecreatePod(c, deployment)
 		framework.ExpectNoError(err, "While waiting for pod to be recreated")
 
 		ginkgo.By("Waiting for file system resize to finish")
@@ -174,27 +169,3 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 	})
 })
-
-func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *appsv1.Deployment) (v1.Pod, error) {
-	var runningPod v1.Pod
-	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-		podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
-		if err != nil {
-			return false, fmt.Errorf("failed to get pods for deployment: %v", err)
-		}
-		for _, pod := range podList.Items {
-			switch pod.Status.Phase {
-			case v1.PodRunning:
-				runningPod = pod
-				return true, nil
-			case v1.PodFailed, v1.PodSucceeded:
-				return false, conditions.ErrPodCompleted
-			}
-		}
-		return false, nil
-	})
-	if waitErr != nil {
-		return runningPod, fmt.Errorf("error waiting for recreated pod: %v", waitErr)
-	}
-	return runningPod, nil
-}

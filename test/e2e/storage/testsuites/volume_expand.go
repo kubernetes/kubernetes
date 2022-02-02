@@ -24,13 +24,16 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -432,4 +435,28 @@ func WaitForFSResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)
 	}
 	return updatedPVC, nil
+}
+
+func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *appsv1.Deployment) (v1.Pod, error) {
+	var runningPod v1.Pod
+	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+		podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
+		if err != nil {
+			return false, fmt.Errorf("failed to get pods for deployment: %v", err)
+		}
+		for _, pod := range podList.Items {
+			switch pod.Status.Phase {
+			case v1.PodRunning:
+				runningPod = pod
+				return true, nil
+			case v1.PodFailed, v1.PodSucceeded:
+				return false, conditions.ErrPodCompleted
+			}
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return runningPod, fmt.Errorf("error waiting for recreated pod: %v", waitErr)
+	}
+	return runningPod, nil
 }
