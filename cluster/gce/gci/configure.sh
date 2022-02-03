@@ -586,19 +586,23 @@ function ensure-container-runtime {
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
     log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
+
+  # when custom containerd version is installed sourcing containerd_env.sh will add all tools like ctr to the PATH
+  if [[ -e "/etc/profile.d/containerd_env.sh" ]]; then
+   log-wrap 'SourceContainerdEnv' source "/etc/profile.d/containerd_env.sh"
+  fi
+    
   # Verify presence and print versions of ctr, containerd, runc
   if ! command -v ctr >/dev/null 2>&1; then
     echo "ERROR ctr not found. Aborting."
     exit 2
   fi
   ctr --version
-
   if ! command -v containerd >/dev/null 2>&1; then
     echo "ERROR containerd not found. Aborting."
     exit 2
   fi
   containerd --version
-
   if ! command -v runc >/dev/null 2>&1; then
     echo "ERROR runc not found. Aborting."
     exit 2
