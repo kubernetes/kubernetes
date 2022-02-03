@@ -892,6 +892,13 @@ runTests() {
     record_command run_kubectl_explain_tests
   fi
 
+  ##############################
+  # CRD Deletion / Re-creation #
+  ##############################
+
+  if kube::test::if_supports_resource "${namespaces}" ; then
+      record_command run_crd_deletion_recreation_tests
+  fi
 
   ###########
   # Swagger #
