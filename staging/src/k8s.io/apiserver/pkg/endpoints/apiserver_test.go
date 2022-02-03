@@ -4523,7 +4523,8 @@ func TestFieldValidation(t *testing.T) {
 
 			warnings, _ := net.ParseWarningHeaders(response.Header["Warning"])
 			if len(warnings) != len(test.expectedWarns) {
-				t.Fatalf("unexpected warnings: %#v", warnings)
+				t.Fatalf("unexpected number of warnings. Got count %d, expected %d. Got warnings %#v, expected %#v", len(warnings), len(test.expectedWarns), warnings, test.expectedWarns)
+
 			}
 			for i, warn := range warnings {
 				if warn.Text != test.expectedWarns[i] {
