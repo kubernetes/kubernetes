@@ -195,3 +195,70 @@ func TestIsSystemdStyleName(t *testing.T) {
 		})
 	}
 }
+
+func newTestCgroupManger(t *testing.T, cgroupDriver string) CgroupManager {
+	t.Helper()
+	subsystems, err := GetCgroupSubsystems()
+	require.NoError(t, err)
+
+	mgr := NewCgroupManager(subsystems, cgroupDriver)
+	return mgr
+}
+
+func TestCgroupManager_Name(t *testing.T) {
+	tc := []struct {
+		name         string
+		cgroupDriver string
+		input        CgroupName
+		expected     string
+	}{
+		{
+			name:         "with_cgroupfs_adapter_returns_cgroupfs_paths",
+			cgroupDriver: string(libcontainerCgroupfs),
+			input:        NewCgroupName(RootCgroupName, "Burstable"),
+			expected:     "/Burstable",
+		},
+		{
+			name:         "with_systemd_adapter_returns_systemd_paths",
+			cgroupDriver: string(libcontainerSystemd),
+			input:        NewCgroupName(RootCgroupName, "Burstable"),
+			expected:     "/Burstable.slice",
+		},
+	}
+
+	for _, c := range tc {
+		t.Run(c.name, func(t *testing.T) {
+			mgr := newTestCgroupManger(t, c.cgroupDriver)
+			require.Equal(t, c.expected, mgr.Name(c.input))
+		})
+	}
+}
+
+func TestCgroupManager_ParseName(t *testing.T) {
+	tc := []struct {
+		name         string
+		cgroupDriver string
+		input        string
+		expected     CgroupName
+	}{
+		{
+			name:         "with_cgroupfs_adapter_parses_cgroupfs_paths",
+			cgroupDriver: string(libcontainerCgroupfs),
+			input:        "/Burstable",
+			expected:     NewCgroupName(RootCgroupName, "Burstable"),
+		},
+		{
+			name:         "with_systemd_adapter_parses_systemd_paths",
+			cgroupDriver: string(libcontainerSystemd),
+			input:        "/Burstable.slice",
+			expected:     NewCgroupName(RootCgroupName, "Burstable"),
+		},
+	}
+
+	for _, c := range tc {
+		t.Run(c.name, func(t *testing.T) {
+			mgr := newTestCgroupManger(t, c.cgroupDriver)
+			require.Equal(t, c.expected, mgr.CgroupName(c.input))
+		})
+	}
+}
