@@ -1182,7 +1182,7 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
-// CoreDump SSHs to the controlPlane and all nodes and dumps their logs into dir.
+// CoreDump SSHs to the control plane and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
 	if TestContext.DisableLogDump {
