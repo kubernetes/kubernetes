@@ -20,9 +20,12 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
 	"path"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestNewCgroupName tests confirms that #68416 is fixed
@@ -167,5 +170,28 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 		if actual := ParseSystemdToCgroupName(testCase.input); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
+	}
+}
+
+func TestIsSystemdStyleName(t *testing.T) {
+	tc := []struct {
+		input    string
+		expected bool
+	}{
+		{
+			input:    "/test",
+			expected: false,
+		},
+		{
+			input:    "/test.slice",
+			expected: true,
+		},
+	}
+
+	for _, c := range tc {
+		t.Run(fmt.Sprintf("%q", c.input), func(t *testing.T) {
+			result := IsSystemdStyleName(c.input)
+			require.Equal(t, c.expected, result)
+		})
 	}
 }
