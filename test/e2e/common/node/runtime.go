@@ -19,7 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"time"
 
@@ -291,7 +291,7 @@ while true; do sleep 1; done
 }`
 					// we might be told to use a different docker config JSON.
 					if framework.TestContext.DockerConfigFile != "" {
-						contents, err := ioutil.ReadFile(framework.TestContext.DockerConfigFile)
+						contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
 						framework.ExpectNoError(err)
 						auth = string(contents)
 					}

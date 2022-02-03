@@ -19,7 +19,6 @@ package ipamperf
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -101,7 +100,7 @@ func logResults(allResults []*Results) {
 	}
 	if resultsLogFile != "" {
 		klog.Infof("Logging results to %s", resultsLogFile)
-		if err := ioutil.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
+		if err := os.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
 			klog.Errorf("Error logging results to %s: %v", resultsLogFile, err)
 		}
 	}

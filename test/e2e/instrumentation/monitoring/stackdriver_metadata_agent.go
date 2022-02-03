@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"reflect"
 	"time"
 
@@ -89,7 +89,7 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 	if resp.StatusCode != 200 {
 		framework.Failf("Stackdriver Metadata API returned error status: %s", resp.Status)
 	}
-	metadataAPIResponse, err := ioutil.ReadAll(resp.Body)
+	metadataAPIResponse, err := io.ReadAll(resp.Body)
 	if err != nil {
 		framework.Failf("Failed to read response from Stackdriver Metadata API: %s", err)
 	}

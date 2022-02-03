@@ -22,7 +22,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -73,7 +73,7 @@ var _ = SIGDescribe("Node Container Manager [Serial]", func() {
 })
 
 func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
-	out, err := ioutil.ReadFile(filePath)
+	out, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %q", filePath)
 	}

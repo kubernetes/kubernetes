@@ -23,7 +23,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -237,7 +236,7 @@ func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, impor
 			continue
 		}
 
-		files, err := ioutil.ReadDir(importDirectory)
+		files, err := os.ReadDir(importDirectory)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to read import path directory %s with error %s, skipping\n", importDirectory, err)
 			continue

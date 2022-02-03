@@ -41,7 +41,6 @@ package windows
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -245,7 +244,7 @@ func retrieveCRDManifestFileContents(f *framework.Framework, node v1.Node) strin
 func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(), error) {
 	cleanUpFunc := func() {}
 
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return cleanUpFunc, fmt.Errorf("unable to create temp dir: %w", err)
 	}
@@ -287,7 +286,7 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 func createGmsaCustomResource(ns string, crdManifestContents string) (func(), error) {
 	cleanUpFunc := func() {}
 
-	tempFile, err := ioutil.TempFile("", "")
+	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return cleanUpFunc, fmt.Errorf("unable to create temp file: %w", err)
 	}

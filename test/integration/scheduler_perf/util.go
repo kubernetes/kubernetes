@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -178,7 +177,7 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	if err := json.Indent(formatted, b, "", "  "); err != nil {
 		return fmt.Errorf("indenting error: %v", err)
 	}
-	return ioutil.WriteFile(destFile, formatted.Bytes(), 0644)
+	return os.WriteFile(destFile, formatted.Bytes(), 0644)
 }
 
 type labelValues struct {

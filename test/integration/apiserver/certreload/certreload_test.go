@@ -25,7 +25,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path"
@@ -204,10 +203,10 @@ func testClientCA(t *testing.T, recreate bool) {
 	}
 
 	// when we run this the second time, we know which one we are expecting
-	if err := ioutil.WriteFile(clientCAFilename, clientCA.CACert, 0644); err != nil {
+	if err := os.WriteFile(clientCAFilename, clientCA.CACert, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(frontProxyCAFilename, frontProxyCA.CACert, 0644); err != nil {
+	if err := os.WriteFile(frontProxyCAFilename, frontProxyCA.CACert, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -492,10 +491,10 @@ func testServingCert(t *testing.T, recreate bool) {
 		}
 	}
 
-	if err := ioutil.WriteFile(path.Join(servingCertPath, "apiserver.key"), serverKey, 0644); err != nil {
+	if err := os.WriteFile(path.Join(servingCertPath, "apiserver.key"), serverKey, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(path.Join(servingCertPath, "apiserver.crt"), serverCert, 0644); err != nil {
+	if err := os.WriteFile(path.Join(servingCertPath, "apiserver.crt"), serverCert, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -522,10 +521,10 @@ func TestSNICert(t *testing.T) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			servingCertPath = opts.SecureServing.ServerCert.CertDirectory
 
-			if err := ioutil.WriteFile(path.Join(servingCertPath, "foo.key"), anotherServerKey, 0644); err != nil {
+			if err := os.WriteFile(path.Join(servingCertPath, "foo.key"), anotherServerKey, 0644); err != nil {
 				t.Fatal(err)
 			}
-			if err := ioutil.WriteFile(path.Join(servingCertPath, "foo.crt"), anotherServerCert, 0644); err != nil {
+			if err := os.WriteFile(path.Join(servingCertPath, "foo.crt"), anotherServerCert, 0644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -546,10 +545,10 @@ func TestSNICert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(path.Join(servingCertPath, "foo.key"), serverKey, 0644); err != nil {
+	if err := os.WriteFile(path.Join(servingCertPath, "foo.key"), serverKey, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(path.Join(servingCertPath, "foo.crt"), serverCert, 0644); err != nil {
+	if err := os.WriteFile(path.Join(servingCertPath, "foo.crt"), serverCert, 0644); err != nil {
 		t.Fatal(err)
 	}
 

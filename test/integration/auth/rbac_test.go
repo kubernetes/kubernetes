@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	gopath "path"
@@ -623,7 +622,7 @@ func TestRBAC(t *testing.T) {
 					t.Errorf("case %d, req %d: %s expected %q got %q", i, j, r, statusCode(r.expectedStatus), statusCode(resp.StatusCode))
 				}
 
-				b, _ := ioutil.ReadAll(resp.Body)
+				b, _ := io.ReadAll(resp.Body)
 
 				if r.verb == "POST" && (resp.StatusCode/100) == 2 {
 					// For successful create operations, extract resourceVersion

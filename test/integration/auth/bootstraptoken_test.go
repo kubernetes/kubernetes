@@ -19,7 +19,7 @@ package auth
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -160,7 +160,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := test.request.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", test.name)
 				t.Errorf("Expected status one of %v, but got %v", test.request.statusCodes, resp.StatusCode)

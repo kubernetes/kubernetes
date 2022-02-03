@@ -19,7 +19,7 @@ package apiserver
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -73,7 +73,7 @@ func TestOpenAPIV3SpecRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer resp.Body.Close()
-			bs, err := ioutil.ReadAll(resp.Body)
+			bs, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -217,7 +217,7 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer protoResp.Body.Close()
-	bs, err = ioutil.ReadAll(protoResp.Body)
+	bs, err = io.ReadAll(protoResp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
