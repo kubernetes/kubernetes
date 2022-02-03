@@ -22,7 +22,8 @@ package cm
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -193,6 +194,43 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	return f, nil
 }
 
+func validateSwapConfiguration(fs fs.FS, failSwapOn bool) error {
+	if !failSwapOn {
+		return nil
+	}
+	if fs == nil {
+		fs = os.DirFS("/proc")
+	}
+
+	// Check whether swap is enabled. Kubelet only supports running with Swap
+	// when --fail-on-swap=false is provided and NodeMemorySwap is enabled.
+	swapFile, err := fs.Open("swaps")
+	if err != nil {
+		if os.IsNotExist(err) {
+			klog.InfoS("File does not exist, assuming that swap is disabled", "path", "/proc/swaps")
+			return nil
+		}
+
+		return err
+	}
+	defer swapFile.Close()
+
+	swapData, err := io.ReadAll(swapFile)
+	if err != nil {
+		return err
+	}
+	swapData = bytes.TrimSpace(swapData) // extra trailing \n
+	swapLines := strings.Split(string(swapData), "\n")
+
+	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
+	// error out unless --fail-swap-on is set to false.
+	if len(swapLines) > 1 {
+		return fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+	}
+
+	return nil
+}
+
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
@@ -202,26 +240,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	if failSwapOn {
-		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-		swapFile := "/proc/swaps"
-		swapData, err := ioutil.ReadFile(swapFile)
-		if err != nil {
-			if os.IsNotExist(err) {
-				klog.InfoS("File does not exist, assuming that swap is disabled", "path", swapFile)
-			} else {
-				return nil, err
-			}
-		} else {
-			swapData = bytes.TrimSpace(swapData) // extra trailing \n
-			swapLines := strings.Split(string(swapData), "\n")
-
-			// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-			// error out unless --fail-swap-on is set to false.
-			if len(swapLines) > 1 {
-				return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
-			}
-		}
+	err = validateSwapConfiguration(nil, failSwapOn)
+	if err != nil {
+		return nil, err
 	}
 
 	var internalCapacity = v1.ResourceList{}

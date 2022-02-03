@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"testing/fstest"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
@@ -165,4 +166,77 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	f, err := validateSystemRequirements(mountInt)
 	assert.NoError(t, err)
 	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
+}
+
+func TestValidateSwapConfiguration(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		name             string
+		swapFileContents string
+		failSwapOn       bool
+		expectedErr      string
+	}{
+		{
+			name:       "swapfile_does_not_exist_fail_on",
+			failSwapOn: true,
+		},
+		{
+			name:       "swapfile_does_not_exist_fail_off",
+			failSwapOn: false,
+		},
+		{
+			name:       "swapfile_is_only_a_header_fail_off",
+			failSwapOn: false,
+			swapFileContents: `
+Filename                                Type            Size            Used            Priority
+			`,
+		},
+		{
+			name:       "swapfile_is_only_a_header_fail_on",
+			failSwapOn: true,
+			swapFileContents: `
+Filename                                Type            Size            Used            Priority
+			`,
+		},
+		{
+			name:       "swap_is_enabled_fail_off",
+			failSwapOn: false,
+			swapFileContents: `
+Filename                                Type            Size            Used            Priority
+/dev/dm-1                               partition       16760828        0               -2
+			`,
+		},
+		{
+			name:       "swap_is_enabled_fail_on",
+			failSwapOn: true,
+			swapFileContents: `
+Filename                                Type            Size            Used            Priority
+/dev/dm-1                               partition       16760828        0               -2
+			`,
+			expectedErr: "running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained:",
+		},
+	}
+
+	for _, c := range tc {
+		t.Run(c.name, func(t *testing.T) {
+			tfs := fstest.MapFS{}
+
+			if c.swapFileContents != "" {
+				tfs = fstest.MapFS{
+					"swaps": {
+						Data: []byte(c.swapFileContents),
+					},
+				}
+			}
+
+			result := validateSwapConfiguration(tfs, c.failSwapOn)
+			if c.expectedErr == "" {
+				require.NoError(t, result)
+			} else {
+				require.Error(t, result)
+				require.Contains(t, result.Error(), c.expectedErr)
+			}
+		})
+	}
 }
