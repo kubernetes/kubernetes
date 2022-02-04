@@ -17,11 +17,14 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 var (
@@ -46,6 +49,32 @@ func WithLatencyTrackers(handler http.Handler) http.Handler {
 		}
 
 		req = req.WithContext(request.WithLatencyTrackers(ctx))
+		w = responsewriter.WrapForHTTP1Or2(&writeLatencyTracker{
+			ResponseWriter: w,
+			ctx:            req.Context(),
+		})
+
 		handler.ServeHTTP(w, req)
 	})
+}
+
+var _ http.ResponseWriter = &writeLatencyTracker{}
+var _ responsewriter.UserProvidedDecorator = &writeLatencyTracker{}
+
+type writeLatencyTracker struct {
+	http.ResponseWriter
+	ctx context.Context
+}
+
+func (wt *writeLatencyTracker) Unwrap() http.ResponseWriter {
+	return wt.ResponseWriter
+}
+
+func (wt *writeLatencyTracker) Write(bs []byte) (int, error) {
+	startedAt := time.Now()
+	defer func() {
+		request.TrackResponseWriteLatency(wt.ctx, time.Since(startedAt))
+	}()
+
+	return wt.ResponseWriter.Write(bs)
 }
