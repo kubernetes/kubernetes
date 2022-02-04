@@ -135,10 +135,10 @@ func TestGenerateContainerConfig(t *testing.T) {
 	assert.Error(t, err)
 
 	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	image, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID})
+	resp, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID}, false)
 
-	image.Uid = nil
-	image.Username = "test"
+	resp.Image.Uid = nil
+	resp.Image.Username = "test"
 
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue

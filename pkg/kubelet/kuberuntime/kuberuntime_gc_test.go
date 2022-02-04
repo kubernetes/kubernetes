@@ -181,9 +181,9 @@ func TestSandboxGC(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Len(t, realRemain, len(test.remain))
 			for _, remain := range test.remain {
-				status, err := fakeRuntime.PodSandboxStatus(fakeSandboxes[remain].Id)
+				resp, err := fakeRuntime.PodSandboxStatus(fakeSandboxes[remain].Id, false)
 				assert.NoError(t, err)
-				assert.Equal(t, &fakeSandboxes[remain].PodSandboxStatus, status)
+				assert.Equal(t, &fakeSandboxes[remain].PodSandboxStatus, resp.Status)
 			}
 		})
 	}
@@ -409,9 +409,9 @@ func TestContainerGC(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Len(t, realRemain, len(test.remain))
 			for _, remain := range test.remain {
-				status, err := fakeRuntime.ContainerStatus(fakeContainers[remain].Id)
+				resp, err := fakeRuntime.ContainerStatus(fakeContainers[remain].Id, false)
 				assert.NoError(t, err)
-				assert.Equal(t, &fakeContainers[remain].ContainerStatus, status)
+				assert.Equal(t, &fakeContainers[remain].ContainerStatus, resp.Status)
 			}
 		})
 	}

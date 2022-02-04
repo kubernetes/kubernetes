@@ -86,7 +86,7 @@ func TestStatus(t *testing.T) {
 		},
 	}
 	irs := newInstrumentedRuntimeService(fakeRuntime)
-	actural, err := irs.Status()
+	actural, err := irs.Status(false)
 	assert.NoError(t, err)
 	expected := &runtimeapi.RuntimeStatus{
 		Conditions: []*runtimeapi.RuntimeCondition{
@@ -94,5 +94,5 @@ func TestStatus(t *testing.T) {
 			{Type: runtimeapi.NetworkReady, Status: true},
 		},
 	}
-	assert.Equal(t, expected, actural)
+	assert.Equal(t, expected, actural.Status)
 }

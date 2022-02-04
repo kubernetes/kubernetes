@@ -48,6 +48,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -505,11 +506,15 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 	statuses := make([]*kubecontainer.Status, len(containers))
 	// TODO: optimization: set maximum number of containers per container name to examine.
 	for i, c := range containers {
-		status, err := m.runtimeService.ContainerStatus(c.Id)
+		resp, err := m.runtimeService.ContainerStatus(c.Id, false)
 		if err != nil {
 			// Merely log this here; GetPodStatus will actually report the error out.
 			klog.V(4).InfoS("ContainerStatus return error", "containerID", c.Id, "err", err)
 			return nil, err
+		}
+		status := resp.GetStatus()
+		if status == nil {
+			return nil, remote.ErrContainerStatusNil
 		}
 		cStatus := toKubeContainerStatus(status, m.runtimeName)
 		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
@@ -607,9 +612,13 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID 
 func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID kubecontainer.ContainerID) (*v1.Pod, *v1.Container, error) {
 	var pod *v1.Pod
 	var container *v1.Container
-	s, err := m.runtimeService.ContainerStatus(containerID.ID)
+	resp, err := m.runtimeService.ContainerStatus(containerID.ID, false)
 	if err != nil {
 		return nil, nil, err
+	}
+	s := resp.GetStatus()
+	if s == nil {
+		return nil, nil, remote.ErrContainerStatusNil
 	}
 
 	l := getContainerInfoFromLabels(s.Labels)
@@ -869,10 +878,14 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 
 // GetContainerLogs returns logs of a specific container.
 func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
-	status, err := m.runtimeService.ContainerStatus(containerID.ID)
+	resp, err := m.runtimeService.ContainerStatus(containerID.ID, false)
 	if err != nil {
 		klog.V(4).InfoS("Failed to get container status", "containerID", containerID.String(), "err", err)
 		return fmt.Errorf("unable to retrieve container logs for %v", containerID.String())
+	}
+	status := resp.GetStatus()
+	if status == nil {
+		return remote.ErrContainerStatusNil
 	}
 	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }
@@ -950,9 +963,13 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 		return err
 	}
 
-	status, err := m.runtimeService.ContainerStatus(containerID)
+	resp, err := m.runtimeService.ContainerStatus(containerID, false)
 	if err != nil {
 		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+	}
+	status := resp.GetStatus()
+	if status == nil {
+		return remote.ErrContainerStatusNil
 	}
 	// Remove the legacy container log symlink.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
