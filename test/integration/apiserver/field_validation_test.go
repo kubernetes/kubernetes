@@ -19,9 +19,11 @@ package apiserver
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -343,6 +345,123 @@ spec:
 		}
 	}
 	`
+
+	smpBody = `
+	{
+		"spec": {
+			"unknown1": "val1",
+			"unknownDupe": "valDupe",
+			"unknownDupe": "valDupe2",
+			"paused": true,
+			"paused": false,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"unknownNested": "val1",
+						"imagePullPolicy": "Always",
+						"imagePullPolicy": "Never"
+					}]
+				}
+			}
+		}
+	}
+	`
+	// non-conflicting SMP has issues with the patch (duplicate fields),
+	// but doesn't conflict with the existing object it's being patched to
+	nonconflictingSMPBody = `
+	{
+		"spec": {
+			"paused": true,
+			"paused": false,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"imagePullPolicy": "Always",
+						"imagePullPolicy": "Never"
+					}]
+				}
+			}
+		}
+	}
+	`
+
+	mergePatchBody = `
+{
+	"spec": {
+		"unknown1": "val1",
+		"unknownDupe": "valDupe",
+		"unknownDupe": "valDupe2",
+		"paused": true,
+		"paused": false,
+		"template": {
+			"spec": {
+				"containers": [{
+					"name": "nginx",
+					"image": "nginx:latest",
+					"unknownNested": "val1",
+					"imagePullPolicy": "Always",
+					"imagePullPolicy": "Never"
+				}]
+			}
+		}
+	}
+}
+	`
+	jsonPatchBody = `
+			[
+				{"op": "add", "path": "/spec/unknown1", "value": "val1", "foo":"bar"},
+				{"op": "add", "path": "/spec/unknown2", "path": "/spec/unknown3", "value": "val1"},
+				{"op": "add", "path": "/spec/unknownDupe", "value": "valDupe"},
+				{"op": "add", "path": "/spec/unknownDupe", "value": "valDupe2"},
+				{"op": "add", "path": "/spec/paused", "value": true},
+				{"op": "add", "path": "/spec/paused", "value": false},
+				{"op": "add", "path": "/spec/template/spec/containers/0/unknownNested", "value": "val1"},
+				{"op": "add", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Always"},
+				{"op": "add", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"}
+			]
+			`
+	// non-conflicting mergePatch has issues with the patch (duplicate fields),
+	// but doesn't conflict with the existing object it's being patched to
+	nonconflictingMergePatchBody = `
+{
+	"spec": {
+		"paused": true,
+		"paused": false,
+		"template": {
+			"spec": {
+				"containers": [{
+					"name": "nginx",
+					"image": "nginx:latest",
+					"imagePullPolicy": "Always",
+					"imagePullPolicy": "Never"
+				}]
+			}
+		}
+	}
+}
+			`
 )
 
 func TestFieldValidation(t *testing.T) {
@@ -1005,67 +1124,6 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 // with unknown fields errors out when fieldValidation is strict,
 // but succeeds when fieldValidation is ignored.
 func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
-	smpBody := `
-	{
-		"spec": {
-			"unknown1": "val1",
-			"unknownDupe": "valDupe",
-			"unknownDupe": "valDupe2",
-			"paused": true,
-			"paused": false,
-			"selector": {
-				"matchLabels": {
-					"app": "nginx"
-				}
-			},
-			"template": {
-				"metadata": {
-					"labels": {
-						"app": "nginx"
-					}
-				},
-				"spec": {
-					"containers": [{
-						"name": "nginx",
-						"unknownNested": "val1",
-						"imagePullPolicy": "Always",
-						"imagePullPolicy": "Never"
-					}]
-				}
-			}
-		}
-	}
-	`
-	// non-conflicting SMP has issues with the patch (duplicate fields),
-	// but doesn't conflict with the existing object it's being patched to
-	nonconflictingSMPBody := `
-	{
-		"spec": {
-			"paused": true,
-			"paused": false,
-			"selector": {
-				"matchLabels": {
-					"app": "nginx"
-				}
-			},
-			"template": {
-				"metadata": {
-					"labels": {
-						"app": "nginx"
-					}
-				},
-				"spec": {
-					"containers": [{
-						"name": "nginx",
-						"imagePullPolicy": "Always",
-						"imagePullPolicy": "Never"
-					}]
-				}
-			}
-		}
-	}
-	`
-
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -2892,4 +2950,539 @@ func setupCRD(t *testing.T, config *rest.Config, apiGroup string, schemaless boo
 	}
 
 	return crd
+}
+
+func BenchmarkFieldValidation(b *testing.B) {
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
+	flag.Lookup("v").Value.Set("0")
+	server, err := kubeapiservertesting.StartTestServer(b, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		b.Fatal(err)
+	}
+	config := server.ClientConfig
+	defer server.TearDownFn()
+
+	// don't log warnings, tests inspect them in the responses directly
+	config.WarningHandler = rest.NoWarnings{}
+
+	client := clientset.NewForConfigOrDie(config)
+
+	b.Run("Post", func(b *testing.B) { benchFieldValidationPost(b, client) })
+	b.Run("Put", func(b *testing.B) { benchFieldValidationPut(b, client) })
+	b.Run("PatchTyped", func(b *testing.B) { benchFieldValidationPatchTyped(b, client) })
+	b.Run("SMP", func(b *testing.B) { benchFieldValidationSMP(b, client) })
+	b.Run("ApplyCreate", func(b *testing.B) { benchFieldValidationApplyCreate(b, client) })
+	b.Run("ApplyUpdate", func(b *testing.B) { benchFieldValidationApplyUpdate(b, client) })
+
+}
+
+func benchFieldValidationPost(b *testing.B, client clientset.Interface) {
+	var benchmarks = []struct {
+		name        string
+		bodyBase    string
+		opts        metav1.CreateOptions
+		contentType string
+	}{
+		{
+			name: "post-strict-validation",
+			opts: metav1.CreateOptions{
+				FieldValidation: "Strict",
+			},
+			bodyBase: invalidBodyJSON,
+		},
+		{
+			name: "post-warn-validation",
+			opts: metav1.CreateOptions{
+				FieldValidation: "Warn",
+			},
+			bodyBase: invalidBodyJSON,
+		},
+		{
+			name: "post-ignore-validation",
+			opts: metav1.CreateOptions{
+				FieldValidation: "Ignore",
+			},
+			bodyBase: invalidBodyJSON,
+		},
+		{
+			name:     "post-default-ignore-validation",
+			bodyBase: invalidBodyJSON,
+		},
+		{
+			name: "post-strict-validation-yaml",
+			opts: metav1.CreateOptions{
+				FieldValidation: "Strict",
+			},
+			bodyBase:    invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "post-warn-validation-yaml",
+			opts: metav1.CreateOptions{
+				FieldValidation: "Warn",
+			},
+			bodyBase:    invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "post-ignore-validation-yaml",
+			opts: metav1.CreateOptions{
+				FieldValidation: "Ignore",
+			},
+			bodyBase:    invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name:        "post-no-validation-yaml",
+			bodyBase:    invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				body := []byte(fmt.Sprintf(bm.bodyBase, fmt.Sprintf("test-deployment-%s-%d-%d-%d", bm.name, n, b.N, time.Now().UnixNano())))
+				req := client.CoreV1().RESTClient().Post().
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					SetHeader("Content-Type", bm.contentType).
+					VersionedParams(&bm.opts, metav1.ParameterCodec)
+				_ = req.Body(body).Do(context.TODO())
+			}
+		})
+	}
+}
+
+func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
+	var testcases = []struct {
+		name        string
+		opts        metav1.UpdateOptions
+		putBodyBase string
+		contentType string
+	}{
+		{
+			name: "put-strict-validation",
+			opts: metav1.UpdateOptions{
+				FieldValidation: "Strict",
+			},
+			putBodyBase: invalidBodyJSON,
+		},
+		{
+			name: "put-warn-validation",
+			opts: metav1.UpdateOptions{
+				FieldValidation: "Warn",
+			},
+			putBodyBase: invalidBodyJSON,
+		},
+		{
+			name: "put-default-ignore-validation",
+			opts: metav1.UpdateOptions{
+				FieldValidation: "Ignore",
+			},
+			putBodyBase: invalidBodyJSON,
+		},
+		{
+			name:        "put-ignore-validation",
+			putBodyBase: invalidBodyJSON,
+		},
+		{
+			name: "put-strict-validation-yaml",
+			opts: metav1.UpdateOptions{
+				FieldValidation: "Strict",
+			},
+			putBodyBase: invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "put-warn-validation-yaml",
+			opts: metav1.UpdateOptions{
+				FieldValidation: "Warn",
+			},
+			putBodyBase: invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "put-ignore-validation-yaml",
+			opts: metav1.UpdateOptions{
+				FieldValidation: "Ignore",
+			},
+			putBodyBase: invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name:        "put-no-validation-yaml",
+			putBodyBase: invalidBodyYAML,
+			contentType: "application/yaml",
+		},
+	}
+
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				deployName := fmt.Sprintf("%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				postBody := []byte(fmt.Sprintf(string(validBodyJSON), deployName))
+
+				if _, err := client.CoreV1().RESTClient().Post().
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Body(postBody).
+					DoRaw(context.TODO()); err != nil {
+					b.Fatalf("failed to create initial deployment: %v", err)
+				}
+
+				putBody := []byte(fmt.Sprintf(string(tc.putBodyBase), deployName))
+				req := client.CoreV1().RESTClient().Put().
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					SetHeader("Content-Type", tc.contentType).
+					Name(deployName).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				_ = req.Body([]byte(putBody)).Do(context.TODO())
+			}
+		})
+	}
+}
+
+func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
+
+	var testcases = []struct {
+		name      string
+		opts      metav1.PatchOptions
+		patchType types.PatchType
+		body      string
+	}{
+		{
+			name: "merge-patch-strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			patchType: types.MergePatchType,
+			body:      mergePatchBody,
+		},
+		{
+			name: "merge-patch-warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			patchType: types.MergePatchType,
+			body:      mergePatchBody,
+		},
+		{
+			name: "merge-patch-ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			patchType: types.MergePatchType,
+			body:      mergePatchBody,
+		},
+		{
+			name:      "merge-patch-no-validation",
+			patchType: types.MergePatchType,
+			body:      mergePatchBody,
+		},
+		{
+			name:      "json-patch-strict-validation",
+			patchType: types.JSONPatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			body: jsonPatchBody,
+		},
+		{
+			name:      "json-patch-warn-validation",
+			patchType: types.JSONPatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			body: jsonPatchBody,
+		},
+		{
+			name:      "json-patch-ignore-validation",
+			patchType: types.JSONPatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			body: jsonPatchBody,
+		},
+		{
+			name:      "json-patch-no-validation",
+			patchType: types.JSONPatchType,
+			body:      jsonPatchBody,
+		},
+		{
+			name: "nonconflicting-merge-patch-strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			patchType: types.MergePatchType,
+			body:      nonconflictingMergePatchBody,
+		},
+		{
+			name: "nonconflicting-merge-patch-warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			patchType: types.MergePatchType,
+			body:      nonconflictingMergePatchBody,
+		},
+		{
+			name: "nonconflicting-merge-patch-ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			patchType: types.MergePatchType,
+			body:      nonconflictingMergePatchBody,
+		},
+		{
+			name:      "nonconflicting-merge-patch-no-validation",
+			patchType: types.MergePatchType,
+			body:      nonconflictingMergePatchBody,
+		},
+	}
+
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				deployName := fmt.Sprintf("%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				postBody := []byte(fmt.Sprintf(string(validBodyJSON), deployName))
+
+				if _, err := client.CoreV1().RESTClient().Post().
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Body(postBody).
+					DoRaw(context.TODO()); err != nil {
+					b.Fatalf("failed to create initial deployment: %v", err)
+				}
+
+				req := client.CoreV1().RESTClient().Patch(tc.patchType).
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Name(deployName).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				_ = req.Body([]byte(tc.body)).Do(context.TODO())
+			}
+
+		})
+	}
+}
+
+func benchFieldValidationSMP(b *testing.B, client clientset.Interface) {
+	var testcases = []struct {
+		name string
+		opts metav1.PatchOptions
+		body string
+	}{
+		{
+			name: "smp-strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			body: smpBody,
+		},
+		{
+			name: "smp-warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			body: smpBody,
+		},
+		{
+			name: "smp-ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			body: smpBody,
+		},
+		{
+			name: "smp-no-validation",
+			body: smpBody,
+		},
+		{
+			name: "nonconflicting-smp-strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			body: nonconflictingSMPBody,
+		},
+		{
+			name: "nonconflicting-smp-warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			body: nonconflictingSMPBody,
+		},
+		{
+			name: "nonconflicting-smp-ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			body: nonconflictingSMPBody,
+		},
+		{
+			name: "nonconflicting-smp-no-validation",
+			body: nonconflictingSMPBody,
+		},
+	}
+
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				name := fmt.Sprintf("%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				body := []byte(fmt.Sprintf(validBodyJSON, name))
+				_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Name(name).
+					Param("fieldManager", "apply_test").
+					Body(body).
+					Do(context.TODO()).
+					Get()
+				if err != nil {
+					b.Fatalf("Failed to create object using Apply patch: %v", err)
+				}
+
+				req := client.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Name(name).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				_ = req.Body([]byte(tc.body)).Do(context.TODO())
+			}
+		})
+	}
+
+}
+
+func benchFieldValidationApplyCreate(b *testing.B, client clientset.Interface) {
+	var testcases = []struct {
+		name string
+		opts metav1.PatchOptions
+	}{
+		{
+			name: "strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "no-validation",
+			opts: metav1.PatchOptions{
+				FieldManager: "mgr",
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				name := fmt.Sprintf("apply-create-deployment-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				body := []byte(fmt.Sprintf(applyInvalidBody, name))
+				req := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Name(name).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				_ = req.Body(body).Do(context.TODO())
+			}
+		})
+	}
+}
+
+func benchFieldValidationApplyUpdate(b *testing.B, client clientset.Interface) {
+	var testcases = []struct {
+		name string
+		opts metav1.PatchOptions
+	}{
+		{
+			name: "strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "no-validation",
+			opts: metav1.PatchOptions{
+				FieldManager: "mgr",
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				name := fmt.Sprintf("apply-update-deployment-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				createBody := []byte(fmt.Sprintf(validBodyJSON, name))
+				createReq := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Name(name).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				createResult := createReq.Body(createBody).Do(context.TODO())
+				if createResult.Error() != nil {
+					b.Fatalf("unexpected apply create err: %v", createResult.Error())
+				}
+
+				updateBody := []byte(fmt.Sprintf(applyInvalidBody, name))
+				updateReq := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+					AbsPath("/apis/apps/v1").
+					Namespace("default").
+					Resource("deployments").
+					Name(name).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				_ = updateReq.Body(updateBody).Do(context.TODO())
+			}
+		})
+	}
 }
