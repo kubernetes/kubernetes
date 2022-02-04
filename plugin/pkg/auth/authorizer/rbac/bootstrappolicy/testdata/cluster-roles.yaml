@@ -143,6 +143,12 @@ items:
     - patch
     - update
   - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
+  - apiGroups:
     - apps
     resources:
     - daemonsets
