@@ -1084,7 +1084,6 @@ func (fv *FakeVolume) GetUnmountDeviceCallCount() int {
 func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
-	fv.DetachCallCount++
 
 	node := string(nodeName)
 	volumeNodes, exist := fv.VolumesAttached[volumeName]
@@ -1092,6 +1091,7 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 		return fmt.Errorf("trying to detach volume %q that is not attached to the node %q", volumeName, node)
 	}
 
+	fv.DetachCallCount++
 	if nodeName == FailDetachNode {
 		return fmt.Errorf("fail to detach volume %q to node %q", volumeName, nodeName)
 	}
