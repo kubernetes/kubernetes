@@ -485,7 +485,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		testNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
-	ginkgo.It("should only allow access from service loadbalancer source ranges [Slow]", func() {
+	ginkgo.It("should only allow access from service loadbalancer source ranges", func() {
 		// this feature currently supported only on GCE/GKE/AWS
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -978,7 +978,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 })
 
-var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
+var _ = common.SIGDescribe("LoadBalancers ESIPP", func() {
 	f := framework.NewDefaultFramework("esipp")
 	var loadBalancerCreateTimeout time.Duration
 
@@ -1005,7 +1005,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		serviceLBNames = []string{}
 	})
 
-	ginkgo.It("should work for type=LoadBalancer", func() {
+	ginkgo.It("should work for type=LoadBalancer [Slow]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-lb"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -1054,7 +1054,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should work for type=NodePort", func() {
+	ginkgo.It("should work for type=NodePort [Slow]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodeport"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -1163,7 +1163,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should work from pods", func() {
+	ginkgo.It("should work from pods [Slow]", func() {
 		var err error
 		namespace := f.Namespace.Name
 		serviceName := "external-local-pods"
@@ -1222,7 +1222,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
+	ginkgo.It("should handle updates to ExternalTrafficPolicy field [Slow]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
