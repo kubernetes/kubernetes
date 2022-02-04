@@ -88,13 +88,13 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 		klog.ErrorS(err, "Failed to ensure that filter table exists KUBE-FIREWALL chain")
 		return false
 	}
-	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableFilter, KubeFirewallChain,
-		"-m", "comment", "--comment", "kubernetes firewall for dropping marked packets",
-		"-m", "mark", "--mark", fmt.Sprintf("%s/%s", dropMark, dropMark),
-		"-j", "DROP"); err != nil {
-		klog.ErrorS(err, "Failed to ensure rule to drop packet marked by the KUBE-MARK-DROP in KUBE-FIREWALL chain")
-		return false
-	}
+//	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableFilter, KubeFirewallChain,
+//		"-m", "comment", "--comment", "kubernetes firewall for dropping marked packets",
+//		"-m", "mark", "--mark", fmt.Sprintf("%s/%s", dropMark, dropMark),
+//		"-j", "DROP"); err != nil {
+//		klog.ErrorS(err, "Failed to ensure rule to drop packet marked by the KUBE-MARK-DROP in KUBE-FIREWALL chain")
+//		return false
+//	}
 
 	// drop all non-local packets to localhost if they're not part of an existing
 	// forwarded connection. See #90259
