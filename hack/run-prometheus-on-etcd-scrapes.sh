@@ -14,16 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Unpacks a tarfile of etcd scrapes and runs a simple web server exposing it
+# Given some prometheus scrapes, runs a simple web server exposing them
 # and a Prometheus server scraping that simple web server.
 # The simple web server listens on port 9091.
 # The Prometheus server is run in a container and looks for the
 # simple web server at the host's first global IPv4 address.
 
-# Usage: $0 scrapes_tar_pathname
+# Usage: $0 scrapes_directory_or_tarfile
 #
-# Where scrapes_tar_pathname is a gzipped tar archive containing
-# files whose name is of the form
+# Where scrapes_directory_or_tarfile is a pathname of either a
+# directory of scrape files or a gzipped tar archive of such a
+# directory.  A scrape file has a name of the form
 # <timestamp>.scrape
 # where <timestamp> is seconds since Jan 1, 1970 UTC.
 # Each such file is taken to be a scrape that lacks timestamps,
@@ -36,26 +37,31 @@
 # - an `nc` command that serve-prom-scrapes.sh knows how to wrangle
 
 if (( $# != 1 )); then
-    echo "Usage: $0 \$scrapes_tar_pathname" >&2
+    echo "Usage: $0 \$scrapes_directory_or_tarfile" >&2
     exit 1
 fi
 
-scrapes_file="$1"
+scrapes_path="$1"
 
-if ! [[ -r "$scrapes_file" ]]; then
-    echo "$0: $scrapes_file is not a readable file" >&2
+if [[ -d "$scrapes_path" ]]; then
+    UNPACKDIR="$scrapes_path"
+    DO_UNPACK=No
+elif [[ -f "$scrapes_path" ]] && file "$scrapes_path" | grep -qw gzip ; then
+    UNPACKDIR="/tmp/$(cd /tmp && mktemp -d unpack.XXXXXX)"
+    DO_UNPACK=Yes
+else
+    echo "$0: $scrapes_path is neither a directory nor a gzipped tar file" >&2
     exit 2
 fi
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")
 
 CONFIG="/tmp/$(cd /tmp && mktemp config.XXXXXX)"
-UNPACKDIR="/tmp/$(cd /tmp && mktemp -d unpack.XXXXXX)"
 SERVER_PID=""
 
 cleanup_prom() {
     rm -f "$CONFIG"
-    rm -rf "$UNPACKDIR"
+    [[ "$DO_UNPACK" != "Yes" ]] || rm -rf "$UNPACKDIR"
     if [[ -n "$SERVER_PID" ]]; then
 	kill "$SERVER_PID"
     fi
@@ -65,7 +71,7 @@ trap cleanup_prom EXIT
 
 chmod +r "$CONFIG" "$UNPACKDIR"
 
-tar xzf "$scrapes_file" -C "$UNPACKDIR"
+[[ "$DO_UNPACK" != "Yes" ]] || tar xzf "$scrapes_path" -C "$UNPACKDIR"
 
 if which ip > /dev/null; then
     IPADDR=$(ip addr show scope global up |
