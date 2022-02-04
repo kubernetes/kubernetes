@@ -141,6 +141,13 @@ type LatencyTrackers struct {
 	// the latency measured here will include the time spent writing the
 	// serialized raw bytes to the http ResponseWriter object.
 	SerializationTracker DurationTracker
+
+	// ResponseWriteTracker tracks the latency incurred in writing the
+	// serialized raw bytes to the http ResponseWriter object (via the
+	// Write method) associated with the request.
+	// The Write method can be invoked multiple times, so we use a
+	// latency tracker that sums up the duration from each call.
+	ResponseWriteTracker DurationTracker
 }
 
 type latencyTrackersKeyType int
@@ -164,6 +171,7 @@ func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) co
 		StorageTracker:           newSumLatencyTracker(c),
 		TransformTracker:         newSumLatencyTracker(c),
 		SerializationTracker:     newSumLatencyTracker(c),
+		ResponseWriteTracker:     newSumLatencyTracker(c),
 	})
 }
 
@@ -212,6 +220,16 @@ func TrackSerializeResponseObjectLatency(ctx context.Context, f func()) {
 	f()
 }
 
+// TrackResponseWriteLatency is used to track latency incurred in writing
+// the serialized raw bytes to the http ResponseWriter object (via the
+// Write method) associated with the request.
+// When called multiple times, the latency provided will be summed up.
+func TrackResponseWriteLatency(ctx context.Context, d time.Duration) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.ResponseWriteTracker.TrackDuration(d)
+	}
+}
+
 // AuditAnnotationsFromLatencyTrackers will inspect each latency tracker
 // associated with the request context and return a set of audit
 // annotations that can be added to the API audit entry.
@@ -220,6 +238,7 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 		transformLatencyKey         = "apiserver.latency.k8s.io/transform-response-object"
 		storageLatencyKey           = "apiserver.latency.k8s.io/etcd"
 		serializationLatencyKey     = "apiserver.latency.k8s.io/serialize-response-object"
+		responseWriteLatencyKey     = "apiserver.latency.k8s.io/response-write"
 		mutatingWebhookLatencyKey   = "apiserver.latency.k8s.io/mutating-webhook"
 		validatingWebhookLatencyKey = "apiserver.latency.k8s.io/validating-webhook"
 	)
@@ -238,6 +257,9 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 	}
 	if latency := tracker.SerializationTracker.GetLatency(); latency != 0 {
 		annotations[serializationLatencyKey] = latency.String()
+	}
+	if latency := tracker.ResponseWriteTracker.GetLatency(); latency != 0 {
+		annotations[responseWriteLatencyKey] = latency.String()
 	}
 	if latency := tracker.MutatingWebhookTracker.GetLatency(); latency != 0 {
 		annotations[mutatingWebhookLatencyKey] = latency.String()
