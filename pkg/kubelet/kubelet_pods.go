@@ -1514,10 +1514,16 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			klog.V(4).InfoS("Cannot get host IPs", "err", err)
 		} else {
 			s.HostIP = hostIPs[0].String()
-			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
-				s.PodIP = hostIPs[0].String()
-				s.PodIPs = []v1.PodIP{{IP: s.PodIP}}
-				if len(hostIPs) == 2 {
+			// HostNetwork Pods inherit the node IPs as PodIPs. They are immutable once set,
+			// other than that if the node becomes dual-stack, we add the secondary IP.
+			if kubecontainer.IsHostNetworkPod(pod) {
+				// Primary IP is not set
+				if s.PodIP == "" {
+					s.PodIP = hostIPs[0].String()
+					s.PodIPs = []v1.PodIP{{IP: s.PodIP}}
+				}
+				// Secondary IP is not set #105320
+				if len(hostIPs) == 2 && len(s.PodIPs) == 1 {
 					s.PodIPs = append(s.PodIPs, v1.PodIP{IP: hostIPs[1].String()})
 				}
 			}

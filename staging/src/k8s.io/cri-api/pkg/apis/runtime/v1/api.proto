@@ -445,6 +445,7 @@ message PodIP{
     string ip = 1;
 }
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
+// Currently ignored for pods sharing the host networking namespace.
 message PodSandboxNetworkStatus {
     // IP address of the PodSandbox.
     string ip = 1;

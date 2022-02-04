@@ -1608,6 +1608,7 @@ func (m *PodIP) GetIp() string {
 }
 
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
+// Currently ignored for pods sharing the host networking namespace.
 type PodSandboxNetworkStatus struct {
 	// IP address of the PodSandbox.
 	Ip string `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
