@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -750,7 +751,12 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 	}
 }
 
-func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) containermap.ContainerMap {
+type minimalRuntimeService interface {
+	ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
+	ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
+}
+
+func buildContainerMapFromRuntime(runtimeService minimalRuntimeService) containermap.ContainerMap {
 	podSandboxMap := make(map[string]string)
 	podSandboxList, _ := runtimeService.ListPodSandbox(nil)
 	for _, p := range podSandboxList {

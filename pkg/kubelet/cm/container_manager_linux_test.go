@@ -20,6 +20,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"path"
@@ -30,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/mount-utils"
 )
 
@@ -236,6 +238,147 @@ Filename                                Type            Size            Used    
 			} else {
 				require.Error(t, result)
 				require.Contains(t, result.Error(), c.expectedErr)
+			}
+		})
+	}
+}
+
+type fakeRuntimeService struct {
+	podSandboxesResponse []*runtimeapi.PodSandbox
+	podSandboxesErr      error
+
+	listContainersResponse []*runtimeapi.Container
+	listContainersErr      error
+}
+
+func (f *fakeRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+	if filter != nil {
+		return nil, errors.New("filters unsupported")
+	}
+
+	return f.podSandboxesResponse, f.podSandboxesErr
+}
+
+func (f *fakeRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	if filter != nil {
+		return nil, errors.New("filters unsupported")
+	}
+
+	return f.listContainersResponse, f.listContainersErr
+}
+
+func TestBuildContainerMapFromRuntime(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		name string
+
+		sandboxes  []*runtimeapi.PodSandbox
+		sandboxErr error
+
+		containers   []*runtimeapi.Container
+		containerErr error
+
+		findableContainers []string
+	}{
+		{
+			name:      "no_containers_to_be_found_when_the_sandbox_is_missing",
+			sandboxes: []*runtimeapi.PodSandbox{},
+			containers: []*runtimeapi.Container{
+				{
+					Id:           "54df6a69-2a1e-4e9b-a387-abc759232e4b",
+					PodSandboxId: "aa04d9ab-e593-433c-9ed0-40ae6933ec90",
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name: "container",
+					},
+				},
+			},
+
+			findableContainers: []string{},
+		},
+		{
+			name:       "ignores_errors_from_the_runtimeservice_for_sandboxes",
+			sandboxErr: errors.New("service unavailable"),
+			containers: []*runtimeapi.Container{
+				{
+					Id:           "54df6a69-2a1e-4e9b-a387-abc759232e4b",
+					PodSandboxId: "aa04d9ab-e593-433c-9ed0-40ae6933ec90",
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name: "container",
+					},
+				},
+			},
+
+			findableContainers: []string{},
+		},
+		{
+			name: "ignores_errors_from_the_runtimeservice_for_containers",
+			sandboxes: []*runtimeapi.PodSandbox{
+				{
+					Id: "aa04d9ab-e593-433c-9ed0-40ae6933ec90",
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Uid: "aa04d9ab-e593-433c-9ed0-40ae6933ec90",
+					},
+				},
+			},
+			containerErr: errors.New("service unavailable"),
+
+			findableContainers: []string{},
+		},
+		{
+			name: "happy_case_when_all_containers_have_sandboxes",
+			sandboxes: []*runtimeapi.PodSandbox{
+				{
+					Id: "aa04d9ab-e593-433c-9ed0-40ae6933ec90",
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Uid: "aa04d9ab-e593-433c-9ed0-40ae6933ec90",
+					},
+				},
+			},
+			containers: []*runtimeapi.Container{
+				{
+					Id:           "54df6a69-2a1e-4e9b-a387-abc759232e4b",
+					PodSandboxId: "aa04d9ab-e593-433c-9ed0-40ae6933ec90",
+					Metadata: &runtimeapi.ContainerMetadata{
+						Name: "container",
+					},
+				},
+			},
+
+			findableContainers: []string{
+				"54df6a69-2a1e-4e9b-a387-abc759232e4b",
+			},
+		},
+	}
+
+	for _, c := range tc {
+		t.Run(c.name, func(t *testing.T) {
+			rs := &fakeRuntimeService{
+				podSandboxesResponse:   c.sandboxes,
+				podSandboxesErr:        c.sandboxErr,
+				listContainersResponse: c.containers,
+				listContainersErr:      c.containerErr,
+			}
+
+			cm := buildContainerMapFromRuntime(rs)
+
+			findableIDs := make(map[string]struct{}, len(c.findableContainers))
+
+			// Validate that all expected containers can be found by id
+			for _, ctrID := range c.findableContainers {
+				findableIDs[ctrID] = struct{}{}
+				_, _, err := cm.GetContainerRef(ctrID)
+				require.NoError(t, err)
+			}
+
+			// Validate pods that should not be found cannot be.
+			for _, ctr := range c.containers {
+				if _, ok := findableIDs[ctr.Id]; ok {
+					break
+				}
+
+				_, _, err := cm.GetContainerRef(ctr.Id)
+				require.Error(t, err)
 			}
 		})
 	}
