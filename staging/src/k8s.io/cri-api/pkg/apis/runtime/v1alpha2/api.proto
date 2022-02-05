@@ -18,7 +18,7 @@ limitations under the License.
 syntax = "proto3";
 
 package runtime.v1alpha2;
-option go_package = "v1alpha2";
+option go_package = "k8s.io/cri-api/pkg/apis/runtime/v1alpha2";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
