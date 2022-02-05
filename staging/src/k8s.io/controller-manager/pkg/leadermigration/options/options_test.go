@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/controller-manager/config"
 	migrationconfig "k8s.io/controller-manager/pkg/leadermigration/config"
 )
@@ -77,6 +78,106 @@ controllerLeaders: []
 				LeaderName:        "test-leader-migration",
 				ResourceLock:      "leases",
 				ControllerLeaders: []config.ControllerLeaderConfiguration{},
+			},
+		},
+		{
+			name:          "enabled, with custom configuration file (version v1)",
+			flags:         []string{"--enable-leader-migration"},
+			expectEnabled: true,
+			configContent: `
+apiVersion: controllermanager.config.k8s.io/v1
+kind: LeaderMigrationConfiguration
+leaderName: test-leader-migration
+controllerLeaders: []
+`,
+			expectErr: false,
+			expectConfig: &config.LeaderMigrationConfiguration{
+				LeaderName:        "test-leader-migration",
+				ResourceLock:      "leases",
+				ControllerLeaders: []config.ControllerLeaderConfiguration{},
+			},
+		},
+		{
+			name:          "enabled, with populated controllerLeaders (version v1)",
+			flags:         []string{"--enable-leader-migration"},
+			expectEnabled: true,
+			configContent: `
+apiVersion: controllermanager.config.k8s.io/v1
+kind: LeaderMigrationConfiguration
+leaderName: test-leader-migration
+controllerLeaders:
+  - name: route
+    component: "*"
+  - name: service
+    component: "*"
+  - name: cloud-node-lifecycle
+    component: "*"
+  - name: nodeipam
+    component: "*"
+`,
+			expectErr: false,
+			expectConfig: &config.LeaderMigrationConfiguration{
+				LeaderName:   "test-leader-migration",
+				ResourceLock: "leases",
+				ControllerLeaders: []config.ControllerLeaderConfiguration{
+					{
+						Name:      "route",
+						Component: "*",
+					},
+					{
+						Name:      "service",
+						Component: "*",
+					},
+					{
+						Name:      "cloud-node-lifecycle",
+						Component: "*",
+					},
+					{
+						Name:      "nodeipam",
+						Component: "*",
+					},
+				},
+			},
+		}, {
+			name:          "enabled, with non-wildcard controllerLeaders (version v1)",
+			flags:         []string{"--enable-leader-migration"},
+			expectEnabled: true,
+			configContent: `
+apiVersion: controllermanager.config.k8s.io/v1
+kind: LeaderMigrationConfiguration
+leaderName: test-leader-migration
+controllerLeaders:
+  - name: route
+    component: "cloud-controller-manager"
+  - name: service
+    component: "cloud-controller-manager"
+  - name: cloud-node-lifecycle
+    component: "cloud-controller-manager"
+  - name: nodeipam
+    component: "kube-controller-manager"
+`,
+			expectErr: false,
+			expectConfig: &config.LeaderMigrationConfiguration{
+				LeaderName:   "test-leader-migration",
+				ResourceLock: "leases",
+				ControllerLeaders: []config.ControllerLeaderConfiguration{
+					{
+						Name:      "route",
+						Component: "cloud-controller-manager",
+					},
+					{
+						Name:      "service",
+						Component: "cloud-controller-manager",
+					},
+					{
+						Name:      "cloud-node-lifecycle",
+						Component: "cloud-controller-manager",
+					},
+					{
+						Name:      "nodeipam",
+						Component: "kube-controller-manager",
+					},
+				},
 			},
 		},
 	}
