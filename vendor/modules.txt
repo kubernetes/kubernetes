@@ -220,10 +220,6 @@ github.com/cyphar/filepath-securejoin
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 github.com/daviddengcn/go-colortext
-# github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1+incompatible
-## explicit
-github.com/docker/distribution/digestset
-github.com/docker/distribution/reference
 # github.com/docker/go-units v0.4.0 => github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
@@ -2014,6 +2010,10 @@ k8s.io/gengo/generator
 k8s.io/gengo/namer
 k8s.io/gengo/parser
 k8s.io/gengo/types
+# k8s.io/internal/distribution v0.0.0-20220126150042-5582208b4e44 => k8s.io/internal/distribution v0.0.0-20220126150042-5582208b4e44
+## explicit
+k8s.io/internal/distribution/digestset
+k8s.io/internal/distribution/reference
 # k8s.io/klog/v2 v2.40.1 => k8s.io/klog/v2 v2.40.1
 ## explicit
 k8s.io/klog/v2
@@ -2775,6 +2775,7 @@ sigs.k8s.io/yaml
 # k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 # k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 # k8s.io/gengo => k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
+# k8s.io/internal/distribution => k8s.io/internal/distribution v0.0.0-20220126150042-5582208b4e44
 # k8s.io/klog/v2 => k8s.io/klog/v2 v2.40.1
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager

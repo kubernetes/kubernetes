@@ -31,7 +31,6 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful v2.9.5+incompatible
@@ -119,6 +118,7 @@ require (
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
+	k8s.io/internal/distribution v0.0.0-20220126150042-5582208b4e44
 	k8s.io/klog/v2 v2.40.1
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
@@ -502,6 +502,7 @@ replace (
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
+	k8s.io/internal/distribution => k8s.io/internal/distribution v0.0.0-20220126150042-5582208b4e44
 	k8s.io/klog/v2 => k8s.io/klog/v2 v2.40.1
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager

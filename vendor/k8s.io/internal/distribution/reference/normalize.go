@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/distribution/digestset"
+	"k8s.io/internal/distribution/digestset"
+
 	"github.com/opencontainers/go-digest"
 )
 

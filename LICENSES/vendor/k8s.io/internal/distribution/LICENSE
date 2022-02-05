@@ -1,4 +1,4 @@
-= vendor/github.com/docker/distribution licensed under: =
+= vendor/k8s.io/internal/distribution licensed under: =
 
 Apache License
                            Version 2.0, January 2004
@@ -203,4 +203,4 @@ Apache License
    limitations under the License.
 
 
-= vendor/github.com/docker/distribution/LICENSE d2794c0df5b907fdace235a619d80314
+= vendor/k8s.io/internal/distribution/LICENSE d2794c0df5b907fdace235a619d80314
