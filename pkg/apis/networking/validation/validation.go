@@ -182,6 +182,11 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy) field.Er
 	return allErrs
 }
 
+// ValidateNetworkPolicyStatusUpdate tests if an update to a NetworkPolicy status is valid
+func ValidateNetworkPolicyStatusUpdate(status, oldstatus networking.NetworkPolicyStatus, fldPath *field.Path) field.ErrorList {
+	return unversionedvalidation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))
+}
+
 // ValidateIPBlock validates a cidr and the except fields of an IpBlock NetworkPolicyPeer
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
