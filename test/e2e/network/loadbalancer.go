@@ -495,27 +495,38 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		serviceName := "lb-sourcerange"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		ginkgo.By("Prepare allow source ips")
+		ginkgo.By("Creating exec pods")
 		// prepare the exec pods
 		// acceptPod are allowed to access the loadbalancer
 		acceptPod := e2epod.CreateExecPodOrFail(cs, namespace, "execpod-accept", nil)
 		dropPod := e2epod.CreateExecPodOrFail(cs, namespace, "execpod-drop", nil)
 
+		ginkgo.By("Waiting for exec pods to be ready")
+		err := e2epod.WaitForPodsRunningReady(cs, namespace, 2, 0, framework.PodReadyBeforeTimeout, nil)
+		framework.ExpectNoError(err, "exec pods did not become ready")
+
+		// Re-fetch the pods so we'll have their PodIP/HostIP below
+		acceptPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), acceptPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
+		dropPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), dropPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Unable to get pod %s", dropPod.Name)
+
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
 		// This container is an nginx container listening on port 80
 		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
-		_, err := jig.Run(nil)
+		_, err = jig.Run(nil)
 		framework.ExpectNoError(err)
-		// Make sure acceptPod is running. There are certain chances that pod might be teminated due to unexpected reasons.
-		acceptPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), acceptPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
-		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)
-		framework.ExpectNotEqual(acceptPod.Status.PodIP, "")
 
-		// Create loadbalancer service with source range from node[0] and podAccept
+		// Create loadbalancer service which accepts traffic from the acceptPod's
+		// podIP and the dropPod's hostIP. Accepting connections from the
+		// dropPod's hostIP helps us to catch failures in the LB-short-circuiting
+		// rules that might otherwise be missed; see kubernetes#85572.
 		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			svc.Spec.LoadBalancerSourceRanges = []string{acceptPod.Status.PodIP + "/32"}
+			svc.Spec.LoadBalancerSourceRanges = []string{
+				acceptPod.Status.PodIP + "/32",
+				dropPod.Status.HostIP + "/32",
+			}
 		})
 		framework.ExpectNoError(err)
 
@@ -1121,6 +1132,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", func() {
 
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
+		svcTCPNodePort := int(svc.Spec.Ports[0].NodePort)
 
 		const threshold = 2
 		config := e2enetwork.NewNetworkingTestConfig(f)
@@ -1158,6 +1170,24 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", func() {
 					expectedSuccess,
 					threshold)
 				framework.ExpectNoError(err)
+
+				// Test that a "healthy" NodePort works and an "unhealthy"
+				// NodePort doesn't work; there's no need to bother testing
+				// all n^2 times; just one good check and one bad check is
+				// good enough.
+				if i == 0 && n == 0 {
+					ginkgo.By("connecting to the service via its NodePort on the node with the endpoint")
+					err := config.DialEchoFromTestContainer("http", ips[n], svcTCPNodePort, 1, 0, "hello")
+					if err != nil {
+						framework.Failf("expected success, got %v", err)
+					}
+				} else if i == 0 && n == 1 {
+					ginkgo.By("failing to connect the service via its NodePort on a node without an endpoint")
+					err := config.DialEchoFromTestContainer("http", ips[n], svcTCPNodePort, 1, 0, "hello")
+					if err == nil {
+						framework.Failf("expected timeout, got success")
+					}
+				}
 			}
 			framework.ExpectNoError(e2erc.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
 		}
