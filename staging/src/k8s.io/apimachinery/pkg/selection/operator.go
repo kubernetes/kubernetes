@@ -30,4 +30,6 @@ const (
 	Exists       Operator = "exists"
 	GreaterThan  Operator = "gt"
 	LessThan     Operator = "lt"
+	StartsWith   Operator = "=*"
+	EndsWith     Operator = "*="
 )

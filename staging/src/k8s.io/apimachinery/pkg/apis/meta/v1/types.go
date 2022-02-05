@@ -1228,6 +1228,8 @@ const (
 	LabelSelectorOpNotIn        LabelSelectorOperator = "NotIn"
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
+	LabelSelectorStartsWith     LabelSelectorOperator = "StartsWith"
+	LabelSelectorEndsWith       LabelSelectorOperator = "EndsWith"
 )
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource

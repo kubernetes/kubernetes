@@ -51,6 +51,10 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPat
 		if len(sr.Values) > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
 		}
+	case metav1.LabelSelectorStartsWith, metav1.LabelSelectorEndsWith:
+		if len(sr.Values) != 1 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'StartsWith' or 'EndsWith'"))
+		}
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
 	}

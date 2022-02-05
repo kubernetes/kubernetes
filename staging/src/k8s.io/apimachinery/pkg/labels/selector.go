@@ -183,6 +183,10 @@ func NewRequirement(key string, op selection.Operator, vals []string, opts ...fi
 				allErrs = append(allErrs, field.Invalid(valuePath.Index(i), vals[i], "for 'Gt', 'Lt' operators, the value must be an integer"))
 			}
 		}
+	case selection.StartsWith, selection.EndsWith:
+		if len(vals) != 1 {
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "'starts-with' and 'ends-with' operators requires one single value"))
+		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(path.Child("operator"), op, validRequirementOperators))
 	}
@@ -204,6 +208,24 @@ func (r *Requirement) hasValue(value string) bool {
 	return false
 }
 
+func (r *Requirement) startsWith(value string) bool {
+	for i := range r.strValues {
+		if strings.HasPrefix(value, r.strValues[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Requirement) endsWith(value string) bool {
+	for i := range r.strValues {
+		if strings.HasSuffix(value, r.strValues[i]) {
+			return true
+		}
+	}
+	return false
+}
+
 // Matches returns true if the Requirement matches the input Labels.
 // There is a match in the following cases:
 // (1) The operator is Exists and Labels has the Requirement's key.
@@ -215,6 +237,10 @@ func (r *Requirement) hasValue(value string) bool {
 //     Requirement's key.
 // (5) The operator is GreaterThanOperator or LessThanOperator, and Labels has
 //     the Requirement's key and the corresponding value satisfies mathematical inequality.
+// (6) The operator is StartsWith, Labels has the Requirement's key  and the label value
+//     starts with the Requirement's value
+// (7) The operator is EndsWith, Labels has the Requirement's key and the label value
+//     starts with the Requirement's value
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
@@ -256,6 +282,16 @@ func (r *Requirement) Matches(ls Labels) bool {
 			}
 		}
 		return (r.operator == selection.GreaterThan && lsValue > rValue) || (r.operator == selection.LessThan && lsValue < rValue)
+	case selection.StartsWith:
+		if !ls.Has(r.key) {
+			return false
+		}
+		return r.startsWith(ls.Get(r.key))
+	case selection.EndsWith:
+		if !ls.Has(r.key) {
+			return false
+		}
+		return r.endsWith(ls.Get(r.key))
 	default:
 		return false
 	}
@@ -333,6 +369,10 @@ func (r *Requirement) String() string {
 		sb.WriteString("<")
 	case selection.Exists, selection.DoesNotExist:
 		return sb.String()
+	case selection.StartsWith:
+		sb.WriteString("=*")
+	case selection.EndsWith:
+		sb.WriteString("*=")
 	}
 
 	switch r.operator {
@@ -447,6 +487,10 @@ const (
 	NotInToken
 	// OpenParToken represents open parenthesis
 	OpenParToken
+	// StartsWithToken represents starts with
+	StartsWithToken
+	// EndsWithToken represents ends with
+	EndsWithToken
 )
 
 // string2token contains the mapping between lexer Token and token literal
@@ -463,6 +507,8 @@ var string2token = map[string]Token{
 	"!=":    NotEqualsToken,
 	"notin": NotInToken,
 	"(":     OpenParToken,
+	"=*":    StartsWithToken,
+	"*=":    EndsWithToken,
 }
 
 // ScannedItem contains the Token and the literal produced by the lexer.
@@ -479,7 +525,7 @@ func isWhitespace(ch byte) bool {
 // isSpecialSymbol detects if the character ch can be an operator
 func isSpecialSymbol(ch byte) bool {
 	switch ch {
-	case '=', '!', '(', ')', ',', '>', '<':
+	case '=', '!', '(', ')', ',', '>', '<', '*':
 		return true
 	}
 	return false
@@ -696,7 +742,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 	switch operator {
 	case selection.In, selection.NotIn:
 		values, err = p.parseValues()
-	case selection.Equals, selection.DoubleEquals, selection.NotEquals, selection.GreaterThan, selection.LessThan:
+	case selection.Equals, selection.DoubleEquals, selection.NotEquals, selection.GreaterThan, selection.LessThan, selection.StartsWith, selection.EndsWith:
 		values, err = p.parseExactValue()
 	}
 	if err != nil {
@@ -751,6 +797,10 @@ func (p *Parser) parseOperator() (op selection.Operator, err error) {
 		op = selection.NotIn
 	case NotEqualsToken:
 		op = selection.NotEquals
+	case StartsWithToken:
+		op = selection.StartsWith
+	case EndsWithToken:
+		op = selection.EndsWith
 	default:
 		return "", fmt.Errorf("found '%s', expected: %v", lit, strings.Join(binaryOperators, ", "))
 	}
