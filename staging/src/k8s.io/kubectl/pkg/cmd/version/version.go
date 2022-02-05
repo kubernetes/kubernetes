@@ -75,7 +75,7 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -101,7 +101,11 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 // Validate validates the provided options
-func (o *Options) Validate() error {
+func (o *Options) Validate(args []string) error {
+	if len(args) != 0 {
+		return errors.New(fmt.Sprintf("extra arguments: %v", args))
+	}
+
 	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {
 		return errors.New(`--output must be 'yaml' or 'json'`)
 	}
