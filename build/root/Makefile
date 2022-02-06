@@ -226,10 +226,8 @@ define TEST_E2E_NODE_HELP_INFO
 #  TIMEOUT: For REMOTE=true only. How long (in golang duration format) to wait
 #    for ginkgo tests to complete. Defaults to 45m.
 #  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
-#  RUNTIME: Container runtime to use (eg. docker, remote).
-#    Defaults to "docker".
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
-#    Used when RUNTIME is set to "remote".
+#    Defaults to "/run/containerd/containerd.sock".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
 #    Used when RUNTIME is set to "remote".
 #  IMAGE_CONFIG_FILE: path to a file containing image configuration.
