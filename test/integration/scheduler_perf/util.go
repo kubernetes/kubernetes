@@ -44,6 +44,7 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -75,6 +76,8 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
 func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+	// Run API server with minimimal logging by default. Can be raised with -v.
+	framework.MinVerbosity = 0
 	apiURL, apiShutdown := util.StartApiserver()
 	var err error
 

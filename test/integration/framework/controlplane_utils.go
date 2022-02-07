@@ -65,6 +65,13 @@ const (
 	UnprivilegedUserToken = "unprivileged-user"
 )
 
+// MinVerbosity determines the minimum klog verbosity when running tests that
+// involve the apiserver.  This overrides the -v value from the command line,
+// i.e. -v=0 has no effect when MinVerbosity is 4 (the default).  Tests can opt
+// out of this by setting MinVerbosity to zero before starting the control
+// plane or choose some different minimum verbosity.
+var MinVerbosity = 4
+
 // Config is a struct of configuration directives for NewControlPlaneComponents.
 type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
@@ -139,11 +146,11 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	var m *controlplane.Instance
 	var s *httptest.Server
 
-	// Ensure we log at least level 4
+	// Ensure we log at least at the desired level
 	v := flag.Lookup("v").Value
 	level, _ := strconv.Atoi(v.String())
-	if level < 4 {
-		v.Set("4")
+	if level < MinVerbosity {
+		v.Set(strconv.Itoa(MinVerbosity))
 	}
 
 	if incomingServer != nil {
