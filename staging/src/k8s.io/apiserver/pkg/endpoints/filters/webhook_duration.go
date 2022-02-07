@@ -22,12 +22,13 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-// WithWebhookDuration adds WebhookDuration trackers to the
-// context associated with a request.
-func WithWebhookDuration(handler http.Handler) http.Handler {
+// WithLatencyTrackers adds a LatencyTrackers instance to the
+// context associated with a request so that we can measure latency
+// incurred in various components within the apiserver.
+func WithLatencyTrackers(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		req = req.WithContext(request.WithWebhookDuration(ctx))
+		req = req.WithContext(request.WithLatencyTrackers(ctx))
 		handler.ServeHTTP(w, req)
 	})
 }

@@ -482,8 +482,8 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		}
 	}
 	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
-	if wd, ok := request.WebhookDurationFrom(req.Context()); ok {
-		sloLatency := elapsedSeconds - (wd.AdmitTracker.GetLatency() + wd.ValidateTracker.GetLatency()).Seconds()
+	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
+		sloLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency()).Seconds()
 		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sloLatency)
 	}
 	// We are only interested in response sizes of read requests.

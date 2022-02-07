@@ -85,38 +85,43 @@ func newMaxLatencyTracker(c clock.Clock) DurationTracker {
 	}
 }
 
-// WebhookDuration stores trackers used to measure webhook request durations.
-// Since admit webhooks are done sequentially duration is aggregated using
-// sum function. Validate webhooks are done in parallel so max function
-// is used.
-type WebhookDuration struct {
-	AdmitTracker    DurationTracker
-	ValidateTracker DurationTracker
+// LatencyTrackers stores trackers used to measure latecny incurred in
+// components within the apiserver.
+type LatencyTrackers struct {
+	// MutatingWebhookTracker tracks the latency incurred in mutating webhook(s).
+	// Since mutating webhooks are done sequentially, latency
+	// is aggregated using sum function.
+	MutatingWebhookTracker DurationTracker
+
+	// ValidatingWebhookTracker tracks the latency incurred in validating webhook(s).
+	// Validate webhooks are done in parallel, so max function is used.
+	ValidatingWebhookTracker DurationTracker
 }
 
-type webhookDurationKeyType int
+type latencyTrackersKeyType int
 
-// webhookDurationKey is the WebhookDuration (the time the request spent waiting
-// for the webhooks to finish) key for the context.
-const webhookDurationKey webhookDurationKeyType = iota
+// latencyTrackersKey is the key that associates a LatencyTrackers
+// instance with the request context.
+const latencyTrackersKey latencyTrackersKeyType = iota
 
-// WithWebhookDuration returns a copy of parent context to which the
-// WebhookDuration trackers are added.
-func WithWebhookDuration(parent context.Context) context.Context {
-	return WithWebhookDurationAndCustomClock(parent, clock.RealClock{})
+// WithLatencyTrackers returns a copy of parent context to which an
+// instance of LatencyTrackers is added.
+func WithLatencyTrackers(parent context.Context) context.Context {
+	return WithLatencyTrackersAndCustomClock(parent, clock.RealClock{})
 }
 
-// WithWebhookDurationAndCustomClock returns a copy of parent context to which
-// the WebhookDuration trackers are added. Tracers use given clock.
-func WithWebhookDurationAndCustomClock(parent context.Context, c clock.Clock) context.Context {
-	return WithValue(parent, webhookDurationKey, &WebhookDuration{
-		AdmitTracker:    newSumLatencyTracker(c),
-		ValidateTracker: newMaxLatencyTracker(c),
+// WithLatencyTrackersAndCustomClock returns a copy of parent context to which
+// an instance of LatencyTrackers is added. Tracers use given clock.
+func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) context.Context {
+	return WithValue(parent, latencyTrackersKey, &LatencyTrackers{
+		MutatingWebhookTracker:   newSumLatencyTracker(c),
+		ValidatingWebhookTracker: newMaxLatencyTracker(c),
 	})
 }
 
-// WebhookDurationFrom returns the value of the WebhookDuration key from the specified context.
-func WebhookDurationFrom(ctx context.Context) (*WebhookDuration, bool) {
-	wd, ok := ctx.Value(webhookDurationKey).(*WebhookDuration)
+// LatencyTrackersFrom returns the associated LatencyTrackers instance
+// from the specified context.
+func LatencyTrackersFrom(ctx context.Context) (*LatencyTrackers, bool) {
+	wd, ok := ctx.Value(latencyTrackersKey).(*LatencyTrackers)
 	return wd, ok && wd != nil
 }
