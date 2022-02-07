@@ -55,6 +55,7 @@ import (
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -571,7 +572,7 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
 			// If we have no storage for any resource configured, this API group is effectively disabled.
 			// This can happen when an entire API group, version, or development-stage (alpha, beta, GA) is disabled.
-			klog.Warningf("API group %q is not enabled, skipping.", groupName)
+			klog.Infof("API group %q is not enabled, skipping.", groupName)
 			continue
 		}
 
@@ -638,11 +639,9 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	return addrs, nil
 }
 
-// DefaultAPIResourceConfigSource returns default configuration for an APIResource.
-func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
-	ret := serverstorage.NewResourceConfig()
-	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
-	ret.EnableVersions(
+var (
+	// stableAPIGroupVersionsEnabledByDefault is a list of our stable versions.
+	stableAPIGroupVersionsEnabledByDefault = []schema.GroupVersion{
 		admissionregistrationv1.SchemeGroupVersion,
 		apiv1.SchemeGroupVersion,
 		appsv1.SchemeGroupVersion,
@@ -650,34 +649,73 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authorizationapiv1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		autoscalingapiv2.SchemeGroupVersion,
-		autoscalingapiv2beta1.SchemeGroupVersion,
-		autoscalingapiv2beta2.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
-		batchapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
 		discoveryv1.SchemeGroupVersion,
-		discoveryv1beta1.SchemeGroupVersion,
 		eventsv1.SchemeGroupVersion,
-		eventsv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
 		nodev1.SchemeGroupVersion,
-		nodev1beta1.SchemeGroupVersion, // remove in 1.26
 		policyapiv1.SchemeGroupVersion,
-		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
-		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
-		flowcontrolv1beta2.SchemeGroupVersion,
+	}
+
+	// legacyBetaEnabledByDefaultResources is the list of beta resources we enable.  You may only add to this list
+	// if your resource is already enabled by default in a beta level we still serve AND there is no stable API for it.
+	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-architecture/3136-beta-apis-off-by-default
+	// for more details.
+	legacyBetaEnabledByDefaultResources = []schema.GroupVersionResource{
+		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"), // remove in 1.25
+		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"), // remove in 1.26
+		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"),                       // remove in 1.25
+		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"),                // remove in 1.25
+		eventsv1beta1.SchemeGroupVersion.WithResource("events"),                           // remove in 1.25
+		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"),                     // remove in 1.25
+		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"),          // remove in 1.25
+		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),           // remove in 1.25
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"),                     // remove in 1.25
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"),         // remove in 1.27
+		flowcontrolv1beta1.SchemeGroupVersion.WithResource("flowschemas"),                 // remove in 1.26
+		flowcontrolv1beta1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"), // remove in 1.26
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas"),                 // remove in 1.29
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations"), // remove in 1.29
+	}
+	// betaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions.
+	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		autoscalingapiv2beta1.SchemeGroupVersion,
+		autoscalingapiv2beta2.SchemeGroupVersion,
+		batchapiv1beta1.SchemeGroupVersion,
+		discoveryv1beta1.SchemeGroupVersion,
+		eventsv1beta1.SchemeGroupVersion,
+		nodev1beta1.SchemeGroupVersion, // remove in 1.26
+		policyapiv1beta1.SchemeGroupVersion,
+		storageapiv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
-	)
-	// disable alpha versions explicitly so we have a full list of what's possible to serve
-	ret.DisableVersions(
+		flowcontrolv1beta2.SchemeGroupVersion,
+	}
+
+	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have.  They are always disabled by default.
+	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
-	)
+	}
+)
+
+// DefaultAPIResourceConfigSource returns default configuration for an APIResource.
+func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
+	ret := serverstorage.NewResourceConfig()
+	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha or beta versions in the list.
+	ret.EnableVersions(stableAPIGroupVersionsEnabledByDefault...)
+
+	// disable alpha and beta versions explicitly so we have a full list of what's possible to serve
+	ret.DisableVersions(betaAPIGroupVersionsDisabledByDefault...)
+	ret.DisableVersions(alphaAPIGroupVersionsDisabledByDefault...)
+
+	// enable the legacy beta resources that were present before stopped serving new beta APIs by default.
+	ret.EnableResources(legacyBetaEnabledByDefaultResources...)
 
 	return ret
 }
