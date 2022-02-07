@@ -166,14 +166,6 @@ func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
 	}
 }
 
-func makeServiceWithLoadBalancerClass(loadBalancerClass *string) *api.Service {
-	return &api.Service{
-		Spec: api.ServiceSpec{
-			LoadBalancerClass: loadBalancerClass,
-		},
-	}
-}
-
 func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPolicyType) *api.Service {
 	return &api.Service{
 		Spec: api.ServiceSpec{
@@ -188,7 +180,6 @@ func TestDropDisabledField(t *testing.T) {
 	testCases := []struct {
 		name                        string
 		enableMixedProtocol         bool
-		enableLoadBalancerClass     bool
 		enableInternalTrafficPolicy bool
 		svc                         *api.Service
 		oldSvc                      *api.Service
@@ -308,63 +299,6 @@ func TestDropDisabledField(t *testing.T) {
 			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
 			compareSvc:          makeServiceWithPorts(nil),
 		},
-		/* svc.Spec.LoadBalancerClass */
-		{
-			name:                    "loadBalancerClass not enabled, field not used in old, not used in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(nil),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
-		{
-			name:                    "loadBalancerClass not enabled, field used in old and in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass not enabled, field not used in old, used in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
-		{
-			name:                    "loadBalancerClass not enabled, field used in old, not used in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field not used in old, not used in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(nil),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field used in old and in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field not used in old, used in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field used in old, not used in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(nil),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
 		/* svc.spec.internalTrafficPolicy */
 		{
 			name:                        "internal traffic policy not enabled, field used in old, not used in new",
@@ -392,7 +326,6 @@ func TestDropDisabledField(t *testing.T) {
 	for _, tc := range testCases {
 		func() {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, tc.enableLoadBalancerClass)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.enableInternalTrafficPolicy)()
 			old := tc.oldSvc.DeepCopy()
 
