@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-type createClusterOptions struct {
+type setClusterOptions struct {
 	configAccess          clientcmd.ConfigAccess
 	name                  string
 	server                cliflag.StringFlag
@@ -45,19 +45,19 @@ type createClusterOptions struct {
 }
 
 var (
-	createClusterLong = templates.LongDesc(i18n.T(`
+	setClusterLong = templates.LongDesc(i18n.T(`
 		Set a cluster entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`))
 
-	createClusterExample = templates.Examples(`
+	setClusterExample = templates.Examples(`
 		# Set only the server field on the e2e cluster entry without touching other values
 		kubectl config set-cluster e2e --server=https://1.2.3.4
 
 		# Embed certificate authority data for the e2e cluster entry
 		kubectl config set-cluster e2e --embed-certs --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
 
-		# Disable cert checking for the dev cluster entry
+		# Disable cert checking for the e2e cluster entry
 		kubectl config set-cluster e2e --insecure-skip-tls-verify=true
 
 		# Set custom TLS server name to use for validation for the e2e cluster entry
@@ -69,14 +69,14 @@ var (
 
 // NewCmdConfigSetCluster returns a Command instance for 'config set-cluster' sub command
 func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createClusterOptions{configAccess: configAccess}
+	options := &setClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true] [--%v=example.com]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagTLSServerName),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Set a cluster entry in kubeconfig"),
-		Long:                  createClusterLong,
-		Example:               createClusterExample,
+		Long:                  setClusterLong,
+		Example:               setClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
@@ -99,7 +99,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	return cmd
 }
 
-func (o createClusterOptions) run() error {
+func (o setClusterOptions) run() error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -124,8 +124,7 @@ func (o createClusterOptions) run() error {
 	return nil
 }
 
-// cluster builds a Cluster object from the options
-func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) clientcmdapi.Cluster {
+func (o *setClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) clientcmdapi.Cluster {
 	modifiedCluster := existingCluster
 
 	if o.server.Provided() {
@@ -169,7 +168,7 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 	return modifiedCluster
 }
 
-func (o *createClusterOptions) complete(cmd *cobra.Command) error {
+func (o *setClusterOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
 		return helpErrorf(cmd, "Unexpected args: %v", args)
@@ -179,7 +178,7 @@ func (o *createClusterOptions) complete(cmd *cobra.Command) error {
 	return nil
 }
 
-func (o createClusterOptions) validate() error {
+func (o setClusterOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("you must specify a non-empty cluster name")
 	}
