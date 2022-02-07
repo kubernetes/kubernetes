@@ -82,6 +82,38 @@ var (
 		}
 	}
 		`
+	validBodyJSON = `
+{
+	"apiVersion": "apps/v1",
+	"kind": "Deployment",
+	"metadata": {
+		"name": "%s",
+		"labels": {"app": "nginx"},
+		"annotations": {"a1": "foo", "a2": "bar"}
+	},
+	"spec": {
+		"selector": {
+			"matchLabels": {
+				"app": "nginx"
+			}
+		},
+		"template": {
+			"metadata": {
+				"labels": {
+					"app": "nginx"
+				}
+			},
+			"spec": {
+				"containers": [{
+					"name":  "nginx",
+					"image": "nginx:latest",
+					"imagePullPolicy": "Always"
+				}]
+			}
+		},
+		"replicas": 2
+	}
+}`
 
 	invalidBodyYAML = `apiVersion: apps/v1
 kind: Deployment
@@ -110,36 +142,31 @@ spec:
         imagePullPolicy: Always
         imagePullPolicy: Never`
 
-	validBodyJSON = `
-{
-	"apiVersion": "apps/v1",
-	"kind": "Deployment",
-	"metadata": {
-		"name": "%s",
-		"labels": {"app": "nginx"}
-	},
-	"spec": {
-		"selector": {
-			"matchLabels": {
-				"app": "nginx"
-			}
-		},
-		"template": {
-			"metadata": {
-				"labels": {
-					"app": "nginx"
-				}
-			},
-			"spec": {
-				"containers": [{
-					"name":  "nginx",
-					"image": "nginx:latest",
-					"imagePullPolicy": "Always"
-				}]
-			}
-		}
-	}
-}`
+	validBodyYAML = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: %s
+  labels:
+    app: nginx
+  annotations:
+    a1: foo
+    a2: bar
+spec:
+  replicas: 2
+  paused: true
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        imagePullPolicy: Always`
+
 	applyInvalidBody = `{
 		"apiVersion": "apps/v1",
 		"kind": "Deployment",
@@ -2968,11 +2995,11 @@ func BenchmarkFieldValidation(b *testing.B) {
 	client := clientset.NewForConfigOrDie(config)
 
 	b.Run("Post", func(b *testing.B) { benchFieldValidationPost(b, client) })
-	b.Run("Put", func(b *testing.B) { benchFieldValidationPut(b, client) })
-	b.Run("PatchTyped", func(b *testing.B) { benchFieldValidationPatchTyped(b, client) })
-	b.Run("SMP", func(b *testing.B) { benchFieldValidationSMP(b, client) })
-	b.Run("ApplyCreate", func(b *testing.B) { benchFieldValidationApplyCreate(b, client) })
-	b.Run("ApplyUpdate", func(b *testing.B) { benchFieldValidationApplyUpdate(b, client) })
+	//b.Run("Put", func(b *testing.B) { benchFieldValidationPut(b, client) })
+	//b.Run("PatchTyped", func(b *testing.B) { benchFieldValidationPatchTyped(b, client) })
+	//b.Run("SMP", func(b *testing.B) { benchFieldValidationSMP(b, client) })
+	//b.Run("ApplyCreate", func(b *testing.B) { benchFieldValidationApplyCreate(b, client) })
+	//b.Run("ApplyUpdate", func(b *testing.B) { benchFieldValidationApplyUpdate(b, client) })
 
 }
 
@@ -2988,32 +3015,32 @@ func benchFieldValidationPost(b *testing.B, client clientset.Interface) {
 			opts: metav1.CreateOptions{
 				FieldValidation: "Strict",
 			},
-			bodyBase: invalidBodyJSON,
+			bodyBase: validBodyJSON,
 		},
 		{
 			name: "post-warn-validation",
 			opts: metav1.CreateOptions{
 				FieldValidation: "Warn",
 			},
-			bodyBase: invalidBodyJSON,
+			bodyBase: validBodyJSON,
+		},
+		{
+			name:     "post-no-validation",
+			bodyBase: validBodyJSON,
 		},
 		{
 			name: "post-ignore-validation",
 			opts: metav1.CreateOptions{
 				FieldValidation: "Ignore",
 			},
-			bodyBase: invalidBodyJSON,
-		},
-		{
-			name:     "post-default-ignore-validation",
-			bodyBase: invalidBodyJSON,
+			bodyBase: validBodyJSON,
 		},
 		{
 			name: "post-strict-validation-yaml",
 			opts: metav1.CreateOptions{
 				FieldValidation: "Strict",
 			},
-			bodyBase:    invalidBodyYAML,
+			bodyBase:    validBodyYAML,
 			contentType: "application/yaml",
 		},
 		{
@@ -3021,7 +3048,12 @@ func benchFieldValidationPost(b *testing.B, client clientset.Interface) {
 			opts: metav1.CreateOptions{
 				FieldValidation: "Warn",
 			},
-			bodyBase:    invalidBodyYAML,
+			bodyBase:    validBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name:        "post-no-validation-yaml",
+			bodyBase:    validBodyYAML,
 			contentType: "application/yaml",
 		},
 		{
@@ -3029,12 +3061,7 @@ func benchFieldValidationPost(b *testing.B, client clientset.Interface) {
 			opts: metav1.CreateOptions{
 				FieldValidation: "Ignore",
 			},
-			bodyBase:    invalidBodyYAML,
-			contentType: "application/yaml",
-		},
-		{
-			name:        "post-no-validation-yaml",
-			bodyBase:    invalidBodyYAML,
+			bodyBase:    validBodyYAML,
 			contentType: "application/yaml",
 		},
 	}
@@ -3051,7 +3078,10 @@ func benchFieldValidationPost(b *testing.B, client clientset.Interface) {
 					Resource("deployments").
 					SetHeader("Content-Type", bm.contentType).
 					VersionedParams(&bm.opts, metav1.ParameterCodec)
-				_ = req.Body(body).Do(context.TODO())
+				result := req.Body(body).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected request err: %v", result.Error())
+				}
 			}
 		})
 	}
