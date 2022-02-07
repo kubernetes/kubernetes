@@ -459,3 +459,12 @@ func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestNoBetaVersionsEnabledByDefault(t *testing.T) {
+	config := DefaultAPIResourceConfigSource()
+	for gv, enable := range config.GroupVersionConfigs {
+		if enable && strings.Contains(gv.Version, "beta") {
+			t.Errorf("Beta API version %s enabled by default", gv.String())
+		}
+	}
+}
