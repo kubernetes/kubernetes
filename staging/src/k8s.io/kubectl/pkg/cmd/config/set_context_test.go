@@ -26,7 +26,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-type createContextTest struct {
+type setContextTest struct {
 	description    string
 	testContext    string              // name of the context being modified
 	config         clientcmdapi.Config //initiate kubectl config
@@ -38,7 +38,7 @@ type createContextTest struct {
 
 func TestCreateContext(t *testing.T) {
 	conf := clientcmdapi.Config{}
-	test := createContextTest{
+	test := setContextTest{
 		testContext: "shaker-context",
 		description: "Testing for create a new context",
 		config:      conf,
@@ -61,7 +61,7 @@ func TestModifyContext(t *testing.T) {
 		Contexts: map[string]*clientcmdapi.Context{
 			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
 			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
-	test := createContextTest{
+	test := setContextTest{
 		testContext: "shaker-context",
 		description: "Testing for modify a already exist context",
 		config:      conf,
@@ -86,7 +86,7 @@ func TestModifyCurrentContext(t *testing.T) {
 		Contexts: map[string]*clientcmdapi.Context{
 			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
 			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
-	test := createContextTest{
+	test := setContextTest{
 		testContext: "shaker-context",
 		description: "Testing for modify a current context",
 		config:      conf,
@@ -106,7 +106,7 @@ func TestModifyCurrentContext(t *testing.T) {
 	test.run(t)
 }
 
-func (test createContextTest) run(t *testing.T) {
+func (test setContextTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

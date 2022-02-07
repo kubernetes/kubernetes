@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-type createContextOptions struct {
+type setContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	name         string
 	currContext  bool
@@ -42,26 +42,26 @@ type createContextOptions struct {
 }
 
 var (
-	createContextLong = templates.LongDesc(i18n.T(`
+	setContextLong = templates.LongDesc(i18n.T(`
 		Set a context entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`))
 
-	createContextExample = templates.Examples(`
+	setContextExample = templates.Examples(`
 		# Set the user field on the gce context entry without touching other values
 		kubectl config set-context gce --user=cluster-admin`)
 )
 
 // NewCmdConfigSetContext returns a Command instance for 'config set-context' sub command
 func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createContextOptions{configAccess: configAccess}
+	options := &setContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Set a context entry in kubeconfig"),
-		Long:                  createContextLong,
-		Example:               createContextExample,
+		Long:                  setContextLong,
+		Example:               setContextExample,
 		ValidArgsFunction:     util.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
@@ -83,7 +83,7 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	return cmd
 }
 
-func (o createContextOptions) run() (string, bool, error) {
+func (o setContextOptions) run() (string, bool, error) {
 	err := o.validate()
 	if err != nil {
 		return "", false, err
@@ -116,7 +116,7 @@ func (o createContextOptions) run() (string, bool, error) {
 	return name, exists, nil
 }
 
-func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Context) clientcmdapi.Context {
+func (o *setContextOptions) modifyContext(existingContext clientcmdapi.Context) clientcmdapi.Context {
 	modifiedContext := existingContext
 
 	if o.cluster.Provided() {
@@ -132,7 +132,7 @@ func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Contex
 	return modifiedContext
 }
 
-func (o *createContextOptions) complete(cmd *cobra.Command) error {
+func (o *setContextOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
 	if len(args) > 1 {
 		return helpErrorf(cmd, "Unexpected args: %v", args)
@@ -143,7 +143,7 @@ func (o *createContextOptions) complete(cmd *cobra.Command) error {
 	return nil
 }
 
-func (o createContextOptions) validate() error {
+func (o setContextOptions) validate() error {
 	if len(o.name) == 0 && !o.currContext {
 		return errors.New("you must specify a non-empty context name or --current")
 	}
