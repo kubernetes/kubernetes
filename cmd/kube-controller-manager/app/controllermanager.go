@@ -128,8 +128,9 @@ controller, and serviceaccounts controller.`,
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
-
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if err := Run(ctx, c.Complete()); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -170,7 +171,7 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 }
 
 // Run runs the KubeControllerManagerOptions.  This should never exit.
-func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
+func Run(ctx context.Context, c *config.CompletedConfig) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -188,7 +189,6 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		checks = append(checks, electionChecker)
 	}
 	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
-
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
@@ -196,7 +196,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		if _, _, err := c.SecureServing.Serve(ctx, handler, 0); err != nil {
 			return err
 		}
 	}
@@ -216,8 +216,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
 
-		controllerContext.InformerFactory.Start(stopCh)
-		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
+		controllerContext.InformerFactory.Start(ctx.Done())
+		controllerContext.ObjectOrMetadataInformerFactory.Start(ctx.Done())
 		close(controllerContext.InformersStarted)
 
 		select {}

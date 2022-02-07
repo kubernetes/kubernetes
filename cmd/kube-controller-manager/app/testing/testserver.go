@@ -105,12 +105,13 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
+	ctx := context.TODO()
 	errCh := make(chan error)
-	go func(stopCh <-chan struct{}) {
-		if err := app.Run(config.Complete(), stopCh); err != nil {
+	go func(ctx context.Context) {
+		if err := app.Run(ctx, config.Complete()); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}(ctx)
 
 	t.Logf("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)

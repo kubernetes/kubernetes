@@ -17,6 +17,7 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -121,6 +122,8 @@ func TestConfigMapCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			client := fake.NewSimpleClientset(caConfigMap, existNS)
 			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 			cmInformer := informers.Core().V1().ConfigMaps()
@@ -156,7 +159,7 @@ func TestConfigMapCreation(t *testing.T) {
 			}
 
 			for controller.queue.Len() != 0 {
-				controller.processNextWorkItem()
+				controller.processNextWorkItem(ctx)
 			}
 
 			actions := client.Actions()
@@ -249,6 +252,8 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			client := fake.NewSimpleClientset(tc.ExistingConfigMaps...)
 			configMapIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			for _, obj := range tc.ExistingConfigMaps {
@@ -264,7 +269,7 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 				nsListerSynced: func() bool { return true },
 			}
 
-			err := controller.syncNamespace("default")
+			err := controller.syncNamespace(ctx, "default")
 			if err != nil {
 				t.Fatal(err)
 			}

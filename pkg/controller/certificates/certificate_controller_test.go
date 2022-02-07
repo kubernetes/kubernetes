@@ -42,13 +42,13 @@ func TestCertificateController(t *testing.T) {
 	client := fake.NewSimpleClientset(csr)
 	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(csr), controller.NoResyncPeriodFunc())
 
-	handler := func(csr *certificates.CertificateSigningRequest) error {
+	handler := func(ctx context.Context, csr *certificates.CertificateSigningRequest) error {
 		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
 			Type:    certificates.CertificateApproved,
 			Reason:  "test reason",
 			Message: "test message",
 		})
-		_, err := client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
+		_, err := client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -63,15 +63,15 @@ func TestCertificateController(t *testing.T) {
 	)
 	controller.csrsSynced = func() bool { return true }
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informerFactory.Start(stopCh)
-	informerFactory.WaitForCacheSync(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 	wait.PollUntil(10*time.Millisecond, func() (bool, error) {
 		return controller.queue.Len() >= 1, nil
-	}, stopCh)
+	}, ctx.Done())
 
-	controller.processNextWorkItem()
+	controller.processNextWorkItem(ctx)
 
 	actions := client.Actions()
 	if len(actions) != 1 {

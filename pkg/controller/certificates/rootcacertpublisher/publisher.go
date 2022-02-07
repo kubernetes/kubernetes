@@ -155,14 +155,14 @@ func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
 	c.queue.Add(newNamespace.Name)
 }
 
-func (c *Publisher) runWorker(ctx context.Context, ) {
+func (c *Publisher) runWorker(ctx context.Context) {
 	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue. It returns false when
 // it's time to quit.
-func (c *Publisher) processNextWorkItem(ctx context.Context, ) bool {
+func (c *Publisher) processNextWorkItem(ctx context.Context) bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false

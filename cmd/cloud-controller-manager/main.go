@@ -27,7 +27,6 @@ package main
 import (
 	"os"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
@@ -70,7 +69,7 @@ func main() {
 		Constructor: nodeIpamController.StartNodeIpamControllerWrapper,
 	}
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss)
 	code := cli.Run(command)
 	os.Exit(code)
 }
