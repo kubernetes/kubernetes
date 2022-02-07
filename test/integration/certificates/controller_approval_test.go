@@ -98,10 +98,10 @@ func TestController_AutoApproval(t *testing.T) {
 			// Register the controller
 			c := approver.NewCSRApprovingController(client, informers.Certificates().V1().CertificateSigningRequests())
 			// Start the controller & informers
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			informers.Start(stopCh)
-			go c.Run(1, stopCh)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			informers.Start(ctx.Done())
+			go c.Run(ctx, 1)
 
 			// Configure appropriate permissions
 			if test.grantNodeClient {

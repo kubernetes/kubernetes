@@ -125,7 +125,7 @@ func (s *Server) Start(ctx context.Context) error {
 		compbasemetrics.HandlerFor(s.metricsRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}))
 
 	if s.insecureServing != nil {
-		if err := s.insecureServing.Serve(mux, 0, ctx.Done()); err != nil {
+		if err := s.insecureServing.Serve(ctx, mux, 0); err != nil {
 			return fmt.Errorf("failed to start insecure server: %w", err)
 		}
 	}
@@ -134,7 +134,7 @@ func (s *Server) Start(ctx context.Context) error {
 	var listenerStoppedCh <-chan struct{}
 	if s.secureServing != nil {
 		var err error
-		shutdownCh, listenerStoppedCh, err = s.secureServing.Serve(mux, 0, ctx.Done())
+		shutdownCh, listenerStoppedCh, err = s.secureServing.Serve(ctx, mux, 0)
 		if err != nil {
 			return fmt.Errorf("failed to start secure server: %w", err)
 		}

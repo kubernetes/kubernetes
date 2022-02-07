@@ -17,6 +17,7 @@ limitations under the License.
 package services
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -42,14 +43,17 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 // APIServer is a server which manages apiserver.
 type APIServer struct {
 	storageConfig storagebackend.Config
-	stopCh        chan struct{}
+	ctx           context.Context
+	cancelFn      context.CancelFunc
 }
 
 // NewAPIServer creates an apiserver.
 func NewAPIServer(storageConfig storagebackend.Config) *APIServer {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &APIServer{
 		storageConfig: storageConfig,
-		stopCh:        make(chan struct{}),
+		ctx:           ctx,
+		cancelFn:      cancel,
 	}
 }
 
@@ -101,7 +105,7 @@ func (a *APIServer) Start() error {
 			return
 		}
 
-		err = apiserver.Run(completedOptions, a.stopCh)
+		err = apiserver.Run(a.ctx, completedOptions)
 		if err != nil {
 			errCh <- fmt.Errorf("run apiserver error: %v", err)
 			return
@@ -118,9 +122,8 @@ func (a *APIServer) Start() error {
 // Stop stops the apiserver. Currently, there is no way to stop the apiserver.
 // The function is here only for completion.
 func (a *APIServer) Stop() error {
-	if a.stopCh != nil {
-		close(a.stopCh)
-		a.stopCh = nil
+	if a.ctx != nil {
+		defer a.cancelFn()
 	}
 	return nil
 }

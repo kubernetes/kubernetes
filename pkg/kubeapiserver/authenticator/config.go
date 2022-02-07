@@ -17,7 +17,6 @@ limitations under the License.
 package authenticator
 
 import (
-	"context"
 	"errors"
 	"time"
 
@@ -92,7 +91,7 @@ type Config struct {
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func (config Config) New(ctx context.Context) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
 	var authenticators []authenticator.Request
 	var tokenAuthenticators []authenticator.Token
 	securityDefinitions := spec.SecurityDefinitions{}
@@ -155,7 +154,7 @@ func (config Config) New(ctx context.Context) (authenticator.Request, *spec.Secu
 		var oidcCAContent oidc.CAContentProvider
 		if len(config.OIDCCAFile) != 0 {
 			var oidcCAErr error
-			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile(ctx, "oidc-authenticator", config.OIDCCAFile)
+			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", config.OIDCCAFile)
 			if oidcCAErr != nil {
 				return nil, nil, oidcCAErr
 			}

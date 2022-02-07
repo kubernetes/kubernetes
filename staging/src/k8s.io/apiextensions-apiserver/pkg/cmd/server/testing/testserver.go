@@ -152,11 +152,12 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 
 	errCh := make(chan error)
-	go func(stopCh <-chan struct{}) {
-		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
+	ctx := context.TODO()
+	go func(ctx context.Context) {
+		if err := server.GenericAPIServer.PrepareRun().Run(ctx); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}(ctx)
 
 	t.Logf("Waiting for /healthz to be ok...")
 

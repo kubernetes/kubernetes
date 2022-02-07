@@ -82,7 +82,7 @@ func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan st
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunWardleServer(stopCh); err != nil {
+			if err := o.RunWardleServer(); err != nil {
 				return err
 			}
 			return nil
@@ -151,7 +151,7 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 }
 
 // RunWardleServer starts a new WardleServer given WardleServerOptions
-func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
+func (o WardleServerOptions) RunWardleServer() error {
 	config, err := o.Config()
 	if err != nil {
 		return err
@@ -167,6 +167,6 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 		o.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
-
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+	ctx := genericapiserver.SetupSignalContext()
+	return server.GenericAPIServer.PrepareRun().Run(ctx)
 }

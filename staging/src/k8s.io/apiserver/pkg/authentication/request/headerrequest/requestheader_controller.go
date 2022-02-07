@@ -183,8 +183,8 @@ func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers in
 }
 
 // // RunOnce runs a single sync loop
-func (c *RequestHeaderAuthRequestController) RunOnce() error {
-	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(context.TODO(), c.configmapName, metav1.GetOptions{})
+func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error {
+	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(ctx, c.configmapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		// ignore, authConfigMap is nil now

@@ -615,7 +615,7 @@ func TestGracefulShutdown(t *testing.T) {
 		Addr:    "0.0.0.0:0",
 		Handler: s.Handler,
 	}
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 
 	ln, err := net.Listen("tcp", insecureServer.Addr)
 	if err != nil {
@@ -624,7 +624,7 @@ func TestGracefulShutdown(t *testing.T) {
 
 	// get port
 	serverPort := ln.Addr().(*net.TCPAddr).Port
-	stoppedCh, _, err := RunServer(insecureServer, ln, 10*time.Second, stopCh)
+	stoppedCh, _, err := RunServer(ctx, insecureServer, ln, 10*time.Second)
 	if err != nil {
 		t.Fatalf("RunServer err: %v", err)
 	}
@@ -644,7 +644,7 @@ func TestGracefulShutdown(t *testing.T) {
 
 	// close stopCh after request sent to server to guarantee request handler is running.
 	wg.Wait()
-	close(stopCh)
+	cancel()
 
 	time.Sleep(500 * time.Millisecond)
 	if _, err := http.Get("http://127.0.0.1:" + strconv.Itoa(serverPort) + "/200"); err == nil {

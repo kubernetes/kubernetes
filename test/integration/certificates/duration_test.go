@@ -115,13 +115,12 @@ func TestCSRDuration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stopCh := make(chan struct{})
 	t.Cleanup(func() {
-		close(stopCh)
+		cancel()
 	})
 
-	informerFactory.Start(stopCh)
-	go c.Run(1, stopCh)
+	informerFactory.Start(ctx.Done())
+	go c.Run(ctx, 1)
 
 	tests := []struct {
 		name, csrName          string

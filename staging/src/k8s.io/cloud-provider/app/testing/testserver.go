@@ -102,7 +102,8 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		return cloud
 	}
 	fss := cliflag.NamedFlagSets{}
-	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, fss, stopCh)
+
+	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, fss)
 
 	commandArgs := []string{}
 	listeners := []net.Listener{}

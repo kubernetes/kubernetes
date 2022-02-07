@@ -18,6 +18,7 @@ package options
 
 import (
 	"bytes"
+	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -267,8 +268,8 @@ func TestServerRunWithSNI(t *testing.T) {
 				signatures[sig] = j
 			}
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			// launch server
 			config := setUp(t)
@@ -316,7 +317,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			preparedServer := s.PrepareRun()
 			preparedServerErrors := make(chan error)
 			go func() {
-				if err := preparedServer.Run(stopCh); err != nil {
+				if err := preparedServer.Run(ctx); err != nil {
 					preparedServerErrors <- err
 				}
 			}()

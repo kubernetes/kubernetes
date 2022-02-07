@@ -163,11 +163,11 @@ func (o *CloudControllerManagerOptions) ApplyTo(ctx context.Context, c *config.C
 	if err = o.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err = o.SecureServing.ApplyTo(ctx, &c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err = o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil {
-		if err = o.Authentication.ApplyTo(ctx, &c.Authentication, c.SecureServing, nil); err != nil {
+		if err = o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
 			return err
 		}
 		if err = o.Authorization.ApplyTo(&c.Authorization); err != nil {
@@ -254,7 +254,9 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 	}
 
 	c := &config.Config{}
-	if err := o.ApplyTo(c, CloudControllerManagerUserAgent); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := o.ApplyTo(ctx, c, CloudControllerManagerUserAgent); err != nil {
 		return nil, err
 	}
 

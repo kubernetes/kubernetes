@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/pflag"
@@ -101,7 +100,7 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ApplyTo adds RecommendedOptions to the server configuration.
 // pluginInitializers can be empty, it is only need for additional initializers.
-func (o *RecommendedOptions) ApplyTo(ctx context.Context, config *server.RecommendedConfig) error {
+func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
@@ -113,10 +112,10 @@ func (o *RecommendedOptions) ApplyTo(ctx context.Context, config *server.Recomme
 			return err
 		}
 	}
-	if err := o.SecureServing.ApplyTo(ctx, &config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
+	if err := o.SecureServing.ApplyTo(&config.Config.SecureServing, &config.Config.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(ctx, &config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {
+	if err := o.Authentication.ApplyTo(&config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {
 		return err
 	}
 	if err := o.Authorization.ApplyTo(&config.Config.Authorization); err != nil {

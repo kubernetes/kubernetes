@@ -116,12 +116,12 @@ func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ToAuthenticationRequestHeaderConfig returns a RequestHeaderConfig config object for these options
 // if necessary, nil otherwise.
-func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig(ctx context.Context) (*authenticatorfactory.RequestHeaderConfig, error) {
+func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() (*authenticatorfactory.RequestHeaderConfig, error) {
 	if len(s.ClientCAFile) == 0 {
 		return nil, nil
 	}
 
-	caBundleProvider, err := dynamiccertificates.NewDynamicCAContentFromFile(ctx,"request-header", s.ClientCAFile)
+	caBundleProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("request-header", s.ClientCAFile)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ type ClientCertAuthenticationOptions struct {
 }
 
 // GetClientVerifyOptionFn provides verify options for your authenticator while respecting the preferred order of verifiers.
-func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider(ctx context.Context) (dynamiccertificates.CAContentProvider, error) {
+func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider() (dynamiccertificates.CAContentProvider, error) {
 	if s.CAContentProvider != nil {
 		return s.CAContentProvider, nil
 	}
@@ -157,7 +157,7 @@ func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider(ctx context
 		return nil, nil
 	}
 
-	return dynamiccertificates.NewDynamicCAContentFromFile(ctx, "client-ca-bundle", s.ClientCA)
+	return dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", s.ClientCA)
 }
 
 func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
@@ -276,7 +276,7 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		"Note that this can result in authentication that treats all requests as anonymous.")
 }
 
-func (s *DelegatingAuthenticationOptions) ApplyTo(ctx context.Context, authenticationInfo *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
+func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
 	if s == nil {
 		authenticationInfo.Authenticator = nil
 		return nil
@@ -298,12 +298,13 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(ctx context.Context, authentic
 	if client != nil {
 		cfg.TokenAccessReviewClient = client.AuthenticationV1()
 	}
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// get the clientCA information
 	clientCASpecified := s.ClientCert != ClientCertAuthenticationOptions{}
 	var clientCAProvider dynamiccertificates.CAContentProvider
 	if clientCASpecified {
-		clientCAProvider, err = s.ClientCert.GetClientCAContentProvider(ctx)
+		clientCAProvider, err = s.ClientCert.GetClientCAContentProvider()
 		if err != nil {
 			return fmt.Errorf("unable to load client CA provider: %v", err)
 		}
@@ -331,7 +332,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(ctx context.Context, authentic
 	requestHeaderCAFileSpecified := len(s.RequestHeader.ClientCAFile) > 0
 	var requestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 	if requestHeaderCAFileSpecified {
-		requestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig(ctx)
+		requestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
 		if err != nil {
 			return fmt.Errorf("unable to create request header authentication config: %v", err)
 		}

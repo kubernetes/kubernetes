@@ -17,6 +17,7 @@ limitations under the License.
 package headerrequest
 
 import (
+	"context"
 	"encoding/json"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"testing"
@@ -220,8 +221,9 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 			fakeKubeClient := fake.NewSimpleClientset(scenario.cm)
 			target.client = fakeKubeClient
 
+			ctx := context.TODO()
 			// act
-			err := target.RunOnce()
+			err := target.RunOnce(ctx)
 
 			if err != nil && !scenario.expectErr {
 				t.Errorf("got unexpected error %v", err)

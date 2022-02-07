@@ -54,7 +54,7 @@ var _ CertKeyContentProvider = &DynamicCertKeyPairContent{}
 var _ ControllerRunner = &DynamicCertKeyPairContent{}
 
 // NewDynamicServingContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
-func NewDynamicServingContentFromFiles(ctx context.Context, purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
+func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
 	if len(certFile) == 0 || len(keyFile) == 0 {
 		return nil, fmt.Errorf("missing filename for serving cert")
 	}
@@ -66,7 +66,7 @@ func NewDynamicServingContentFromFiles(ctx context.Context, purpose, certFile, k
 		keyFile:  keyFile,
 		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
 	}
-	if err := ret.loadCertKeyPair(ctx); err != nil {
+	if err := ret.loadCertKeyPair(); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +79,7 @@ func (c *DynamicCertKeyPairContent) AddListener(listener Listener) {
 }
 
 // loadCertKeyPair determines the next set of content for the file.
-func (c *DynamicCertKeyPairContent) loadCertKeyPair(ctx context.Context) error {
+func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 	cert, err := ioutil.ReadFile(c.certFile)
 	if err != nil {
 		return err
@@ -121,7 +121,7 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair(ctx context.Context) error {
 
 // RunOnce runs a single sync loop
 func (c *DynamicCertKeyPairContent) RunOnce(ctx context.Context) error {
-	return c.loadCertKeyPair(ctx)
+	return c.loadCertKeyPair()
 }
 
 // Run starts the controller and blocks until stopCh is closed.
@@ -133,7 +133,9 @@ func (c *DynamicCertKeyPairContent) Run(ctx context.Context, workers int) {
 	defer klog.InfoS("Shutting down controller", "name", c.name)
 
 	// doesn't matter what workers say, only start one.
-	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+	// This doesn't seem to make any api call but loading from file so no need to pass
+	// context around
+	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
 	// start the loop that watches the cert and key files until stopCh is closed.
 	go wait.UntilWithContext(ctx, func(ctx context.Context) {
@@ -197,19 +199,19 @@ func (c *DynamicCertKeyPairContent) handleWatchEvent(e fsnotify.Event, w *fsnoti
 	return nil
 }
 
-func (c *DynamicCertKeyPairContent) runWorker(ctx context.Context) {
-	for c.processNextWorkItem(ctx) {
+func (c *DynamicCertKeyPairContent) runWorker() {
+	for c.processNextWorkItem() {
 	}
 }
 
-func (c *DynamicCertKeyPairContent) processNextWorkItem(ctx context.Context) bool {
+func (c *DynamicCertKeyPairContent) processNextWorkItem() bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(dsKey)
 
-	err := c.loadCertKeyPair(ctx)
+	err := c.loadCertKeyPair()
 	if err == nil {
 		c.queue.Forget(dsKey)
 		return true

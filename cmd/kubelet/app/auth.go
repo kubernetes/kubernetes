@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -38,7 +39,7 @@ import (
 
 // BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs
 // It returns AuthInterface, a run method to start internal controllers (like cert reloading) and error.
-func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, func(<-chan struct{}), error) {
+func BuildAuth(ctx context.Context, nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, func(<-chan struct{}), error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.AuthenticationV1Interface
@@ -49,7 +50,7 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient = client.AuthorizationV1()
 	}
 
-	authenticator, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
+	authenticator, runAuthenticatorCAReload, err := BuildAuthn(ctx, tokenClient, config.Authentication)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -65,7 +66,7 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, func(<-chan struct{}), error) {
+func BuildAuthn(ctx context.Context, client authenticationclient.AuthenticationV1Interface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, func(<-chan struct{}), error) {
 	var dynamicCAContentFromFile *dynamiccertificates.DynamicFileCAContent
 	var err error
 	if len(authn.X509.ClientCAFile) > 0 {
@@ -94,9 +95,9 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 		return nil, nil, err
 	}
 
-	return authenticator, func(stopCh <-chan struct{}) {
+	return authenticator, func(<-chan struct{}) {
 		if dynamicCAContentFromFile != nil {
-			go dynamicCAContentFromFile.Run(1, stopCh)
+			go dynamicCAContentFromFile.Run(ctx, 1)
 		}
 	}, err
 }

@@ -163,10 +163,10 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	})
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		defer cancel()
+		s.PrepareRun().Run(ctx)
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -183,7 +183,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 
 	// step 2: signal termination event: initiate a shutdown
-	close(stopCh)
+	cancel()
 
 	// step 3: before ShutdownDelayDuration elapses new request(s) should be served successfully.
 	delayedStopVerificationStep.execute()
@@ -212,7 +212,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 
 	t.Log("Waiting for the apiserver Run method to return")
 	select {
-	case <-runCompletedCh:
+	case <-ctx.Done():
 	case <-time.After(5 * time.Second):
 		t.Fatal("Expected the apiserver Run method to return")
 	}
@@ -285,10 +285,10 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	})
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		defer cancel()
+		s.PrepareRun().Run(ctx)
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -309,7 +309,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	assertResponse(t, resultGot, http.StatusOK)
 
 	// step 2: signal termination event: initiate a shutdown
-	close(stopCh)
+	cancel()
 
 	// step 3: /readyz must return an error, but we need to give it some time
 	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
@@ -359,7 +359,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 
 	t.Log("Waiting for the apiserver Run method to return")
 	select {
-	case <-runCompletedCh:
+	case <-ctx.Done():
 	case <-time.After(5 * time.Second):
 		t.Fatal("Expected the apiserver Run method to return")
 	}
@@ -398,10 +398,10 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 	}
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		defer cancel()
+		s.PrepareRun().Run(ctx)
 	}()
 	waitForAPIServerStarted(t, doer)
 

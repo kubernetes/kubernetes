@@ -213,7 +213,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
-	server, err := app.CreateServerChain(completedOptions, stopCh)
+	server, err := app.CreateServerChain(completedOptions)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
@@ -221,15 +221,16 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
 	}
 
+	ctx := context.TODO()
 	errCh := make(chan error)
-	go func(stopCh <-chan struct{}) {
+	go func(ctx context.Context) {
 		prepared, err := server.PrepareRun()
 		if err != nil {
 			errCh <- err
-		} else if err := prepared.Run(stopCh); err != nil {
+		} else if err := prepared.Run(ctx); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}(ctx)
 
 	t.Logf("Waiting for /healthz to be ok...")
 

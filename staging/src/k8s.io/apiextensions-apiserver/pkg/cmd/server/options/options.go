@@ -95,7 +95,6 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
-
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 	if err := o.ServerRunOptions.ApplyTo(&serverConfig.Config); err != nil {
 		return nil, err

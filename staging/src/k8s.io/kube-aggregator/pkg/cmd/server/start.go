@@ -67,7 +67,7 @@ func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(stopCh); err != nil {
+			if err := o.RunAggregator(); err != nil {
 				return err
 			}
 			return nil
@@ -119,7 +119,7 @@ func (o *AggregatorOptions) Complete() error {
 }
 
 // RunAggregator runs the API Aggregator.
-func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
+func (o AggregatorOptions) RunAggregator() error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -161,8 +161,8 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 
 	config.ExtraConfig.ProxyClientCertFile = o.ProxyClientCertFile
 	config.ExtraConfig.ProxyClientKeyFile = o.ProxyClientKeyFile
-
-	server, err := config.Complete().NewWithDelegate(genericapiserver.NewEmptyDelegate())
+	ctx := genericapiserver.SetupSignalContext()
+	server, err := config.Complete().NewWithDelegate(ctx, genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return err
 	}
@@ -171,5 +171,5 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	return prepared.Run(stopCh)
+	return prepared.Run(ctx)
 }
