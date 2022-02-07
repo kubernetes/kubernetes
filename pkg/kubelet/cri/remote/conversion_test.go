@@ -19,6 +19,7 @@ package remote
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -81,8 +82,8 @@ func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
 			if aField.Name != bField.Name {
 				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field name %d: %s %s", i, aField.Name, bField.Name))
 			}
-			if aField.Tag != bField.Tag {
-				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field tag %d: %s %s", i, aField.Tag, bField.Tag))
+			if aTag, bTag := stripEnum(aField.Tag), stripEnum(bField.Tag); aTag != bTag {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field tag %d:\n%s\n%s\n", i, aTag, bTag))
 			}
 			if aField.Offset != bField.Offset {
 				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field offset %d: %v %v", i, aField.Offset, bField.Offset))
@@ -99,15 +100,23 @@ func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
 		}
 
 	case reflect.Ptr, reflect.Slice:
-		aElem := a.Elem()
-		bElem := b.Elem()
-		aElemType := reflect.TypeOf(aElem)
-		bElemType := reflect.TypeOf(bElem)
+		aElemType := a.Elem()
+		bElemType := b.Elem()
 		assertEqualTypes(t, path, aElemType, bElemType)
+
+	case reflect.Int32:
+		if a.Kind() != b.Kind() {
+			fatalTypeError(t, path, a, b, "incompatible types")
+		}
 
 	default:
 		fatalTypeError(t, path, a, b, "unhandled kind")
 	}
+}
+
+// strip the enum value from the protobuf tag, since that doesn't impact the wire serialization and differs by package
+func stripEnum(tagValue reflect.StructTag) reflect.StructTag {
+	return reflect.StructTag(regexp.MustCompile(",enum=[^,]+").ReplaceAllString(string(tagValue), ""))
 }
 
 func fatalTypeError(t *testing.T, path []string, a, b reflect.Type, message string) {
