@@ -563,6 +563,8 @@ func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
 
 // NewCSR creates a new CSR
 func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error) {
+	RemoveDuplicateAltNames(&cfg.AltNames)
+
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
