@@ -1204,7 +1204,7 @@ func TestSchedulerBinding(t *testing.T) {
 				Extenders:      test.extenders,
 				SchedulerCache: scache,
 			}
-			err = sched.bind(context.Background(), fwk, pod, "node", nil)
+			err = sched.bind(context.Background(), fwk, pod, ScheduleResult{SuggestedHost: "node"}, nil)
 			if err != nil {
 				t.Error(err)
 			}

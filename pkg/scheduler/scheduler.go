@@ -372,11 +372,12 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 // bind binds a pod to a given node defined in a binding object.
 // The precedence for binding is: (1) extenders and (2) framework plugins.
 // We expect this to run asynchronously, so we handle binding metrics internally.
-func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, targetNode string, state *framework.CycleState) (err error) {
+func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, scheduleResult ScheduleResult, state *framework.CycleState) (err error) {
 	defer func() {
-		sched.finishBinding(fwk, assumed, targetNode, err)
+		sched.finishBinding(fwk, assumed, scheduleResult, err)
 	}()
 
+	targetNode := scheduleResult.SuggestedHost
 	bound, err := sched.extendersBinding(assumed, targetNode)
 	if bound {
 		return err
@@ -405,7 +406,8 @@ func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error)
 	return false, nil
 }
 
-func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, targetNode string, err error) {
+func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, scheduleResult ScheduleResult, err error) {
+	targetNode := scheduleResult.SuggestedHost
 	if finErr := sched.SchedulerCache.FinishBinding(assumed); finErr != nil {
 		klog.ErrorS(finErr, "Scheduler cache FinishBinding failed")
 	}
@@ -414,7 +416,8 @@ func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, 
 		return
 	}
 
-	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
+	msg := truncateMessage(fmt.Sprintf("Successfully assigned %v/%v to %v. Top 3 Node scores: %v", assumed.Namespace, assumed.Name, targetNode, scheduleResult.NodeScoreList))
+	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", msg)
 }
 
 var (
@@ -601,7 +604,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			return
 		}
 
-		err := sched.bind(bindingCycleCtx, fwk, assumedPod, scheduleResult.SuggestedHost, state)
+		err := sched.bind(bindingCycleCtx, fwk, assumedPod, scheduleResult, state)
 		if err != nil {
 			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod

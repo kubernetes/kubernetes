@@ -17,9 +17,11 @@ limitations under the License.
 package scheduler
 
 import (
+	"container/heap"
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,6 +50,9 @@ const (
 	// to ensure that a certain minimum of nodes are checked for feasibility.
 	// This in turn helps ensure a minimum level of spreading.
 	minFeasibleNodesPercentageToFind = 5
+	// numberOfNodeScoresToIncludeInScheduleResult is the number of node scores
+	// to be included in ScheduleResult.
+	numberOfNodeScoresToIncludeInScheduleResult = 3
 )
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
@@ -69,6 +74,61 @@ type ScheduleResult struct {
 	EvaluatedNodes int
 	// Number of feasible nodes on one pod scheduled
 	FeasibleNodes int
+	// Only the top numberOfNodeScoresToIncludeInScheduleResult scores will be recorded.
+	NodeScoreList NodeScoreResultList
+}
+
+type NodeScoreResultList []NodeScoreResult
+
+// String implements fmt.Stringer interface.
+// It will be like this:
+// [NodeName: node3 FinalScore: 675 Detailed Scores: [PodTopologySpread: 200 InterPodAffinity: 0 NodeResourcesBalancedAllocation: 100 ImageLocality: 0 TaintToleration: 300 NodeAffinity: 0 NodeResourcesFit: 75 VolumeBinding: 0]] [NodeName: node2 FinalScore: 425 Detailed Scores: [NodeAffinity: 0 NodeResourcesFit: 25 VolumeBinding: 0 PodTopologySpread: 0 InterPodAffinity: 0 NodeResourcesBalancedAllocation: 100 ImageLocality: 0 TaintToleration: 300]]]
+func (n NodeScoreResultList) String() string {
+	var str string
+	for i := range n {
+		str += fmt.Sprintf("[NodeName: %s FinalScore: %d Detailed Scores: [", n[i].Name, n[i].FinalScore)
+		for k, v := range n[i].Scores {
+			str += fmt.Sprintf("%s: %d ", k, v)
+		}
+		str = strings.TrimSpace(str)
+		str += fmt.Sprintf("]] ")
+	}
+	str = strings.TrimSpace(str)
+	str += fmt.Sprintf("]")
+	return str
+}
+
+// NodeScoreResult has the score result for the Node.
+type NodeScoreResult struct {
+	// Name indicates the name of the Node.
+	Name string
+	// FinalScore indicates the final score for the Node.
+	FinalScore int64
+	// Scores indicates the scores which each plugin returned for the Node.
+	// plugin name → score
+	Scores map[string]int64
+}
+
+func NewNodeScoreResult(nodeName string, finalScore int64) NodeScoreResult {
+	return NodeScoreResult{
+		Name:       nodeName,
+		FinalScore: finalScore,
+		Scores:     map[string]int64{},
+	}
+}
+
+func (result *NodeScoreResult) AddScores(scoreMap framework.PluginToNodeScores) {
+	if result.Scores == nil {
+		result.Scores = map[string]int64{}
+	}
+
+	for plugin, nodeScoreList := range scoreMap {
+		for _, nodeScore := range nodeScoreList {
+			if result.Name == nodeScore.Name {
+				result.Scores[plugin] = nodeScore.Score
+			}
+		}
+	}
 }
 
 type genericScheduler struct {
@@ -124,44 +184,98 @@ func (g *genericScheduler) Schedule(ctx context.Context, extenders []framework.E
 		}, nil
 	}
 
-	priorityList, err := prioritizeNodes(ctx, extenders, fwk, state, pod, feasibleNodes)
+	priorityList, scoreMap, err := prioritizeNodes(ctx, extenders, fwk, state, pod, feasibleNodes)
 	if err != nil {
 		return result, err
 	}
 
-	host, err := g.selectHost(priorityList)
+	host, nodeScores, err := g.selectHost(priorityList, numberOfNodeScoresToIncludeInScheduleResult)
 	trace.Step("Prioritizing done")
+
+	for _, score := range nodeScores {
+		score.AddScores(scoreMap)
+	}
 
 	return ScheduleResult{
 		SuggestedHost:  host,
 		EvaluatedNodes: len(feasibleNodes) + len(diagnosis.NodeToStatusMap),
 		FeasibleNodes:  len(feasibleNodes),
+		NodeScoreList:  nodeScores,
 	}, err
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
 // in a reservoir sampling manner from the nodes that had the highest score.
-func (g *genericScheduler) selectHost(nodeScoreList framework.NodeScoreList) (string, error) {
+// It also returns the top {numberOfNodeScoresToReturn} scores which sorted in descending order.
+// The top of the list is always the score of the selected host.
+func (g *genericScheduler) selectHost(nodeScoreList []framework.NodeScore, numberOfNodeScoresToReturn int) (string, []NodeScoreResult, error) {
 	if len(nodeScoreList) == 0 {
-		return "", fmt.Errorf("empty priorityList")
+		return "", nil, fmt.Errorf("empty priorityList")
 	}
-	maxScore := nodeScoreList[0].Score
-	selected := nodeScoreList[0].Name
+
+	var h nodeScoreHeap = nodeScoreList
+	heap.Init(&h)
 	cntOfMaxScore := 1
-	for _, ns := range nodeScoreList[1:] {
-		if ns.Score > maxScore {
-			maxScore = ns.Score
-			selected = ns.Name
-			cntOfMaxScore = 1
-		} else if ns.Score == maxScore {
+	// The top of the heap is the NodeScoreResult with the highest score.
+	selected := heap.Pop(&h).(framework.NodeScore)
+	sortedNodeScoreList := make([]NodeScoreResult, 0, numberOfNodeScoresToReturn)
+
+	// For efficient computation, the following for-loop does two things:
+	// - There may be more than one NodeScoreResult with the highest score,
+	//   and all Nodes should be taken into account for a reservoir sampling.
+	// - Take {numberOfNodeScoresToReturn - 1} NodeScoreResult from the top of the heap and put them in sortedNodeScoreList.
+	for ns := heap.Pop(&h).(framework.NodeScore);
+	// All Nodes with the highest scores must be checked for a reservoir sampling,
+	// even if the next condition for the length of sortedNodeScoreList is violated.
+	ns.Score == selected.Score ||
+		// selectedNode will be inserted into sortedNodeScoreList later
+		// to ensure to make selectedNode the top of sortedNodeScoreList.
+		len(sortedNodeScoreList) < numberOfNodeScoresToReturn-1; ns = heap.Pop(&h).(framework.NodeScore) {
+		if ns.Score == selected.Score {
 			cntOfMaxScore++
 			if rand.Intn(cntOfMaxScore) == 0 {
 				// Replace the candidate with probability of 1/cntOfMaxScore
-				selected = ns.Name
+				previousSelected := selected
+				selected = ns
+				ns = previousSelected
 			}
 		}
+
+		if len(sortedNodeScoreList)+1 <= numberOfNodeScoresToReturn {
+			sortedNodeScoreList = append(sortedNodeScoreList, NewNodeScoreResult(ns.Name, ns.Score))
+		}
+		if h.Len() == 0 {
+			break
+		}
 	}
-	return selected, nil
+
+	sortedNodeScoreList = append([]NodeScoreResult{
+		NewNodeScoreResult(selected.Name, selected.Score),
+	}, sortedNodeScoreList...)
+
+	return selected.Name, sortedNodeScoreList, nil
+}
+
+// An nodeScoreHeap is a max-heap of framework.NodeScore.
+type nodeScoreHeap []framework.NodeScore
+
+// nodeScoreHeap implements heap.Interface.
+var _ heap.Interface = &nodeScoreHeap{}
+
+func (h nodeScoreHeap) Len() int           { return len(h) }
+func (h nodeScoreHeap) Less(i, j int) bool { return h[i].Score > h[j].Score }
+func (h nodeScoreHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *nodeScoreHeap) Push(x interface{}) {
+	*h = append(*h, x.(framework.NodeScore))
+}
+
+func (h *nodeScoreHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
 }
 
 // numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
@@ -392,7 +506,8 @@ func findNodesThatPassExtenders(extenders []framework.Extender, pod *v1.Pod, fea
 // which return a score for each node from the call to RunScorePlugins().
 // The scores from each plugin are added together to make the score for that node, then
 // any extenders are run as well.
-// All scores are finally combined (added) to get the total weighted scores of all nodes
+// All scores are finally combined (added) to get the total weighted scores of all nodes.
+// And it also returns PluginToNodeScores which contains the result from each plugin and extender.
 func prioritizeNodes(
 	ctx context.Context,
 	extenders []framework.Extender,
@@ -400,7 +515,7 @@ func prioritizeNodes(
 	state *framework.CycleState,
 	pod *v1.Pod,
 	nodes []*v1.Node,
-) (framework.NodeScoreList, error) {
+) (framework.NodeScoreList, framework.PluginToNodeScores, error) {
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(extenders) == 0 && !fwk.HasScorePlugins() {
@@ -411,19 +526,19 @@ func prioritizeNodes(
 				Score: 1,
 			})
 		}
-		return result, nil
+		return result, nil, nil
 	}
 
 	// Run PreScore plugins.
 	preScoreStatus := fwk.RunPreScorePlugins(ctx, state, pod, nodes)
 	if !preScoreStatus.IsSuccess() {
-		return nil, preScoreStatus.AsError()
+		return nil, nil, preScoreStatus.AsError()
 	}
 
 	// Run the Score plugins.
 	scoresMap, scoreStatus := fwk.RunScorePlugins(ctx, state, pod, nodes)
 	if !scoreStatus.IsSuccess() {
-		return nil, scoreStatus.AsError()
+		return nil, nil, scoreStatus.AsError()
 	}
 
 	// Additional details logged at level 10 if enabled.
@@ -436,20 +551,16 @@ func prioritizeNodes(
 		}
 	}
 
-	// Summarize all scores.
-	result := make(framework.NodeScoreList, 0, len(nodes))
-
-	for i := range nodes {
-		result = append(result, framework.NodeScore{Name: nodes[i].Name, Score: 0})
-		for j := range scoresMap {
-			result[i].Score += scoresMap[j][i].Score
-		}
-	}
-
 	if len(extenders) != 0 && nodes != nil {
+		// extenderPrefix is used to avoid name collision
+		// if there is an extender with the same name as the plugin's name.
+		const extenderPrefix = "extenders/"
 		var mu sync.Mutex
 		var wg sync.WaitGroup
-		combinedScores := make(map[string]int64, len(nodes))
+		for _, ex := range extenders {
+			scoresMap[extenderPrefix+ex.Name()] = make(framework.NodeScoreList, len(nodes))
+		}
+
 		for i := range extenders {
 			if !extenders[i].IsInterested(pod) {
 				continue
@@ -461,28 +572,41 @@ func prioritizeNodes(
 					metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
 					wg.Done()
 				}()
+				nodeScoreList := scoresMap[extenderPrefix+extenders[extIndex].Name()]
 				prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
 				if err != nil {
 					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
 					return
 				}
-				mu.Lock()
 				for i := range *prioritizedList {
-					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+					score := (*prioritizedList)[i].Score
 					if klogV.Enabled() {
-						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
+						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", nodeScoreList[i].Name, "score", nodeScoreList[i].Score)
 					}
-					combinedScores[host] += score * weight
+					mu.Lock()
+					nodeScoreList[i].Name = (*prioritizedList)[i].Host
+					// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
+					// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
+					nodeScoreList[i].Score = score * weight * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
+					mu.Unlock()
 				}
-				mu.Unlock()
 			}(i)
 		}
 		// wait for all go routines to finish
 		wg.Wait()
-		for i := range result {
-			// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
-			// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
-			result[i].Score += combinedScores[result[i].Name] * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
+	}
+
+	// Summarize all scores.
+	result := make(framework.NodeScoreList, 0, len(nodes))
+	indexMap := map[string]int{}
+	for i := range nodes {
+		result = append(result, framework.NodeScore{Name: nodes[i].Name, Score: 0})
+		indexMap[nodes[i].Name] = len(result) - 1
+	}
+
+	for j := range scoresMap {
+		for _, s := range scoresMap[j] {
+			result[indexMap[s.Name]].Score += s.Score
 		}
 	}
 
@@ -491,7 +615,7 @@ func prioritizeNodes(
 			klogV.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
 		}
 	}
-	return result, nil
+	return result, scoresMap, nil
 }
 
 // NewGenericScheduler creates a genericScheduler object.

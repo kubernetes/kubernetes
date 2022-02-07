@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"container/heap"
 	"context"
 	"errors"
 	"fmt"
@@ -25,6 +26,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -204,42 +207,134 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 func TestSelectHost(t *testing.T) {
 	scheduler := genericScheduler{}
 	tests := []struct {
-		name          string
-		list          framework.NodeScoreList
-		possibleHosts sets.String
-		expectsErr    bool
+		name                            string
+		list                            framework.NodeScoreList
+		numberOfNodeScoresToReturn      int
+		possibleHosts                   sets.String
+		returnedNodeScoreListAssertFunc func(got []NodeScoreResult) bool
+		expectsErr                      bool
 	}{
 		{
 			name: "unique properly ordered scores",
 			list: []framework.NodeScore{
-				{Name: "machine1.1", Score: 1},
-				{Name: "machine2.1", Score: 2},
+				{Name: "machine1", Score: 1},
+				{Name: "machine2", Score: 2},
 			},
-			possibleHosts: sets.NewString("machine2.1"),
-			expectsErr:    false,
+			numberOfNodeScoresToReturn: 2,
+			possibleHosts:              sets.NewString("machine2"),
+			returnedNodeScoreListAssertFunc: func(got []NodeScoreResult) bool {
+				return reflect.DeepEqual(
+					[]NodeScoreResult{
+						{Name: "machine2", FinalScore: 2, Scores: map[string]int64{}},
+						{Name: "machine1", FinalScore: 1, Scores: map[string]int64{}},
+					}, got)
+			},
+			expectsErr: false,
+		},
+		{
+			name: "numberOfNodeScoresToReturn < len(list)",
+			list: []framework.NodeScore{
+				{Name: "machine1", Score: 1},
+				{Name: "machine2", Score: 2},
+			},
+			numberOfNodeScoresToReturn: 100,
+			possibleHosts:              sets.NewString("machine2"),
+			returnedNodeScoreListAssertFunc: func(got []NodeScoreResult) bool {
+				return reflect.DeepEqual(
+					[]NodeScoreResult{
+						{Name: "machine2", FinalScore: 2, Scores: map[string]int64{}},
+						{Name: "machine1", FinalScore: 1, Scores: map[string]int64{}},
+					}, got)
+			},
+			expectsErr: false,
 		},
 		{
 			name: "equal scores",
 			list: []framework.NodeScore{
-				{Name: "machine1.1", Score: 1},
-				{Name: "machine1.2", Score: 2},
-				{Name: "machine1.3", Score: 2},
 				{Name: "machine2.1", Score: 2},
+				{Name: "machine2.2", Score: 2},
+				{Name: "machine2.3", Score: 2},
 			},
-			possibleHosts: sets.NewString("machine1.2", "machine1.3", "machine2.1"),
-			expectsErr:    false,
+			numberOfNodeScoresToReturn: 2,
+			possibleHosts:              sets.NewString("machine2.1", "machine2.2", "machine2.3"),
+			returnedNodeScoreListAssertFunc: func(got []NodeScoreResult) bool {
+				for _, g := range got {
+					if !reflect.DeepEqual(g, NodeScoreResult{Name: "machine2.1", FinalScore: 2, Scores: map[string]int64{}}) &&
+						!reflect.DeepEqual(g, NodeScoreResult{Name: "machine2.2", FinalScore: 2, Scores: map[string]int64{}}) &&
+						!reflect.DeepEqual(g, NodeScoreResult{Name: "machine2.3", FinalScore: 2, Scores: map[string]int64{}}) {
+						return false
+					}
+				}
+				return true
+			},
+			expectsErr: false,
 		},
 		{
 			name: "out of order scores",
 			list: []framework.NodeScore{
-				{Name: "machine1.1", Score: 3},
-				{Name: "machine1.2", Score: 3},
+				{Name: "machine3.1", Score: 3},
 				{Name: "machine2.1", Score: 2},
-				{Name: "machine3.1", Score: 1},
-				{Name: "machine1.3", Score: 3},
+				{Name: "machine1.1", Score: 1},
+				{Name: "machine3.2", Score: 3},
 			},
-			possibleHosts: sets.NewString("machine1.1", "machine1.2", "machine1.3"),
-			expectsErr:    false,
+			numberOfNodeScoresToReturn: 3,
+			possibleHosts:              sets.NewString("machine3.1", "machine3.2"),
+			returnedNodeScoreListAssertFunc: func(got []NodeScoreResult) bool {
+				validScoreLists := [][]NodeScoreResult{
+					{
+						{Name: "machine3.1", FinalScore: 3, Scores: map[string]int64{}},
+						{Name: "machine3.2", FinalScore: 3, Scores: map[string]int64{}},
+						{Name: "machine2.1", FinalScore: 2, Scores: map[string]int64{}},
+					},
+					{
+						{Name: "machine3.2", FinalScore: 3, Scores: map[string]int64{}},
+						{Name: "machine3.1", FinalScore: 3, Scores: map[string]int64{}},
+						{Name: "machine2.1", FinalScore: 2, Scores: map[string]int64{}},
+					},
+				}
+
+				for _, v := range validScoreLists {
+					if reflect.DeepEqual(v, got) {
+						return true
+					}
+				}
+				return false
+			},
+			expectsErr: false,
+		},
+		{
+			name: "out of order huge score list",
+			list: []framework.NodeScore{
+				{Name: "machine1", Score: 1},
+				{Name: "machine0", Score: 0},
+				{Name: "machine2", Score: 2},
+				{Name: "machine9", Score: 9},
+				{Name: "machine5", Score: 5},
+				{Name: "machine8", Score: 8},
+				{Name: "machine6", Score: 6},
+				{Name: "machine3", Score: 3},
+				{Name: "machine7", Score: 7},
+				{Name: "machine4", Score: 4},
+			},
+			numberOfNodeScoresToReturn: 10,
+			possibleHosts:              sets.NewString("machine9"),
+			returnedNodeScoreListAssertFunc: func(got []NodeScoreResult) bool {
+				return reflect.DeepEqual(
+					[]NodeScoreResult{
+						{Name: "machine9", FinalScore: 9, Scores: map[string]int64{}},
+						{Name: "machine8", FinalScore: 8, Scores: map[string]int64{}},
+						{Name: "machine7", FinalScore: 7, Scores: map[string]int64{}},
+						{Name: "machine6", FinalScore: 6, Scores: map[string]int64{}},
+						{Name: "machine5", FinalScore: 5, Scores: map[string]int64{}},
+						{Name: "machine4", FinalScore: 4, Scores: map[string]int64{}},
+						{Name: "machine3", FinalScore: 3, Scores: map[string]int64{}},
+						{Name: "machine2", FinalScore: 2, Scores: map[string]int64{}},
+						{Name: "machine1", FinalScore: 1, Scores: map[string]int64{}},
+						{Name: "machine0", FinalScore: 0, Scores: map[string]int64{}},
+					}, got)
+			},
+
+			expectsErr: false,
 		},
 		{
 			name:          "empty priority list",
@@ -253,7 +348,7 @@ func TestSelectHost(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// increase the randomness
 			for i := 0; i < 10; i++ {
-				got, err := scheduler.selectHost(test.list)
+				got, scoreList, err := scheduler.selectHost(test.list, test.numberOfNodeScoresToReturn)
 				if test.expectsErr {
 					if err == nil {
 						t.Error("Unexpected non-error")
@@ -265,9 +360,97 @@ func TestSelectHost(t *testing.T) {
 					if !test.possibleHosts.Has(got) {
 						t.Errorf("got %s is not in the possible map %v", got, test.possibleHosts)
 					}
+					if got != scoreList[0].Name {
+						t.Errorf("The head of list should be the selected Node's score: got: %v, expected: %v", scoreList[0], got)
+					}
+					if !test.returnedNodeScoreListAssertFunc(scoreList) {
+						t.Errorf("Unexpected scoreList: %v", scoreList)
+					}
 				}
 			}
 		})
+	}
+}
+
+func TestNodeScoreResultAddScores(t *testing.T) {
+	r := NodeScoreResult{
+		Name:       "Node1",
+		FinalScore: 10,
+		Scores:     map[string]int64{},
+	}
+
+	scoreMap := framework.PluginToNodeScores{
+		"plugin1": []framework.NodeScore{
+			{
+				Name:  "Node1",
+				Score: 2,
+			},
+			{
+				Name:  "Node2",
+				Score: 1,
+			},
+		},
+		"plugin2": []framework.NodeScore{
+			{
+				Name:  "Node1",
+				Score: 4,
+			},
+			{
+				Name:  "Node2",
+				Score: 1,
+			},
+		},
+	}
+
+	r.AddScores(scoreMap)
+
+	expected := NodeScoreResult{
+		Name:       "Node1",
+		FinalScore: 10,
+		Scores: map[string]int64{
+			"plugin1": 2,
+			"plugin2": 4,
+		},
+	}
+
+	if !reflect.DeepEqual(r, expected) {
+		t.Errorf("got unexpected result: got %v expected %v", r, expected)
+	}
+}
+
+func TestNodeScoreHeap(t *testing.T) {
+	var h nodeScoreHeap = []framework.NodeScore{
+		{Name: "machine1", Score: 1},
+		{Name: "machine0", Score: 0},
+		{Name: "machine2", Score: 2},
+		{Name: "machine9", Score: 9},
+		{Name: "machine5", Score: 5},
+		{Name: "machine8", Score: 8},
+		{Name: "machine6", Score: 6},
+		{Name: "machine3", Score: 3},
+		{Name: "machine7", Score: 7},
+		{Name: "machine4", Score: 4},
+	}
+	heap.Init(&h)
+
+	sorted := []framework.NodeScore{
+		{Name: "machine9", Score: 9},
+		{Name: "machine8", Score: 8},
+		{Name: "machine7", Score: 7},
+		{Name: "machine6", Score: 6},
+		{Name: "machine5", Score: 5},
+		{Name: "machine4", Score: 4},
+		{Name: "machine3", Score: 3},
+		{Name: "machine2", Score: 2},
+		{Name: "machine1", Score: 1},
+		{Name: "machine0", Score: 0},
+	}
+
+	for i := 0; h.Len() != 0; i++ {
+		ns := heap.Pop(&h).(framework.NodeScore)
+		if !reflect.DeepEqual(sorted[i], ns) {
+			t.Errorf("Unexpected NodeScoreResult: index: %v expected: %v got: %v", i, sorted[i], ns)
+		}
 	}
 }
 
@@ -446,14 +629,15 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 func TestGenericScheduler(t *testing.T) {
 	fts := feature.Features{}
 	tests := []struct {
-		name            string
-		registerPlugins []st.RegisterPluginFunc
-		nodes           []string
-		pvcs            []v1.PersistentVolumeClaim
-		pod             *v1.Pod
-		pods            []*v1.Pod
-		expectedHosts   sets.String
-		wErr            error
+		name                    string
+		registerPlugins         []st.RegisterPluginFunc
+		nodes                   []string
+		pvcs                    []v1.PersistentVolumeClaim
+		pod                     *v1.Pod
+		pods                    []*v1.Pod
+		expectedHosts           sets.String
+		assertNodeScoreResultFn func(t *testing.T, got []NodeScoreResult)
+		wErr                    error
 	}{
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -485,8 +669,35 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"machine1", "machine2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
 			expectedHosts: sets.NewString("machine1", "machine2"),
-			name:          "test 2",
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				if !reflect.DeepEqual(got, []NodeScoreResult{
+					{
+						Name:       "machine2",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+					{
+						Name:       "machine1",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+				}) && !reflect.DeepEqual(got, []NodeScoreResult{
+					{
+						Name:       "machine1",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+					{
+						Name:       "machine2",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+				}) {
+					t.Errorf("unexpected NodeScoreResult: %v", got)
+				}
+			},
+			name: "test 2",
+			wErr: nil,
 		},
 		{
 			// Fits on a machine where the pod ID matches the machine name
@@ -498,8 +709,13 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"machine1", "machine2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
 			expectedHosts: sets.NewString("machine2"),
-			name:          "test 3",
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				if got != nil {
+					t.Errorf("NodeScoreResult is expected to be nil. got: %v", got)
+				}
+			},
+			name: "test 3",
+			wErr: nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -511,8 +727,36 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
 			expectedHosts: sets.NewString("3"),
-			name:          "test 4",
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				expected := []NodeScoreResult{
+					{
+						Name:       "3",
+						FinalScore: 3,
+						Scores: map[string]int64{
+							"NumericMap": 3,
+						},
+					},
+					{
+						Name:       "2",
+						FinalScore: 2,
+						Scores: map[string]int64{
+							"NumericMap": 2,
+						},
+					},
+					{
+						Name:       "1",
+						FinalScore: 1,
+						Scores: map[string]int64{
+							"NumericMap": 1,
+						},
+					},
+				}
+				if !reflect.DeepEqual(got, expected) {
+					t.Errorf("unexpected NodeScoreResult. got %v, expected: %v", got, expected)
+				}
+			},
+			name: "test 4",
+			wErr: nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -524,8 +768,13 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			expectedHosts: sets.NewString("2"),
-			name:          "test 5",
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				if got != nil {
+					t.Errorf("NodeScoreResult is expected to be nil. got: %v", got)
+				}
+			},
+			name: "test 5",
+			wErr: nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -538,8 +787,39 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"3", "2", "1"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			expectedHosts: sets.NewString("1"),
-			name:          "test 6",
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				expected := []NodeScoreResult{
+					{
+						Name:       "1",
+						FinalScore: 7,
+						Scores: map[string]int64{
+							"NumericMap":        1,
+							"ReverseNumericMap": 6,
+						},
+					},
+					{
+						Name:       "2",
+						FinalScore: 6,
+						Scores: map[string]int64{
+							"NumericMap":        2,
+							"ReverseNumericMap": 4,
+						},
+					},
+					{
+						Name:       "3",
+						FinalScore: 5,
+						Scores: map[string]int64{
+							"NumericMap":        3,
+							"ReverseNumericMap": 2,
+						},
+					},
+				}
+				if !reflect.DeepEqual(got, expected) {
+					t.Errorf("unexpected NodeScoreResult. got %v, expected: %v", got, expected)
+				}
+			},
+			name: "test 6",
+			wErr: nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -629,8 +909,35 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 			expectedHosts: sets.NewString("machine1", "machine2"),
-			name:          "existing PVC",
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				if !reflect.DeepEqual(got, []NodeScoreResult{
+					{
+						Name:       "machine2",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+					{
+						Name:       "machine1",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+				}) && !reflect.DeepEqual(got, []NodeScoreResult{
+					{
+						Name:       "machine1",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+					{
+						Name:       "machine2",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+				}) {
+					t.Errorf("unexpected NodeScoreResult: %v", got)
+				}
+			},
+			name: "existing PVC",
+			wErr: nil,
 		},
 		{
 			// Pod with non existing PVC
@@ -789,7 +1096,12 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 			expectedHosts: sets.NewString("machine2"),
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				if got != nil {
+					t.Errorf("NodeScoreResult is expected to be nil. got: %v", got)
+				}
+			},
+			wErr: nil,
 		},
 		{
 			name: "test podtopologyspread plugin - 3 nodes with maxskew=2",
@@ -854,7 +1166,34 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 			expectedHosts: sets.NewString("machine2", "machine3"),
-			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				if !reflect.DeepEqual(got, []NodeScoreResult{
+					{
+						Name:       "machine3",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+					{
+						Name:       "machine2",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+				}) && !reflect.DeepEqual(got, []NodeScoreResult{
+					{
+						Name:       "machine2",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+					{
+						Name:       "machine3",
+						FinalScore: 1,
+						Scores:     map[string]int64{},
+					},
+				}) {
+					t.Errorf("unexpected NodeScoreResult: %v", got)
+				}
+			},
+			wErr: nil,
 		},
 		{
 			name: "test with filter plugin returning Unschedulable status",
@@ -921,6 +1260,11 @@ func TestGenericScheduler(t *testing.T) {
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 			expectedHosts: nil,
 			wErr:          nil,
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				if got != nil {
+					t.Errorf("NodeScoreResult is expected to be nil. got: %v", got)
+				}
+			},
 		},
 		{
 			name: "test prefilter plugin returning Unschedulable status",
@@ -961,6 +1305,52 @@ func TestGenericScheduler(t *testing.T) {
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 			expectedHosts: nil,
 			wErr:          fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
+		},
+		{
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:         []string{"4", "3", "2", "1"},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			expectedHosts: sets.NewString("1"),
+			assertNodeScoreResultFn: func(t *testing.T, got []NodeScoreResult) {
+				expected := []NodeScoreResult{
+					{
+						Name:       "1",
+						FinalScore: 9,
+						Scores: map[string]int64{
+							"NumericMap":        1,
+							"ReverseNumericMap": 8,
+						},
+					},
+					{
+						Name:       "2",
+						FinalScore: 8,
+						Scores: map[string]int64{
+							"NumericMap":        2,
+							"ReverseNumericMap": 6,
+						},
+					},
+					{
+						Name:       "3",
+						FinalScore: 7,
+						Scores: map[string]int64{
+							"NumericMap":        3,
+							"ReverseNumericMap": 4,
+						},
+					},
+					// NodeScoreResult shouldn't have the score of Node "4"
+				}
+				if !reflect.DeepEqual(got, expected) {
+					t.Errorf("unexpected NodeScoreResult. got %v, expected: %v", got, expected)
+				}
+			},
+			name: "NodeScoreList contains only top 3 Nodes",
+			wErr: nil,
 		},
 	}
 	for _, test := range tests {
@@ -1021,6 +1411,9 @@ func TestGenericScheduler(t *testing.T) {
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
 				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
+			}
+			if test.assertNodeScoreResultFn != nil {
+				test.assertNodeScoreResultFn(t, result.NodeScoreList)
 			}
 			if test.wErr == nil && len(test.nodes) != result.EvaluatedNodes {
 				t.Errorf("Expected EvaluatedNodes: %d, got: %d", len(test.nodes), result.EvaluatedNodes)
@@ -1209,6 +1602,131 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 	}
 }
 
+// Test_prioritizeNodesPluginToNodeScores is to check
+// if prioritizeNodes returns expected PluginToNodeScores.
+func Test_prioritizeNodesPluginToNodeScores(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name                   string
+		pod                    *v1.Pod
+		pods                   []*v1.Pod
+		nodes                  []*v1.Node
+		extenders              []st.FakeExtender
+		wantPluginToNodeScores framework.PluginToNodeScores
+	}{
+		{
+			name:  "the score from extender should also be recorded in PluginToNodeScores",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			extenders: []st.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   3,
+							Function: st.Node1PrioritizerExtender,
+						},
+					},
+				},
+				{
+					ExtenderName: "FakeExtender2",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   2,
+							Function: st.Node2PrioritizerExtender,
+						},
+					},
+				},
+			},
+			wantPluginToNodeScores: framework.PluginToNodeScores{
+				"NodeResourcesBalancedAllocation": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 100,
+					},
+					{
+						Name:  "node2",
+						Score: 100,
+					},
+				},
+				"extenders/FakeExtender1": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 300,
+					},
+					{
+						Name:  "node2",
+						Score: 30,
+					},
+				},
+				"extenders/FakeExtender2": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 20,
+					},
+					{
+						Name:  "node2",
+						Score: 200,
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
+			fts := feature.Features{}
+			pluginRegistrations := []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(fts, noderesources.NewBalancedAllocation), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			fwk, err := st.NewFramework(
+				pluginRegistrations, "",
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+			)
+			if err != nil {
+				t.Fatalf("error creating framework: %+v", err)
+			}
+
+			scheduler := NewGenericScheduler(
+				nil,
+				emptySnapshot,
+				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+			scheduler.nodeInfoSnapshot = snapshot
+
+			ctx := context.Background()
+			state := framework.NewCycleState()
+			_, _, err = scheduler.findNodesThatFitPod(ctx, nil, fwk, state, test.pod)
+			if err != nil {
+				t.Fatalf("error filtering nodes: %+v", err)
+			}
+			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
+			var extenders []framework.Extender
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
+			}
+			_, scoreMap, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			assert.Equal(t, test.wantPluginToNodeScores, scoreMap)
+		})
+	}
+}
+
 // The point of this test is to show that you:
 // - get the same priority for a zero-request pod as for a pod with the defaults requests,
 //   both when the zero-request pod is already on the machine and when the zero-request pod
@@ -1341,7 +1859,7 @@ func TestZeroRequest(t *testing.T) {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
 			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
-			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, test.nodes)
+			list, _, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
