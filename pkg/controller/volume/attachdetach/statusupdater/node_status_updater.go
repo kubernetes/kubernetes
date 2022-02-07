@@ -57,10 +57,15 @@ type nodeStatusUpdater struct {
 }
 
 func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
+	var abort bool
 	// TODO: investigate right behavior if nodeName is empty
 	// kubernetes/kubernetes/issues/37777
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
+		if abort {
+			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+			continue
+		}
 		nodeObj, err := nsu.nodeLister.Get(string(nodeName))
 		if errors.IsNotFound(err) {
 			// If node does not exist, its status cannot be updated.
@@ -79,6 +84,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		}
 
 		if err := nsu.updateNodeStatus(nodeName, nodeObj, attachedVolumes); err != nil {
+			abort = true
 			// If update node status fails, reset flag statusUpdateNeeded back to true
 			// to indicate this node status needs to be updated again
 			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
@@ -88,8 +94,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 				nodeName,
 				err)
 
-			// We currently always return immediately on error
-			return err
+			continue
 		}
 	}
 	return nil
