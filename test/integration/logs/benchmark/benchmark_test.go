@@ -175,6 +175,7 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		generateOutput(b, config, nil, out)
 	})
 	b.Run("JSON", func(b *testing.B) {
+		options := logs.NewOptions()
 		var logger logr.Logger
 		var flush func()
 		var out1, out2 *os.File
@@ -193,15 +194,14 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		}
 		b.Run("single-stream", func(b *testing.B) {
 			if discard {
-				logger, flush = logsjson.NewJSONLogger(logsjson.AddNopSync(&output), nil, nil)
+				logger, flush = logsjson.NewJSONLogger(options.Config.Verbosity, logsjson.AddNopSync(&output), nil, nil)
 			} else {
 				stderr := os.Stderr
 				os.Stderr = out1
 				defer func() {
 					os.Stderr = stderr
 				}()
-				options := logs.NewOptions()
-				logger, flush = logsjson.Factory{}.Create(options.Config.Options)
+				logger, flush = logsjson.Factory{}.Create(options.Config)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
@@ -210,7 +210,7 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 
 		b.Run("split-stream", func(b *testing.B) {
 			if discard {
-				logger, flush = logsjson.NewJSONLogger(logsjson.AddNopSync(&output), logsjson.AddNopSync(&output), nil)
+				logger, flush = logsjson.NewJSONLogger(options.Config.Verbosity, logsjson.AddNopSync(&output), logsjson.AddNopSync(&output), nil)
 			} else {
 				stdout, stderr := os.Stdout, os.Stderr
 				os.Stdout, os.Stderr = out1, out2
@@ -219,7 +219,7 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 				}()
 				options := logs.NewOptions()
 				options.Config.Options.JSON.SplitStream = true
-				logger, flush = logsjson.Factory{}.Create(options.Config.Options)
+				logger, flush = logsjson.Factory{}.Create(options.Config)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()

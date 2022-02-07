@@ -80,8 +80,11 @@ func (o *Options) apply() {
 	if factory == nil {
 		klog.ClearLogger()
 	} else {
-		log, flush := factory.Create(o.Config.Options)
-		klog.SetLoggerWithOptions(log, klog.FlushLogger(flush))
+		// This logger will do its own verbosity checking, using the exact same
+		// configuration as klog itself.
+		log, flush := factory.Create(o.Config)
+		// Therefore it can get called directly.
+		klog.SetLoggerWithOptions(log, klog.ContextualLogger(true), klog.FlushLogger(flush))
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(o.Config.Verbosity.String()); err != nil {
 		panic(fmt.Errorf("internal error while setting klog verbosity: %v", err))

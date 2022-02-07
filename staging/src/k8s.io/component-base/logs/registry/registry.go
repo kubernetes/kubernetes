@@ -41,7 +41,7 @@ type LogFormatFactory interface {
 	// Returning a flush function for the logger is optional.
 	// If provided, the caller must ensure that it is called
 	// periodically (if desired) and at program exit.
-	Create(options config.FormatOptions) (log logr.Logger, flush func())
+	Create(c config.LoggingConfiguration) (log logr.Logger, flush func())
 }
 
 // NewLogFormatRegistry return new init LogFormatRegistry struct
