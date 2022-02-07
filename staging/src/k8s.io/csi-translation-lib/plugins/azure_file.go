@@ -129,9 +129,21 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 			resourceGroup = v
 		}
 	}
-	namespace := defaultSecretNamespace
+
+	// Secret is required when mounting a volume but pod presence cannot be assumed - we should not try to read pod now.
+	namespace := ""
+	// Try to read SecretNamespace from source pv.
 	if azureSource.SecretNamespace != nil {
 		namespace = *azureSource.SecretNamespace
+	} else {
+		// Try to read namespace from ClaimRef which should be always present.
+		if pv.Spec.ClaimRef != nil {
+			namespace = pv.Spec.ClaimRef.Namespace
+		}
+	}
+
+	if len(namespace) == 0 {
+		return nil, fmt.Errorf("could not find a secret namespace in PersistentVolumeSource or ClaimRef")
 	}
 
 	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, pv.ObjectMeta.Name, namespace)
