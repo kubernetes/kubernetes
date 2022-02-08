@@ -247,6 +247,10 @@ message HorizontalPodAutoscalerSpec {
   // If not set, the default HPAScalingRules for scale up and scale down are used.
   // +optional
   optional HorizontalPodAutoscalerBehavior behavior = 5;
+
+  // UpdatePolicy describes how changes are applied to the cluster.
+  // If not specified, all values are set to default
+  optional HorizontalPodAutoscalerUpdatePolicy updatePolicy = 6;
 }
 
 // HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
@@ -282,6 +286,14 @@ message HorizontalPodAutoscalerStatus {
   // +listMapKey=type
   // +optional
   repeated HorizontalPodAutoscalerCondition conditions = 6;
+}
+
+// UpdatePolicy describes the rules on how changes are applied to the cluster.
+message HorizontalPodAutoscalerUpdatePolicy {
+  // Controls when autoscaler applies changes to the cluster.
+  // The default is 'Auto'.
+  // +optional
+  optional string updateMode = 1;
 }
 
 // MetricIdentifier defines the name and optionally selector for a metric

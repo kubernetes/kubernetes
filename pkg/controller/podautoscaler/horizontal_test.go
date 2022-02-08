@@ -109,6 +109,7 @@ type testCase struct {
 	initialReplicas int32
 	scaleUpRules    *autoscalingv2.HPAScalingRules
 	scaleDownRules  *autoscalingv2.HPAScalingRules
+	updateMode      *autoscalingv2.UpdateMode
 
 	// CPU target utilization as a percentage of the requested resources.
 	CPUTarget                    int32
@@ -205,6 +206,12 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				ScaleDown: tc.scaleDownRules,
 			}
 		}
+
+		var updatePolicy *autoscalingv2.HorizontalPodAutoscalerUpdatePolicy
+
+		if tc.updateMode != nil {
+			updatePolicy = &autoscalingv2.HorizontalPodAutoscalerUpdatePolicy{UpdateMode: tc.updateMode}
+		}
 		hpa := autoscalingv2.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      hpaName,
@@ -216,9 +223,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					Name:       tc.resource.name,
 					APIVersion: tc.resource.apiVersion,
 				},
-				MinReplicas: &tc.minReplicas,
-				MaxReplicas: tc.maxReplicas,
-				Behavior:    behavior,
+				MinReplicas:  &tc.minReplicas,
+				MaxReplicas:  tc.maxReplicas,
+				Behavior:     behavior,
+				UpdatePolicy: updatePolicy,
 			},
 			Status: autoscalingv2.HorizontalPodAutoscalerStatus{
 				CurrentReplicas: tc.specReplicas,
@@ -361,6 +369,13 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			defer tc.Unlock()
 
 			obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+			if tc.updateMode != nil && *tc.updateMode == autoscalingv2.UpdateModeOff {
+				fmt.Println(tc.expectedDesiredReplicas)
+				fmt.Println(obj.Status.CurrentReplicas)
+				assert.NotEqual(t, tc.expectedDesiredReplicas, obj.Status.CurrentReplicas, "the current replica count reported in the object status should be not equal to desired replica count")
+				return true, obj, nil
+
+			}
 			assert.Equal(t, namespace, obj.Namespace, "the HPA namespace should be as expected")
 			assert.Equal(t, hpaName, obj.Name, "the HPA name should be as expected")
 			assert.Equal(t, tc.expectedDesiredReplicas, obj.Status.DesiredReplicas, "the desired replica count reported in the object status should be as expected")
@@ -666,6 +681,11 @@ func (tc *testCase) verifyResults(t *testing.T) {
 	tc.Lock()
 	defer tc.Unlock()
 
+	if tc.updateMode != nil && *tc.updateMode == autoscalingv2.UpdateModeOff {
+		assert.Equal(t, tc.specReplicas == tc.expectedDesiredReplicas, tc.scaleUpdated, "In dry run mode scaleUpdated is false and spec replicas should not equal desired replicas")
+		return
+
+	}
 	assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.scaleUpdated, "the scale should only be updated if we expected a change in replicas")
 	assert.True(t, tc.statusUpdated, "the status should have been updated")
 	if tc.verifyEvents {
@@ -798,6 +818,40 @@ func TestScaleUp(t *testing.T) {
 		reportedLevels:          []uint64{300, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
+	}
+	tc.runTest(t)
+}
+
+func TestUpdateModeAuto(t *testing.T) {
+	updateMode := autoscalingv2.UpdateModeAuto
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               30,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		updateMode:              &updateMode,
+	}
+	tc.runTest(t)
+}
+
+func TestUpdateModeOff(t *testing.T) {
+	updateMode := autoscalingv2.UpdateModeOff
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               30,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		updateMode:              &updateMode,
 	}
 	tc.runTest(t)
 }

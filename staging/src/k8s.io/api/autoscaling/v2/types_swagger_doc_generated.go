@@ -153,6 +153,7 @@ var map_HorizontalPodAutoscalerSpec = map[string]string{
 	"maxReplicas":    "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
 	"metrics":        "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the default metric will be set to 80% average CPU utilization.",
 	"behavior":       "behavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively). If not set, the default HPAScalingRules for scale up and scale down are used.",
+	"updatePolicy":   "UpdatePolicy describes how changes are applied to the cluster. If not specified, all values are set to default",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
@@ -171,6 +172,15 @@ var map_HorizontalPodAutoscalerStatus = map[string]string{
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
 	return map_HorizontalPodAutoscalerStatus
+}
+
+var map_HorizontalPodAutoscalerUpdatePolicy = map[string]string{
+	"":           "UpdatePolicy describes the rules on how changes are applied to the cluster.",
+	"updateMode": "Controls when autoscaler applies changes to the cluster. The default is 'Auto'.",
+}
+
+func (HorizontalPodAutoscalerUpdatePolicy) SwaggerDoc() map[string]string {
+	return map_HorizontalPodAutoscalerUpdatePolicy
 }
 
 var map_MetricIdentifier = map[string]string{

@@ -81,7 +81,31 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" protobuf:"bytes,5,opt,name=behavior"`
+
+	// UpdatePolicy describes how changes are applied to the cluster.
+	// If not specified, all values are set to default
+	UpdatePolicy *HorizontalPodAutoscalerUpdatePolicy `json:"updatePolicy,omitempty" protobuf:"bytes,6,opt,name=updatePolicy"`
 }
+
+// UpdatePolicy describes the rules on how changes are applied to the cluster.
+type HorizontalPodAutoscalerUpdatePolicy struct {
+	// Controls when autoscaler applies changes to the cluster.
+	// The default is 'Auto'.
+	// +optional
+	UpdateMode *UpdateMode `json:"updateMode,omitempty" protobuf:"bytes,1,opt,name=updateMode"`
+}
+
+// UpdateMode controls when autoscaler applies changes to the cluster.
+type UpdateMode string
+
+const (
+	// UpdateModeOff means that autoscaler never cretes/deletes pods.
+	// The HorizontalPodAutoscalerStatus.DesiredReplicas field is still populated.
+	// This can be used for a "dry run"
+	UpdateModeOff UpdateMode = "Off"
+	// UpdateModeAuto means that autoscaler creates/deletes pods based on the sclaing decision
+	UpdateModeAuto UpdateMode = "Auto"
+)
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {

@@ -672,6 +672,10 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		}
 		rescale = desiredReplicas != currentReplicas
 	}
+	if hpa.Spec.UpdatePolicy != nil &&
+		*hpa.Spec.UpdatePolicy.UpdateMode == autoscalingv2.UpdateModeOff {
+		rescale = false
+	}
 
 	if rescale {
 		scale.Spec.Replicas = desiredReplicas

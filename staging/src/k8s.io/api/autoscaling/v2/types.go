@@ -9,7 +9,7 @@ You may obtain a copy of the License at
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.ß
 See the License for the specific language governing permissions and
 limitations under the License.
 */
@@ -79,7 +79,31 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" protobuf:"bytes,5,opt,name=behavior"`
+
+	// UpdatePolicy describes how changes are applied to the cluster.
+	// If not specified, all values are set to default
+	UpdatePolicy *HorizontalPodAutoscalerUpdatePolicy `json:"updatePolicy,omitempty" protobuf:"bytes,6,opt,name=updatePolicy"`
 }
+
+// UpdatePolicy describes the rules on how changes are applied to the cluster.
+type HorizontalPodAutoscalerUpdatePolicy struct {
+	// Controls when autoscaler applies changes to the cluster.
+	// The default is 'Auto'.
+	// +optional
+	UpdateMode *UpdateMode `json:"updateMode,omitempty" protobuf:"bytes,1,opt,name=updateMode"`
+}
+
+// UpdateMode controls when autoscaler applies changes to the cluster.
+type UpdateMode string
+
+const (
+	// UpdateModeOff means that autoscaler never cretes/deletes pods.
+	// The HorizontalPodAutoscalerStatus.DesiredReplicas field is still populated.
+	// This can be used for a "dry run"
+	UpdateModeOff UpdateMode = "Off"
+	// UpdateModeAuto means that autoscaler creates/deletes pods based on the sclaing decision
+	UpdateModeAuto UpdateMode = "Auto"
+)
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
