@@ -35,6 +35,7 @@ func TestValidationExpressions(t *testing.T) {
 		name       string
 		schema     *schema.Structural
 		obj        map[string]interface{}
+		oldObj     map[string]interface{}
 		valid      []string
 		errors     map[string]string // rule -> string that error message must contain
 		costBudget int64
@@ -1692,6 +1693,21 @@ func TestValidationExpressions(t *testing.T) {
 				"isURL('../relative-path') == false",
 			},
 		},
+		{name: "transition rules",
+			obj: map[string]interface{}{
+				"v": "new",
+			},
+			oldObj: map[string]interface{}{
+				"v": "old",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"v": stringType,
+			}),
+			valid: []string{
+				"oldSelf.v != self.v",
+				"oldSelf.v == 'old' && self.v == 'new'",
+			},
+		},
 	}
 
 	for i := range tests {
@@ -1710,13 +1726,13 @@ func TestValidationExpressions(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
 					}
 
 					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, 0)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, 0)
 					var found bool
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
@@ -1736,7 +1752,7 @@ func TestValidationExpressions(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
@@ -1755,7 +1771,7 @@ func TestValidationExpressions(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					if len(errs) == 0 {
 						t.Error("expected validation errors but got none")
 					}
@@ -1766,7 +1782,7 @@ func TestValidationExpressions(t *testing.T) {
 					}
 
 					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, 0)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, 0)
 					var found bool
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
@@ -1815,7 +1831,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
-			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 			for _, err := range errs {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1824,7 +1840,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			found := false
 			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 			cancel()
-			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 			for _, err := range errs {
 				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
 					found = true
@@ -1869,7 +1885,7 @@ func BenchmarkCELValidationWithContext(b *testing.B) {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
-				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Fatalf("validation failed: %v", err)
 				}
@@ -1911,7 +1927,7 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 				cancel()
-				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 				//found := false
 				//for _, err := range errs {
 				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {

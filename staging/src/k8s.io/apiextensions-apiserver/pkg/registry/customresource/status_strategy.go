@@ -85,15 +85,21 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 	var errs field.ErrorList
 	errs = append(errs, a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, obj, old, a.scale)...)
 
-	// validate embedded resources
-	if u, ok := obj.(*unstructured.Unstructured); ok {
-		v := obj.GetObjectKind().GroupVersionKind().Version
+	uNew, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return errs
+	}
+	uOld, ok := old.(*unstructured.Unstructured)
+	if !ok {
+		return errs
+	}
 
-		// validate x-kubernetes-validations rules
-		if celValidator, ok := a.customResourceStrategy.celValidators[v]; ok {
-			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchemas[v], u.Object, cel.RuntimeCELCostBudget)
-			errs = append(errs, err...)
-		}
+	v := obj.GetObjectKind().GroupVersionKind().Version
+
+	// validate x-kubernetes-validations rules
+	if celValidator, ok := a.customResourceStrategy.celValidators[v]; ok {
+		err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchemas[v], uNew.Object, uOld.Object, cel.RuntimeCELCostBudget)
+		errs = append(errs, err...)
 	}
 	return errs
 }
