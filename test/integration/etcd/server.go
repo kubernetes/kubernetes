@@ -136,7 +136,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 
 	stopCh := make(chan struct{})
 
-	kubeAPIServer, err := app.CreateServerChain(completedOptions)
+	kubeAPIServer, err := app.CreateServerChain(completedOptions, stopCh)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,6 +151,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
 
 	kubeClient := clientset.NewForConfigOrDie(kubeClientConfig)
+
 	go func() {
 		// Catch panics that occur in this go routine so we get a comprehensible failure
 		defer func() {
@@ -163,8 +164,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		if err != nil {
 			t.Error(err)
 		}
-		ctx := context.TODO()
-		if err := prepared.Run(ctx); err != nil {
+		if err := prepared.Run(stopCh); err != nil {
 			t.Error(err)
 		}
 	}()

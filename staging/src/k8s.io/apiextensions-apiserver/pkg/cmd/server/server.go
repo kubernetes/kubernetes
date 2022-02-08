@@ -25,7 +25,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
-func NewServerCommand(out, errOut io.Writer) *cobra.Command {
+func NewServerCommand(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
 	o := options.NewCustomResourceDefinitionsServerOptions(out, errOut)
 
 	cmd := &cobra.Command{
@@ -38,7 +38,7 @@ func NewServerCommand(out, errOut io.Writer) *cobra.Command {
 			if err := o.Validate(); err != nil {
 				return err
 			}
-			if err := Run(o); err != nil {
+			if err := Run(o, stopCh); err != nil {
 				return err
 			}
 			return nil
@@ -50,7 +50,7 @@ func NewServerCommand(out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func Run(o *options.CustomResourceDefinitionsServerOptions) error {
+func Run(o *options.CustomResourceDefinitionsServerOptions, stopCh <-chan struct{}) error {
 	config, err := o.Config()
 	if err != nil {
 		return err
@@ -60,6 +60,5 @@ func Run(o *options.CustomResourceDefinitionsServerOptions) error {
 	if err != nil {
 		return err
 	}
-	ctx := genericapiserver.SetupSignalContext()
-	return server.GenericAPIServer.PrepareRun().Run(ctx)
+	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }

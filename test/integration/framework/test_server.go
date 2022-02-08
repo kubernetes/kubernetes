@@ -147,10 +147,8 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	go func() {
-		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(ctx); err != nil {
+		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
 			t.Error(err)
 		}
 	}()
