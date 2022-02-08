@@ -98,32 +98,34 @@ func validator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *
 // If the validation rules exceed the costBudget, subsequent evaluations will be skipped, the list of errs returned will not be empty, and a negative remainingBudget will be returned.
 // Most callers can ignore the returned remainingBudget value unless another validate call is going to be made
 // context is passed for supporting context cancellation during cel validation
-func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if s == nil || obj == nil {
 		return nil, remainingBudget
 	}
 
-	errs, remainingBudget = s.validateExpressions(ctx, fldPath, sts, obj, remainingBudget)
+	errs, remainingBudget = s.validateExpressions(ctx, fldPath, sts, obj, oldObj, remainingBudget)
 	if remainingBudget < 0 {
 		return errs, remainingBudget
 	}
 	switch obj := obj.(type) {
 	case []interface{}:
+		oldArray, _ := oldObj.([]interface{})
 		var arrayErrs field.ErrorList
-		arrayErrs, remainingBudget = s.validateArray(ctx, fldPath, sts, obj, remainingBudget)
+		arrayErrs, remainingBudget = s.validateArray(ctx, fldPath, sts, obj, oldArray, remainingBudget)
 		errs = append(errs, arrayErrs...)
 		return errs, remainingBudget
 	case map[string]interface{}:
+		oldMap, _ := oldObj.(map[string]interface{})
 		var mapErrs field.ErrorList
-		mapErrs, remainingBudget = s.validateMap(ctx, fldPath, sts, obj, remainingBudget)
+		mapErrs, remainingBudget = s.validateMap(ctx, fldPath, sts, obj, oldMap, remainingBudget)
 		errs = append(errs, mapErrs...)
 		return errs, remainingBudget
 	}
 	return errs, remainingBudget
 }
 
-func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if obj == nil {
 		// We only validate non-null values. Rules that need to check for the state of a nullable value or the presence of an optional
@@ -145,7 +147,10 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	if s.isResourceRoot {
 		sts = model.WithTypeAndObjectMeta(sts)
 	}
-	activation := NewValidationActivation(obj, sts)
+	var activation interpreter.Activation = NewValidationActivation(ScopedVarName, obj, sts)
+	if oldObj != nil {
+		activation = interpreter.NewHierarchicalActivation(activation, NewValidationActivation(OldScopedVarName, oldObj, sts))
+	}
 	for i, compiled := range s.compiledRules {
 		rule := sts.XValidations[i]
 		if compiled.Error != nil {
@@ -156,10 +161,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			// rule is empty
 			continue
 		}
-		if compiled.TransitionRule {
+		if compiled.TransitionRule && oldObj == nil {
 			// transition rules are evaluated only if there is a comparable existing value
-			errs = append(errs, field.InternalError(fldPath, fmt.Errorf("oldSelf validation not implemented")))
-			continue // todo: wire oldObj parameter
+			continue
 		}
 		evalResult, evalDetails, err := compiled.Program.ContextEval(ctx, activation)
 		if evalDetails == nil {
@@ -214,16 +218,21 @@ func ruleErrorString(rule apiextensions.ValidationRule) string {
 }
 
 type validationActivation struct {
-	self ref.Val
+	name string
+	val  ref.Val
 }
 
-func NewValidationActivation(obj interface{}, structural *schema.Structural) *validationActivation {
-	return &validationActivation{self: UnstructuredToVal(obj, structural)}
+func NewValidationActivation(name string, obj interface{}, structural *schema.Structural) *validationActivation {
+	va := &validationActivation{
+		name: name,
+		val:  UnstructuredToVal(obj, structural),
+	}
+	return va
 }
 
 func (a *validationActivation) ResolveName(name string) (interface{}, bool) {
-	if name == ScopedVarName {
-		return a.self, true
+	if name == a.name {
+		return a.val, true
 	}
 	return nil, false
 }
@@ -232,7 +241,7 @@ func (a *validationActivation) Parent() interpreter.Activation {
 	return nil
 }
 
-func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj map[string]interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj map[string]interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if remainingBudget < 0 {
 		return errs, remainingBudget
@@ -241,10 +250,18 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 		return nil, remainingBudget
 	}
 
+	// if a third map type is introduced, assume it's not correlatable. granular is the default if unspecified.
+	correlatable := sts.XMapType == nil || *sts.XMapType == "granular" || *sts.XMapType == "atomic"
+
 	if s.AdditionalProperties != nil && sts.AdditionalProperties != nil && sts.AdditionalProperties.Structural != nil {
 		for k, v := range obj {
+			var oldV interface{}
+			if correlatable {
+				oldV = oldObj[k]
+			}
+
 			var err field.ErrorList
-			err, remainingBudget = s.AdditionalProperties.Validate(ctx, fldPath.Key(k), sts.AdditionalProperties.Structural, v, remainingBudget)
+			err, remainingBudget = s.AdditionalProperties.Validate(ctx, fldPath.Key(k), sts.AdditionalProperties.Structural, v, oldV, remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget
@@ -256,8 +273,13 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 			stsProp, stsOk := sts.Properties[k]
 			sub, ok := s.Properties[k]
 			if ok && stsOk {
+				var oldV interface{}
+				if correlatable {
+					oldV = oldObj[k]
+				}
+
 				var err field.ErrorList
-				err, remainingBudget = sub.Validate(ctx, fldPath.Child(k), &stsProp, v, remainingBudget)
+				err, remainingBudget = sub.Validate(ctx, fldPath.Child(k), &stsProp, v, oldV, remainingBudget)
 				errs = append(errs, err...)
 				if remainingBudget < 0 {
 					return errs, remainingBudget
@@ -269,15 +291,20 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 	return errs, remainingBudget
 }
 
-func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj []interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj []interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if remainingBudget < 0 {
 		return errs, remainingBudget
 	}
+
+	// only map-type lists support self-oldSelf correlation for cel rules. if this isn't a
+	// map-type list, then makeMapList returns an implementation that always returns nil
+	correlatableOldItems := makeMapList(sts, makeKeyStrategy(sts), oldObj)
+
 	if s.Items != nil && sts.Items != nil {
 		for i := range obj {
 			var err field.ErrorList
-			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], remainingBudget)
+			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.get(obj[i]), remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget

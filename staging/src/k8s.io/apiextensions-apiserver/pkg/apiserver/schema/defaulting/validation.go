@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	kubeopenapivalidate "k8s.io/kube-openapi/pkg/validation/validate"
+
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
@@ -29,8 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
-	kubeopenapivalidate "k8s.io/kube-openapi/pkg/validation/validate"
 )
 
 // ValidateDefaults checks that default values validate and are properly pruned.
@@ -89,7 +90,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			} else if celValidator := cel.NewValidator(s, cel.PerCallLimit); celValidator != nil {
-				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, remainingCost)
+				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, nil, remainingCost)
 				remainingCost = rmCost
 				allErrs = append(allErrs, celErrs...)
 				if remainingCost < 0 {
@@ -114,7 +115,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			} else if celValidator := cel.NewValidator(s, cel.PerCallLimit); celValidator != nil {
-				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, remainingCost)
+				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, nil, remainingCost)
 				remainingCost = rmCost
 				allErrs = append(allErrs, celErrs...)
 				if remainingCost < 0 {
