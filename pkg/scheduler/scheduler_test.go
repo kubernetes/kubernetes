@@ -55,7 +55,6 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
-	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -773,7 +772,6 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
 	pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
-
 	scheduler, bindingChan, errChan := setupTestScheduler(ctx, queuedPodStore, scache, nil, nil, fns...)
 
 	queuedPodStore.Add(pod)
@@ -900,13 +898,10 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, s
 		recorder = &events.FakeRecorder{}
 	}
 
-	var schedulingQueue *queue.PriorityQueue
 	if informerFactory == nil {
 		informerFactory = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
-		schedulingQueue = internalqueue.NewTestQueue(ctx, nil)
-	} else {
-		schedulingQueue = internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
 	}
+	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
 
 	fwk, _ := st.NewFramework(
 		fns,
