@@ -30,10 +30,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -51,14 +49,12 @@ func Register(plugins *admission.Plugins) {
 // Plugin is an implementation of admission.Interface.
 type Plugin struct {
 	*admission.Handler
-	client                kubernetes.Interface
-	lister                schedulingv1listers.PriorityClassLister
-	nonPreemptingPriority bool
+	client kubernetes.Interface
+	lister schedulingv1listers.PriorityClassLister
 }
 
 var _ admission.MutationInterface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
-var _ genericadmissioninitializers.WantsFeatures = &Plugin{}
 var _ = genericadmissioninitializers.WantsExternalKubeInformerFactory(&Plugin{})
 var _ = genericadmissioninitializers.WantsExternalKubeClientSet(&Plugin{})
 
@@ -78,11 +74,6 @@ func (p *Plugin) ValidateInitialization() error {
 		return fmt.Errorf("%s requires a lister", PluginName)
 	}
 	return nil
-}
-
-// InspectFeatureGates allows setting bools without taking a dep on a global variable
-func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.nonPreemptingPriority = featureGates.Enabled(features.NonPreemptingPriority)
 }
 
 // SetExternalKubeClientSet implements the WantsInternalKubeClientSet interface.
@@ -199,15 +190,13 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 		}
 		pod.Spec.Priority = &priority
 
-		if p.nonPreemptingPriority {
-			var corePolicy core.PreemptionPolicy
-			if preemptionPolicy != nil {
-				corePolicy = core.PreemptionPolicy(*preemptionPolicy)
-				if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy != corePolicy {
-					return admission.NewForbidden(a, fmt.Errorf("the string value of PreemptionPolicy (%s) must not be provided in pod spec; priority admission controller computed %s from the given PriorityClass name", *pod.Spec.PreemptionPolicy, corePolicy))
-				}
-				pod.Spec.PreemptionPolicy = &corePolicy
+		var corePolicy core.PreemptionPolicy
+		if preemptionPolicy != nil {
+			corePolicy = core.PreemptionPolicy(*preemptionPolicy)
+			if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy != corePolicy {
+				return admission.NewForbidden(a, fmt.Errorf("the string value of PreemptionPolicy (%s) must not be provided in pod spec; priority admission controller computed %s from the given PriorityClass name", *pod.Spec.PreemptionPolicy, corePolicy))
 			}
+			pod.Spec.PreemptionPolicy = &corePolicy
 		}
 	}
 	return nil
