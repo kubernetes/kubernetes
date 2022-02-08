@@ -455,6 +455,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 	out.MaxReplicas = in.MaxReplicas
 	// WARNING: in.Metrics requires manual conversion: does not exist in peer-type
 	// WARNING: in.Behavior requires manual conversion: does not exist in peer-type
+	// WARNING: in.UpdatePolicy requires manual conversion: does not exist in peer-type
 	return nil
 }
 

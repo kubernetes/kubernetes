@@ -101,7 +101,32 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior
+
+	// UpdatePolicy describes how changes are applied to the cluster.
+	// If not specified, all values are set to default
+	// +optional
+	UpdatePolicy *HorizontalPodAutoscalerUpdatePolicy
 }
+
+// UpdatePolicy describes the rules on how changes are applied to the cluster.
+type HorizontalPodAutoscalerUpdatePolicy struct {
+	// Controls when autoscaler applies changes to the cluster.
+	// The default is 'Auto'.
+	// +optional
+	UpdateMode *UpdateMode `json:"updateMode,omitempty" protobuf:"bytes,1,opt,name=updateMode"`
+}
+
+// UpdateMode controls when autoscaler applies changes to the cluster.
+type UpdateMode string
+
+const (
+	// UpdateModeOff means that autoscaler never cretes/deletes pods.
+	// The HorizontalPodAutoscalerStatus.DesiredReplicas field is still populated.
+	// This can be used for a "dry run"
+	UpdateModeOff UpdateMode = "Off"
+	// UpdateModeAuto means that autoscaler creates/deletes pods based on the sclaing decision
+	UpdateModeAuto UpdateMode = "Auto"
+)
 
 // HorizontalPodAutoscalerBehavior configures a scaling behavior for Up and Down direction
 // (scaleUp and scaleDown fields respectively).

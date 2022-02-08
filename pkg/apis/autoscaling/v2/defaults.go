@@ -89,6 +89,7 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutosca
 		}
 	}
 	SetDefaults_HorizontalPodAutoscalerBehavior(obj)
+	SetDefaults_HorizontalPodAutoscalerUpdatePolicy(obj)
 }
 
 // SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it is not null
@@ -97,6 +98,15 @@ func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPo
 	if obj.Spec.Behavior != nil {
 		obj.Spec.Behavior.ScaleUp = GenerateHPAScaleUpRules(obj.Spec.Behavior.ScaleUp)
 		obj.Spec.Behavior.ScaleDown = GenerateHPAScaleDownRules(obj.Spec.Behavior.ScaleDown)
+	}
+}
+
+// SetDefaults_HorizontalPodAutoscalerUpdatePolicy fills the UpdatePolicy if it is not null
+func SetDefaults_HorizontalPodAutoscalerUpdatePolicy(obj *autoscalingv2.HorizontalPodAutoscaler) {
+	// if UpdatePolicy is specified, we should fill all the 'nil' values with the default ones
+	if obj.Spec.UpdatePolicy == nil {
+		updateMode := autoscalingv2.UpdateModeAuto
+		obj.Spec.UpdatePolicy = &autoscalingv2.HorizontalPodAutoscalerUpdatePolicy{UpdateMode: &updateMode}
 	}
 }
 
