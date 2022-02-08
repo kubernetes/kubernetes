@@ -27,9 +27,15 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/golang/mock/gomock"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	cpumanagertesting "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/testing"
+	devicemanagertesting "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/testing"
+	memorymanagertesting "k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/testing"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/mount-utils"
@@ -380,6 +386,110 @@ func TestBuildContainerMapFromRuntime(t *testing.T) {
 				_, _, err := cm.GetContainerRef(ctr.Id)
 				require.Error(t, err)
 			}
+		})
+	}
+}
+
+func TestResourceAllocator_Admit(t *testing.T) {
+	t.Parallel()
+
+	tc := []struct {
+		name string
+
+		deviceManagerShouldSucceed bool
+		cpuManagerShouldSucceed    bool
+		memoryManagerShouldSucceed bool
+
+		shouldAdmit bool
+	}{
+		{
+			name:                       "when_all_managers_admit",
+			deviceManagerShouldSucceed: true,
+			cpuManagerShouldSucceed:    true,
+			memoryManagerShouldSucceed: true,
+
+			shouldAdmit: true,
+		},
+		{
+			name:                       "when_device_manager_rejects",
+			deviceManagerShouldSucceed: false,
+			cpuManagerShouldSucceed:    true,
+			memoryManagerShouldSucceed: true,
+
+			shouldAdmit: false,
+		},
+		{
+			name:                       "when_cpu_manager_rejects",
+			deviceManagerShouldSucceed: true,
+			cpuManagerShouldSucceed:    false,
+			memoryManagerShouldSucceed: true,
+
+			shouldAdmit: false,
+		},
+		{
+			name:                       "when_memory_manager_rejects",
+			deviceManagerShouldSucceed: true,
+			cpuManagerShouldSucceed:    true,
+			memoryManagerShouldSucceed: false,
+
+			shouldAdmit: false,
+		},
+	}
+
+	for _, c := range tc {
+		t.Run(c.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			cpuManager := cpumanagertesting.NewMockManager(mockCtrl)
+			memoryManager := memorymanagertesting.NewMockManager(mockCtrl)
+			deviceManager := devicemanagertesting.NewMockManager(mockCtrl)
+
+			func() {
+				// This test is regrettably tied to ordering of validation in the allocator.
+				// We stop checking on first failure, so many of these won't be called if
+				// an earlier manager fails. We setup expectations in a closure to simplify
+				// representing that.
+				if c.deviceManagerShouldSucceed {
+					deviceManager.EXPECT().Allocate(gomock.Any(), gomock.Any()).Return(nil)
+				} else {
+					deviceManager.EXPECT().Allocate(gomock.Any(), gomock.Any()).Return(errors.New("unexpected error"))
+					return
+				}
+
+				if c.cpuManagerShouldSucceed {
+					cpuManager.EXPECT().Allocate(gomock.Any(), gomock.Any()).Return(nil)
+				} else {
+					cpuManager.EXPECT().Allocate(gomock.Any(), gomock.Any()).Return(errors.New("unexpected error"))
+					return
+				}
+
+				if c.memoryManagerShouldSucceed {
+					memoryManager.EXPECT().Allocate(gomock.Any(), gomock.Any()).Return(nil)
+				} else {
+					memoryManager.EXPECT().Allocate(gomock.Any(), gomock.Any()).Return(errors.New("unexpected error"))
+					return
+				}
+			}()
+
+			ra := &resourceAllocator{
+				cpuManager:    cpuManager,
+				memoryManager: memoryManager,
+				deviceManager: deviceManager,
+			}
+
+			attrs := &lifecycle.PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "some-container",
+							},
+						},
+					},
+				},
+			}
+
+			admissionResult := ra.Admit(attrs)
+			require.Equal(t, c.shouldAdmit, admissionResult.Admit)
 		})
 	}
 }
