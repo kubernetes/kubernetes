@@ -36,7 +36,10 @@ type ScaleApplyConfiguration struct {
 // ScaleApplyConfiguration constructs an declarative configuration of the Scale type for use with
 // apply.
 func Scale() *ScaleApplyConfiguration {
-	return &ScaleApplyConfiguration{}
+	b := &ScaleApplyConfiguration{}
+	b.WithKind("Scale")
+	b.WithAPIVersion("autoscaling/v1")
+	return b
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value
