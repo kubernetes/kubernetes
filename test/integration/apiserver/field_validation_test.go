@@ -404,173 +404,6 @@ spec:
 		}
 	}
 	`
-
-	smpBody = `
-	{
-		"spec": {
-			"unknown1": "val1",
-			"unknownDupe": "valDupe",
-			"unknownDupe": "valDupe2",
-			"paused": true,
-			"paused": false,
-			"selector": {
-				"matchLabels": {
-					"app": "nginx"
-				}
-			},
-			"template": {
-				"metadata": {
-					"labels": {
-						"app": "nginx"
-					}
-				},
-				"spec": {
-					"containers": [{
-						"name": "nginx",
-						"unknownNested": "val1",
-						"imagePullPolicy": "Always",
-						"imagePullPolicy": "Never"
-					}]
-				}
-			}
-		}
-	}
-	`
-	smpBodyValid = `
-	{
-		"spec": {
-			"replicas": 3,
-			"paused": false,
-			"selector": {
-				"matchLabels": {
-					"app": "nginx"
-				}
-			},
-			"template": {
-				"metadata": {
-					"labels": {
-						"app": "nginx"
-					}
-				},
-				"spec": {
-					"containers": [{
-						"name": "nginx",
-						"imagePullPolicy": "Never"
-					}]
-				}
-			}
-		}
-	}
-	`
-	// non-conflicting SMP has issues with the patch (duplicate fields),
-	// but doesn't conflict with the existing object it's being patched to
-	nonconflictingSMPBody = `
-	{
-		"spec": {
-			"paused": true,
-			"paused": false,
-			"selector": {
-				"matchLabels": {
-					"app": "nginx"
-				}
-			},
-			"template": {
-				"metadata": {
-					"labels": {
-						"app": "nginx"
-					}
-				},
-				"spec": {
-					"containers": [{
-						"name": "nginx",
-						"imagePullPolicy": "Always",
-						"imagePullPolicy": "Never"
-					}]
-				}
-			}
-		}
-	}
-	`
-
-	mergePatchBody = `
-{
-	"spec": {
-		"unknown1": "val1",
-		"unknownDupe": "valDupe",
-		"unknownDupe": "valDupe2",
-		"paused": true,
-		"paused": false,
-		"template": {
-			"spec": {
-				"containers": [{
-					"name": "nginx",
-					"image": "nginx:latest",
-					"unknownNested": "val1",
-					"imagePullPolicy": "Always",
-					"imagePullPolicy": "Never"
-				}]
-			}
-		}
-	}
-}
-	`
-	jsonPatchBody = `
-			[
-				{"op": "add", "path": "/spec/unknown1", "value": "val1", "foo":"bar"},
-				{"op": "add", "path": "/spec/unknown2", "path": "/spec/unknown3", "value": "val1"},
-				{"op": "add", "path": "/spec/unknownDupe", "value": "valDupe"},
-				{"op": "add", "path": "/spec/unknownDupe", "value": "valDupe2"},
-				{"op": "add", "path": "/spec/paused", "value": true},
-				{"op": "add", "path": "/spec/paused", "value": false},
-				{"op": "add", "path": "/spec/template/spec/containers/0/unknownNested", "value": "val1"},
-				{"op": "add", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Always"},
-				{"op": "add", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"}
-			]
-			`
-	// non-conflicting mergePatch has issues with the patch (duplicate fields),
-	// but doesn't conflict with the existing object it's being patched to
-	nonconflictingMergePatchBody = `
-{
-	"spec": {
-		"paused": true,
-		"paused": false,
-		"template": {
-			"spec": {
-				"containers": [{
-					"name": "nginx",
-					"image": "nginx:latest",
-					"imagePullPolicy": "Always",
-					"imagePullPolicy": "Never"
-				}]
-			}
-		}
-	}
-}
-			`
-	mergePatchBodyValid = `
-{
-	"spec": {
-		"paused": false,
-		"template": {
-			"spec": {
-				"containers": [{
-					"name": "nginx",
-					"image": "nginx:latest",
-					"imagePullPolicy": "Always"
-				}]
-			}
-		},
-		"replicas": 2
-	}
-}
-	`
-	jsonPatchBodyValid = `
-			[
-				{"op": "add", "path": "/spec/paused", "value": true},
-				{"op": "add", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"},
-				{"op": "add", "path": "/spec/replicas", "value": 2}
-			]
-			`
 )
 
 func TestFieldValidation(t *testing.T) {
@@ -686,7 +519,7 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			bodyBase: invalidBodyJSON,
 		},
 		{
-			name:     "post-default-ignore-validation",
+			name:     "post-no-validation",
 			bodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
 				`unknown field "spec.unknown1"`,
@@ -1233,6 +1066,67 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 // with unknown fields errors out when fieldValidation is strict,
 // but succeeds when fieldValidation is ignored.
 func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
+	// non-conflicting SMP has issues with the patch (duplicate fields),
+	// but doesn't conflict with the existing object it's being patched to
+	nonconflictingSMPBody := `
+	{
+		"spec": {
+			"paused": true,
+			"paused": false,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"imagePullPolicy": "Always",
+						"imagePullPolicy": "Never"
+					}]
+				}
+			}
+		}
+	}
+	`
+
+	smpBody := `
+	{
+		"spec": {
+			"unknown1": "val1",
+			"unknownDupe": "valDupe",
+			"unknownDupe": "valDupe2",
+			"paused": true,
+			"paused": false,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"unknownNested": "val1",
+						"imagePullPolicy": "Always",
+						"imagePullPolicy": "Never"
+					}]
+				}
+			}
+		}
+	}
+	`
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
@@ -3254,6 +3148,31 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 }
 
 func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
+	mergePatchBodyValid := `
+{
+	"spec": {
+		"paused": false,
+		"template": {
+			"spec": {
+				"containers": [{
+					"name": "nginx",
+					"image": "nginx:latest",
+					"imagePullPolicy": "Always"
+				}]
+			}
+		},
+		"replicas": 2
+	}
+}
+	`
+
+	jsonPatchBodyValid := `
+			[
+				{"op": "add", "path": "/spec/paused", "value": true},
+				{"op": "add", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"},
+				{"op": "add", "path": "/spec/replicas", "value": 2}
+			]
+			`
 
 	var testcases = []struct {
 		name      string
@@ -3349,6 +3268,32 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 }
 
 func benchFieldValidationSMP(b *testing.B, client clientset.Interface) {
+	smpBodyValid := `
+	{
+		"spec": {
+			"replicas": 3,
+			"paused": false,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"imagePullPolicy": "Never"
+					}]
+				}
+			}
+		}
+	}
+	`
 	var testcases = []struct {
 		name string
 		opts metav1.PatchOptions
