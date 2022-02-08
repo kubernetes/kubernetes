@@ -72,9 +72,31 @@ type testWatchCache struct {
 }
 
 func (w *testWatchCache) getAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
-	w.watchCache.RLock()
-	defer w.watchCache.RUnlock()
-	return w.watchCache.GetAllEventsSinceThreadUnsafe(resourceVersion)
+	cacheInterval, err := w.getCacheIntervalForEvents(resourceVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	result := []*watchCacheEvent{}
+	for {
+		event, err := cacheInterval.Next()
+		if err != nil {
+			return nil, err
+		}
+		if event == nil {
+			break
+		}
+		result = append(result, event)
+	}
+
+	return result, nil
+}
+
+func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64) (*watchCacheInterval, error) {
+	w.RLock()
+	defer w.RUnlock()
+
+	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)
 }
 
 // newTestWatchCache just adds a fake clock.
