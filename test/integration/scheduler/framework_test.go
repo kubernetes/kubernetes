@@ -104,8 +104,8 @@ type PreBindPlugin struct {
 }
 
 type BindPlugin struct {
+	name                  string
 	numBindCalled         int
-	PluginName            string
 	bindStatus            *framework.Status
 	client                clientset.Interface
 	pluginInvokeEventChan chan pluginInvokeEvent
@@ -351,7 +351,7 @@ func (pp *PreBindPlugin) reset() {
 const bindPluginAnnotation = "bindPluginName"
 
 func (bp *BindPlugin) Name() string {
-	return bp.PluginName
+	return bp.name
 }
 
 func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
@@ -1037,124 +1037,396 @@ func TestPrebindPlugin(t *testing.T) {
 	}
 }
 
-// // TestUnreserveReservePlugin tests invocation of the Unreserve operation in
-// // reserve plugins through failures in execution points such as pre-bind. Also
-// // tests that the order of invocation of Unreserve operation is executed in the
-// // reverse order of invocation of the Reserve operation.
-// func TestReservePluginUnreserve(t *testing.T) {
-// 	tests := []struct {
-// 		name             string
-// 		failReserve      bool
-// 		failReserveIndex int
-// 		failPreBind      bool
-// 	}{
-// 		{
-// 			name:             "fail reserve",
-// 			failReserve:      true,
-// 			failReserveIndex: 1,
-// 		},
-// 		{
-// 			name:        "fail preBind",
-// 			failPreBind: true,
-// 		},
-// 		{
-// 			name: "pass everything",
-// 		},
-// 	}
+// TestUnReserveReservePlugins tests invocation of the Unreserve operation in
+// reserve plugins through failures in execution points such as pre-bind. Also
+// tests that the order of invocation of Unreserve operation is executed in the
+// reverse order of invocation of the Reserve operation.
+func TestUnReserveReservePlugins(t *testing.T) {
+	tests := []struct {
+		name          string
+		plugins       []*ReservePlugin
+		fail          bool
+		failPluginIdx int
+	}{
+		{
+			name:          "The first Reserve plugin fails",
+			failPluginIdx: 0,
+			plugins: []*ReservePlugin{
+				{
+					name:        "failedReservePlugin1",
+					failReserve: true,
+				},
+				{
+					name:        "succeedReservePlugin",
+					failReserve: false,
+				},
+				{
+					name:        "failedReservePlugin2",
+					failReserve: true,
+				},
+			},
+			fail: true,
+		},
+		{
+			name:          "The middle Reserve plugin fails",
+			failPluginIdx: 1,
+			plugins: []*ReservePlugin{
+				{
+					name:        "succeedReservePlugin1",
+					failReserve: false,
+				},
+				{
+					name:        "failedReservePlugin1",
+					failReserve: true,
+				},
+				{
+					name:        "succeedReservePlugin2",
+					failReserve: false,
+				},
+			},
+			fail: true,
+		},
+		{
+			name:          "The last Reserve plugin fails",
+			failPluginIdx: 2,
+			plugins: []*ReservePlugin{
+				{
+					name:        "succeedReservePlugin1",
+					failReserve: false,
+				},
+				{
+					name:        "succeedReservePlugin2",
+					failReserve: false,
+				},
+				{
+					name:        "failedReservePlugin1",
+					failReserve: true,
+				},
+			},
+			fail: true,
+		},
+		{
+			name:          "The Reserve plugins succeed",
+			failPluginIdx: -1,
+			plugins: []*ReservePlugin{
+				{
+					name:        "succeedReservePlugin1",
+					failReserve: false,
+				},
+				{
+					name:        "succeedReservePlugin2",
+					failReserve: false,
+				},
+				{
+					name:        "succeedReservePlugin3",
+					failReserve: false,
+				},
+			},
+			fail: false,
+		},
+	}
 
-// 	for _, test := range tests {
-// 		t.Run(test.name, func(t *testing.T) {
-// 			numReservePlugins := 3
-// 			pluginInvokeEventChan := make(chan pluginInvokeEvent, numReservePlugins)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var pls []framework.Plugin
+			for _, pl := range test.plugins {
+				pls = append(pls, pl)
+			}
+			registry, prof := initRegistryAndConfig(t, pls...)
 
-// 			preBindPlugin := &PreBindPlugin{
-// 				failPreBind: true,
-// 			}
-// 			var reservePlugins []*ReservePlugin
-// 			for i := 0; i < numReservePlugins; i++ {
-// 				reservePlugins = append(reservePlugins, &ReservePlugin{
-// 					name:                  fmt.Sprintf("%s-%d", reservePluginName, i),
-// 					pluginInvokeEventChan: pluginInvokeEventChan,
-// 				})
-// 			}
+			// Create the API server and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(
+				t,
+				testutils.InitTestAPIServer(t, "unreserve-reserve-plugin", nil),
+				2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer testutils.CleanupTest(t, testCtx)
 
-// 			registry := frameworkruntime.Registry{
-// 				// TODO(#92229): test more failure points that would trigger Unreserve in
-// 				// reserve plugins than just one pre-bind plugin.
-// 				preBindPluginName: newPlugin(preBindPlugin),
-// 			}
-// 			for _, pl := range reservePlugins {
-// 				registry[pl.Name()] = newPlugin(pl)
-// 			}
+			// Create a best effort pod.
+			podName := "test-pod"
+			pod, err := createPausePod(testCtx.ClientSet,
+				initPausePod(&pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
+			if err != nil {
+				t.Errorf("Error while creating a test pod: %v", err)
+			}
 
-// 			// Setup initial reserve and prebind plugin for testing.
-// 			prof := schedulerconfig.KubeSchedulerProfile{
-// 				SchedulerName: v1.DefaultSchedulerName,
-// 				Plugins: &schedulerconfig.Plugins{
-// 					Reserve: schedulerconfig.PluginSet{
-// 						// filled by looping over reservePlugins
-// 					},
-// 					PreBind: schedulerconfig.PluginSet{
-// 						Enabled: []schedulerconfig.Plugin{
-// 							{
-// 								Name: preBindPluginName,
-// 							},
-// 						},
-// 					},
-// 				},
-// 			}
-// 			for _, pl := range reservePlugins {
-// 				prof.Plugins.Reserve.Enabled = append(prof.Plugins.Reserve.Enabled, schedulerconfig.Plugin{
-// 					Name: pl.Name(),
-// 				})
-// 			}
+			if test.fail {
+				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
+				}
 
-// 			// Create the master and the scheduler with the test plugin set.
-// 			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "reserve-plugin-unreserve", nil), 2,
-// 				scheduler.WithProfiles(prof),
-// 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-// 			defer testutils.CleanupTest(t, testCtx)
+				for i, pl := range test.plugins {
+					if i <= test.failPluginIdx {
+						if pl.numReserveCalled != 1 {
+							t.Errorf("Reserve Plugins %s numReserveCalled = %d, want 1.", pl.name, pl.numReserveCalled)
+						}
+					} else {
+						if pl.numReserveCalled != 0 {
+							t.Errorf("Reserve Plugins %s numReserveCalled = %d, want 0.", pl.name, pl.numReserveCalled)
+						}
+					}
 
-// 			preBindPlugin.failPreBind = test.failPreBind
-// 			if test.failReserve {
-// 				reservePlugins[test.failReserveIndex].failReserve = true
-// 			}
-// 			// Create a best effort pod.
-// 			pod, err := createPausePod(testCtx.ClientSet,
-// 				initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-// 			if err != nil {
-// 				t.Errorf("Error while creating a test pod: %v", err)
-// 			}
+					if pl.numUnreserveCalled != 1 {
+						t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", pl.name, pl.numUnreserveCalled)
+					}
+				}
+			} else {
+				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+					t.Errorf("Expected the pod to be scheduled. error: %v", err)
+				}
 
-// 			if test.failPreBind || test.failReserve {
-// 				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-// 					t.Errorf("Expected a scheduling error, but didn't get it: %v", err)
-// 				}
-// 				for i := numReservePlugins - 1; i >= 0; i-- {
-// 					select {
-// 					case event := <-pluginInvokeEventChan:
-// 						expectedPluginName := reservePlugins[i].Name()
-// 						if expectedPluginName != event.pluginName {
-// 							t.Errorf("event.pluginName = %s, want %s", event.pluginName, expectedPluginName)
-// 						}
-// 					case <-time.After(time.Second * 30):
-// 						t.Errorf("pluginInvokeEventChan receive timed out")
-// 					}
-// 				}
-// 			} else {
-// 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
-// 					t.Errorf("Expected the pod to be scheduled, got an error: %v", err)
-// 				}
-// 				for i, pl := range reservePlugins {
-// 					if pl.numUnreserveCalled != 0 {
-// 						t.Errorf("reservePlugins[%d].numUnreserveCalled = %d, want 0", i, pl.numUnreserveCalled)
-// 					}
-// 				}
-// 			}
-// 			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
-// 		})
-// 	}
-// }
+				for _, pl := range test.plugins {
+					if pl.numReserveCalled != 1 {
+						t.Errorf("Reserve Plugin %s numReserveCalled = %d, want 1.", pl.name, pl.numReserveCalled)
+					}
+					if pl.numUnreserveCalled != 0 {
+						t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", pl.name, pl.numUnreserveCalled)
+					}
+				}
+			}
+			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
+		})
+	}
+}
+
+// TestUnReservePermitPlugins tests unreserve of Permit plugins.
+func TestUnReservePermitPlugins(t *testing.T) {
+	tests := []struct {
+		name   string
+		plugin *PermitPlugin
+		fail   bool
+	}{
+		{
+			name: "All Reserve plugins passed, but a Permit plugin was rejected",
+			fail: true,
+			plugin: &PermitPlugin{
+				name:         "rejectedPermitPlugin",
+				rejectPermit: true,
+			},
+		},
+		{
+			name: "All Reserve plugins passed, but a Permit plugin timeout in waiting",
+			fail: true,
+			plugin: &PermitPlugin{
+				name:          "timeoutPermitPlugin",
+				timeoutPermit: true,
+			},
+		},
+		{
+			name: "The Permit plugin succeed",
+			fail: false,
+			plugin: &PermitPlugin{
+				name: "succeedPermitPlugin",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reservePlugin := &ReservePlugin{
+				name:        "reservePlugin",
+				failReserve: false,
+			}
+			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
+
+			// Create the API server and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(
+				t,
+				testutils.InitTestAPIServer(t, "unreserve-reserve-plugin", nil),
+				2,
+				scheduler.WithProfiles(profile),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer testutils.CleanupTest(t, testCtx)
+
+			// Create a best effort pod.
+			podName := "test-pod"
+			pod, err := createPausePod(testCtx.ClientSet,
+				initPausePod(&pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
+			if err != nil {
+				t.Errorf("Error while creating a test pod: %v", err)
+			}
+
+			if test.fail {
+				if err = waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+				}
+
+				// Verify the Reserve Plugins
+				if reservePlugin.numUnreserveCalled != 1 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				}
+			} else {
+				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+					t.Errorf("Expected the pod to be scheduled. error: %v", err)
+				}
+
+				// Verify the Reserve Plugins
+				if reservePlugin.numUnreserveCalled != 0 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				}
+			}
+
+			if test.plugin.numPermitCalled != 1 {
+				t.Errorf("Expected the Permit plugin to be called.")
+			}
+
+			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
+		})
+	}
+}
+
+// TestUnReservePreBindPlugins tests unreserve of Prebind plugins.
+func TestUnReservePreBindPlugins(t *testing.T) {
+	tests := []struct {
+		name   string
+		plugin *PreBindPlugin
+		fail   bool
+	}{
+		{
+			name: "All Reserve plugins passed, but a PreBind plugin failed",
+			fail: true,
+			plugin: &PreBindPlugin{
+				podUIDs:       make(map[types.UID]struct{}),
+				rejectPreBind: true,
+			},
+		},
+		{
+			name:   "All Reserve plugins passed, and PreBind plugin succeed",
+			fail:   false,
+			plugin: &PreBindPlugin{podUIDs: make(map[types.UID]struct{})},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reservePlugin := &ReservePlugin{
+				name:        "reservePlugin",
+				failReserve: false,
+			}
+			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
+
+			// Create the API server and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(
+				t,
+				testutils.InitTestAPIServer(t, "unreserve-prebind-plugin", nil),
+				2,
+				scheduler.WithProfiles(profile),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer testutils.CleanupTest(t, testCtx)
+
+			// Create a pause pod.
+			podName := "test-pod"
+			pod, err := createPausePod(testCtx.ClientSet,
+				initPausePod(&pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
+			if err != nil {
+				t.Errorf("Error while creating a test pod: %v", err)
+			}
+
+			if test.fail {
+				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
+				}
+
+				// Verify the Reserve Plugins
+				if reservePlugin.numUnreserveCalled != 1 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				}
+			} else {
+				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+					t.Errorf("Expected the pod to be scheduled. error: %v", err)
+				}
+
+				// Verify the Reserve Plugins
+				if reservePlugin.numUnreserveCalled != 0 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				}
+			}
+
+			if test.plugin.numPreBindCalled != 1 {
+				t.Errorf("Expected the Prebind plugin to be called.")
+			}
+
+			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
+		})
+	}
+}
+
+// TestUnReserveBindPlugins tests unreserve of Bind plugins.
+func TestUnReserveBindPlugins(t *testing.T) {
+	tests := []struct {
+		name   string
+		plugin *BindPlugin
+		fail   bool
+	}{
+		{
+			name:   "All Reserve plugins passed, and Bind plugin succeed",
+			fail:   false,
+			plugin: &BindPlugin{name: "SucceedBindPlugin"},
+		},
+		{
+			name:   "All Reserve plugins passed, but a Bind plugin failed",
+			fail:   false,
+			plugin: &BindPlugin{name: "FailedBindPlugin"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reservePlugin := &ReservePlugin{
+				name:        "reservePlugin",
+				failReserve: false,
+			}
+			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
+
+			apiCtx := testutils.InitTestAPIServer(t, "unreserve-bind-plugin", nil)
+			test.plugin.client = apiCtx.ClientSet
+
+			// Create the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(
+				t,
+				apiCtx,
+				2,
+				scheduler.WithProfiles(profile),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer testutils.CleanupTest(t, testCtx)
+
+			// Create a pause pod.
+			podName := "test-pod"
+			pod, err := createPausePod(testCtx.ClientSet,
+				initPausePod(&pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
+			if err != nil {
+				t.Errorf("Error while creating a test pod: %v", err)
+			}
+
+			if test.fail {
+				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
+				}
+
+				// Verify the Reserve Plugins
+				if reservePlugin.numUnreserveCalled != 1 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				}
+			} else {
+				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+					t.Errorf("Expected the pod to be scheduled. error: %v", err)
+				}
+
+				// Verify the Reserve Plugins
+				if reservePlugin.numUnreserveCalled != 0 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				}
+			}
+
+			if test.plugin.numBindCalled != 1 {
+				t.Errorf("Expected the Prebind plugin to be called.")
+			}
+
+			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
+		})
+	}
+}
 
 type pluginInvokeEvent struct {
 	pluginName string
@@ -1164,8 +1436,8 @@ type pluginInvokeEvent struct {
 // TestBindPlugin tests invocation of bind plugins.
 func TestBindPlugin(t *testing.T) {
 	testContext := testutils.InitTestAPIServer(t, "bind-plugin", nil)
-	bindPlugin1 := &BindPlugin{PluginName: "bind-plugin-1", client: testContext.ClientSet}
-	bindPlugin2 := &BindPlugin{PluginName: "bind-plugin-2", client: testContext.ClientSet}
+	bindPlugin1 := &BindPlugin{name: "bind-plugin-1", client: testContext.ClientSet}
+	bindPlugin2 := &BindPlugin{name: "bind-plugin-2", client: testContext.ClientSet}
 	reservePlugin := &ReservePlugin{name: "mock-reserve-plugin"}
 	postBindPlugin := &PostBindPlugin{name: "mock-post-bind-plugin"}
 	// Create a plugin registry for testing. Register reserve, bind, and
