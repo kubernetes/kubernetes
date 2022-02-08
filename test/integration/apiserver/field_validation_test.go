@@ -199,6 +199,38 @@ spec:
 			}
 		}
 	}`
+	applyValidBody = `
+{
+	"apiVersion": "apps/v1",
+	"kind": "Deployment",
+	"metadata": {
+		"name": "%s",
+		"labels": {"app": "nginx"},
+		"annotations": {"a1": "foo", "a2": "bar"}
+	},
+	"spec": {
+		"selector": {
+			"matchLabels": {
+				"app": "nginx"
+			}
+		},
+		"template": {
+			"metadata": {
+				"labels": {
+					"app": "nginx"
+				}
+			},
+			"spec": {
+				"containers": [{
+					"name":  "nginx",
+					"image": "nginx:latest",
+					"imagePullPolicy": "Always"
+				}]
+			}
+		},
+		"replicas": 3
+	}
+}`
 	crdInvalidBody = `
 {
 	"apiVersion": "%s",
@@ -404,6 +436,32 @@ spec:
 		}
 	}
 	`
+	smpBodyValid = `
+	{
+		"spec": {
+			"replicas": 3,
+			"paused": false,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"imagePullPolicy": "Never"
+					}]
+				}
+			}
+		}
+	}
+	`
 	// non-conflicting SMP has issues with the patch (duplicate fields),
 	// but doesn't conflict with the existing object it's being patched to
 	nonconflictingSMPBody = `
@@ -488,6 +546,30 @@ spec:
 		}
 	}
 }
+			`
+	mergePatchBodyValid = `
+{
+	"spec": {
+		"paused": false,
+		"template": {
+			"spec": {
+				"containers": [{
+					"name": "nginx",
+					"image": "nginx:latest",
+					"imagePullPolicy": "Always"
+				}]
+			}
+		},
+		"replicas": 2
+	}
+}
+	`
+	jsonPatchBodyValid = `
+			[
+				{"op": "add", "path": "/spec/paused", "value": true},
+				{"op": "add", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"},
+				{"op": "add", "path": "/spec/replicas", "value": 2}
+			]
 			`
 )
 
@@ -2995,11 +3077,11 @@ func BenchmarkFieldValidation(b *testing.B) {
 	client := clientset.NewForConfigOrDie(config)
 
 	b.Run("Post", func(b *testing.B) { benchFieldValidationPost(b, client) })
-	//b.Run("Put", func(b *testing.B) { benchFieldValidationPut(b, client) })
-	//b.Run("PatchTyped", func(b *testing.B) { benchFieldValidationPatchTyped(b, client) })
-	//b.Run("SMP", func(b *testing.B) { benchFieldValidationSMP(b, client) })
-	//b.Run("ApplyCreate", func(b *testing.B) { benchFieldValidationApplyCreate(b, client) })
-	//b.Run("ApplyUpdate", func(b *testing.B) { benchFieldValidationApplyUpdate(b, client) })
+	b.Run("Put", func(b *testing.B) { benchFieldValidationPut(b, client) })
+	b.Run("PatchTyped", func(b *testing.B) { benchFieldValidationPatchTyped(b, client) })
+	b.Run("SMP", func(b *testing.B) { benchFieldValidationSMP(b, client) })
+	b.Run("ApplyCreate", func(b *testing.B) { benchFieldValidationApplyCreate(b, client) })
+	b.Run("ApplyUpdate", func(b *testing.B) { benchFieldValidationApplyUpdate(b, client) })
 
 }
 
@@ -3099,32 +3181,32 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Strict",
 			},
-			putBodyBase: invalidBodyJSON,
+			putBodyBase: validBodyJSON,
 		},
 		{
 			name: "put-warn-validation",
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Warn",
 			},
-			putBodyBase: invalidBodyJSON,
+			putBodyBase: validBodyJSON,
 		},
 		{
 			name: "put-default-ignore-validation",
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Ignore",
 			},
-			putBodyBase: invalidBodyJSON,
+			putBodyBase: validBodyJSON,
 		},
 		{
 			name:        "put-ignore-validation",
-			putBodyBase: invalidBodyJSON,
+			putBodyBase: validBodyJSON,
 		},
 		{
 			name: "put-strict-validation-yaml",
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Strict",
 			},
-			putBodyBase: invalidBodyYAML,
+			putBodyBase: validBodyYAML,
 			contentType: "application/yaml",
 		},
 		{
@@ -3132,7 +3214,7 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Warn",
 			},
-			putBodyBase: invalidBodyYAML,
+			putBodyBase: validBodyYAML,
 			contentType: "application/yaml",
 		},
 		{
@@ -3140,12 +3222,12 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Ignore",
 			},
-			putBodyBase: invalidBodyYAML,
+			putBodyBase: validBodyYAML,
 			contentType: "application/yaml",
 		},
 		{
 			name:        "put-no-validation-yaml",
-			putBodyBase: invalidBodyYAML,
+			putBodyBase: validBodyYAML,
 			contentType: "application/yaml",
 		},
 	}
@@ -3175,7 +3257,10 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 					SetHeader("Content-Type", tc.contentType).
 					Name(deployName).
 					VersionedParams(&tc.opts, metav1.ParameterCodec)
-				_ = req.Body([]byte(putBody)).Do(context.TODO())
+				result := req.Body([]byte(putBody)).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected request err: %v", result.Error())
+				}
 			}
 		})
 	}
@@ -3195,7 +3280,7 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 				FieldValidation: "Strict",
 			},
 			patchType: types.MergePatchType,
-			body:      mergePatchBody,
+			body:      mergePatchBodyValid,
 		},
 		{
 			name: "merge-patch-warn-validation",
@@ -3203,7 +3288,7 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 				FieldValidation: "Warn",
 			},
 			patchType: types.MergePatchType,
-			body:      mergePatchBody,
+			body:      mergePatchBodyValid,
 		},
 		{
 			name: "merge-patch-ignore-validation",
@@ -3211,12 +3296,12 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 				FieldValidation: "Ignore",
 			},
 			patchType: types.MergePatchType,
-			body:      mergePatchBody,
+			body:      mergePatchBodyValid,
 		},
 		{
 			name:      "merge-patch-no-validation",
 			patchType: types.MergePatchType,
-			body:      mergePatchBody,
+			body:      mergePatchBodyValid,
 		},
 		{
 			name:      "json-patch-strict-validation",
@@ -3224,7 +3309,7 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: jsonPatchBody,
+			body: jsonPatchBodyValid,
 		},
 		{
 			name:      "json-patch-warn-validation",
@@ -3232,7 +3317,7 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Warn",
 			},
-			body: jsonPatchBody,
+			body: jsonPatchBodyValid,
 		},
 		{
 			name:      "json-patch-ignore-validation",
@@ -3240,41 +3325,12 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Ignore",
 			},
-			body: jsonPatchBody,
+			body: jsonPatchBodyValid,
 		},
 		{
 			name:      "json-patch-no-validation",
 			patchType: types.JSONPatchType,
-			body:      jsonPatchBody,
-		},
-		{
-			name: "nonconflicting-merge-patch-strict-validation",
-			opts: metav1.PatchOptions{
-				FieldValidation: "Strict",
-			},
-			patchType: types.MergePatchType,
-			body:      nonconflictingMergePatchBody,
-		},
-		{
-			name: "nonconflicting-merge-patch-warn-validation",
-			opts: metav1.PatchOptions{
-				FieldValidation: "Warn",
-			},
-			patchType: types.MergePatchType,
-			body:      nonconflictingMergePatchBody,
-		},
-		{
-			name: "nonconflicting-merge-patch-ignore-validation",
-			opts: metav1.PatchOptions{
-				FieldValidation: "Ignore",
-			},
-			patchType: types.MergePatchType,
-			body:      nonconflictingMergePatchBody,
-		},
-		{
-			name:      "nonconflicting-merge-patch-no-validation",
-			patchType: types.MergePatchType,
-			body:      nonconflictingMergePatchBody,
+			body:      jsonPatchBodyValid,
 		},
 	}
 
@@ -3301,7 +3357,10 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 					Resource("deployments").
 					Name(deployName).
 					VersionedParams(&tc.opts, metav1.ParameterCodec)
-				_ = req.Body([]byte(tc.body)).Do(context.TODO())
+				result := req.Body([]byte(tc.body)).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected request err: %v", result.Error())
+				}
 			}
 
 		})
@@ -3319,50 +3378,25 @@ func benchFieldValidationSMP(b *testing.B, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: smpBody,
+			body: smpBodyValid,
 		},
 		{
 			name: "smp-warn-validation",
 			opts: metav1.PatchOptions{
 				FieldValidation: "Warn",
 			},
-			body: smpBody,
+			body: smpBodyValid,
 		},
 		{
 			name: "smp-ignore-validation",
 			opts: metav1.PatchOptions{
 				FieldValidation: "Ignore",
 			},
-			body: smpBody,
+			body: smpBodyValid,
 		},
 		{
 			name: "smp-no-validation",
-			body: smpBody,
-		},
-		{
-			name: "nonconflicting-smp-strict-validation",
-			opts: metav1.PatchOptions{
-				FieldValidation: "Strict",
-			},
-			body: nonconflictingSMPBody,
-		},
-		{
-			name: "nonconflicting-smp-warn-validation",
-			opts: metav1.PatchOptions{
-				FieldValidation: "Warn",
-			},
-			body: nonconflictingSMPBody,
-		},
-		{
-			name: "nonconflicting-smp-ignore-validation",
-			opts: metav1.PatchOptions{
-				FieldValidation: "Ignore",
-			},
-			body: nonconflictingSMPBody,
-		},
-		{
-			name: "nonconflicting-smp-no-validation",
-			body: nonconflictingSMPBody,
+			body: smpBodyValid,
 		},
 	}
 
@@ -3392,7 +3426,10 @@ func benchFieldValidationSMP(b *testing.B, client clientset.Interface) {
 					Resource("deployments").
 					Name(name).
 					VersionedParams(&tc.opts, metav1.ParameterCodec)
-				_ = req.Body([]byte(tc.body)).Do(context.TODO())
+				result := req.Body([]byte(tc.body)).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected request err: %v", result.Error())
+				}
 			}
 		})
 	}
@@ -3439,14 +3476,17 @@ func benchFieldValidationApplyCreate(b *testing.B, client clientset.Interface) {
 			b.ReportAllocs()
 			for n := 0; n < b.N; n++ {
 				name := fmt.Sprintf("apply-create-deployment-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
-				body := []byte(fmt.Sprintf(applyInvalidBody, name))
+				body := []byte(fmt.Sprintf(validBodyJSON, name))
 				req := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 					AbsPath("/apis/apps/v1").
 					Namespace("default").
 					Resource("deployments").
 					Name(name).
 					VersionedParams(&tc.opts, metav1.ParameterCodec)
-				_ = req.Body(body).Do(context.TODO())
+				result := req.Body(body).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected request err: %v", result.Error())
+				}
 			}
 		})
 	}
@@ -3504,14 +3544,17 @@ func benchFieldValidationApplyUpdate(b *testing.B, client clientset.Interface) {
 					b.Fatalf("unexpected apply create err: %v", createResult.Error())
 				}
 
-				updateBody := []byte(fmt.Sprintf(applyInvalidBody, name))
+				updateBody := []byte(fmt.Sprintf(applyValidBody, name))
 				updateReq := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 					AbsPath("/apis/apps/v1").
 					Namespace("default").
 					Resource("deployments").
 					Name(name).
 					VersionedParams(&tc.opts, metav1.ParameterCodec)
-				_ = updateReq.Body(updateBody).Do(context.TODO())
+				result := updateReq.Body(updateBody).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected request err: %v", result.Error())
+				}
 			}
 		})
 	}
