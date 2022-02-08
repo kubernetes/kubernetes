@@ -580,12 +580,6 @@ func dropDisabledFields(
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
-		!podPriorityInUse(oldPodSpec) {
-		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
-		// does not specify any values for these fields.
-		podSpec.PreemptionPolicy = nil
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS) && !podOSInUse(oldPodSpec) {
 		podSpec.OS = nil
 	}
@@ -736,17 +730,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 			return true
 		}
-	}
-	return false
-}
-
-// podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
-func podPriorityInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
-		return true
 	}
 	return false
 }

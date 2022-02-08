@@ -27,14 +27,11 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
@@ -536,8 +533,7 @@ func TestPodAdmission(t *testing.T) {
 			},
 		},
 	}
-	// Enable NonPreemptingPriority feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
+
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass
@@ -682,7 +678,6 @@ func TestPodAdmission(t *testing.T) {
 	for _, test := range tests {
 		klog.V(4).Infof("starting test %q", test.name)
 		ctrl := NewPlugin()
-		ctrl.nonPreemptingPriority = true
 		// Add existing priority classes.
 		if err := addPriorityClasses(ctrl, test.existingClasses); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
