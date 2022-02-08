@@ -42,7 +42,7 @@ const memoryManagerStateFileName = "memory_manager_state"
 // ActivePodsFunc is a function that returns a list of active pods
 type ActivePodsFunc func() []*v1.Pod
 
-type runtimeService interface {
+type RuntimeService interface {
 	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
 }
 
@@ -51,10 +51,11 @@ type sourcesReadyStub struct{}
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
+//go:generate mockgen -source=memory_manager.go -destination=testing/memory_manager_mock.go -package=testing Manager
 // Manager interface provides methods for Kubelet to manage pod memory.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime RuntimeService, initialContainers containermap.ContainerMap) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the memory allocation during the container removal

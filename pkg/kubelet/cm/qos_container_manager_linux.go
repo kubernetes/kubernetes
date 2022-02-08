@@ -43,6 +43,7 @@ const (
 	periodicQOSCgroupUpdateInterval = 1 * time.Minute
 )
 
+//go:generate mockgen -source=qos_container_manager_linux.go -destination=testing/qos_container_manager_mock_linux.go -package=testing QOSContainerManager
 type QOSContainerManager interface {
 	Start(func() v1.ResourceList, ActivePodsFunc) error
 	GetQOSContainersInfo() QOSContainersInfo

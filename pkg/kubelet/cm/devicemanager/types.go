@@ -28,6 +28,7 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
+//go:generate mockgen -source=types.go -destination=testing/devicemanager_mock.go -package=testing Manager
 // Manager manages all the Device Plugins running on a node.
 type Manager interface {
 	// Start starts device plugin registration service.

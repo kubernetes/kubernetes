@@ -41,7 +41,7 @@ import (
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
 
-type runtimeService interface {
+type RuntimeService interface {
 	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
 }
 
@@ -50,10 +50,11 @@ type policyName string
 // cpuManagerStateFileName is the file name where cpu manager stores its state
 const cpuManagerStateFileName = "cpu_manager_state"
 
+//go:generate mockgen -source=cpu_manager.go -destination=testing/cpu_manager_mock.go -package=testing Manager
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime RuntimeService, initialContainers containermap.ContainerMap) error
 
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
@@ -110,7 +111,7 @@ type manager struct {
 
 	// containerRuntime is the container runtime service interface needed
 	// to make UpdateContainerResources() calls against the containers.
-	containerRuntime runtimeService
+	containerRuntime RuntimeService
 
 	// activePods is a method for listing active pods on the node
 	// so all the containers can be updated in the reconciliation loop.
@@ -209,7 +210,7 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 	return manager, nil
 }
 
-func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime RuntimeService, initialContainers containermap.ContainerMap) error {
 	klog.InfoS("Starting CPU manager", "policy", m.policy.Name())
 	klog.InfoS("Reconciling", "reconcilePeriod", m.reconcilePeriod)
 	m.sourcesReady = sourcesReady

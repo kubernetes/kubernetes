@@ -55,6 +55,7 @@ type CgroupConfig struct {
 	ResourceParameters *ResourceConfig
 }
 
+//go:generate mockgen -source=types.go -destination=testing/cgroupmanager_mock.go -package=testing CgroupManager
 // CgroupManager allows for cgroup management.
 // Supports Cgroup Creation ,Deletion and Updates.
 type CgroupManager interface {
