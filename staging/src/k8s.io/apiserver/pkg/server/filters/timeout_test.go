@@ -219,6 +219,7 @@ func TestTimeoutHeaders(t *testing.T) {
 		})
 	}
 
+	postTimeoutCh := make(chan struct{})
 	ts := httptest.NewServer(
 		withDeadline(
 			WithTimeout(
@@ -226,13 +227,18 @@ func TestTimeoutHeaders(t *testing.T) {
 					h := w.Header()
 					// trigger the timeout
 					cancel()
-					// mutate response Headers
-					for j := 0; j < 1000; j++ {
-						h.Set("Test", "post")
+					// keep mutating response Headers until the request times out
+					for {
+						select {
+						case <-postTimeoutCh:
+							return
+						default:
+							h.Set("Test", "post")
+						}
 					}
 				}),
 				func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
-					return req, false, func() {}, apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
+					return req, false, func() { close(postTimeoutCh) }, apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 				},
 			),
 		),
