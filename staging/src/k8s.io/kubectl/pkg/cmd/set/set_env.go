@@ -190,10 +190,6 @@ func validateNoOverwrites(existing []v1.EnvVar, env []v1.EnvVar) error {
 	return nil
 }
 
-func keyToEnvName(key string) string {
-	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
-}
-
 func contains(key string, keyList []string) bool {
 	if len(keyList) == 0 {
 		return true
@@ -205,6 +201,14 @@ func contains(key string, keyList []string) bool {
 		}
 	}
 	return false
+}
+
+func (o *EnvOptions) keyToEnvName(key string) string {
+	envName := strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
+	if envName != key {
+		fmt.Fprintf(o.ErrOut, "warning: key %s transferred to %s\n", key, envName)
+	}
+	return envName
 }
 
 // Complete completes all required options
@@ -306,7 +310,7 @@ func (o *EnvOptions) RunEnv() error {
 				for key := range from.Data {
 					if contains(key, o.Keys) {
 						envVar := v1.EnvVar{
-							Name: keyToEnvName(key),
+							Name: o.keyToEnvName(key),
 							ValueFrom: &v1.EnvVarSource{
 								SecretKeyRef: &v1.SecretKeySelector{
 									LocalObjectReference: v1.LocalObjectReference{
@@ -323,7 +327,7 @@ func (o *EnvOptions) RunEnv() error {
 				for key := range from.Data {
 					if contains(key, o.Keys) {
 						envVar := v1.EnvVar{
-							Name: keyToEnvName(key),
+							Name: o.keyToEnvName(key),
 							ValueFrom: &v1.EnvVarSource{
 								ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 									LocalObjectReference: v1.LocalObjectReference{
