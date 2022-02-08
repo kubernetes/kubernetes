@@ -288,8 +288,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	containerRuntime string,
 	runtimeCgroups string,
 	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
-	nonMasqueradeCIDR string) error {
+	remoteImageEndpoint string) error {
 	if remoteRuntimeEndpoint != "" {
 		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
 		if remoteImageEndpoint == "" {

@@ -2356,7 +2356,7 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 }
 
 func TestPreInitRuntimeService(t *testing.T) {
-	err := PreInitRuntimeService(nil, nil, nil, "", "", "", "", "")
+	err := PreInitRuntimeService(nil, nil, nil, "", "", "", "")
 	if err == nil {
 		t.Fatal("PreInitRuntimeService should fail when not configured with a container runtime")
 	}

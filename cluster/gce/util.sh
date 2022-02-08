@@ -781,9 +781,6 @@ function construct-linux-kubelet-flags {
       flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
     fi
   fi
-  if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
-    flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
-  fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   local node_labels
   node_labels="$(build-linux-node-labels "${node_type}")"
