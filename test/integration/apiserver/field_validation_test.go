@@ -3107,10 +3107,6 @@ func benchFieldValidationPost(b *testing.B, client clientset.Interface) {
 			bodyBase: validBodyJSON,
 		},
 		{
-			name:     "post-no-validation",
-			bodyBase: validBodyJSON,
-		},
-		{
 			name: "post-ignore-validation",
 			opts: metav1.CreateOptions{
 				FieldValidation: "Ignore",
@@ -3130,11 +3126,6 @@ func benchFieldValidationPost(b *testing.B, client clientset.Interface) {
 			opts: metav1.CreateOptions{
 				FieldValidation: "Warn",
 			},
-			bodyBase:    validBodyYAML,
-			contentType: "application/yaml",
-		},
-		{
-			name:        "post-no-validation-yaml",
 			bodyBase:    validBodyYAML,
 			contentType: "application/yaml",
 		},
@@ -3191,14 +3182,10 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 			putBodyBase: validBodyJSON,
 		},
 		{
-			name: "put-default-ignore-validation",
+			name: "put-ignore-validation",
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Ignore",
 			},
-			putBodyBase: validBodyJSON,
-		},
-		{
-			name:        "put-ignore-validation",
 			putBodyBase: validBodyJSON,
 		},
 		{
@@ -3225,19 +3212,14 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 			putBodyBase: validBodyYAML,
 			contentType: "application/yaml",
 		},
-		{
-			name:        "put-no-validation-yaml",
-			putBodyBase: validBodyYAML,
-			contentType: "application/yaml",
-		},
 	}
 
 	for _, tc := range testcases {
 		b.Run(tc.name, func(b *testing.B) {
-			b.ResetTimer()
-			b.ReportAllocs()
+			names := make([]string, b.N)
 			for n := 0; n < b.N; n++ {
 				deployName := fmt.Sprintf("%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				names[n] = deployName
 				postBody := []byte(fmt.Sprintf(string(validBodyJSON), deployName))
 
 				if _, err := client.CoreV1().RESTClient().Post().
@@ -3249,6 +3231,11 @@ func benchFieldValidationPut(b *testing.B, client clientset.Interface) {
 					b.Fatalf("failed to create initial deployment: %v", err)
 				}
 
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				deployName := names[n]
 				putBody := []byte(fmt.Sprintf(string(tc.putBodyBase), deployName))
 				req := client.CoreV1().RESTClient().Put().
 					AbsPath("/apis/apps/v1").
@@ -3299,11 +3286,6 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 			body:      mergePatchBodyValid,
 		},
 		{
-			name:      "merge-patch-no-validation",
-			patchType: types.MergePatchType,
-			body:      mergePatchBodyValid,
-		},
-		{
 			name:      "json-patch-strict-validation",
 			patchType: types.JSONPatchType,
 			opts: metav1.PatchOptions{
@@ -3327,19 +3309,14 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 			},
 			body: jsonPatchBodyValid,
 		},
-		{
-			name:      "json-patch-no-validation",
-			patchType: types.JSONPatchType,
-			body:      jsonPatchBodyValid,
-		},
 	}
 
 	for _, tc := range testcases {
 		b.Run(tc.name, func(b *testing.B) {
-			b.ResetTimer()
-			b.ReportAllocs()
+			names := make([]string, b.N)
 			for n := 0; n < b.N; n++ {
 				deployName := fmt.Sprintf("%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				names[n] = deployName
 				postBody := []byte(fmt.Sprintf(string(validBodyJSON), deployName))
 
 				if _, err := client.CoreV1().RESTClient().Post().
@@ -3350,7 +3327,11 @@ func benchFieldValidationPatchTyped(b *testing.B, client clientset.Interface) {
 					DoRaw(context.TODO()); err != nil {
 					b.Fatalf("failed to create initial deployment: %v", err)
 				}
-
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				deployName := names[n]
 				req := client.CoreV1().RESTClient().Patch(tc.patchType).
 					AbsPath("/apis/apps/v1").
 					Namespace("default").
@@ -3394,18 +3375,14 @@ func benchFieldValidationSMP(b *testing.B, client clientset.Interface) {
 			},
 			body: smpBodyValid,
 		},
-		{
-			name: "smp-no-validation",
-			body: smpBodyValid,
-		},
 	}
 
 	for _, tc := range testcases {
 		b.Run(tc.name, func(b *testing.B) {
-			b.ResetTimer()
-			b.ReportAllocs()
+			names := make([]string, b.N)
 			for n := 0; n < b.N; n++ {
 				name := fmt.Sprintf("%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				names[n] = name
 				body := []byte(fmt.Sprintf(validBodyJSON, name))
 				_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 					AbsPath("/apis/apps/v1").
@@ -3419,7 +3396,11 @@ func benchFieldValidationSMP(b *testing.B, client clientset.Interface) {
 				if err != nil {
 					b.Fatalf("Failed to create object using Apply patch: %v", err)
 				}
-
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				name := names[n]
 				req := client.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).
 					AbsPath("/apis/apps/v1").
 					Namespace("default").
@@ -3460,12 +3441,6 @@ func benchFieldValidationApplyCreate(b *testing.B, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Ignore",
 				FieldManager:    "mgr",
-			},
-		},
-		{
-			name: "no-validation",
-			opts: metav1.PatchOptions{
-				FieldManager: "mgr",
 			},
 		},
 	}
@@ -3518,20 +3493,14 @@ func benchFieldValidationApplyUpdate(b *testing.B, client clientset.Interface) {
 				FieldManager:    "mgr",
 			},
 		},
-		{
-			name: "no-validation",
-			opts: metav1.PatchOptions{
-				FieldManager: "mgr",
-			},
-		},
 	}
 
 	for _, tc := range testcases {
 		b.Run(tc.name, func(b *testing.B) {
-			b.ResetTimer()
-			b.ReportAllocs()
+			names := make([]string, b.N)
 			for n := 0; n < b.N; n++ {
 				name := fmt.Sprintf("apply-update-deployment-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				names[n] = name
 				createBody := []byte(fmt.Sprintf(validBodyJSON, name))
 				createReq := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 					AbsPath("/apis/apps/v1").
@@ -3543,7 +3512,11 @@ func benchFieldValidationApplyUpdate(b *testing.B, client clientset.Interface) {
 				if createResult.Error() != nil {
 					b.Fatalf("unexpected apply create err: %v", createResult.Error())
 				}
-
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				name := names[n]
 				updateBody := []byte(fmt.Sprintf(applyValidBody, name))
 				updateReq := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 					AbsPath("/apis/apps/v1").
