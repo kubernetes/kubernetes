@@ -386,7 +386,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
-func (s preparedGenericAPIServer) Run(ctx context.Context) error {
+func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
 
@@ -398,7 +398,7 @@ func (s preparedGenericAPIServer) Run(ctx context.Context) error {
 			select {
 			case <-muxAndDiscoveryCompletedSignal:
 				continue
-			case <-ctx.Done():
+			case <-stopCh:
 				klog.V(1).Infof("haven't completed %s, stop requested", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 				return
 			}
@@ -411,7 +411,7 @@ func (s preparedGenericAPIServer) Run(ctx context.Context) error {
 		defer delayedStopCh.Signal()
 		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", delayedStopCh.Name())
 
-		<-ctx.Done()
+		<-stopCh
 
 		// As soon as shutdown is initiated, /readyz should start returning failure.
 		// This gives the load balancer a window defined by ShutdownDelayDuration to detect that /readyz is red
@@ -438,7 +438,7 @@ func (s preparedGenericAPIServer) Run(ctx context.Context) error {
 		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
 	}
 
-	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(ctx, stopHttpServerCh, shutdownTimeout)
+	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
 	if err != nil {
 		return err
 	}
@@ -461,7 +461,7 @@ func (s preparedGenericAPIServer) Run(ctx context.Context) error {
 	}()
 
 	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")
-	<-ctx.Done()
+	<-stopCh
 
 	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
 	err = s.RunPreShutdownHooks()
@@ -482,7 +482,7 @@ func (s preparedGenericAPIServer) Run(ctx context.Context) error {
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
-func (s preparedGenericAPIServer) NonBlockingRun(ctx context.Context, stopCh <-chan struct{}, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
 	// Use an stop channel to allow graceful shutdown without dropping audit events
 	// after http server shutdown.
 	auditStopCh := make(chan struct{})
@@ -495,15 +495,15 @@ func (s preparedGenericAPIServer) NonBlockingRun(ctx context.Context, stopCh <-c
 		}
 	}
 
-	// Use an internal stop channel to allow cleanup of the listeners on error.
-	internalStopCh := make(chan struct{})
+	// Use an internal context to allow cleanup of the listeners on error.
+	ctx, cancel := context.WithCancel(context.Background())
 	var stoppedCh <-chan struct{}
 	var listenerStoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
 		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.Serve(ctx, s.Handler, shutdownTimeout)
 		if err != nil {
-			close(internalStopCh)
+			cancel()
 			close(auditStopCh)
 			return nil, nil, err
 		}
@@ -514,7 +514,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(ctx context.Context, stopCh <-c
 	// ensure cleanup.
 	go func() {
 		<-stopCh
-		close(internalStopCh)
+		cancel()
 		if stoppedCh != nil {
 			<-stoppedCh
 		}
