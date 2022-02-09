@@ -23,6 +23,10 @@ import (
 	"strings"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/slice"
+
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1247,9 +1251,11 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(volume *v1.Persist
 		return "", nil
 	}
 
-	if newVolume.GetDeletionTimestamp() != nil {
-		klog.V(3).Infof("Volume %q is already being deleted", volume.Name)
-		return "", nil
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		if newVolume.GetDeletionTimestamp() != nil {
+			klog.V(3).Infof("Volume %q is already being deleted", volume.Name)
+			return "", nil
+		}
 	}
 	needsReclaim, err := ctrl.isVolumeReleased(newVolume)
 	if err != nil {
@@ -1439,9 +1445,39 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 		// Deleter failed
 		return pluginName, false, err
 	}
-
 	klog.V(2).Infof("volume %q deleted", volume.Name)
+	// Remove in-tree delete finalizer on the PV as the volume has been deleted from the underlying storage
+	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		err = ctrl.removeDeletionProtectionFinalizer(context.TODO(), volume)
+		if err != nil {
+			return pluginName, true, err
+		}
+	}
 	return pluginName, true, nil
+}
+
+func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx context.Context, volume *v1.PersistentVolume) error {
+	var err error
+	pvUpdateNeeded := false
+	volumeClone := volume.DeepCopy()
+	pvFinalizers := volumeClone.Finalizers
+	if pvFinalizers != nil && slice.ContainsString(pvFinalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil) {
+		pvUpdateNeeded = true
+		pvFinalizers = slice.RemoveString(pvFinalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil)
+	}
+	if pvUpdateNeeded {
+		volumeClone.SetFinalizers(pvFinalizers)
+		_, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("persistent volume controller can't update finalizer: %v", err)
+		}
+		_, err = ctrl.storeVolumeUpdate(volumeClone)
+		if err != nil {
+			return fmt.Errorf("persistent Volume Controller can't anneal migration finalizer: %v", err)
+		}
+		klog.V(2).Infof("PV in-tree protection finalizer removed from volume: %q", volume.Name)
+	}
+	return nil
 }
 
 // provisionClaim starts new asynchronous operation to provision a claim if
@@ -1618,6 +1654,11 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	// Add AnnBoundByController (used in deleting the volume)
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, pvutil.AnnBoundByController, "yes")
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, pvutil.AnnDynamicallyProvisioned, plugin.GetPluginName())
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		// Add finalizer here
+		volume.SetFinalizers([]string{pvutil.PVDeletionInTreeProtectionFinalizer})
+	}
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {

@@ -78,6 +78,9 @@ const (
 
 	//PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
 	PVDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
+
+	// PVDeletionInTreeProtectionFinalizer is the finalizer added to protect PV deletion for in-tree volumes.
+	PVDeletionInTreeProtectionFinalizer = "kubernetes.io/pv-controller"
 )
 
 // IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation

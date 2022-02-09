@@ -294,29 +294,15 @@ func TestControllerSync(t *testing.T) {
 			},
 		},
 		{
-			// delete success(?) - volume has deletion timestamp before doDelete() starts
-			"8-13 - volume is has deletion timestamp and is not processed",
-			withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)),
-			withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty)),
-			noclaims,
-			noclaims,
-			noevents, noerrors,
-			// We don't need to do anything in test function because deletion will be noticed automatically and synced.
-			// Attempting to use testSyncVolume here will cause an error because of race condition between manually
-			// calling testSyncVolume and volume loop running.
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				return nil
-			},
-		},
-		{
-			// Test that the finalizer gets removed if CSI migration is disabled.
+			// Test that the finalizer gets removed if CSI migration is disabled. The in-tree finalizer is added
+			// back on the PV since migration is disabled.
 			"5-9 - volume has its PV deletion protection finalizer removed as CSI migration is disabled",
 			volumesWithFinalizers(
 				volumesWithAnnotation(pvutil.AnnMigratedTo, "pd.csi.storage.gke.io",
 					newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned)),
 				[]string{pvutil.PVDeletionProtectionFinalizer},
 			),
-			newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+			volumesWithFinalizers(newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned), []string{pvutil.PVDeletionInTreeProtectionFinalizer}),
 			noclaims,
 			noclaims,
 			noevents,
@@ -743,12 +729,13 @@ func TestUpdateFinalizer(t *testing.T) {
 		{
 			// Represents an in-tree volume that has the migrated-to annotation but the external-provisioner is
 			// yet to sync the volume and add the pv deletion protection finalizer. The custom finalizer is some
-			// pre-existing finalizer, for example the pv-protection finalizer. The csi-migration is disabled,
-			// the migrated-to annotation will be removed shortly when updateVolumeMigrationAnnotationsAndFinalizers is called.
+			// pre-existing finalizer, for example the pv-protection finalizer. When csi-migration is disabled,
+			// the migrated-to annotation will be removed shortly when updateVolumeMigrationAnnotationsAndFinalizers
+			// is called followed by adding back the in-tree pv protection finalizer.
 			name:                "13-3 migration was disabled but still has migrated-to annotation, volume does not have pv deletion protection finalizer",
 			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			volumeFinalizers:    []string{customFinalizer},
-			expVolumeFinalizers: []string{customFinalizer},
+			expVolumeFinalizers: []string{customFinalizer, pvutil.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
 		},
@@ -756,39 +743,40 @@ func TestUpdateFinalizer(t *testing.T) {
 			name:                "13-4 migration was disabled but still has migrated-to annotation, volume has no finalizers",
 			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			volumeFinalizers:    nil,
-			expVolumeFinalizers: nil,
+			expVolumeFinalizers: []string{pvutil.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
 			// Represents roll back scenario where the external-provisioner has added the pv deletion protection
 			// finalizer and later the csi migration was disabled. The pv deletion protection finalizer added through
-			// external-provisioner will be removed.
+			// external-provisioner will be removed and the in-tree pv deletion protection finalizer will be added.
 			name:                "13-5 migration was disabled as it has the migrated-to annotation, volume has the finalizer",
 			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
-			expVolumeFinalizers: nil,
+			expVolumeFinalizers: []string{pvutil.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
 			// Represents roll-back of csi-migration as 13-5, here there are multiple finalizers, only the pv deletion
-			// protection finalizer added by external-provisioner needs to be removed.
+			// protection finalizer added by external-provisioner will be removed and the in-tree pv deletion protection
+			// finalizer will be added.
 			name:                "13-6 migration was disabled as it has the migrated-to annotation, volume has multiple finalizers",
 			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer, customFinalizer},
-			expVolumeFinalizers: []string{customFinalizer},
+			expVolumeFinalizers: []string{customFinalizer, pvutil.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
 			// csi migration is enabled, the pv controller should not delete the finalizer added by the
-			// external-provisioner.
+			// external-provisioner and the in-tree finalizer should be deleted.
 			name:                "13-7 migration is enabled, has the migrated-to annotation, volume has the finalizer",
 			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
+			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer, pvutil.PVDeletionInTreeProtectionFinalizer},
 			expVolumeFinalizers: []string{pvutil.PVDeletionProtectionFinalizer},
-			expModified:         false,
+			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{features.CSIMigration, features.CSIMigrationGCE},
 		},
 		{
@@ -797,16 +785,17 @@ func TestUpdateFinalizer(t *testing.T) {
 			name:                "13-8 migration is enabled but plugin migration feature is disabled, has the migrated-to annotation, volume has the finalizer",
 			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer},
-			expVolumeFinalizers: nil,
+			expVolumeFinalizers: []string{pvutil.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
 		},
 		{
-			// same as 13-8 but multiple finalizers exists, only the pv deletion protection finalizer needs to be removed.
+			// same as 13-8 but multiple finalizers exists, only the pv deletion protection finalizer needs to be
+			// removed and the in-tree pv deletion protection finalizer needs to be added.
 			name:                "13-9 migration is enabled but plugin migration feature is disabled, has the migrated-to annotation, volume has multiple finalizers",
 			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			volumeFinalizers:    []string{pvutil.PVDeletionProtectionFinalizer, customFinalizer},
-			expVolumeFinalizers: []string{customFinalizer},
+			expVolumeFinalizers: []string{customFinalizer, pvutil.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
 		},
@@ -835,6 +824,15 @@ func TestUpdateFinalizer(t *testing.T) {
 			expVolumeFinalizers: []string{pvutil.PVDeletionProtectionFinalizer},
 			expModified:         false,
 			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// csi migration is enabled, the pv controller should delete the in-tree finalizer
+			name:                "13-13 migration is enabled, has the migrated-to annotation, volume has the in-tree finalizer",
+			volumeAnnotations:   map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			volumeFinalizers:    []string{pvutil.PVDeletionInTreeProtectionFinalizer},
+			expVolumeFinalizers: nil,
+			expModified:         true,
+			migratedDriverGates: []featuregate.Feature{features.CSIMigration, features.CSIMigrationGCE},
 		},
 	}
 

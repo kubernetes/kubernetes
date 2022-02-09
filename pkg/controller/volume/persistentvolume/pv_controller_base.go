@@ -409,6 +409,7 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 
 	migratedToDriver := ann[pvutil.AnnMigratedTo]
 	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
+		modified := false
 		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)
 		if err != nil {
 			klog.Errorf("Could not update volume migration annotations. Migration enabled for plugin %s but could not find corresponding driver name: %v", provisioner, err)
@@ -416,19 +417,37 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 		}
 		if migratedToDriver != csiDriverName {
 			ann[pvutil.AnnMigratedTo] = csiDriverName
-			return true
+			modified = true
 		}
+		// Remove in-tree delete finalizer on the PV as migration is enabled.
+		if !claim && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+			if finalizers != nil && slice.ContainsString(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil) {
+				*finalizers = slice.RemoveString(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil)
+				modified = true
+			}
+		}
+		return modified
 	} else {
 		if migratedToDriver != "" {
 			// Migration annotation exists but the driver isn't migrated currently
 			delete(ann, pvutil.AnnMigratedTo)
-			// Remove the PV deletion protection finalizer on volumes.
-			if !claim && finalizers != nil && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+			if !claim && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+				modified := false
+				if finalizers == nil {
+					*finalizers = []string{}
+				}
+				// Add back the in-tree PV deletion protection finalizer if does not already exists
+				if !slice.ContainsString(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil) {
+					*finalizers = append(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer)
+					modified = true
+				}
+				// Remove the external PV deletion protection finalizer
 				if slice.ContainsString(*finalizers, pvutil.PVDeletionProtectionFinalizer, nil) {
 					*finalizers = slice.RemoveString(*finalizers, pvutil.PVDeletionProtectionFinalizer, nil)
+					modified = true
 				}
+				return modified
 			}
-			return true
 		}
 	}
 	return false
