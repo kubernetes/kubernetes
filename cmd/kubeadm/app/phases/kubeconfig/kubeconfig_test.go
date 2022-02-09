@@ -262,7 +262,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			kubeConfig:         configWithAnotherClusterCa,
 			expectedError:      true,
 		},
-		{ // if KubeConfig is not equal to the existingKubeConfig - tollerate custom server addresses
+		{ // if KubeConfig is not equal to the existingKubeConfig - tolerate custom server addresses
 			name:               "KubeConfig referst to the cluster with another address",
 			existingKubeConfig: config,
 			kubeConfig:         configWithAnotherClusterAddress,
@@ -484,7 +484,7 @@ func TestValidateKubeConfig(t *testing.T) {
 	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
 
 	// create a valid config but with whitespace around the CA PEM.
-	// validateKubeConfig() should tollerate that.
+	// validateKubeConfig() should tolerate that.
 	configWhitespace := config.DeepCopy()
 	configWhitespaceCtx := configWhitespace.Contexts[configWhitespace.CurrentContext]
 	configWhitespaceCA := string(configWhitespace.Clusters[configWhitespaceCtx.Cluster].CertificateAuthorityData)

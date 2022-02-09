@@ -82,11 +82,9 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 		// Extract the value of the UnversionedKubeletConfigMap feature gate if its present.
 		// TODO: remove this after the UnversionedKubeletConfigMap feature gate goes GA:
 		// https://github.com/kubernetes/kubeadm/issues/1582
-		var UnversionedKubeletConfigMap bool
+		UnversionedKubeletConfigMap := true
 		if _, ok := m["featureGates"]; ok {
 			if featureGates, ok := m["featureGates"].(map[interface{}]interface{}); ok {
-				// TODO: update the default to true once this graduates to Beta.
-				UnversionedKubeletConfigMap = false
 				if val, ok := featureGates["UnversionedKubeletConfigMap"]; ok {
 					if valBool, ok := val.(bool); ok {
 						UnversionedKubeletConfigMap = valBool
