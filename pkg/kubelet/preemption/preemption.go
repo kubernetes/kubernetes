@@ -32,7 +32,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-const message = "Preempted in order to admit critical pod"
+const messageTemplate = "Preempted in order to admit critical pod %s"
 
 // CriticalPodAdmissionHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
 // If the ONLY admission failures are due to insufficient resources, then CriticalPodAdmissionHandler evicts pods
@@ -92,13 +92,14 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, f
 func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, insufficientResources admissionRequirementList) error {
 	podsToPreempt, err := getPodsToPreempt(admitPod, c.getPodsFunc(), insufficientResources)
 	if err != nil {
-		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
+		return fmt.Errorf("preemption: error finding a set of pods to preempt for %s: %v", klog.KObj(admitPod), err)
 	}
 	for _, pod := range podsToPreempt {
 		// record that we are evicting the pod
+		message := fmt.Sprintf(messageTemplate, klog.KObj(pod))
 		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, message)
 		// this is a blocking call and should only return when the pod and its containers are killed.
-		klog.V(3).InfoS("Preempting pod to free up resources", "pod", klog.KObj(pod), "podUID", pod.UID, "insufficientResources", insufficientResources)
+		klog.V(3).InfoS("Preempting pod to free up resources", "pod", klog.KObj(pod), "podUID", pod.UID, "insufficientResources", insufficientResources, "admitPod", klog.KObj(admitPod))
 		err := c.killPodFunc(pod, true, nil, func(status *v1.PodStatus) {
 			status.Phase = v1.PodFailed
 			status.Reason = events.PreemptContainer
