@@ -423,7 +423,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	// close socket after delayed stopCh
 	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
-	stopHttpServerCh := delayedStopCh.Signaled()
+	delayedStopOrDrainedCh := delayedStopCh.Signaled()
 	shutdownTimeout := s.ShutdownTimeout
 	if s.ShutdownSendRetryAfter {
 		// when this mode is enabled, we do the following:
@@ -432,10 +432,19 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s
-		stopHttpServerCh = drainedCh.Signaled()
+		delayedStopOrDrainedCh = drainedCh.Signaled()
 		shutdownTimeout = 2 * time.Second
 		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
 	}
+
+	// pre-shutdown hooks need to finish before we stop the http server
+	preShutdownHooksHasStoppedCh, stopHttpServerCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stopHttpServerCh)
+
+		<-delayedStopOrDrainedCh
+		<-preShutdownHooksHasStoppedCh
+	}()
 
 	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
 	if err != nil {
@@ -463,7 +472,10 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	<-stopCh
 
 	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
-	err = s.RunPreShutdownHooks()
+	func() {
+		defer close(preShutdownHooksHasStoppedCh)
+		err = s.RunPreShutdownHooks()
+	}()
 	if err != nil {
 		return err
 	}
