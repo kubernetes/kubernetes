@@ -1521,7 +1521,12 @@ func TestPodTimestamp(t *testing.T) {
 				op(queue, test.operands[i])
 			}
 
-			for i := 0; i < len(test.expected); i++ {
+			expectedLen := len(test.expected)
+			if queue.activeQ.Len() != expectedLen {
+				t.Fatalf("Expected %v items to be in activeQ, but got: %v", expectedLen, queue.activeQ.Len())
+			}
+
+			for i := 0; i < expectedLen; i++ {
 				if pInfo, err := queue.activeQ.Pop(); err != nil {
 					t.Errorf("Error while popping the head of the queue: %v", err)
 				} else {
