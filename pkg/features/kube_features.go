@@ -487,6 +487,7 @@ const (
 
 	// owner: @arjunrn @mwielgus @josephburnett
 	// alpha: v1.20
+	// beta: v1.25
 	//
 	// Add support for the HPA to scale based on metrics from individual containers
 	// in target pods
@@ -901,7 +902,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinOverlay:                                     {Default: true, PreRelease: featuregate.Beta},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
 	DisableAcceleratorUsageMetrics:                 {Default: true, PreRelease: featuregate.Beta},
-	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
+	HPAContainerMetrics:                            {Default: true, PreRelease: featuregate.Beta},
 	SizeMemoryBackedVolumes:                        {Default: true, PreRelease: featuregate.Beta},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
