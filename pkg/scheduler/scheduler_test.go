@@ -852,7 +852,9 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit), "Filter", "PreFilter"),
 	}
-	scheduler, _, errChan := setupTestScheduler(ctx, queuedPodStore, scache, nil, nil, fns...)
+
+	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objects...), 0)
+	scheduler, _, errChan := setupTestScheduler(ctx, queuedPodStore, scache, informerFactory, nil, fns...)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
 	scheduler.scheduleOne(ctx)
@@ -962,8 +964,6 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, volumeBinder volum
 		}, "PreFilter", "Filter", "Reserve", "PreBind"),
 	}
 	s, bindingChan, errChan := setupTestScheduler(ctx, queuedPodStore, scache, informerFactory, broadcaster, fns...)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
 	return s, bindingChan, errChan
 }
 
