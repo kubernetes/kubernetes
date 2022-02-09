@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"google.golang.org/grpc/grpclog"
@@ -128,7 +129,15 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	stop := func() {
-		cancel()
+		// try to exit etcd gracefully
+		cmd.Process.Signal(syscall.SIGTERM)
+		go func() {
+			select {
+			case <-ctx.Done():
+			case <-time.After(5 * time.Second):
+				cancel()
+			}
+		}()
 		err := cmd.Wait()
 		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
