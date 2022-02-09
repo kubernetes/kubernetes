@@ -18,7 +18,6 @@ package apiclient
 
 import (
 	"net"
-	"strings"
 
 	"github.com/pkg/errors"
 
@@ -36,7 +35,6 @@ import (
 // Need to handle these routes in a special manner:
 // - GET /default/services/kubernetes -- must return a valid Service
 // - GET /clusterrolebindings/system:nodes -- can safely return a NotFound error
-// - GET /kube-system/secrets/bootstrap-token-* -- can safely return a NotFound error
 // - GET /nodes/<node-name> -- must return a valid Node
 // - ...all other, unknown GETs/LISTs will be logged
 type InitDryRunGetter struct {
@@ -61,7 +59,6 @@ func (idr *InitDryRunGetter) HandleGetAction(action core.GetAction) (bool, runti
 		idr.handleKubernetesService,
 		idr.handleGetNode,
 		idr.handleSystemNodesClusterRoleBinding,
-		idr.handleGetBootstrapToken,
 	}
 	for _, f := range funcs {
 		handled, obj, err := f(action)
@@ -147,15 +144,4 @@ func (idr *InitDryRunGetter) handleSystemNodesClusterRoleBinding(action core.Get
 	// We can safely return a NotFound error here as the code will just proceed normally and don't care about modifying this clusterrolebinding
 	// This can only happen on an upgrade; and in that case the ClientBackedDryRunGetter impl will be used
 	return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), "clusterrolebinding not found")
-}
-
-// handleGetBootstrapToken handles the case where kubeadm init creates the default token; and the token code GETs the
-// bootstrap token secret first in order to check if it already exists
-func (idr *InitDryRunGetter) handleGetBootstrapToken(action core.GetAction) (bool, runtime.Object, error) {
-	if !strings.HasPrefix(action.GetName(), "bootstrap-token-") || action.GetNamespace() != metav1.NamespaceSystem || action.GetResource().Resource != "secrets" {
-		// We can't handle this event
-		return false, nil, nil
-	}
-	// We can safely return a NotFound error here as the code will just proceed normally and create the Bootstrap Token
-	return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), "secret not found")
 }
