@@ -87,8 +87,6 @@ var (
 		// allows users to address all alpha api versions
 		APIAlpha: func(gvr schema.GroupVersionResource) bool { return alphaPattern.MatchString(gvr.Version) },
 	}
-
-	groupVersionResourceMatchersOrder = []string{APIAll, APIGA, APIBeta, APIAlpha}
 )
 
 func resourceMatcherForVersion(gv schema.GroupVersion) func(gvr schema.GroupVersionResource) bool {
@@ -192,11 +190,11 @@ func MergeAPIResourceConfigs(
 		// if a user has expressed a preference about a version, that preference takes priority over the hardcoded resources
 		resourceConfig.RemoveMatchingResourcePreferences(resourceMatcherForVersion(versionPreference.groupVersion))
 		if versionPreference.enabled {
-			// enable the groupVersion for "group/version=true" and "group/version/resource=true"
+			// enable the groupVersion for "group/version=true"
 			resourceConfig.EnableVersions(versionPreference.groupVersion)
 
 		} else {
-			// disable the groupVersion only for "group/version=false", not "group/version/resource=false"
+			// disable the groupVersion only for "group/version=false"
 			resourceConfig.DisableVersions(versionPreference.groupVersion)
 		}
 	}
@@ -204,6 +202,7 @@ func MergeAPIResourceConfigs(
 	// apply resource preferences last, so they have the highest priority
 	for _, resourcePreference := range resourcePreferences {
 		if resourcePreference.enabled {
+			// enable the resource for "group/version/resource=true"
 			resourceConfig.EnableResources(resourcePreference.groupVersionResource)
 		} else {
 			resourceConfig.DisableResources(resourcePreference.groupVersionResource)

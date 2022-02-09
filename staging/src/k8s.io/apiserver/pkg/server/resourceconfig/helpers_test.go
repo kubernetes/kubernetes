@@ -20,15 +20,13 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1 "k8s.io/api/apps/v1"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/stretchr/testify/require"
 
+	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 )
 
@@ -40,6 +38,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		runtimeConfig         map[string]string
 		defaultResourceConfig func() *serverstore.ResourceConfig
 		expectedAPIConfig     func() *serverstore.ResourceConfig
+		expectedEnabledAPIs   map[schema.GroupVersionResource]bool
 		err                   bool
 	}{
 		{
@@ -65,7 +64,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				return newFakeAPIResourceConfigSource()
 			},
-			err: false,
+			expectedEnabledAPIs: defaultFakeEnabledResources(),
+			err:                 false,
 		},
 		{
 			name:          "no-runtimeConfig-override",
@@ -80,7 +80,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
 			},
-			err: false,
+			expectedEnabledAPIs: defaultFakeEnabledResources(),
+			err:                 false,
 		},
 		{
 			name: "version-enabled-by-runtimeConfig-override",
@@ -95,7 +96,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config := newFakeAPIResourceConfigSource()
 				return config
 			},
-			err: false,
+			expectedEnabledAPIs: defaultFakeEnabledResources(),
+			err:                 false,
 		},
 		{
 			name: "disable-v1",
@@ -110,6 +112,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableVersions(apiv1GroupVersion)
 				return config
 			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       false,
+			},
 			err: false,
 		},
 		{
@@ -123,7 +133,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				return newFakeAPIResourceConfigSource()
 			},
-			err: false,
+			expectedEnabledAPIs: defaultFakeEnabledResources(),
+			err:                 false,
 		},
 		{
 			name: "enable-all",
@@ -139,6 +150,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				// disabling groups of APIs removes the individual resource preferences from the default
 				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
+			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  true,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
 			},
 			err: false,
 		},
@@ -159,6 +178,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               false,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			},
 			err: false,
 		},
 		{
@@ -174,7 +201,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.EnableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
-			err: false,
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			}, err: false,
 		},
 		{
 			name: "disable-specific-extensions-resources",
@@ -189,7 +223,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"))
 				return config
 			},
-			err: false,
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			}, err: false,
 		},
 		{
 			name: "disable-all-extensions-resources",
@@ -206,7 +247,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
-			err: false,
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			}, err: false,
 		},
 		{
 			name: "disable-a-no-extensions-resources",
@@ -220,6 +268,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
+			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               false,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
 			},
 			err: false, // no error for backwards compatibility
 		},
@@ -238,6 +294,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			},
 			err: false, // no error for backwards compatibility
 		},
 		{
@@ -253,6 +317,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
+			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               false,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
 			},
 			err: false, // no error for backwards compatibility
 		},
@@ -271,6 +343,15 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				appsv1.SchemeGroupVersion.WithResource("other"):                     false,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			},
 			err: false, // no error for backwards compatibility
 		},
 		{
@@ -286,6 +367,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
+			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               false,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
 			},
 			err: false, // no error for backwards compatibility
 		},
@@ -304,6 +393,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableVersions(appsv1.SchemeGroupVersion)
 				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
+			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       false,
 			},
 			err: false, // no error for backwards compatibility
 		},
@@ -324,6 +421,15 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               false,
+				appsv1.SchemeGroupVersion.WithResource("other"):                     true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       false,
+			},
 			err: false, // no error for backwards compatibility
 		},
 		{
@@ -343,6 +449,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       false,
+			},
 			err: false, // no error for backwards compatibility
 		},
 		{
@@ -361,6 +475,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               false,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			},
 			err: false, // no error for backwards compatibility
 		},
 		{
@@ -378,6 +500,15 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableVersions(appsv1.SchemeGroupVersion)
 				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
+			},
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				appsv1.SchemeGroupVersion.WithResource("other"):                     false,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
 			},
 			err: false, // no error for backwards compatibility
 		},
@@ -398,6 +529,20 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedConfig := test.expectedAPIConfig()
 			if !reflect.DeepEqual(actualDisablers, expectedConfig) {
 				t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
+			}
+
+			for _, resourceToCheck := range apiResourcesToCheck() {
+				actual := actualDisablers.ResourceEnabled(resourceToCheck)
+				expected := test.expectedEnabledAPIs[resourceToCheck]
+				if actual != expected {
+					t.Errorf("for %v, actual=%v, expected=%v", resourceToCheck, actual, expected)
+				}
+			}
+			for resourceToCheck, expected := range test.expectedEnabledAPIs {
+				actual := actualDisablers.ResourceEnabled(resourceToCheck)
+				if actual != expected {
+					t.Errorf("for %v, actual=%v, expected=%v", resourceToCheck, actual, expected)
+				}
 			}
 		})
 	}
@@ -432,7 +577,29 @@ func matchAllExplicitResourcesForFake(gvr schema.GroupVersionResource) bool {
 		return true
 	}
 	return false
+}
 
+// apiResourcesToCheck are the apis we use in this set of unit tests.  They will be check for enable/disable status
+func apiResourcesToCheck() []schema.GroupVersionResource {
+	return []schema.GroupVersionResource{
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
+		appsv1.SchemeGroupVersion.WithResource("deployments"),
+		apiv1.SchemeGroupVersion.WithResource("pods"),
+	}
+}
+
+func defaultFakeEnabledResources() map[schema.GroupVersionResource]bool {
+	return map[schema.GroupVersionResource]bool{
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   true,
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+		appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+		apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+	}
 }
 
 func newFakeScheme(t *testing.T) *runtime.Scheme {

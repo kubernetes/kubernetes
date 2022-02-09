@@ -240,7 +240,7 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 
 func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
-		if s.APIResourceConfigSource.AnyVersionForGroupEnabled(potentialStorageResource.Group) {
+		if s.APIResourceConfigSource.AnyResourceForGroupEnabled(potentialStorageResource.Group) {
 			return potentialStorageResource
 		}
 	}
