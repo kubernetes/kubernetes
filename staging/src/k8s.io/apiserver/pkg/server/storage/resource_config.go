@@ -70,6 +70,20 @@ func (o *ResourceConfig) EnableMatchingVersions(matcher func(gv schema.GroupVers
 	}
 }
 
+// RemoveMatchingResourcePreferences removes individual resource preferences that match.  This is useful when an override of a version or level enablement should
+// override the previously individual preferences.
+func (o *ResourceConfig) RemoveMatchingResourcePreferences(matcher func(gvr schema.GroupVersionResource) bool) {
+	keysToRemove := []schema.GroupVersionResource{}
+	for k := range o.ResourceConfigs {
+		if matcher(k) {
+			keysToRemove = append(keysToRemove, k)
+		}
+	}
+	for _, k := range keysToRemove {
+		delete(o.ResourceConfigs, k)
+	}
+}
+
 // DisableVersions disables the versions entirely.
 func (o *ResourceConfig) DisableVersions(versions ...schema.GroupVersion) {
 	for _, version := range versions {

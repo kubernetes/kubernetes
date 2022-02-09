@@ -20,6 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/stretchr/testify/require"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -32,13 +36,28 @@ func TestParseRuntimeConfig(t *testing.T) {
 	scheme := newFakeScheme(t)
 	apiv1GroupVersion := apiv1.SchemeGroupVersion
 	testCases := []struct {
+		name                  string
 		runtimeConfig         map[string]string
 		defaultResourceConfig func() *serverstore.ResourceConfig
 		expectedAPIConfig     func() *serverstore.ResourceConfig
 		err                   bool
 	}{
 		{
-			// everything default value.
+			name: "using-kind",
+			runtimeConfig: map[string]string{
+				"apps/v1/Deployment": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedEnabledAPIs: defaultFakeEnabledResources(),
+			err:                 true,
+		},
+		{
+			name:          "everything-default-value",
 			runtimeConfig: map[string]string{},
 			defaultResourceConfig: func() *serverstore.ResourceConfig {
 				return newFakeAPIResourceConfigSource()
@@ -49,7 +68,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// no runtimeConfig override.
+			name:          "no-runtimeConfig-override",
 			runtimeConfig: map[string]string{},
 			defaultResourceConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
@@ -64,7 +83,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// version enabled by runtimeConfig override.
+			name: "version-enabled-by-runtimeConfig-override",
 			runtimeConfig: map[string]string{
 				"apps/v1": "",
 			},
@@ -79,7 +98,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// Disable v1.
+			name: "disable-v1",
 			runtimeConfig: map[string]string{
 				"/v1": "false",
 			},
@@ -94,7 +113,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// invalid runtime config
+			name: "invalid-runtime-config",
 			runtimeConfig: map[string]string{
 				"invalidgroup/version": "false",
 			},
@@ -107,7 +126,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// enable all
+			name: "enable-all",
 			runtimeConfig: map[string]string{
 				"api/all": "true",
 			},
@@ -117,12 +136,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.EnableVersions(scheme.PrioritizedVersionsAllGroups()...)
+				// disabling groups of APIs removes the individual resource preferences from the default
+				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
 			err: false,
 		},
 		{
-			// only enable v1
+			name: "only-enable-v1",
 			runtimeConfig: map[string]string{
 				"api/all": "false",
 				"/v1":     "true",
@@ -132,13 +153,16 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(appsv1.SchemeGroupVersion)
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				// disabling groups of APIs removes the individual resource preferences from the default
+				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
 			err: false,
 		},
 		{
-			// enable specific extensions resources
+			name: "enable-specific-extensions-resources",
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1/deployments": "true",
 			},
@@ -153,7 +177,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// disable specific extensions resources
+			name: "disable-specific-extensions-resources",
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1/ingresses": "false",
 			},
@@ -168,7 +192,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// disable all extensions resources
+			name: "disable-all-extensions-resources",
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1": "false",
 			},
@@ -178,12 +202,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				// disabling groups of APIs removes the individual resource preferences from the default
+				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
 			err: false,
 		},
 		{
-			// disable a non-extensions resource
+			name: "disable-a-no-extensions-resources",
 			runtimeConfig: map[string]string{
 				"apps/v1/deployments": "false",
 			},
@@ -191,12 +217,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				return newFakeAPIResourceConfigSource()
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
-				return newFakeAPIResourceConfigSource()
+				config := newFakeAPIResourceConfigSource()
+				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
 			},
 			err: false, // no error for backwards compatibility
 		},
 		{
-			// disable all beta resources
+			name: "disable-all-beta-resources",
 			runtimeConfig: map[string]string{
 				"api/beta": "false",
 			},
@@ -206,24 +234,172 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				// disabling groups of APIs removes the individual resource preferences from the default
+				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-disable-resource-over-user-version-enable",
+			runtimeConfig: map[string]string{
+				"apps/v1":             "true",
+				"apps/v1/deployments": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-enable-resource-over-user-version-disable",
+			runtimeConfig: map[string]string{
+				"apps/v1":             "false",
+				"apps/v1/deployments": "true",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(appsv1.SchemeGroupVersion)
+				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-disable-resource-over-user-stability-enable",
+			runtimeConfig: map[string]string{
+				"api/ga":              "true",
+				"apps/v1/deployments": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-enable-resource-over-user-stability-disable",
+			runtimeConfig: map[string]string{
+				"api/ga":              "false",
+				"apps/v1/deployments": "true",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(apiv1.SchemeGroupVersion)
+				config.DisableVersions(appsv1.SchemeGroupVersion)
+				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-disable-resource-over-user-version-enable-over-user-stability-disable",
+			runtimeConfig: map[string]string{
+				"api/ga":              "false",
+				"apps/v1":             "true",
+				"apps/v1/deployments": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(apiv1.SchemeGroupVersion)
+				config.EnableVersions(appsv1.SchemeGroupVersion)
+				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-enable-resource-over-user-version-disable-over-user-stability-disable",
+			runtimeConfig: map[string]string{
+				"api/ga":              "false",
+				"apps/v1":             "false",
+				"apps/v1/deployments": "true",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(apiv1.SchemeGroupVersion)
+				config.DisableVersions(appsv1.SchemeGroupVersion)
+				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-disable-resource-over-user-version-enable-over-user-stability-enable",
+			runtimeConfig: map[string]string{
+				"api/ga":              "true",
+				"apps/v1":             "true",
+				"apps/v1/deployments": "false",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.EnableVersions(appsv1.SchemeGroupVersion)
+				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
+			},
+			err: false, // no error for backwards compatibility
+		},
+		{
+			name: "user-explicit-enable-resource-over-user-version-disable-over-user-stability-enable",
+			runtimeConfig: map[string]string{
+				"api/ga":              "true",
+				"apps/v1":             "false",
+				"apps/v1/deployments": "true",
+			},
+			defaultResourceConfig: func() *serverstore.ResourceConfig {
+				return newFakeAPIResourceConfigSource()
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := newFakeAPIResourceConfigSource()
+				config.DisableVersions(appsv1.SchemeGroupVersion)
+				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			err: false, // no error for backwards compatibility
 		},
 	}
-	for index, test := range testCases {
-		t.Log(scheme.PrioritizedVersionsAllGroups())
-		actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, scheme)
-		if err == nil && test.err {
-			t.Fatalf("expected error for test case: %v", index)
-		} else if err != nil && !test.err {
-			t.Fatalf("unexpected error: %s, for test: %v", err, test)
-		}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			t.Log(scheme.PrioritizedVersionsAllGroups())
+			actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, scheme)
+			if err == nil && test.err {
+				t.Fatalf("expected error")
+			} else if err != nil && !test.err {
+				t.Fatalf("unexpected error: %s, for test: %v", err, test)
+			}
+			if err != nil {
+				return
+			}
 
-		expectedConfig := test.expectedAPIConfig()
-		if err == nil && !reflect.DeepEqual(actualDisablers, expectedConfig) {
-			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
-		}
+			expectedConfig := test.expectedAPIConfig()
+			if !reflect.DeepEqual(actualDisablers, expectedConfig) {
+				t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
+			}
+		})
 	}
 }
 
@@ -232,6 +408,7 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
+		appsv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 	)
 	ret.EnableResources(
@@ -246,9 +423,22 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 	return ret
 }
 
+func matchAllExplicitResourcesForFake(gvr schema.GroupVersionResource) bool {
+	switch gvr {
+	case extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):
+		return true
+	}
+	return false
+
+}
+
 func newFakeScheme(t *testing.T) *runtime.Scheme {
 	ret := runtime.NewScheme()
 	require.NoError(t, apiv1.AddToScheme(ret))
+	require.NoError(t, appsv1.AddToScheme(ret))
 	require.NoError(t, extensionsapiv1beta1.AddToScheme(ret))
 
 	require.NoError(t, ret.SetVersionPriority(apiv1.SchemeGroupVersion))
