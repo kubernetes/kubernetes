@@ -82,10 +82,10 @@ func TestFixtures(t *testing.T) {
 				}
 
 				for i, pod := range checkData.pass {
-					expectedFiles.Insert(testFixtureFile(t, passDir, fmt.Sprintf("%s%d", strings.ToLower(checkID), i), pod))
+					expectedFiles.Insert(testFixtureFile(t, passDir, fmt.Sprintf("%s%d", strings.ToLower(string(checkID)), i), pod))
 				}
 				for i, pod := range checkData.fail {
-					expectedFiles.Insert(testFixtureFile(t, failDir, fmt.Sprintf("%s%d", strings.ToLower(checkID), i), pod))
+					expectedFiles.Insert(testFixtureFile(t, failDir, fmt.Sprintf("%s%d", strings.ToLower(string(checkID)), i), pod))
 				}
 			}
 		}
