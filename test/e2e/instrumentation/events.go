@@ -27,6 +27,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -130,13 +131,20 @@ var _ = common.SIGDescribe("Events API", func() {
 		framework.ExpectNoError(err, "failed to get test event")
 
 		ginkgo.By("patching the test event")
-		eventPatchNote := "This is a test event - patched"
-		eventPatch, err := json.Marshal(map[string]interface{}{
-			"note": eventPatchNote,
-		})
-		framework.ExpectNoError(err, "failed to marshal the patch JSON payload")
+		oldData, err := json.Marshal(testEvent)
+		framework.ExpectNoError(err, "failed to marshal event")
+		newEvent := testEvent.DeepCopy()
+		eventSeries := &eventsv1.EventSeries{
+			Count:            2,
+			LastObservedTime: metav1.MicroTime{Time: time.Unix(1505828951, 0)},
+		}
+		newEvent.Series = eventSeries
+		newData, err := json.Marshal(newEvent)
+		framework.ExpectNoError(err, "failed to marshal new event")
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, eventsv1.Event{})
+		framework.ExpectNoError(err, "failed to create two-way merge patch")
 
-		_, err = client.Patch(context.TODO(), eventName, types.StrategicMergePatchType, []byte(eventPatch), metav1.PatchOptions{})
+		_, err = client.Patch(context.TODO(), eventName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch the test event")
 
 		ginkgo.By("getting the test event")
@@ -147,7 +155,8 @@ var _ = common.SIGDescribe("Events API", func() {
 		testEvent.ObjectMeta.ResourceVersion = ""
 		event.ObjectMeta.ManagedFields = nil
 		testEvent.ObjectMeta.ManagedFields = nil
-		testEvent.Note = eventPatchNote
+
+		testEvent.Series = eventSeries
 		if !apiequality.Semantic.DeepEqual(testEvent, event) {
 			framework.Failf("test event wasn't properly patched: %v", diff.ObjectReflectDiff(testEvent, event))
 		}
