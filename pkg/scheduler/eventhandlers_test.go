@@ -371,8 +371,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			name:   "default handlers in framework",
 			gvkMap: map[framework.GVK]framework.ActionType{},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):  true,
-				reflect.TypeOf(&v1.Node{}): true,
+				reflect.TypeOf(&v1.Pod{}):       true,
+				reflect.TypeOf(&v1.Node{}):      true,
+				reflect.TypeOf(&v1.Namespace{}): true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -386,6 +387,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):                            true,
 				reflect.TypeOf(&v1.Node{}):                           true,
+				reflect.TypeOf(&v1.Namespace{}):                      true,
 				reflect.TypeOf(&v1.PersistentVolume{}):               true,
 				reflect.TypeOf(&storagev1beta1.CSIStorageCapacity{}): true,
 			},
@@ -398,8 +400,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 				"cronjobs.v1.batch":  framework.Delete,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):  true,
-				reflect.TypeOf(&v1.Node{}): true,
+				reflect.TypeOf(&v1.Pod{}):       true,
+				reflect.TypeOf(&v1.Node{}):      true,
+				reflect.TypeOf(&v1.Namespace{}): true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{
 				{Group: "apps", Version: "v1", Resource: "daemonsets"}: true,
@@ -413,8 +416,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 				"custommetrics.v1beta1": framework.Update,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):  true,
-				reflect.TypeOf(&v1.Node{}): true,
+				reflect.TypeOf(&v1.Pod{}):       true,
+				reflect.TypeOf(&v1.Node{}):      true,
+				reflect.TypeOf(&v1.Namespace{}): true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{
 				{Group: "apps", Version: "v1", Resource: "daemonsets"}: true,
@@ -433,13 +437,14 @@ func TestAddAllEventHandlers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
+			schedulingQueue := queue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
 			testSched := Scheduler{
 				StopEverything:  ctx.Done(),
-				SchedulingQueue: queue.NewTestQueue(ctx, nil),
+				SchedulingQueue: schedulingQueue,
 			}
 
-			client := fake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 
