@@ -21,6 +21,7 @@ import (
 
 	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/client_golang/prometheus/internal"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	dto "github.com/prometheus/client_model/go"
@@ -37,6 +38,23 @@ const (
 	GaugeValue
 	UntypedValue
 )
+
+var (
+	CounterMetricTypePtr = func() *dto.MetricType { d := dto.MetricType_COUNTER; return &d }()
+	GaugeMetricTypePtr   = func() *dto.MetricType { d := dto.MetricType_GAUGE; return &d }()
+	UntypedMetricTypePtr = func() *dto.MetricType { d := dto.MetricType_UNTYPED; return &d }()
+)
+
+func (v ValueType) ToDTO() *dto.MetricType {
+	switch v {
+	case CounterValue:
+		return CounterMetricTypePtr
+	case GaugeValue:
+		return GaugeMetricTypePtr
+	default:
+		return UntypedMetricTypePtr
+	}
+}
 
 // valueFunc is a generic metric for simple values retrieved on collect time
 // from a function. It implements Metric and Collector. Its effective type is
@@ -91,11 +109,15 @@ func NewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues 
 	if err := validateLabelValues(labelValues, len(desc.variableLabels)); err != nil {
 		return nil, err
 	}
+
+	metric := &dto.Metric{}
+	if err := populateMetric(valueType, value, MakeLabelPairs(desc, labelValues), nil, metric); err != nil {
+		return nil, err
+	}
+
 	return &constMetric{
-		desc:       desc,
-		valType:    valueType,
-		val:        value,
-		labelPairs: MakeLabelPairs(desc, labelValues),
+		desc:   desc,
+		metric: metric,
 	}, nil
 }
 
@@ -110,10 +132,8 @@ func MustNewConstMetric(desc *Desc, valueType ValueType, value float64, labelVal
 }
 
 type constMetric struct {
-	desc       *Desc
-	valType    ValueType
-	val        float64
-	labelPairs []*dto.LabelPair
+	desc   *Desc
+	metric *dto.Metric
 }
 
 func (m *constMetric) Desc() *Desc {
@@ -121,7 +141,11 @@ func (m *constMetric) Desc() *Desc {
 }
 
 func (m *constMetric) Write(out *dto.Metric) error {
-	return populateMetric(m.valType, m.val, m.labelPairs, nil, out)
+	out.Label = m.metric.Label
+	out.Counter = m.metric.Counter
+	out.Gauge = m.metric.Gauge
+	out.Untyped = m.metric.Untyped
+	return nil
 }
 
 func populateMetric(
@@ -170,7 +194,7 @@ func MakeLabelPairs(desc *Desc, labelValues []string) []*dto.LabelPair {
 		})
 	}
 	labelPairs = append(labelPairs, desc.constLabelPairs...)
-	sort.Sort(labelPairSorter(labelPairs))
+	sort.Sort(internal.LabelPairSorter(labelPairs))
 	return labelPairs
 }
 

@@ -40,7 +40,3 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 )
-
-replace github.com/prometheus/common => github.com/prometheus/common v0.32.1
-
-replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.1-0.20220126194218-961f8ca5e65b

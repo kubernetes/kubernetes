@@ -19,6 +19,7 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
+	"github.com/prometheus/client_golang/prometheus/cache"
 )
 
 // metricValue describes a single metric value for a given set of label values
@@ -39,4 +40,36 @@ type infoProvider interface {
 	GetVersionInfo() (*info.VersionInfo, error)
 	// GetMachineInfo provides information about the machine.
 	GetMachineInfo() (*info.MachineInfo, error)
+}
+
+type CollectFn func(opts v2.RequestOptions, inserts []cache.Insert) []cache.Insert
+
+type CachedGatherer struct {
+	*cache.CachedTGatherer
+	buf []cache.Insert
+
+	collectFns []CollectFn
+
+	lastUpdate time.Time
+}
+
+func NewCachedGatherer(cfs ...CollectFn) *CachedGatherer {
+	return &CachedGatherer{
+		CachedTGatherer: cache.NewCachedTGatherer(),
+		collectFns:      cfs,
+	}
+}
+
+func (c *CachedGatherer) Update(opts v2.RequestOptions) {
+	if opts.MaxAge == nil || time.Since(c.lastUpdate) > *opts.MaxAge {
+		c.lastUpdate = time.Now()
+
+		c.buf = c.buf[:0]
+		for _, collect := range c.collectFns {
+			c.buf = collect(opts, c.buf)
+		}
+		if err := c.CachedTGatherer.Update(true, c.buf, nil); err != nil {
+			panic(err) // Programmatic error.
+		}
+	}
 }
