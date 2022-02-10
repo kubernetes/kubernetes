@@ -67,8 +67,9 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 		ResourceVersion:      "0",
 		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 		Predicate:            storage.Everything,
+		Recursive:            true,
 	}
-	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
+	if err := s.storage.GetList(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
 		return nil, err
 	}
 

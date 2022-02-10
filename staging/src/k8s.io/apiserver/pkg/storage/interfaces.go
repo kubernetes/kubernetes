@@ -183,7 +183,7 @@ type Interface interface {
 	// and send it in an "ADDED" event, before watch starts.
 	Watch(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
-	// Get unmarshals json found at key into objPtr. On a not found error, will either
+	// Get unmarshals object found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on 'opts.ignoreNotFound'.
 	// Treats empty responses and nil response nodes exactly like a not found error.
 	// The returned contents may be delayed, but it is guaranteed that they will
@@ -196,11 +196,13 @@ type Interface interface {
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	GetToList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
-	// List unmarshalls jsons found at directory defined by key and opaque them
-	// into *List api object (an object that satisfies runtime.IsList definition).
+	// GetList unmarshalls objects found at key into a *List api object (an object
+	// that satisfies runtime.IsList definition).
+	// If 'opts.Recursive' is false, 'key' is used as an exact match. If `opts.Recursive'
+	// is true, 'key' is used as a prefix.
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
-	List(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
+	GetList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.

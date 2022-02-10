@@ -609,8 +609,8 @@ func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOpt
 	return c.list(ctx, key, opts, listObj, false)
 }
 
-// List implements storage.Interface.
-func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+// GetList implements storage.Interface.
+func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	return c.list(ctx, key, opts, listObj, true)
 }
 
@@ -1090,8 +1090,9 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 	storageOpts := storage.ListOptions{
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            pred,
+		Recursive:            true,
 	}
-	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, storageOpts, list); err != nil {
+	if err := lw.storage.GetList(context.TODO(), lw.resourcePrefix, storageOpts, list); err != nil {
 		return nil, err
 	}
 	return list, nil

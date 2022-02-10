@@ -293,8 +293,9 @@ func TestList(t *testing.T) {
 	rvResult := &example.PodList{}
 	options := storage.ListOptions{
 		Predicate: storage.Everything,
+		Recursive: true,
 	}
-	if err := cacher.List(context.TODO(), "pods/ns", options, rvResult); err != nil {
+	if err := cacher.GetList(context.TODO(), "pods/ns", options, rvResult); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	deletedPodRV := rvResult.ListMeta.ResourceVersion
@@ -305,8 +306,9 @@ func TestList(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: deletedPodRV,
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	}
-	if err := cacher.List(context.TODO(), "pods/ns", options, result); err != nil {
+	if err := cacher.GetList(context.TODO(), "pods/ns", options, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != deletedPodRV {
@@ -371,8 +373,9 @@ func TestTooLargeResourceVersionList(t *testing.T) {
 	options := storage.ListOptions{
 		ResourceVersion: listRV,
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	}
-	err = cacher.List(context.TODO(), "pods/ns", options, result)
+	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
 	if !errors.IsTimeout(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -408,12 +411,12 @@ type injectListError struct {
 	storage.Interface
 }
 
-func (self *injectListError) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+func (self *injectListError) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--
 		return fmt.Errorf("injected error")
 	}
-	return self.Interface.List(ctx, key, opts, listObj)
+	return self.Interface.GetList(ctx, key, opts, listObj)
 }
 
 func TestWatch(t *testing.T) {
