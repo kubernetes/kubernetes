@@ -118,11 +118,30 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			if err != nil {
 				return true, nil, err
 			}
-			err = tracker.Update(gvr, action.GetObject(), ns)
+
+			obj := action.GetObject()
+
+			switch action.GetSubresource() {
+			case "status":
+				old, err := tracker.Get(gvr, ns, objMeta.GetName())
+				if err != nil {
+					return true, nil, err
+				}
+
+				old_spec := reflect.ValueOf(old).Elem().FieldByName("Spec")
+				obj_spec := reflect.ValueOf(obj).Elem().FieldByName("Spec")
+				if obj_spec.IsValid() && old_spec.IsValid() {
+					obj_spec.Set(old_spec)
+				}
+			default:
+			}
+
+			err = tracker.Update(gvr, obj, ns)
 			if err != nil {
 				return true, nil, err
 			}
-			obj, err := tracker.Get(gvr, ns, objMeta.GetName())
+
+			obj, err = tracker.Get(gvr, ns, objMeta.GetName())
 			return true, obj, err
 
 		case DeleteActionImpl:
