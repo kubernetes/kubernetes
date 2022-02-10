@@ -270,7 +270,7 @@ type RequestOptions struct {
 	// Whether to include stats for child subcontainers.
 	Recursive bool `json:"recursive"`
 	// Update stats if they are older than MaxAge
-	// nil indicates no update, and 0 will always trigger an update.
+	// nil and 0 indicates always update.
 	MaxAge *time.Duration `json:"max_age"`
 }
 
