@@ -18,9 +18,78 @@ package tail
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestReadAtMost(t *testing.T) {
+	file, err := ioutil.TempFile("", "TestFileReadAtMost")
+	if err != nil {
+		t.Fatalf("unable to create temp file")
+	}
+	defer os.Remove(file.Name())
+
+	line := strings.Repeat("a", blockSize)
+	testBytes := []byte(line + "\n" +
+		line + "\n" +
+		line + "\n" +
+		line + "\n" +
+		line[blockSize/2:]) // incomplete line
+
+	file.Write(testBytes)
+	testCases := []struct {
+		name          string
+		max           int64
+		longerThanMax bool
+		expected      string
+	}{
+		{
+			name:          "the max is negative",
+			max:           -1,
+			longerThanMax: true,
+			expected:      "",
+		},
+		{
+			name:          "the max is zero",
+			max:           0,
+			longerThanMax: true,
+			expected:      "",
+		},
+		{
+			name:          "the file length is longer than max",
+			max:           1,
+			longerThanMax: true,
+			expected:      "a",
+		},
+		{
+			name:          "the file length is longer than max and contains newlines",
+			max:           blockSize,
+			longerThanMax: true,
+			expected:      strings.Repeat("a", blockSize/2-1) + "\n" + strings.Repeat("a", blockSize/2),
+		},
+		{
+			name:          "the max is longer than file length ",
+			max:           4613,
+			longerThanMax: false,
+			expected:      string(testBytes),
+		},
+	}
+
+	for _, test := range testCases {
+		readAtMostBytes, longerThanMax, err := ReadAtMost(file.Name(), test.max)
+		if err != nil {
+			t.Fatalf("Unexpected failure %v", err)
+		}
+		if test.longerThanMax != longerThanMax {
+			t.Fatalf("Unexpected result on whether the file length longer than the max, want: %t, got: %t", test.longerThanMax, longerThanMax)
+		}
+		if test.expected != string(readAtMostBytes) {
+			t.Fatalf("Unexpected most max bytes, want: %s, got: %s", test.expected, readAtMostBytes)
+		}
+	}
+}
 
 func TestTail(t *testing.T) {
 	line := strings.Repeat("a", blockSize)
