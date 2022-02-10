@@ -15,14 +15,13 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+          image: {{.CsiprovisionerImage}}
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
             # ("storage capacity" in csi_mock_volume.go).
             - "--feature-gates=Topology=true"
             - "-v=5"
-            - "--timeout=1m"
             # Needed for fsGroup support.
             - "--default-fstype=ext4"
             # We don't need much concurrency and having many gouroutines
@@ -35,30 +34,32 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
+          image: {{.CsinodedriverregistrarImage}}
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-mock/csi.sock
-            - --timeout=1m
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.7.3
+          image: {{.HostpathpluginImage}}
           args:
-            - -v=5
-            - -nodeid=$(KUBE_NODE_NAME)
-            - -endpoint=/csi/csi.sock
-            - -proxy-endpoint=tcp://:9000
+            - "--drivername=mock.storage.k8s.io"
+            - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--endpoint=/csi/csi.sock"
+            - "--statedir=/tmp/csi-hotpath-data"
+            - "-v=5" # enabled the gRPC call logging
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
@@ -67,27 +68,17 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          ports:
-            - containerPort: 9000
-              name: socat
+          securityContext:
+            privileged: true
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-        # The busybox container is needed for running shell commands which
-        # test for directories or create them. It needs additional privileges
-        # for that.
-        - name: busybox
-          image: k8s.gcr.io/e2e-test-images/busybox:1.29-1
-          securityContext:
-            privileged: true
-          command:
-            - sleep
-            - "100000"
-          volumeMounts:
             - mountPath: /var/lib/kubelet/pods
               name: kubelet-pods-dir
             - mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi
               name: kubelet-csi-dir
+            - mountPath: /dev
+              name: dev-dir
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-mock
@@ -107,3 +98,7 @@ spec:
             path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev-dir

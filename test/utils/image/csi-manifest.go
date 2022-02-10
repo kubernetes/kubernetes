@@ -19,16 +19,49 @@ package image
 const (
 	// Offset the CSI images so there is no collision
 	CSINone = iota + 500
+	Hostpathplugin
+	Csiexternalhealthmonitorcontroller
+	Csinodedriverregistrar
+	Livenessprobe
+	Csiattacher
+	Csiprovisioner
+	Csiresizer
+	Csisnapshotter
 )
 
 type TestCSIImagesStruct struct {
+	HostpathpluginImage                     string
+	CsiexternalhealthmonitorcontrollerImage string
+	CsinodedriverregistrarImage             string
+	LivenessprobeImage                      string
+	CsiattacherImage                        string
+	CsiprovisionerImage                     string
+	CsiresizerImage                         string
+	CsisnapshotterImage                     string
 }
 
 var TestCSIImages TestCSIImagesStruct
 
 func init() {
-	TestCSIImages = TestCSIImagesStruct{}
+	TestCSIImages = TestCSIImagesStruct{
+		GetE2EImage(Hostpathplugin),
+		GetE2EImage(Csiexternalhealthmonitorcontroller),
+		GetE2EImage(Csinodedriverregistrar),
+		GetE2EImage(Livenessprobe),
+		GetE2EImage(Csiattacher),
+		GetE2EImage(Csiprovisioner),
+		GetE2EImage(Csiresizer),
+		GetE2EImage(Csisnapshotter),
+	}
 }
 
 func initCSIImageConfigs(list RegistryList, configs map[int]Config) {
+	configs[Hostpathplugin] = Config{list.SigStorageRegistry, "hostpathplugin", "v1.7.3"}
+	configs[Csiexternalhealthmonitorcontroller] = Config{list.SigStorageRegistry, "csi-external-health-monitor-controller", "v0.4.0"}
+	configs[Csinodedriverregistrar] = Config{list.SigStorageRegistry, "csi-node-driver-registrar", "v2.3.0"}
+	configs[Livenessprobe] = Config{list.SigStorageRegistry, "livenessprobe", "v2.4.0"}
+	configs[Csiattacher] = Config{list.SigStorageRegistry, "csi-attacher", "v3.3.0"}
+	configs[Csiprovisioner] = Config{list.SigStorageRegistry, "csi-provisioner", "v3.0.0"}
+	configs[Csiresizer] = Config{list.SigStorageRegistry, "csi-resizer", "v1.3.0"}
+	configs[Csisnapshotter] = Config{list.SigStorageRegistry, "csi-snapshotter", "v4.2.1"}
 }

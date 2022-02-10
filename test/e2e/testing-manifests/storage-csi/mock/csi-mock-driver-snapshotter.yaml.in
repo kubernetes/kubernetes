@@ -1,35 +1,36 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: csi-mockplugin-attacher
+  name: csi-mockplugin-snapshotter
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      app: csi-mockplugin-attacher
-  replicas: 1
+      app: csi-mockplugin-snapshotter
   template:
     metadata:
       labels:
-        app: csi-mockplugin-attacher
+        app: csi-mockplugin-snapshotter
     spec:
       serviceAccountName: csi-mock
       containers:
-        - name: csi-attacher
-          image: k8s.gcr.io/sig-storage/csi-attacher:v3.3.0
+        - name: csi-snapshotter
+          image: {{.CsisnapshotterImage}}
           args:
-            - --v=5
-            - --csi-address=$(ADDRESS)
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=false"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
           securityContext:
             privileged: true
+          imagePullPolicy: Always
           volumeMounts:
-          - mountPath: /csi
-            name: socket-dir
+            - name: socket-dir
+              mountPath: /csi
       volumes:
-        - hostPath:
+        - name: socket-dir
+          hostPath:
             path: /var/lib/kubelet/plugins/csi-mock
             type: DirectoryOrCreate
-          name: socket-dir
-
