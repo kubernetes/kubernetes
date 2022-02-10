@@ -509,7 +509,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// underlying watchCache is calling processEvent under its lock.
 	c.watchCache.RLock()
 	defer c.watchCache.RUnlock()
-	cacheInterval, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
+	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(watchRV)
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
@@ -656,7 +656,7 @@ func (c *Cacher) list(ctx context.Context, key string, opts storage.ListOptions,
 		return c.delegateList(ctx, key, opts, listObj, recursive)
 	}
 
-	trace := utiltrace.New("cacher list", utiltrace.Field{"type", c.objectType.String()})
+	trace := utiltrace.New("cacher list", utiltrace.Field{Key: "type", Value: c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
@@ -680,7 +680,7 @@ func (c *Cacher) list(ctx context.Context, key string, opts storage.ListOptions,
 	if err != nil {
 		return err
 	}
-	trace.Step("Listed items from cache", utiltrace.Field{"count", len(objs)})
+	trace.Step("Listed items from cache", utiltrace.Field{Key: "count", Value: len(objs)})
 	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
 		// Resize the slice appropriately, since we already know that none
 		// of the elements will be filtered out.
@@ -696,7 +696,7 @@ func (c *Cacher) list(ctx context.Context, key string, opts storage.ListOptions,
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
-	trace.Step("Filtered items", utiltrace.Field{"count", listVal.Len()})
+	trace.Step("Filtered items", utiltrace.Field{Key: "count", Value: listVal.Len()})
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err
@@ -992,7 +992,7 @@ func (c *Cacher) finishDispatching() {
 	defer c.Unlock()
 	c.dispatching = false
 	for _, watcher := range c.watchersToStop {
-		watcher.stopThreadUnsafe()
+		watcher.stopLocked()
 	}
 	c.watchersToStop = c.watchersToStop[:0]
 }
@@ -1000,14 +1000,14 @@ func (c *Cacher) finishDispatching() {
 func (c *Cacher) terminateAllWatchers() {
 	c.Lock()
 	defer c.Unlock()
-	c.watchers.terminateAll(c.objectType, c.stopWatcherThreadUnsafe)
+	c.watchers.terminateAll(c.objectType, c.stopWatcherLocked)
 }
 
-func (c *Cacher) stopWatcherThreadUnsafe(watcher *cacheWatcher) {
+func (c *Cacher) stopWatcherLocked(watcher *cacheWatcher) {
 	if c.dispatching {
 		c.watchersToStop = append(c.watchersToStop, watcher)
 	} else {
-		watcher.stopThreadUnsafe()
+		watcher.stopLocked()
 	}
 }
 
@@ -1037,9 +1037,9 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 		defer c.Unlock()
 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
-		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopThreadUnsafe()
+		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(index, triggerValue, triggerSupported, c.stopWatcherThreadUnsafe)
+		c.watchers.deleteWatcher(index, triggerValue, triggerSupported, c.stopWatcherLocked)
 	}
 }
 
@@ -1196,8 +1196,8 @@ func (c *cacheWatcher) Stop() {
 	c.forget()
 }
 
-// we rely on the fact that stopThredUnsafe is actually protected by Cacher.Lock()
-func (c *cacheWatcher) stopThreadUnsafe() {
+// we rely on the fact that stopLocked is actually protected by Cacher.Lock()
+func (c *cacheWatcher) stopLocked() {
 	if !c.stopped {
 		c.stopped = true
 		close(c.done)

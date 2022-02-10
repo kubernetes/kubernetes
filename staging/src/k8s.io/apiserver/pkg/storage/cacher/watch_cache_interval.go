@@ -35,12 +35,12 @@ import (
 // for starting a watch and reduce the maximum possible time
 // interval for which the lock would be held while events are
 // copied over.
-
+//
 // The source of events for the interval is typically either
 // the watchCache circular buffer, if events being retrieved
 // need to be for resource versions > 0 or the underlying
 // implementation of Store, if resource version = 0.
-
+//
 // Furthermore, an interval can be either valid or invalid at
 // any given point of time. The notion of validity makes sense
 // only in cases where the window of events in the underlying
