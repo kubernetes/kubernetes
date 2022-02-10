@@ -2630,7 +2630,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
 		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
-		ingressClassName := ""
+		ingressClassName := "<none>"
 		if ing.Spec.IngressClassName != nil {
 			ingressClassName = *ing.Spec.IngressClassName
 		}
@@ -2691,7 +2691,7 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
 		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
-		ingressClassName := ""
+		ingressClassName := "<none>"
 		if ing.Spec.IngressClassName != nil {
 			ingressClassName = *ing.Spec.IngressClassName
 		}

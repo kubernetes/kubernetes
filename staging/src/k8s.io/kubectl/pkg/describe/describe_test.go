@@ -2606,6 +2606,30 @@ Annotations:  <none>
 Events:       <none>
 `,
 		},
+		"EmptyIngressClassName": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					DefaultBackend: &backendV1,
+				},
+			}),
+			output: `Name:             bar
+Labels:           <none>
+Namespace:        foo
+Address:          
+Ingress Class:    <none>
+Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:  <none>
+Events:       <none>
+`,
+		},
 	}
 
 	for name, test := range tests {
