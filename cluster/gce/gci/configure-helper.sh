@@ -2596,12 +2596,6 @@ function update-event-exporter {
     sed -i -e "s@{{ exporter_sd_endpoint }}@${STACKDRIVER_ENDPOINT:-}@g" "$1"
 }
 
-function update-dashboard-deployment {
-  if [ -n "${CUSTOM_KUBE_DASHBOARD_BANNER:-}" ]; then
-    sed -i -e "s@\( \+\)# PLATFORM-SPECIFIC ARGS HERE@\1- --system-banner=${CUSTOM_KUBE_DASHBOARD_BANNER}\n\1- --system-banner-severity=WARNING@" "$1"
-  fi
-}
-
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
   setup-addon-manifests "addons" "0-dns/coredns"
@@ -2827,11 +2821,6 @@ EOF
     local -r event_exporter_yaml="${dst_dir}/fluentd-gcp/event-exporter.yaml"
     update-event-exporter ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
-  fi
-  if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "dashboard"
-    local -r dashboard_deployment_yaml="${dst_dir}/dashboard/dashboard-deployment.yaml"
-    update-dashboard-deployment ${dashboard_deployment_yaml}
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"

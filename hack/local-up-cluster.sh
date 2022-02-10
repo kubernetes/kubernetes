@@ -85,9 +85,6 @@ STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 
-# enable kubernetes dashboard
-ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
-
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
 
@@ -923,15 +920,6 @@ function start_nodelocaldns {
   rm nodelocaldns.yaml
 }
 
-function start_kubedashboard {
-    if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
-        echo "Creating kubernetes-dashboard"
-        # use kubectl to create the dashboard
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard.yaml"
-        echo "kubernetes-dashboard deployment and service successfully deployed."
-    fi
-}
-
 function start_csi_snapshotter {
     if [[ "${ENABLE_CSI_SNAPSHOTTER}" = true ]]; then
         echo "Creating Kubernetes-CSI snapshotter"
@@ -1099,7 +1087,6 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
     start_nodelocaldns
   fi
-  start_kubedashboard
   start_csi_snapshotter
 fi
 
