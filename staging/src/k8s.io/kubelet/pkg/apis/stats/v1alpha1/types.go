@@ -65,9 +65,11 @@ type NodeStats struct {
 type RlimitStats struct {
 	Time metav1.Time `json:"time"`
 
-	// The max PID of OS.
+	// The max number of extant process (threads, precisely on Linux) of OS. See RLIMIT_NPROC in getrlimit(2).
+	// The operating system ceiling on the number of process IDs that can be assigned.
+	// On Linux, tasks (either processes or threads) consume 1 PID each.
 	MaxPID *int64 `json:"maxpid,omitempty"`
-	// The number of running process in the OS.
+	// The number of running process (threads, precisely on Linux) in the OS.
 	NumOfRunningProcesses *int64 `json:"curproc,omitempty"`
 }
 

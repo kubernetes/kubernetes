@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
@@ -33,10 +33,21 @@ import (
 func Stats() (*statsapi.RlimitStats, error) {
 	rlimit := &statsapi.RlimitStats{}
 
-	if content, err := ioutil.ReadFile("/proc/sys/kernel/pid_max"); err == nil {
-		if maxPid, err := strconv.ParseInt(string(content[:len(content)-1]), 10, 64); err == nil {
-			rlimit.MaxPID = &maxPid
+	taskMax := int64(-1)
+	// Calculate the mininum of kernel.pid_max and kernel.threads-max as they both specify the
+	// system-wide limit on the number of tasks.
+	for _, file := range []string{"/proc/sys/kernel/pid_max", "/proc/sys/kernel/threads-max"} {
+		if content, err := ioutil.ReadFile(file); err == nil {
+			if limit, err := strconv.ParseInt(string(content[:len(content)-1]), 10, 64); err == nil {
+				if taskMax == -1 || taskMax > limit {
+					taskMax = limit
+				}
+			}
 		}
+	}
+	// Both reads did not fail.
+	if taskMax >= 0 {
+		rlimit.MaxPID = &taskMax
 	}
 
 	var info syscall.Sysinfo_t
