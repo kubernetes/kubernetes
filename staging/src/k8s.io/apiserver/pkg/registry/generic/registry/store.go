@@ -352,7 +352,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			storageOpts.Recursive = false
-			err := e.Storage.GetToList(ctx, key, storageOpts, list)
+			err := e.Storage.GetList(ctx, key, storageOpts, list)
 			return list, storeerr.InterpretListError(err, qualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped

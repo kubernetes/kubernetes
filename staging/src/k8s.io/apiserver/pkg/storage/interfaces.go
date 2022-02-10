@@ -190,12 +190,6 @@ type Interface interface {
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
-	// GetToList unmarshals json found at key and opaque it into *List api object
-	// (an object that satisfies the runtime.IsList definition).
-	// The returned contents may be delayed, but it is guaranteed that they will
-	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
-	GetToList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
-
 	// GetList unmarshalls objects found at key into a *List api object (an object
 	// that satisfies runtime.IsList definition).
 	// If 'opts.Recursive' is false, 'key' is used as an exact match. If `opts.Recursive'
@@ -267,8 +261,8 @@ type ListOptions struct {
 	ResourceVersionMatch metav1.ResourceVersionMatch
 	// Predicate provides the selection rules for the list operation.
 	Predicate SelectionPredicate
-	// Recursive determines whether the watch is defined for a single object or for the whole set
-	// of objects. The option is ignored for non-watch requests.
+	// Recursive determines whether the list or watch is defined for a single object located at the
+	// given key, or for the whole set of objects with the given key as a prefix.
 	Recursive bool
 	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
 	// be delivered to the users. The option is ignored for non-watch requests.

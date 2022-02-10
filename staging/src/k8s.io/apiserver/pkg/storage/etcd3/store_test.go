@@ -541,7 +541,7 @@ func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	}
 }
 
-func TestGetToList(t *testing.T) {
+func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	prevKey, prevStoredObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prev"}})
 
@@ -640,7 +640,13 @@ func TestGetToList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := &example.PodList{}
-			err := store.GetToList(ctx, tt.key, storage.ListOptions{ResourceVersion: tt.rv, ResourceVersionMatch: tt.rvMatch, Predicate: tt.pred}, out)
+			storageOpts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate:            tt.pred,
+				Recursive:            false,
+			}
+			err := store.GetList(ctx, tt.key, storageOpts, out)
 
 			if tt.expectRVTooLarge {
 				if err == nil || !storage.IsTooLargeResourceVersion(err) {
@@ -650,7 +656,7 @@ func TestGetToList(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("%s: GetToList failed: %v", tt.name, err)
+				t.Fatalf("GetList failed: %v", err)
 			}
 			if len(out.ResourceVersion) == 0 {
 				t.Errorf("%s: unset resourceVersion", tt.name)

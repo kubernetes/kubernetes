@@ -196,7 +196,7 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestGetToList(t *testing.T) {
+func TestGetListNonRecursive(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 	cacher, _, err := newTestCacher(etcdStorage)
@@ -212,15 +212,15 @@ func TestGetToList(t *testing.T) {
 		key         string
 		pred        storage.SelectionPredicate
 		expectedOut []*example.Pod
-	}{{ // test GetToList on existing key
+	}{{ // test non-recursive GetList on existing key
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
-	}, { // test GetToList on non-existing key
+	}, { // test non-recursive GetList on non-existing key
 		key:         "/non-existing",
 		pred:        storage.Everything,
 		expectedOut: nil,
-	}, { // test GetToList with matching pod name
+	}, { // test non-recursive GetList with matching pod name
 		key: "/non-existing",
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
@@ -235,9 +235,9 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.PodList{}
-		err := cacher.GetToList(context.TODO(), tt.key, storage.ListOptions{Predicate: tt.pred}, out)
+		err := cacher.GetList(context.TODO(), tt.key, storage.ListOptions{Predicate: tt.pred, Recursive: false}, out)
 		if err != nil {
-			t.Fatalf("GetToList failed: %v", err)
+			t.Fatalf("GetList failed: %v", err)
 		}
 		if len(out.ResourceVersion) == 0 {
 			t.Errorf("#%d: unset resourceVersion", i)
