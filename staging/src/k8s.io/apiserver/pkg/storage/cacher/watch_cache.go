@@ -573,7 +573,21 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 	w.onReplace = onReplace
 }
 
-func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) (*watchCacheInterval, error) {
+func (w *watchCache) Resync() error {
+	// Nothing to do
+	return nil
+}
+
+// isIndexValidLocked checks if a given index is still valid.
+// This assumes that the lock is held.
+func (w *watchCache) isIndexValidLocked(index int) bool {
+	return index >= w.startIndex
+}
+
+// getAllEventsSinceLocked returns a watchCacheInterval that can be used to
+// retrieve events since a certain resourceVersion. This function assumes to
+// be called under the watchCache lock.
+func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCacheInterval, error) {
 	size := w.endIndex - w.startIndex
 	var oldest uint64
 	switch {
@@ -619,15 +633,4 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) (*wat
 	}
 	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.indexValidator, &w.RWMutex)
 	return ci, nil
-}
-
-func (w *watchCache) Resync() error {
-	// Nothing to do
-	return nil
-}
-
-// isIndexValidLocked checks if a given index is still valid.
-// This assumes that the lock is held.
-func (w *watchCache) isIndexValidLocked(index int) bool {
-	return index >= w.startIndex
 }

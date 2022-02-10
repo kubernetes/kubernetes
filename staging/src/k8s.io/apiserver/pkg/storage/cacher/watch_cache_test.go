@@ -96,7 +96,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64) (*wat
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)
+	return w.getAllEventsSinceLocked(resourceVersion)
 }
 
 // newTestWatchCache just adds a fake clock.
