@@ -71,6 +71,10 @@ const (
 
 	// The number of times we retry updating a ReplicaSet's status.
 	statusUpdateRetries = 1
+
+	// controllerUIDIndex is the name for the ReplicaSet store's index function,
+	// which is to index by ReplicaSet's controllerUID.
+	controllerUIDIndex = "controllerUID"
 )
 
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
@@ -98,6 +102,7 @@ type ReplicaSetController struct {
 	// rsListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	rsListerSynced cache.InformerSynced
+	rsIndexer      cache.Indexer
 
 	// A store of pods, populated by the shared informer passed to NewReplicaSetController
 	podLister corelisters.PodLister
@@ -150,6 +155,20 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		UpdateFunc: rsc.updateRS,
 		DeleteFunc: rsc.deleteRS,
 	})
+	rsInformer.Informer().AddIndexers(cache.Indexers{
+		controllerUIDIndex: func(obj interface{}) ([]string, error) {
+			rs, ok := obj.(*apps.ReplicaSet)
+			if !ok {
+				return []string{}, nil
+			}
+			controllerRef := metav1.GetControllerOf(rs)
+			if controllerRef == nil {
+				return []string{}, nil
+			}
+			return []string{string(controllerRef.UID)}, nil
+		},
+	})
+	rsc.rsIndexer = rsInformer.Informer().GetIndexer()
 	rsc.rsLister = rsInformer.Lister()
 	rsc.rsListerSynced = rsInformer.Informer().HasSynced
 
@@ -206,17 +225,14 @@ func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.Repli
 		return nil
 	}
 
-	allRSs, err := rsc.rsLister.ReplicaSets(rs.Namespace).List(labels.Everything())
+	objects, err := rsc.rsIndexer.ByIndex(controllerUIDIndex, string(controllerRef.UID))
 	if err != nil {
 		utilruntime.HandleError(err)
 		return nil
 	}
-
-	var relatedRSs []*apps.ReplicaSet
-	for _, r := range allRSs {
-		if ref := metav1.GetControllerOf(r); ref != nil && ref.UID == controllerRef.UID {
-			relatedRSs = append(relatedRSs, r)
-		}
+	relatedRSs := make([]*apps.ReplicaSet, 0, len(objects))
+	for _, obj := range objects {
+		relatedRSs = append(relatedRSs, obj.(*apps.ReplicaSet))
 	}
 
 	// The if check is used to avoid the overhead for the KObjs call, see
