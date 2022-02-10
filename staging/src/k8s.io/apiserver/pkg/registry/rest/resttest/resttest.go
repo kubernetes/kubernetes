@@ -105,9 +105,6 @@ func (t *Tester) TestNamespace() string {
 // TestContext returns a namespaced context that will be used when making storage calls.
 // Namespace is determined by TestNamespace()
 func (t *Tester) TestContext() context.Context {
-	if t.clusterScope {
-		return genericapirequest.NewContext()
-	}
 	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
 }
 
