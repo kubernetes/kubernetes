@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -255,7 +256,11 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		out.VendorExtensible.AddExtension("x-kubernetes-map-type", *in.XMapType)
 	}
 	if len(in.XValidations) != 0 {
-		out.VendorExtensible.AddExtension("x-kubernetes-validations", in.XValidations)
+		var serializationValidationRules apiextensionsv1.ValidationRules
+		if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&in.XValidations, &serializationValidationRules, nil); err != nil {
+			return err
+		}
+		out.VendorExtensible.AddExtension("x-kubernetes-validations", serializationValidationRules)
 	}
 	return nil
 }
