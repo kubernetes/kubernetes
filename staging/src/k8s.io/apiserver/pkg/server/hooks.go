@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -168,15 +169,33 @@ func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 
 // RunPreShutdownHooks runs the PreShutdownHooks for the server
 func (s *GenericAPIServer) RunPreShutdownHooks() error {
-	var errorList []error
-
 	s.preShutdownHookLock.Lock()
 	defer s.preShutdownHookLock.Unlock()
 	s.preShutdownHooksCalled = true
 
+	errCh := make(chan error, len(s.preShutdownHooks))
 	for hookName, hookEntry := range s.preShutdownHooks {
-		if err := runPreShutdownHook(hookName, hookEntry); err != nil {
-			errorList = append(errorList, err)
+		// capture loop variables
+		hookName := hookName
+		hookEntry := hookEntry
+		go func() {
+			errCh <- runPreShutdownHook(hookName, hookEntry)
+		}()
+	}
+
+	// don't block forever on shutdown
+	timeout := time.After(30 * time.Second)
+	var errorList []error
+	for i := 0; i < len(s.preShutdownHooks); i++ {
+		select {
+		case err := <-errCh:
+			if err != nil {
+				errorList = append(errorList, err)
+			}
+		case <-timeout:
+			// TODO: this can be enhanced with the missing hooks
+			errorList = append(errorList, fmt.Errorf("timeout running PreShutdownHooks"))
+			break
 		}
 	}
 	return utilerrors.NewAggregate(errorList)
