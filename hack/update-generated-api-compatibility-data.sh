@@ -26,6 +26,9 @@ kube::golang::setup_env
 # run in module mode to match test command in readme.md
 export GO111MODULE=on
 
+# Nuke old files so we don't accidentally carry stuff forward.
+rm -f staging/src/k8s.io/api/testdata/HEAD/*.{yaml,json,pb}
+
 # UPDATE_COMPATIBILITY_FIXTURE_DATA=true regenerates fixture data if needed.
 # -run //HEAD only runs the test cases comparing against testdata for HEAD.
 # We suppress the output because we are expecting to have changes.
