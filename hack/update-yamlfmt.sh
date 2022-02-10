@@ -38,6 +38,8 @@ find_files() {
       \) -prune \
     \) -name 'OWNERS*'
 }
+#TODO: we should run this against all *.yaml and *.yml, but some of those are
+# invalid YAML (used as input to sed).  They should be renamed to ".yaml.in".
 
 export GO111MODULE=on
 find_files | xargs go run cmd/yamlfmt/yamlfmt.go
