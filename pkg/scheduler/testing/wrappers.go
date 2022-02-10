@@ -443,6 +443,12 @@ func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
 	return p
 }
 
+// Overhead sets the give resourcelist to the inner pod
+func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
+	p.Spec.Overhead = rl
+	return p
+}
+
 // NodeWrapper wraps a Node inside.
 type NodeWrapper struct{ v1.Node }
 
@@ -500,5 +506,11 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
 	}
 	n.Status.Images = containerImages
+	return n
+}
+
+// Taints applies taints to the inner node.
+func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
+	n.Spec.Taints = taints
 	return n
 }
