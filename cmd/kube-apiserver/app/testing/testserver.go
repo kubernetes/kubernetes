@@ -110,22 +110,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		registry.TrackStorageCleanup()
 	}
 
-	stopCh := make(chan struct{})
-	tearDown := func() {
-		if !instanceOptions.DisableStorageCleanup {
-			registry.CleanupStorage()
-		}
-		close(stopCh)
-		if len(result.TmpDir) != 0 {
-			os.RemoveAll(result.TmpDir)
-		}
-	}
-	defer func() {
-		if result.TearDownFn == nil {
-			tearDown()
-		}
-	}()
-
 	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
@@ -213,6 +197,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
+	stopCh := make(chan struct{})
 	server, err := app.CreateServerChain(completedOptions, stopCh)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
@@ -222,13 +207,37 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 
 	errCh := make(chan error)
+	tearDown := func() {
+		if !instanceOptions.DisableStorageCleanup {
+			registry.CleanupStorage()
+		}
+		t.Logf("Starting API server shutdown")
+		close(stopCh)
+		// allow graceful shutdown
+		select {
+		case err := <-errCh:
+			t.Logf("API server exit with status %v", err)
+		case <-time.After(15 * time.Second):
+			t.Logf("API server didn't exit ... timing out")
+		}
+		if len(result.TmpDir) != 0 {
+			os.RemoveAll(result.TmpDir)
+		}
+	}
+	defer func() {
+		if result.TearDownFn == nil {
+			tearDown()
+		}
+	}()
+
 	go func(stopCh <-chan struct{}) {
+		defer close(errCh)
 		prepared, err := server.PrepareRun()
 		if err != nil {
 			errCh <- err
-		} else if err := prepared.Run(stopCh); err != nil {
-			errCh <- err
+			return
 		}
+		errCh <- prepared.Run(stopCh)
 	}(stopCh)
 
 	t.Logf("Waiting for /healthz to be ok...")
