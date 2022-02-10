@@ -2257,7 +2257,7 @@ func TestDescribeJob(t *testing.T) {
 				if !strings.Contains(out, fmt.Sprintf("Completed Indexes:  %s\n", tc.wantCompletedIndexes)) {
 					t.Errorf("Output didn't contain wanted Completed Indexes:\n%s", out)
 				}
-			} else if strings.Contains(out, fmt.Sprintf("Completed Indexes:")) {
+			} else if strings.Contains(out, "Completed Indexes:") {
 				t.Errorf("Output contains unexpected completed indexes:\n%s", out)
 			}
 		})
@@ -2265,6 +2265,7 @@ func TestDescribeJob(t *testing.T) {
 }
 
 func TestDescribeIngress(t *testing.T) {
+	ingresClassName := "test"
 	backendV1beta1 := networkingv1beta1.IngressBackend{
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt(80),
@@ -2279,6 +2280,7 @@ func TestDescribeIngress(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: networkingv1beta1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1beta1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -2311,6 +2313,7 @@ func TestDescribeIngress(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -2354,6 +2357,7 @@ Labels:           id1=app1
                   id2=app2
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2369,6 +2373,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2385,6 +2390,7 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2406,6 +2412,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2422,6 +2429,7 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2443,6 +2451,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2459,7 +2468,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendV1,
+					DefaultBackend:   &backendV1,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2481,6 +2491,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2497,7 +2508,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendResource,
+					DefaultBackend:   &backendResource,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2519,6 +2531,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  APIGroup: example.com, Kind: foo, Name: bar
 Rules:
   Host         Path  Backends
@@ -2535,7 +2548,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendResource,
+					DefaultBackend:   &backendResource,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2557,6 +2571,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  APIGroup: example.com, Kind: foo, Name: bar
 Rules:
   Host         Path  Backends
@@ -2573,6 +2588,31 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					DefaultBackend:   &backendV1,
+					IngressClassName: &ingresClassName,
+				},
+			}),
+			output: `Name:             bar
+Labels:           <none>
+Namespace:        foo
+Address:          
+Ingress Class:    test
+Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:  <none>
+Events:       <none>
+`,
+		},
+		"EmptyIngressClassName": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
 					DefaultBackend: &backendV1,
 				},
 			}),
@@ -2580,6 +2620,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    <none>
 Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
 Rules:
   Host        Path  Backends
@@ -2609,6 +2650,7 @@ Events:       <none>
 }
 
 func TestDescribeIngressV1(t *testing.T) {
+	ingresClassName := "test"
 	defaultBackend := networkingv1.IngressBackend{
 		Service: &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
@@ -2628,6 +2670,7 @@ func TestDescribeIngressV1(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: "foo.bar.com",
