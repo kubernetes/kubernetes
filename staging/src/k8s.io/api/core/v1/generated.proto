@@ -611,7 +611,7 @@ message Container {
   // Cannot be updated.
   optional string name = 1;
 
-  // Docker image name.
+  // Container image name.
   // More info: https://kubernetes.io/docs/concepts/containers/images
   // This field is optional to allow higher level config management to default or override
   // container images in workload controllers like Deployments and StatefulSets.
@@ -619,7 +619,7 @@ message Container {
   optional string image = 2;
 
   // Entrypoint array. Not executed within a shell.
-  // The docker image's ENTRYPOINT is used if this is not provided.
+  // The container image's ENTRYPOINT is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
   // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -630,7 +630,7 @@ message Container {
   repeated string command = 3;
 
   // Arguments to the entrypoint.
-  // The docker image's CMD is used if this is not provided.
+  // The container image's CMD is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
   // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -873,7 +873,7 @@ message ContainerStateTerminated {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time finishedAt = 6;
 
-  // Container's ID in the format 'docker://<container_id>'
+  // Container's ID in the format '<type>://<container_id>'
   // +optional
   optional string containerID = 7;
 }
@@ -916,7 +916,7 @@ message ContainerStatus {
   // ImageID of the container's image.
   optional string imageID = 7;
 
-  // Container's ID in the format 'docker://<container_id>'.
+  // Container's ID in the format '<type>://<container_id>'.
   // +optional
   optional string containerID = 8;
 
@@ -1220,12 +1220,12 @@ message EphemeralContainerCommon {
   // This name must be unique among all containers, init containers and ephemeral containers.
   optional string name = 1;
 
-  // Docker image name.
+  // Container image name.
   // More info: https://kubernetes.io/docs/concepts/containers/images
   optional string image = 2;
 
   // Entrypoint array. Not executed within a shell.
-  // The docker image's ENTRYPOINT is used if this is not provided.
+  // The image's ENTRYPOINT is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
   // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -1236,7 +1236,7 @@ message EphemeralContainerCommon {
   repeated string command = 3;
 
   // Arguments to the entrypoint.
-  // The docker image's CMD is used if this is not provided.
+  // The image's CMD is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
   // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -3806,8 +3806,7 @@ message PodStatus {
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   repeated ContainerStatus initContainerStatuses = 10;
 
-  // The list has one entry per container in the manifest. Each entry is currently the output
-  // of `docker inspect`.
+  // The list has one entry per container in the manifest.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   // +optional
   repeated ContainerStatus containerStatuses = 8;
