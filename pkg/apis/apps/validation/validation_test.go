@@ -2066,7 +2066,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validPodTemplateDef := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector2,
+				Labels: validSelector,
 			},
 			Spec: validPodSpecDef,
 		},
@@ -2122,30 +2122,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				},
 			},
 		},
-		"change template and selector": {
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 2,
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
-					TemplateGeneration: 3,
-					Template:           validPodTemplateAbc2.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-		},
 		"change template": {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -2185,7 +2161,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
 					TemplateGeneration: 2,
 					Template:           validPodTemplateDef.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
@@ -2290,6 +2266,31 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			},
 			expectedErrNum: 1,
 		},
+		"change template and selector": {
+			old: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					TemplateGeneration: 3,
+					Template:           validPodTemplateAbc2.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
+		},
 		"invalid selector": {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -2313,7 +2314,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrNum: 1,
+			expectedErrNum: 2,
 		},
 		"invalid pod": {
 			old: apps.DaemonSet{
@@ -2463,7 +2464,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrNum: 1,
+			expectedErrNum: 2,
 		},
 	}
 	for testName, errorCase := range errorCases {
