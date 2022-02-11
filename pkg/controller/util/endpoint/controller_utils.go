@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,6 +35,18 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/hash"
+)
+
+// semanticIgnoreResourceVersion does semantic deep equality checks for objects
+// but excludes ResourceVersion of ObjectReference. They are used when comparing
+// endpoints in Endpoints and EndpointSlice objects to avoid unnecessary updates
+// caused by Pod resourceVersion change.
+var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
+	func(a, b v1.ObjectReference) bool {
+		a.ResourceVersion = ""
+		b.ResourceVersion = ""
+		return a == b
+	},
 )
 
 // ServiceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls to AsSelectorPreValidated (see #73527)
@@ -279,7 +291,8 @@ func (sl portsInOrder) Less(i, j int) bool {
 
 // EndpointsEqualBeyondHash returns true if endpoints have equal attributes
 // but excludes equality checks that would have already been covered with
-// endpoint hashing (see hashEndpoint func for more info).
+// endpoint hashing (see hashEndpoint func for more info) and ignores difference
+// in ResourceVersion of TargetRef.
 func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
 	if stringPtrChanged(ep1.NodeName, ep1.NodeName) {
 		return false
@@ -293,7 +306,20 @@ func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
 		return false
 	}
 
-	if objectRefPtrChanged(ep1.TargetRef, ep2.TargetRef) {
+	// Serving and Terminating will only be set when the EndpointSliceTerminatingCondition feature is on.
+	// Ignore their difference if the expected or actual value is nil, which means the feature enablement is changed.
+	// Otherwise all EndpointSlices in the system would be updated on the first controller-manager restart even without
+	// actual changes, leading to delay in processing legitimate updates.
+	// Its value will be set to the expected one when there is an actual change triggering update of this EndpointSlice.
+	if ep1.Conditions.Serving != nil && ep2.Conditions.Serving != nil && *ep1.Conditions.Serving != *ep2.Conditions.Serving {
+		return false
+	}
+
+	if ep1.Conditions.Terminating != nil && ep2.Conditions.Terminating != nil && *ep1.Conditions.Terminating != *ep2.Conditions.Terminating {
+		return false
+	}
+
+	if !semanticIgnoreResourceVersion.DeepEqual(ep1.TargetRef, ep2.TargetRef) {
 		return false
 	}
 
@@ -311,18 +337,6 @@ func boolPtrChanged(ptr1, ptr2 *bool) bool {
 	return false
 }
 
-// objectRefPtrChanged returns true if a set of object ref pointers have
-// different values.
-func objectRefPtrChanged(ref1, ref2 *v1.ObjectReference) bool {
-	if (ref1 == nil) != (ref2 == nil) {
-		return true
-	}
-	if ref1 != nil && ref2 != nil && !apiequality.Semantic.DeepEqual(*ref1, *ref2) {
-		return true
-	}
-	return false
-}
-
 // stringPtrChanged returns true if a set of string pointers have different values.
 func stringPtrChanged(ptr1, ptr2 *string) bool {
 	if (ptr1 == nil) != (ptr2 == nil) {
@@ -332,4 +346,10 @@ func stringPtrChanged(ptr1, ptr2 *string) bool {
 		return true
 	}
 	return false
+}
+
+// EndpointSubsetsEqualIgnoreResourceVersion returns true if EndpointSubsets
+// have equal attributes but excludes ResourceVersion of Pod.
+func EndpointSubsetsEqualIgnoreResourceVersion(subsets1, subsets2 []v1.EndpointSubset) bool {
+	return semanticIgnoreResourceVersion.DeepEqual(subsets1, subsets2)
 }
