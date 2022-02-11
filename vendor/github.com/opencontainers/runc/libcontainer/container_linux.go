@@ -2028,15 +2028,33 @@ func encodeIDMapping(idMap []configs.IDMap) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// netlinkError is an error wrapper type for use by custom netlink message
+// types. Panics with errors are wrapped in netlinkError so that the recover
+// in bootstrapData can distinguish intentional panics.
+type netlinkError struct{ error }
+
 // bootstrapData encodes the necessary data in netlink binary format
 // as a io.Reader.
 // Consumer can write the data to a bootstrap program
 // such as one that uses nsenter package to bootstrap the container's
 // init process correctly, i.e. with correct namespaces, uid/gid
 // mapping etc.
-func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.NamespaceType]string) (io.Reader, error) {
+func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.NamespaceType]string) (_ io.Reader, Err error) {
 	// create the netlink message
 	r := nl.NewNetlinkRequest(int(InitMsg), 0)
+
+	// Our custom messages cannot bubble up an error using returns, instead
+	// they will panic with the specific error type, netlinkError. In that
+	// case, recover from the panic and return that as an error.
+	defer func() {
+		if r := recover(); r != nil {
+			if e, ok := r.(netlinkError); ok {
+				Err = e.error
+			} else {
+				panic(r)
+			}
+		}
+	}()
 
 	// write cloneFlags
 	r.AddData(&Int32msg{
