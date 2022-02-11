@@ -27,9 +27,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/opencontainers/selinux/go-selinux"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 )
@@ -263,7 +263,7 @@ func GetSELinux(path string, mountInfoFilename string, selinuxEnabled seLinuxEna
 // GetSELinuxSupport returns true if given path is on a mount that supports
 // SELinux.
 func (hu *HostUtil) GetSELinuxSupport(pathname string) (bool, error) {
-	return GetSELinux(pathname, procMountInfoPath, selinux.SELinuxEnabled)
+	return GetSELinux(pathname, procMountInfoPath, selinux.GetEnabled)
 }
 
 // GetOwner returns the integer ID for the user and group of the given path
