@@ -169,7 +169,7 @@ func TestUpdateStatus(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewContext()
+	ctx := genericapirequest.NewDefaultContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	pvStart := validNewPersistentVolume("foo")
 	err := storage.Storage.Create(ctx, key, pvStart, nil, 0, false)

@@ -3803,6 +3803,9 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 	client := http.Client{}
 
 	simple := &genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+		},
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
@@ -3914,6 +3917,9 @@ func TestCreate(t *testing.T) {
 	client := http.Client{}
 
 	simple := &genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+		},
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
@@ -3975,6 +3981,9 @@ func TestCreateYAML(t *testing.T) {
 
 	// yaml encoder
 	simple := &genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+		},
 		Other: "bar",
 	}
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), "application/yaml")
@@ -4044,6 +4053,9 @@ func TestCreateInNamespace(t *testing.T) {
 	client := http.Client{}
 
 	simple := &genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "other",
+		},
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
