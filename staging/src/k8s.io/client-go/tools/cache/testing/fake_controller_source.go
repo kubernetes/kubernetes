@@ -275,11 +275,11 @@ func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interfac
 			// clients).
 			changes = append(changes, watch.Event{Type: c.Type, Object: c.Object.DeepCopyObject()})
 		}
-		return f.Broadcaster.WatchWithPrefix(changes), nil
+		return f.Broadcaster.WatchWithPrefix(changes)
 	} else if rc > f.lastRV {
 		return nil, errors.New("resource version in the future not supported by this fake")
 	}
-	return f.Broadcaster.Watch(), nil
+	return f.Broadcaster.Watch()
 }
 
 // Shutdown closes the underlying broadcaster, waiting for events to be

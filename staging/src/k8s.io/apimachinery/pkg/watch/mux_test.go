@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -58,6 +59,10 @@ func TestBroadcaster(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(testWatchers)
 	for i := 0; i < testWatchers; i++ {
+		w, err := m.Watch()
+		if err != nil {
+			t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+		}
 		// Verify that each watcher gets the events in the correct order
 		go func(watcher int, w Interface) {
 			tableLine := 0
@@ -75,7 +80,7 @@ func TestBroadcaster(t *testing.T) {
 				tableLine++
 			}
 			wg.Done()
-		}(i, m.Watch())
+		}(i, w)
 	}
 
 	for i, item := range table {
@@ -90,8 +95,14 @@ func TestBroadcaster(t *testing.T) {
 
 func TestBroadcasterWatcherClose(t *testing.T) {
 	m := NewBroadcaster(0, WaitIfChannelFull)
-	w := m.Watch()
-	w2 := m.Watch()
+	w, err := m.Watch()
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
+	w2, err := m.Watch()
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
 	w.Stop()
 	m.Shutdown()
 	if _, open := <-w.ResultChan(); open {
@@ -108,6 +119,14 @@ func TestBroadcasterWatcherClose(t *testing.T) {
 func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 	done := make(chan bool)
 	m := NewBroadcaster(0, WaitIfChannelFull)
+	w, err := m.Watch()
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
+	w2, err := m.Watch()
+	if err != nil {
+		t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
 	go func(w0, w1 Interface) {
 		// We know Broadcaster is in the distribute loop once one watcher receives
 		// an event. Stop the other watcher while distribute is trying to
@@ -119,7 +138,7 @@ func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 			w0.Stop()
 		}
 		close(done)
-	}(m.Watch(), m.Watch())
+	}(w, w2)
 	m.Action(Added, &myType{})
 	select {
 	case <-time.After(wait.ForeverTestTimeout):
@@ -137,8 +156,12 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 
 	// Add a couple watchers
 	watches := make([]Interface, 2)
+	var err error
 	for i := range watches {
-		watches[i] = m.Watch()
+		watches[i], err = m.Watch()
+		if err != nil {
+			t.Fatalf("Unable start event watcher: '%v' (will not retry!)", err)
+		}
 	}
 
 	// Send a couple events before closing the broadcast channel.
@@ -194,33 +217,32 @@ func TestBroadcasterWatchAfterShutdown(t *testing.T) {
 	m := NewBroadcaster(0, WaitIfChannelFull)
 	m.Shutdown()
 
-	watch := func() {
-		defer func() {
-			if err := recover(); err == nil {
-				t.Error("should cause panic")
-			}
-		}()
-		m.Watch()
-	}
-	watch()
+	_, err := m.Watch()
+	assert.EqualError(t, err, "broadcaster already stopped", "Watch should report error id broadcaster is shutdown")
 
-	watchWithPrefix := func() {
-		defer func() {
-			if err := recover(); err == nil {
-				t.Error("should cause panic")
-			}
-		}()
-		m.WatchWithPrefix([]Event{event1, event2})
-	}
-	watchWithPrefix()
+	_, err = m.WatchWithPrefix([]Event{event1, event2})
+	assert.EqualError(t, err, "broadcaster already stopped", "WatchWithPrefix should report error id broadcaster is shutdown")
+}
 
-	action := func() {
-		defer func() {
-			if err := recover(); err == nil {
-				t.Error("should cause panic")
-			}
-		}()
-		m.Action(event1.Type, event1.Object)
+func TestBroadcasterSendEventAfterShutdown(t *testing.T) {
+	m := NewBroadcaster(1, DropIfChannelFull)
+
+	event := Event{Type: Added, Object: &myType{"foo", "hello world"}}
+
+	// Add a couple watchers
+	watches := make([]Interface, 2)
+	for i := range watches {
+		watches[i], _ = m.Watch()
 	}
-	action()
+	m.Shutdown()
+
+	// Send a couple events after closing the broadcast channel.
+	t.Log("Sending event")
+
+	err := m.Action(event.Type, event.Object)
+	assert.EqualError(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
+
+	sendOnClosed, err := m.ActionOrDrop(event.Type, event.Object)
+	assert.Equal(t, sendOnClosed, false, "ActionOrDrop should return false if broadcaster is already shutdown")
+	assert.EqualError(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
 }
