@@ -455,16 +455,6 @@ const (
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
-	// owner: @javidiaz
-	// kep: http://kep.k8s.io/1797
-	// alpha: v1.19
-	// beta: v1.20
-	// GA: v1.22
-	//
-	// Allow setting the Fully Qualified Domain Name (FQDN) in the hostname of a Pod. If a Pod does not
-	// have FQDN, this feature has no effect.
-	SetHostnameAsFQDN featuregate.Feature = "SetHostnameAsFQDN"
-
 	// owner: @ksubrmnn
 	// alpha: v1.14
 	// beta: v1.20
@@ -897,7 +887,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DownwardAPIHugePages:                           {Default: true, PreRelease: featuregate.Beta},                    // on by default in 1.22
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: true, PreRelease: featuregate.Beta},
-	SetHostnameAsFQDN:                              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	WinOverlay:                                     {Default: true, PreRelease: featuregate.Beta},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
 	DisableAcceleratorUsageMetrics:                 {Default: true, PreRelease: featuregate.Beta},
