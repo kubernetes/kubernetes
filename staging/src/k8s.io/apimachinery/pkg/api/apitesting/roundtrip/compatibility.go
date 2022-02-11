@@ -268,28 +268,46 @@ func CompatibilityTestFuzzer(scheme *runtime.Scheme, fuzzFuncs []interface{}) *f
 }
 
 func (c *CompatibilityTestOptions) Run(t *testing.T) {
+	usedHEADFixtures := sets.NewString()
+
 	for _, gvk := range c.Kinds {
 		t.Run(makeName(gvk), func(t *testing.T) {
 
 			t.Run("HEAD", func(t *testing.T) {
-				c.runCurrentVersionTest(t, gvk)
+				c.runCurrentVersionTest(t, gvk, usedHEADFixtures)
 			})
 
 			for _, previousVersionDir := range c.TestDataDirsPreviousVersions {
 				t.Run(filepath.Base(previousVersionDir), func(t *testing.T) {
-					c.runPreviousVersionTest(t, gvk, previousVersionDir)
+					c.runPreviousVersionTest(t, gvk, previousVersionDir, nil)
 				})
 			}
 
 		})
 	}
+
+	// Check for unused HEAD fixtures
+	t.Run("unused_fixtures", func(t *testing.T) {
+		files, err := os.ReadDir(c.TestDataDirCurrentVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		allFixtures := sets.NewString()
+		for _, file := range files {
+			allFixtures.Insert(file.Name())
+		}
+
+		if unused := allFixtures.Difference(usedHEADFixtures); len(unused) > 0 {
+			t.Fatalf("remove unused fixtures from %s:\n%s", c.TestDataDirCurrentVersion, strings.Join(unused.List(), "\n"))
+		}
+	})
 }
 
-func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schema.GroupVersionKind) {
+func (c *CompatibilityTestOptions) runCurrentVersionTest(t *testing.T, gvk schema.GroupVersionKind, usedFiles sets.String) {
 	expectedObject := c.FuzzedObjects[gvk]
 	expectedJSON, expectedYAML, expectedProto := c.encode(t, expectedObject)
 
-	actualJSON, actualYAML, actualProto, err := read(c.TestDataDirCurrentVersion, gvk, "")
+	actualJSON, actualYAML, actualProto, err := read(c.TestDataDirCurrentVersion, gvk, "", usedFiles)
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
@@ -387,10 +405,18 @@ func (c *CompatibilityTestOptions) encode(t *testing.T, obj runtime.Object) (jso
 	return jsonBytes.Bytes(), yamlBytes.Bytes(), protoBytes.Bytes()
 }
 
-func read(dir string, gvk schema.GroupVersionKind, suffix string) (json, yaml, proto []byte, err error) {
-	actualJSON, jsonErr := ioutil.ReadFile(filepath.Join(dir, makeName(gvk)+suffix+".json"))
-	actualYAML, yamlErr := ioutil.ReadFile(filepath.Join(dir, makeName(gvk)+suffix+".yaml"))
-	actualProto, protoErr := ioutil.ReadFile(filepath.Join(dir, makeName(gvk)+suffix+".pb"))
+func read(dir string, gvk schema.GroupVersionKind, suffix string, usedFiles sets.String) (json, yaml, proto []byte, err error) {
+	jsonFilename := makeName(gvk) + suffix + ".json"
+	actualJSON, jsonErr := ioutil.ReadFile(filepath.Join(dir, jsonFilename))
+	yamlFilename := makeName(gvk) + suffix + ".yaml"
+	actualYAML, yamlErr := ioutil.ReadFile(filepath.Join(dir, yamlFilename))
+	protoFilename := makeName(gvk) + suffix + ".pb"
+	actualProto, protoErr := ioutil.ReadFile(filepath.Join(dir, protoFilename))
+	if usedFiles != nil {
+		usedFiles.Insert(jsonFilename)
+		usedFiles.Insert(yamlFilename)
+		usedFiles.Insert(protoFilename)
+	}
 	if jsonErr != nil {
 		return actualJSON, actualYAML, actualProto, jsonErr
 	}
@@ -412,8 +438,8 @@ func writeFile(t *testing.T, dir string, gvk schema.GroupVersionKind, suffix, ex
 	}
 }
 
-func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk schema.GroupVersionKind, previousVersionDir string) {
-	jsonBeforeRoundTrip, yamlBeforeRoundTrip, protoBeforeRoundTrip, err := read(previousVersionDir, gvk, "")
+func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk schema.GroupVersionKind, previousVersionDir string, usedFiles sets.String) {
+	jsonBeforeRoundTrip, yamlBeforeRoundTrip, protoBeforeRoundTrip, err := read(previousVersionDir, gvk, "", usedFiles)
 	if os.IsNotExist(err) || (len(jsonBeforeRoundTrip) == 0 && len(yamlBeforeRoundTrip) == 0 && len(protoBeforeRoundTrip) == 0) {
 		t.SkipNow()
 		return
@@ -470,7 +496,7 @@ func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk sche
 	}
 	protoAfterRoundTrip := protoBytes.Bytes()
 
-	expectedJSONAfterRoundTrip, expectedYAMLAfterRoundTrip, expectedProtoAfterRoundTrip, _ := read(previousVersionDir, gvk, ".after_roundtrip")
+	expectedJSONAfterRoundTrip, expectedYAMLAfterRoundTrip, expectedProtoAfterRoundTrip, _ := read(previousVersionDir, gvk, ".after_roundtrip", usedFiles)
 	if len(expectedJSONAfterRoundTrip) == 0 {
 		expectedJSONAfterRoundTrip = jsonBeforeRoundTrip
 	}
