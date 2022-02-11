@@ -1584,6 +1584,58 @@ func TestReconcileTopology(t *testing.T) {
 	}
 }
 
+func TestReconcileCreateEndpointSliceNodeMissing(t *testing.T) {
+	client := newClientset()
+	setupMetrics()
+	namespace := "test"
+	podWithNode := newPod(1, namespace, true, 1, false)
+	podWithoutNode := newPod(2, namespace, true, 1, false)
+	podWithoutNode.Spec.NodeName = "MissingNode"
+	pods := []*corev1.Pod{podWithNode, podWithoutNode}
+	nodes := []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	testCases := []struct {
+		name                 string
+		topologyCacheEnabled bool
+		expectCreatedSlice   bool
+		expectError          bool
+	}{
+		{
+			name:                 "pod NodeName doesn't exist - topology disabled",
+			topologyCacheEnabled: false,
+			expectCreatedSlice:   false,
+			expectError:          true,
+		},
+		{
+			name:                 "pod NodeName doesn't exist - topology enable",
+			topologyCacheEnabled: true,
+			expectCreatedSlice:   true,
+			expectError:          false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newReconciler(client, nodes, defaultMaxEndpointsPerSlice)
+			if tc.topologyCacheEnabled {
+				r.topologyCache = topologycache.NewTopologyCache()
+			}
+			err := r.reconcile(&svc, pods, []*discovery.EndpointSlice{}, time.Now())
+			if (err != nil) != tc.expectError {
+				t.Fatalf("Unexpected error: Expected %v Received %v", tc.expectError, err != nil)
+			}
+			fetchedSlices := fetchEndpointSlices(t, client, namespace)
+			createdSliceFound := len(fetchedSlices) == 1
+
+			if createdSliceFound != tc.expectCreatedSlice {
+				t.Errorf("Expected created EndpointSlice existence to be %t, got %t", tc.expectCreatedSlice, createdSliceFound)
+			}
+
+		})
+	}
+}
+
 // Test Helpers
 
 func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *reconciler {

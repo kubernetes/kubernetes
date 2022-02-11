@@ -173,7 +173,19 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 		node, err := r.nodeLister.Get(pod.Spec.NodeName)
 		if err != nil {
-			return err
+			// The Node can not be present in the informer cache, but ShouldPodBeInEndpointSlice guarantee that the Pod has IPs,
+			// so we know that the Node has already existed. We don't know if the Node has gone permanently or temporary.
+			// If this is an informer error or yhr topologyCache is not available we exit immediately, keeping the previous fail-open behavior,
+			// the slice is not updated and it keeps  requeueing this Service until the Pod is definitively deleted by the PodGC controller, the Node recovers,
+			// or until the maxBackoff retry timeout.
+			// If the topology cache is enabled, the Node update/create/delete events will be processed and this Service will be reconciled,
+			// so we can skip this Pod and fail-close not sending traffic to the Pod that at this moment we don't know its real status.
+			if errors.IsNotFound(err) && r.topologyCache != nil {
+				klog.Warningf("Skipping probably orphan Pod %s for Service %s: Node %s not found", pod.Namespace+"/"+pod.Name, service.Namespace+"/"+service.Name, pod.Spec.NodeName)
+				continue
+			} else {
+				return err
+			}
 		}
 		endpoint := podToEndpoint(pod, node, service, addressType)
 		if len(endpoint.Addresses) > 0 {
