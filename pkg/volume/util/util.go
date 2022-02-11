@@ -35,11 +35,13 @@ import (
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -271,6 +273,16 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 		allMountOptions.Insert(mountOption)
 	}
 	return allMountOptions.List()
+}
+
+// AddSELinuxMountOption adds -o context="XYZ mount option to a given list
+func AddSELinuxMountOption(options []string, seLinuxContext string) []string {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		return options
+	}
+	// Use double quotes to support a comma "," in the SELinux context string.
+	// For example: dirsync,context="system_u:object_r:container_file_t:s0:c15,c25",noatime
+	return append(options, "context=%q", seLinuxContext)
 }
 
 // ContainsAccessMode returns whether the requested mode is contained by modes

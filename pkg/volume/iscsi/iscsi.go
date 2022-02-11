@@ -93,7 +93,7 @@ func (plugin *iscsiPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *iscsiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -336,13 +336,14 @@ func (iscsi *iscsiDisk) iscsiPodDeviceMapPath() (string, string) {
 
 type iscsiDiskMounter struct {
 	*iscsiDisk
-	readOnly     bool
-	fsType       string
-	volumeMode   v1.PersistentVolumeMode
-	mounter      *mount.SafeFormatAndMount
-	exec         utilexec.Interface
-	deviceUtil   ioutil.DeviceUtil
-	mountOptions []string
+	readOnly                  bool
+	fsType                    string
+	volumeMode                v1.PersistentVolumeMode
+	mounter                   *mount.SafeFormatAndMount
+	exec                      utilexec.Interface
+	deviceUtil                ioutil.DeviceUtil
+	mountOptions              []string
+	mountedWithSELinuxContext bool
 }
 
 var _ volume.Mounter = &iscsiDiskMounter{}
@@ -351,7 +352,7 @@ func (b *iscsiDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       b.readOnly,
 		Managed:        !b.readOnly,
-		SELinuxRelabel: true,
+		SELinuxRelabel: !b.mountedWithSELinuxContext,
 	}
 }
 
@@ -365,6 +366,9 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	if err != nil {
 		klog.Errorf("iscsi: failed to setup")
 	}
+	// The volume must have been mounted in MountDevice with -o context.
+	// TODO: extract from mount table in GetAttributes() to be sure?
+	b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
 	return err
 }
 
