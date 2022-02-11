@@ -274,9 +274,9 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
 	switch c.ExtraConfig.EndpointReconcilerType {
 	// there are numerous test dependencies that depend on a default controller
-	case "", reconcilers.MasterCountReconcilerType:
+	case reconcilers.MasterCountReconcilerType:
 		return c.createMasterCountReconciler()
-	case reconcilers.LeaseEndpointReconcilerType:
+	case "", reconcilers.LeaseEndpointReconcilerType:
 		return c.createLeaseReconciler()
 	case reconcilers.NoneEndpointReconcilerType:
 		return c.createNoneReconciler()
