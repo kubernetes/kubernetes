@@ -445,7 +445,12 @@ type KubeletConfiguration struct {
 	// +optional
 	RegisterNode bool
 
-	// SkipCadvisorProcessMetrics provide a way to skip the cadvisormetrics.ProcessMetrics
+	// SkipCadvisorProcessMetrics provide a way to skip the cadvisormetrics.ProcessMetrics,
+	// as there is a performance issue when there is a huge number of open files. 
+	// See https://github.com/kubernetes/kubernetes/issues/99183 for more details.
+	// When skipping process metrics,  the cadvisor metrics would not include container_processes,
+	// container_file_descriptors, container_sockets, container_threads_max, container_threads, 
+	// container_ulimits_soft. 
 	// +optional
 	SkipCadvisorProcessMetrics bool
 }
