@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -63,20 +62,6 @@ const (
 	// stored in an Endpoints resource. In a future release, this controller
 	// may truncate endpoints exceeding this length.
 	maxCapacity = 1000
-
-	// TolerateUnreadyEndpointsAnnotation is an annotation on the Service denoting if the endpoints
-	// controller should go ahead and create endpoints for unready pods. This annotation is
-	// currently only used by StatefulSets, where we need the pod to be DNS
-	// resolvable during initialization and termination. In this situation we
-	// create a headless Service just for the StatefulSet, and clients shouldn't
-	// be using this Service for anything so unready endpoints don't matter.
-	// Endpoints of these Services retain their DNS records and continue
-	// receiving traffic for the Service from the moment the kubelet starts all
-	// containers in the pod and marks it "Running", till the kubelet stops all
-	// containers and deletes the pod from the apiserver.
-	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
-	// subsequent releases.  It will be removed no sooner than 1.13.
-	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 
 	// truncated is a possible value for `endpoints.kubernetes.io/over-capacity` annotation on an
 	// endpoint resource and indicates that the number of endpoints have been truncated to
@@ -420,14 +405,6 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 
 	// If the user specified the older (deprecated) annotation, we have to respect it.
 	tolerateUnreadyEndpoints := service.Spec.PublishNotReadyAddresses
-	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
-		b, err := strconv.ParseBool(v)
-		if err == nil {
-			tolerateUnreadyEndpoints = b
-		} else {
-			utilruntime.HandleError(fmt.Errorf("Failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err))
-		}
-	}
 
 	// We call ComputeEndpointLastChangeTriggerTime here to make sure that the
 	// state of the trigger time tracker gets updated even if the sync turns out
