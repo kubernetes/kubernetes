@@ -225,9 +225,9 @@ var _ volume.Mounter = &quobyteMounter{}
 
 func (mounter *quobyteMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        mounter.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       mounter.readOnly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
 }
 

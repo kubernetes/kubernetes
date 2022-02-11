@@ -115,9 +115,9 @@ type Metrics struct {
 
 // Attributes represents the attributes of this mounter.
 type Attributes struct {
-	ReadOnly        bool
-	Managed         bool
-	SupportsSELinux bool
+	ReadOnly       bool
+	Managed        bool
+	SELinuxRelabel bool
 }
 
 // MounterArgs provides more easily extensible arguments to Mounter

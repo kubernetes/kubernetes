@@ -208,8 +208,8 @@ type vsphereVolumeMounter struct {
 
 func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		SupportsSELinux: true,
-		Managed:         true,
+		SELinuxRelabel: true,
+		Managed:        true,
 	}
 }
 

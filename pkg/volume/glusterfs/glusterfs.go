@@ -251,9 +251,9 @@ var _ volume.Mounter = &glusterfsMounter{}
 
 func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
 }
 
