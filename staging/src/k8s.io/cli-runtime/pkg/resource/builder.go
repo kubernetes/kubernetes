@@ -1205,28 +1205,6 @@ func expandIfFilePattern(pattern string) ([]string, error) {
 	return matches, err
 }
 
-type cachingRESTMapperFunc struct {
-	delegate RESTMapperFunc
-
-	lock   sync.Mutex
-	cached meta.RESTMapper
-}
-
-func (c *cachingRESTMapperFunc) ToRESTMapper() (meta.RESTMapper, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.cached != nil {
-		return c.cached, nil
-	}
-
-	ret, err := c.delegate()
-	if err != nil {
-		return nil, err
-	}
-	c.cached = ret
-	return c.cached, nil
-}
-
 type cachingCategoryExpanderFunc struct {
 	delegate CategoryExpanderFunc
 
