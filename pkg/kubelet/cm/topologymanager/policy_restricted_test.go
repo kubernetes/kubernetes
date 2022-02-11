@@ -68,7 +68,7 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 }
 
 func TestPolicyRestrictedMerge(t *testing.T) {
-	numaNodes := []int{0, 1}
+	numaNodes := []int{0, 1, 2, 3}
 	policy := NewRestrictedPolicy(numaNodes)
 
 	tcases := commonPolicyMergeTestCases(numaNodes)
