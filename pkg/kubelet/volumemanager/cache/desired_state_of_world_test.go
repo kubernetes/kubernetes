@@ -17,10 +17,11 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/apimachinery/pkg/api/resource"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -59,7 +60,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
 
 	// Assert
 	if err != nil {
@@ -104,7 +105,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
 
 	// Assert
 	if err != nil {
@@ -259,8 +260,8 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 	for name, v := range testcases {
 		volumeSpec1 := &volume.Spec{Volume: &v.pod1.Spec.Volumes[0]}
 		volumeSpec2 := &volume.Spec{Volume: &v.pod2.Spec.Volumes[0]}
-		generatedVolumeName1, err1 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod1), v.pod1, volumeSpec1, volumeSpec1.Name(), "")
-		generatedVolumeName2, err2 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod2), v.pod2, volumeSpec2, volumeSpec2.Name(), "")
+		generatedVolumeName1, err1 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod1), v.pod1, volumeSpec1, volumeSpec1.Name(), "", nil)
+		generatedVolumeName2, err2 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod2), v.pod2, volumeSpec2, volumeSpec2.Name(), "", nil)
 		if err1 != nil {
 			t.Fatalf("test %q: AddPodToVolume failed. Expected: <no error> Actual: <%v>", name, err1)
 		}
@@ -309,7 +310,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -407,19 +408,19 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	pod3Name := util.GetUniquePodName(pod3)
 
 	generatedVolume1Name, err := dsw.AddPodToVolume(
-		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGidValue */)
+		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume2Name, err := dsw.AddPodToVolume(
-		pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGidValue */)
+		pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume3Name, err := dsw.AddPodToVolume(
-		pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGidValue */)
+		pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -580,14 +581,14 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 	}
 	for i := range pod1.Spec.Volumes {
 		volumeSpec := &volume.Spec{Volume: &pod1.Spec.Volumes[i]}
-		_, err := dsw.AddPodToVolume(pod1Name, pod1, volumeSpec, volumeSpec.Name(), "")
+		_, err := dsw.AddPodToVolume(pod1Name, pod1, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
 		if err != nil {
 			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 		}
 	}
 	for i := range pod2.Spec.Volumes {
 		volumeSpec := &volume.Spec{Volume: &pod2.Spec.Volumes[i]}
-		_, err := dsw.AddPodToVolume(pod2Name, pod2, volumeSpec, volumeSpec.Name(), "")
+		_, err := dsw.AddPodToVolume(pod2Name, pod2, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxContainerContexts */)
 		if err != nil {
 			t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 		}

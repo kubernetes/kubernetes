@@ -737,7 +737,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	}
 
 	// Act
-	err = asw.MarkDeviceAsMounted(generatedVolumeName, devicePath, deviceMountPath)
+	err = asw.MarkDeviceAsMounted(generatedVolumeName, devicePath, deviceMountPath, "")
 
 	// Assert
 	if err != nil {
@@ -824,7 +824,7 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		t.Fatalf("expected volume %s to be found in aws.GetPossiblyMountedVolumesForPod", volumeSpec1.Name())
 	}
 
-	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1, resource.Quantity{})
+	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1, resource.Quantity{}, "")
 	if volExists {
 		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
 	}
@@ -910,7 +910,7 @@ func verifyPodExistsInVolumeAsw(
 	expectedDevicePath string,
 	asw ActualStateOfWorld) {
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{})
+		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{}, "")
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -952,7 +952,7 @@ func verifyPodDoesntExistInVolumeAsw(
 	expectVolumeToExist bool,
 	asw ActualStateOfWorld) {
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{})
+		asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{}, "")
 	if !expectVolumeToExist && err == nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume did not return error. Expected: <error indicating volume does not exist> Actual: <%v>", err)

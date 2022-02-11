@@ -275,16 +275,6 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 	return allMountOptions.List()
 }
 
-// AddSELinuxMountOption adds -o context="XYZ mount option to a given list
-func AddSELinuxMountOption(options []string, seLinuxContext string) []string {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		return options
-	}
-	// Use double quotes to support a comma "," in the SELinux context string.
-	// For example: dirsync,context="system_u:object_r:container_file_t:s0:c15,c25",noatime
-	return append(options, "context=%q", seLinuxContext)
-}
-
 // ContainsAccessMode returns whether the requested mode is contained by modes
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
@@ -584,15 +574,29 @@ func IsLocalEphemeralVolume(volume v1.Volume) bool {
 }
 
 // GetPodVolumeNames returns names of volumes that are used in a pod,
-// either as filesystem mount or raw block device.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String) {
+// either as filesystem mount or raw block device, together with list
+// of all SELinux contexts of all containers that use the volumes.
+func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String, seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
 	mounts = sets.NewString()
 	devices = sets.NewString()
+	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
+		var seLinuxOptions *v1.SELinuxOptions
+		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+			if effectiveContainerSecurity != nil {
+				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions
+				seLinuxOptions = effectiveContainerSecurity.SELinuxOptions
+			}
+		}
+
 		if container.VolumeMounts != nil {
 			for _, mount := range container.VolumeMounts {
 				mounts.Insert(mount.Name)
+				if seLinuxOptions != nil {
+					seLinuxContainerContexts[mount.Name] = append(seLinuxContainerContexts[mount.Name], seLinuxOptions.DeepCopy())
+				}
 			}
 		}
 		if container.VolumeDevices != nil {

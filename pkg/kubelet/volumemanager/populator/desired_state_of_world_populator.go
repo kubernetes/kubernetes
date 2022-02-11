@@ -283,7 +283,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	}
 
 	allVolumesAdded := true
-	mounts, devices := util.GetPodVolumeNames(pod)
+	mounts, devices, seLinuxContainerContexts := util.GetPodVolumeNames(pod)
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
@@ -304,7 +304,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 
 		// Add volume to desired state of world
 		uniqueVolumeName, err := dswp.desiredStateOfWorld.AddPodToVolume(
-			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue)
+			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue, seLinuxContainerContexts[podVolume.Name])
 		if err != nil {
 			klog.ErrorS(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())

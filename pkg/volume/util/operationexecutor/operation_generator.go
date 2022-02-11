@@ -645,7 +645,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				volumeToMount.VolumeSpec,
 				devicePath,
 				deviceMountPath,
-				volume.DeviceMounterArgs{FsGroup: fsGroup},
+				volume.DeviceMounterArgs{FsGroup: fsGroup, SELinuxLabel: volumeToMount.SELinuxLabel},
 			)
 			if err != nil {
 				og.checkForFailedMount(volumeToMount, err)
@@ -659,7 +659,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
-				volumeToMount.VolumeName, devicePath, deviceMountPath)
+				volumeToMount.VolumeName, devicePath, deviceMountPath, volumeToMount.SELinuxLabel)
 			if markDeviceMountedErr != nil {
 				// On failure, return error. Caller will log and retry.
 				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
@@ -688,6 +688,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FsGroup:             hostGID,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
 			FSGroupChangePolicy: fsGroupChangePolicy,
+			SELinuxLabel:        volumeToMount.SELinuxLabel,
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{
@@ -699,6 +700,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			VolumeGidVolume:     volumeToMount.VolumeGidValue,
 			VolumeSpec:          volumeToMount.VolumeSpec,
 			VolumeMountState:    VolumeMounted,
+			SELinuxMountContext: volumeToMount.SELinuxLabel,
 		}
 		if mountErr != nil {
 			og.checkForFailedMount(volumeToMount, mountErr)
@@ -787,7 +789,7 @@ func (og *operationGenerator) markDeviceErrorState(volumeToMount VolumeToMount, 
 		actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) == DeviceNotMounted {
 		// only devices which are not mounted can be marked as uncertain. We do not want to mark a device
 		// which was previously marked as mounted here as uncertain.
-		markDeviceUncertainError := actualStateOfWorld.MarkDeviceAsUncertain(volumeToMount.VolumeName, devicePath, deviceMountPath)
+		markDeviceUncertainError := actualStateOfWorld.MarkDeviceAsUncertain(volumeToMount.VolumeName, devicePath, deviceMountPath, volumeToMount.SELinuxLabel)
 		if markDeviceUncertainError != nil {
 			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainError).Error())
 		}
@@ -955,7 +957,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		unmountDeviceErr := volumeDeviceUnmounter.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
 			// Mark the device as uncertain, so MountDevice is called for new pods. UnmountDevice may be already in progress.
-			markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath)
+			markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath, deviceToDetach.SELinuxMountContext)
 			if markDeviceUncertainErr != nil {
 				// There is nothing else we can do. Hope that UnmountDevice will be re-tried shortly.
 				klog.Errorf(deviceToDetach.GenerateErrorDetailed("UnmountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr).Error())
@@ -976,7 +978,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		// The device is still in use elsewhere. Caller will log and retry.
 		if deviceOpened {
 			// Mark the device as uncertain, so MountDevice is called for new pods.
-			markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath)
+			markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath, deviceToDetach.SELinuxMountContext)
 			if markDeviceUncertainErr != nil {
 				// There is nothing else we can do. Hope that UnmountDevice will be re-tried shortly.
 				klog.Errorf(deviceToDetach.GenerateErrorDetailed("UnmountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr).Error())
@@ -1114,7 +1116,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		// Update actual state of world to reflect volume is globally mounted
 		markedDevicePath := devicePath
 		markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
-			volumeToMount.VolumeName, markedDevicePath, globalMapPath)
+			volumeToMount.VolumeName, markedDevicePath, globalMapPath, "")
 		if markDeviceMappedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
@@ -1183,7 +1185,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		// TODO: This can be improved after #82492 is merged and ASW has state.
 		if markedDevicePath != devicePath {
 			markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
-				volumeToMount.VolumeName, devicePath, globalMapPath)
+				volumeToMount.VolumeName, devicePath, globalMapPath, "")
 			if markDeviceMappedErr != nil {
 				// On failure, return error. Caller will log and retry.
 				eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
@@ -1411,7 +1413,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		// cases below. The volume is marked as fully un-mapped at the end of this function, when everything
 		// succeeds.
 		markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(
-			deviceToDetach.VolumeName, deviceToDetach.DevicePath, globalMapPath)
+			deviceToDetach.VolumeName, deviceToDetach.DevicePath, globalMapPath, "" /* seLinuxMountContext */)
 		if markDeviceUncertainErr != nil {
 			// On failure, return error. Caller will log and retry.
 			eventErr, detailedErr := deviceToDetach.GenerateError("UnmapDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr)
