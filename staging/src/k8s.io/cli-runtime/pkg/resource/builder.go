@@ -259,7 +259,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 		default:
 			matches, err := expandIfFilePattern(s)
 			if err != nil {
-				b.errs = append(b.errs, fmt.Errorf("file pattern %v is not valid: %v", s, err))
+				b.errs = append(b.errs, fmt.Errorf("pattern %q is not valid: %v", s, err))
 				continue
 			}
 			klog.V(4).Infof("Processing path %q, matched with %q", s, matches)
@@ -1200,7 +1200,7 @@ func HasNames(args []string) (bool, error) {
 func expandIfFilePattern(pattern string) ([]string, error) {
 	matches, err := filepath.Glob(pattern)
 	if err == nil && len(matches) == 0 {
-		return nil, fmt.Errorf("pattern did not yield any results")
+		return nil, fmt.Errorf("no match")
 	}
 	return matches, err
 }
