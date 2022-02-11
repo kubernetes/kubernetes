@@ -298,7 +298,10 @@ func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) watc
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value can be ignored or used to stop recording, if desired.
 func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface {
-	watcher := e.Watch()
+	watcher, err := e.Watch()
+	if err != nil {
+		klog.Errorf("Unable start event watcher: '%v' (will not retry!)", err)
+	}
 	go func() {
 		defer utilruntime.HandleCrash()
 		for watchEvent := range watcher.ResultChan() {
@@ -346,7 +349,12 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations m
 	// when we go to shut down this broadcaster.  Just drop events if we get overloaded,
 	// and log an error if that happens (we've configured the broadcaster to drop
 	// outgoing events anyway).
-	if sent := recorder.ActionOrDrop(watch.Added, event); !sent {
+	sent, err := recorder.ActionOrDrop(watch.Added, event)
+	if err != nil {
+		klog.Errorf("unable to record event: %v (will not retry!)", err)
+		return
+	}
+	if !sent {
 		klog.Errorf("unable to record event: too many queued events, dropped event %#v", event)
 	}
 }
