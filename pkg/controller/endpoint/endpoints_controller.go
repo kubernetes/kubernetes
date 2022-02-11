@@ -174,6 +174,7 @@ type Controller struct {
 func (e *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer e.queue.ShutDown()
+	defer e.eventBroadcaster.Shutdown()
 
 	klog.Infof("Starting endpoint controller")
 	defer klog.Infof("Shutting down endpoint controller")

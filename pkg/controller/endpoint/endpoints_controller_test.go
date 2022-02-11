@@ -186,6 +186,7 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 			blockNextAction <- struct{}{}
 		}
 
+		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{})))
 	}
@@ -2275,7 +2276,10 @@ func TestMultipleServiceChanges(t *testing.T) {
 	*controller = *newController(testServer.URL, 0*time.Second)
 	addPods(controller.podStore, ns, 1, 1, 0, ipv4only)
 
-	go func() { controller.Run(context.TODO(), 1) }()
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	go func() { controller.Run(ctx, 1) }()
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
