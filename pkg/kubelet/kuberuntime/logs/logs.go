@@ -27,6 +27,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -383,6 +384,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 			klog.InfoS("Incomplete line in log file", "path", path, "line", l)
 		}
 		if parse == nil {
+			// If the line is empty, we should read next line to reach the real log line
+			if strings.Trim(string(l), string(eol[0])) == "" {
+				continue
+			}
 			// Initialize the log parsing function.
 			parse, err = getParseFunc(l)
 			if err != nil {
