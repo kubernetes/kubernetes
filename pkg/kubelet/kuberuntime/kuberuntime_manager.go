@@ -286,12 +286,6 @@ func (m *kubeGenericRuntimeManager) Type() string {
 	return m.runtimeName
 }
 
-// SupportsSingleFileMapping returns whether the container runtime supports single file mappings or not.
-// It is supported on Windows only if the container runtime is containerd.
-func (m *kubeGenericRuntimeManager) SupportsSingleFileMapping() bool {
-	return true
-}
-
 func newRuntimeVersion(version string) (*utilversion.Version, error) {
 	if ver, err := utilversion.ParseSemantic(version); err == nil {
 		return ver, err
