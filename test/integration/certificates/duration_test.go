@@ -115,10 +115,6 @@ func TestCSRDuration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() {
-		cancel()
-	})
-
 	informerFactory.Start(ctx.Done())
 	go c.Run(ctx, 1)
 

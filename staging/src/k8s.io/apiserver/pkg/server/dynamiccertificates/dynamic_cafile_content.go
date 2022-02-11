@@ -163,16 +163,15 @@ func (c *DynamicFileCAContent) Run(ctx context.Context, workers int) {
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
 	// start the loop that watches the CA file until context is done.
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		if err := c.watchCAFile(ctx); err != nil {
+	go wait.Until(func() {
+		if err := c.watchCAFile(ctx.Done()); err != nil {
 			klog.ErrorS(err, "Failed to watch CA file, will retry later")
 		}
-	}, time.Minute)
-
+	}, time.Minute, ctx.Done())
 	<-ctx.Done()
 }
 
-func (c *DynamicFileCAContent) watchCAFile(ctx context.Context) error {
+func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {
 	// Trigger a check here to ensure the content will be checked periodically even if the following watch fails.
 	c.queue.Add(workItemKey)
 
@@ -196,7 +195,7 @@ func (c *DynamicFileCAContent) watchCAFile(ctx context.Context) error {
 			}
 		case err := <-w.Errors:
 			return fmt.Errorf("received fsnotify error: %v", err)
-		case <-ctx.Done():
+		case <-stopCh:
 			return nil
 		}
 	}

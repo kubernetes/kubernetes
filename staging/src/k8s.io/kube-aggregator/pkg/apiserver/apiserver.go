@@ -172,7 +172,7 @@ func (cfg *Config) Complete() CompletedConfig {
 }
 
 // NewWithDelegate returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(ctx context.Context, delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,8 @@ func (c completedConfig) NewWithDelegate(ctx context.Context, delegationTarget g
 		apiregistrationClient,
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// apiServiceRegistrationControllerInitiated is closed when APIServiceRegistrationController has finished "installing" all known APIServices.
 	// At this point we know that the proxy handler knows about APIServices and can handle client requests.
 	// Before it might have resulted in a 404 response which could have serious consequences for some controllers like  GC and NS

@@ -20,7 +20,6 @@ limitations under the License.
 package app
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -125,9 +124,8 @@ func createAggregatorConfig(
 }
 
 func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, apiExtensionInformers apiextensionsinformers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(ctx, delegateAPIServer)
+
+	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)
 	if err != nil {
 		return nil, err
 	}

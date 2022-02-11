@@ -138,11 +138,11 @@ func (c *DynamicCertKeyPairContent) Run(ctx context.Context, workers int) {
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
 	// start the loop that watches the cert and key files until stopCh is closed.
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+	go wait.Until(func() {
 		if err := c.watchCertKeyFile(ctx.Done()); err != nil {
 			klog.ErrorS(err, "Failed to watch cert and key file, will retry later")
 		}
-	}, time.Minute)
+	}, time.Minute, ctx.Done())
 
 	<-ctx.Done()
 }

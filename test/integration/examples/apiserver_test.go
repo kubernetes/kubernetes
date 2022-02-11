@@ -185,6 +185,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// second wardle should contain all the certs, first and last
 	numMatches := 0
+	t.Logf("Ravig second CAnames %v\n", secondWardleCANames)
 	for _, needle := range firstKubeCANames {
 		for _, haystack := range secondWardleCANames {
 			if needle == haystack {
@@ -202,7 +203,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		}
 	}
 	if numMatches != 4 {
-		t.Fatal("names don't match")
+		t.Fatalf("names don't match %v", numMatches)
 	}
 
 }
