@@ -77,6 +77,7 @@ func TestReadLogs(t *testing.T) {
 		t.Fatalf("unable to create temp file")
 	}
 	defer os.Remove(file.Name())
+	file.WriteString("\n\n")
 	file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n")
