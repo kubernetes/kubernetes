@@ -92,6 +92,10 @@ func (plugin *iscsiPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *iscsiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

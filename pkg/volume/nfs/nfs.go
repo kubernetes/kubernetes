@@ -105,6 +105,10 @@ func (plugin *nfsPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *nfsPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

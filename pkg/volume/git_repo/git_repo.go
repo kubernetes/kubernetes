@@ -89,6 +89,10 @@ func (plugin *gitRepoPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *gitRepoPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	if err := validateVolume(spec.Volume.GitRepo); err != nil {
 		return nil, err

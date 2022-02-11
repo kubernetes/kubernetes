@@ -134,6 +134,10 @@ func (plugin *azureDataDiskPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *azureDataDiskPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
 		util.AzureVolumeLimitKey: defaultAzureVolumeLimit,

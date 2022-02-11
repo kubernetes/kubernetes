@@ -92,6 +92,10 @@ func (plugin *downwardAPIPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName:         spec.Name(),

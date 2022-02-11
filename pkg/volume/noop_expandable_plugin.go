@@ -75,3 +75,7 @@ func (n *noopExpandableVolumePluginInstance) SupportsBulkVolumeVerification() bo
 func (n *noopExpandableVolumePluginInstance) RequiresFSResize() bool {
 	return true
 }
+
+func (n *noopExpandableVolumePluginInstance) SupportsSELinuxContextMount(spec *Spec) (bool, error) {
+	return false, nil
+}

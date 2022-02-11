@@ -581,6 +581,10 @@ func (p *csiPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 // volume.AttachableVolumePlugin methods
 var _ volume.AttachableVolumePlugin = &csiPlugin{}
 
