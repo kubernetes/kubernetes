@@ -756,6 +756,58 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "Serving condition changed from nil to true",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     nil,
+					Terminating: nil,
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			expected: true,
+		},
+		{
+			name: "Serving condition changed from false to true",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			expected: false,
+		},
+		{
 			name: "Pod name changed",
 			ep1: &discovery.Endpoint{
 				Conditions: discovery.EndpointConditions{
@@ -777,11 +829,123 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "Pod resourceVersion changed",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: "1"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: "2"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			expected: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := EndpointsEqualBeyondHash(tt.ep1, tt.ep2); got != tt.expected {
 				t.Errorf("EndpointsEqualBeyondHash() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEndpointSubsetsEqualIgnoreResourceVersion(t *testing.T) {
+	copyAndMutateEndpointSubset := func(orig *v1.EndpointSubset, mutator func(*v1.EndpointSubset)) *v1.EndpointSubset {
+		newSubSet := orig.DeepCopy()
+		mutator(newSubSet)
+		return newSubSet
+	}
+	es1 := &v1.EndpointSubset{
+		Addresses: []v1.EndpointAddress{
+			{
+				IP:        "1.1.1.1",
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod1-1", Namespace: "ns", ResourceVersion: "1"},
+			},
+		},
+		NotReadyAddresses: []v1.EndpointAddress{
+			{
+				IP:        "1.1.1.2",
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod1-2", Namespace: "ns2", ResourceVersion: "2"},
+			},
+		},
+		Ports: []v1.EndpointPort{{Port: 8081, Protocol: "TCP"}},
+	}
+	es2 := &v1.EndpointSubset{
+		Addresses: []v1.EndpointAddress{
+			{
+				IP:        "2.2.2.1",
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod2-1", Namespace: "ns", ResourceVersion: "3"},
+			},
+		},
+		NotReadyAddresses: []v1.EndpointAddress{
+			{
+				IP:        "2.2.2.2",
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod2-2", Namespace: "ns2", ResourceVersion: "4"},
+			},
+		},
+		Ports: []v1.EndpointPort{{Port: 8082, Protocol: "TCP"}},
+	}
+	tests := []struct {
+		name     string
+		subsets1 []v1.EndpointSubset
+		subsets2 []v1.EndpointSubset
+		expected bool
+	}{
+		{
+			name:     "Subsets removed",
+			subsets1: []v1.EndpointSubset{*es1, *es2},
+			subsets2: []v1.EndpointSubset{*es1},
+			expected: false,
+		},
+		{
+			name:     "Ready Pod IP changed",
+			subsets1: []v1.EndpointSubset{*es1, *es2},
+			subsets2: []v1.EndpointSubset{*copyAndMutateEndpointSubset(es1, func(es *v1.EndpointSubset) {
+				es.Addresses[0].IP = "1.1.1.10"
+			}), *es2},
+			expected: false,
+		},
+		{
+			name:     "NotReady Pod IP changed",
+			subsets1: []v1.EndpointSubset{*es1, *es2},
+			subsets2: []v1.EndpointSubset{*es1, *copyAndMutateEndpointSubset(es2, func(es *v1.EndpointSubset) {
+				es.NotReadyAddresses[0].IP = "2.2.2.10"
+			})},
+			expected: false,
+		},
+		{
+			name:     "Pod ResourceVersion changed",
+			subsets1: []v1.EndpointSubset{*es1, *es2},
+			subsets2: []v1.EndpointSubset{*es1, *copyAndMutateEndpointSubset(es2, func(es *v1.EndpointSubset) {
+				es.Addresses[0].TargetRef.ResourceVersion = "100"
+			})},
+			expected: true,
+		},
+		{
+			name:     "Ports changed",
+			subsets1: []v1.EndpointSubset{*es1, *es2},
+			subsets2: []v1.EndpointSubset{*es1, *copyAndMutateEndpointSubset(es1, func(es *v1.EndpointSubset) {
+				es.Ports[0].Port = 8082
+			})},
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := EndpointSubsetsEqualIgnoreResourceVersion(tt.subsets1, tt.subsets2); got != tt.expected {
+				t.Errorf("semanticIgnoreResourceVersion.DeepEqual() = %v, expected %v", got, tt.expected)
 			}
 		})
 	}
