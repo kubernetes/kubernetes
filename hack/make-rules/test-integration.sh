@@ -51,6 +51,10 @@ kube::test::find_integration_test_dirs() {
 
 CLEANUP_REQUIRED=
 cleanup() {
+  ps -axf > ${ARTIFACTS:-}/ps.txt
+  ss -apno > ${ARTIFACTS:-}/ss.txt
+  top -b -n 1 > ${ARTIFACTS:-}/top.txt
+
   if [[ -z "${CLEANUP_REQUIRED}" ]]; then
     return
   fi
