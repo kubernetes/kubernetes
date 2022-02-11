@@ -46,6 +46,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 )
 
 func TestCSRDuration(t *testing.T) {
@@ -119,62 +120,63 @@ func TestCSRDuration(t *testing.T) {
 	go c.Run(ctx, 1)
 
 	tests := []struct {
-		name, csrName          string
-		duration, wantDuration time.Duration
-		wantError              string
+		name, csrName string
+		duration      *time.Duration
+		wantDuration  time.Duration
+		wantError     string
 	}{
 		{
 			name:         "no duration set",
-			duration:     0,
+			duration:     nil,
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "same duration set as certTTL",
-			duration:     24 * time.Hour,
+			duration:     pointer.Duration(24 * time.Hour),
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "longer duration than certTTL",
-			duration:     48 * time.Hour,
+			duration:     pointer.Duration(48 * time.Hour),
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "slightly shorter duration set",
-			duration:     20 * time.Hour,
+			duration:     pointer.Duration(20 * time.Hour),
 			wantDuration: 20 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "even shorter duration set",
-			duration:     10 * time.Hour,
+			duration:     pointer.Duration(10 * time.Hour),
 			wantDuration: 10 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "short duration set",
-			duration:     2 * time.Hour,
+			duration:     pointer.Duration(2 * time.Hour),
 			wantDuration: 2*time.Hour + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "very short duration set",
-			duration:     30 * time.Minute,
+			duration:     pointer.Duration(30 * time.Minute),
 			wantDuration: 30*time.Minute + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "shortest duration set",
-			duration:     10 * time.Minute,
+			duration:     pointer.Duration(10 * time.Minute),
 			wantDuration: 10*time.Minute + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "just too short duration set",
 			csrName:      "invalid-csr-001",
-			duration:     10*time.Minute - time.Second,
+			duration:     pointer.Duration(10*time.Minute - time.Second),
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-001" is invalid: spec.expirationSeconds: Invalid value: 599: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -182,7 +184,7 @@ func TestCSRDuration(t *testing.T) {
 		{
 			name:         "really too short duration set",
 			csrName:      "invalid-csr-002",
-			duration:     3 * time.Minute,
+			duration:     pointer.Duration(3 * time.Minute),
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-002" is invalid: spec.expirationSeconds: Invalid value: 180: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -190,7 +192,7 @@ func TestCSRDuration(t *testing.T) {
 		{
 			name:         "negative duration set",
 			csrName:      "invalid-csr-003",
-			duration:     -7 * time.Minute,
+			duration:     pointer.Duration(-7 * time.Minute),
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-003" is invalid: spec.expirationSeconds: Invalid value: -420: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -211,7 +213,7 @@ func TestCSRDuration(t *testing.T) {
 			}
 
 			csrName, csrUID, errReq := csr.RequestCertificate(client, csrData, tt.csrName, certificatesv1.KubeAPIServerClientSignerName,
-				durationPtr(tt.duration), []certificatesv1.KeyUsage{certificatesv1.UsageClientAuth}, privateKey)
+				tt.duration, []certificatesv1.KeyUsage{certificatesv1.UsageClientAuth}, privateKey)
 
 			if diff := cmp.Diff(tt.wantError, errStr(errReq)); len(diff) > 0 {
 				t.Fatalf("CSR input duration %v err diff (-want, +got):\n%s", tt.duration, diff)
@@ -266,13 +268,6 @@ func TestCSRDuration(t *testing.T) {
 			}
 		})
 	}
-}
-
-func durationPtr(duration time.Duration) *time.Duration {
-	if duration == 0 {
-		return nil
-	}
-	return &duration
 }
 
 func errStr(err error) string {
