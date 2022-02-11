@@ -107,7 +107,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 		ObjectMeta: metav1.ObjectMeta{
 			// Must be unique per disk as it is used as the unique part of the
 			// staging path
-			Name: fmt.Sprintf("%s-%s", AzureDiskDriverName, azureSource.DiskName),
+			Name: azureSource.DataDiskURI,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{

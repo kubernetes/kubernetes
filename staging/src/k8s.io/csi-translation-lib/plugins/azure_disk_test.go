@@ -128,7 +128,7 @@ func TestTranslateAzureDiskInTreeStorageClassToCSI(t *testing.T) {
 			},
 			expVol: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "disk.csi.azure.com-diskname",
+					Name: "datadiskuri",
 				},
 				Spec: corev1.PersistentVolumeSpec{
 					PersistentVolumeSource: corev1.PersistentVolumeSource{
