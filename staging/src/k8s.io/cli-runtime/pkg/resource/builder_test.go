@@ -630,7 +630,7 @@ func TestFilePatternBuilderWhenPatternYieldsNoResult(t *testing.T) {
 	if err == nil {
 		t.Fatalf("unexpected response: error is nil")
 	}
-	const expectedErrorMsg = "pattern did not yield any results"
+	const expectedErrorMsg = "no match"
 	if !strings.Contains(err.Error(), expectedErrorMsg) {
 		t.Fatalf("expected %s but got %s", expectedErrorMsg, err.Error())
 	}
