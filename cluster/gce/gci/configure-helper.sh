@@ -3442,7 +3442,12 @@ function main() {
     # stop docker if it is present as we want to use just containerd
     log-wrap 'StopDocker' systemctl stop docker || echo "unable to stop docker"
   fi
-  log-wrap 'SetupContainerd' setup-containerd
+
+  if [[ ! -e "/etc/profile.d/containerd_env.sh" ]]; then
+    log-wrap 'SetupContainerd' setup-containerd
+  else
+    echo "Skipping SetupContainerd step because containerd has already been setup by containerd's configure.sh script"
+  fi
 
   log-start 'SetupKubePodLogReadersGroupDir'
   if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
