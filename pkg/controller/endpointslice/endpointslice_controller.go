@@ -539,6 +539,7 @@ func (c *Controller) checkNodeTopologyDistribution() {
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error listing Nodes: %v", err)
+		return
 	}
 	c.topologyCache.SetNodes(nodes)
 	serviceKeys := c.topologyCache.GetOverloadedServices()
