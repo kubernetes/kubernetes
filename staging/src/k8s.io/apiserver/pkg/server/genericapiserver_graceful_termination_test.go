@@ -420,6 +420,54 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 		t.Fatalf("%s wasn't closed", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 	}
 }
+
+func TestPreShutdownHooks(t *testing.T) {
+	// setup
+	testSignal := make(chan error)
+	s := newGenericAPIServer(t, true)
+	doer := setupDoer(t, s.SecureServingInfo)
+
+	err := s.AddPreShutdownHook("test-backend", func() error {
+		var err error
+		client := newClient(true)
+		for i := 0; i < 5; i++ {
+			result := doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/echo?message=attempt-%d", i), 100*time.Millisecond)
+			err = result.err
+			if err != nil {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		testSignal <- err
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// start the API server
+	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(runCompletedCh)
+		s.PrepareRun().Run(stopCh)
+	}()
+	waitForAPIServerStarted(t, doer)
+
+	close(stopCh)
+
+	select {
+	case err := <-testSignal:
+		if err != nil {
+			t.Fatalf("PreSHutdown hook can not access the API server")
+		}
+		// ok
+	case <-runCompletedCh:
+		t.Fatalf("API Server exited without running the PreShutdown hooks")
+	case <-time.After(15 * time.Second):
+		t.Fatalf("test timed out after 15 seconds")
+	}
+}
+
 func shouldReuseConnection(t *testing.T) func(httptrace.GotConnInfo) {
 	return func(ci httptrace.GotConnInfo) {
 		if !ci.Reused {
