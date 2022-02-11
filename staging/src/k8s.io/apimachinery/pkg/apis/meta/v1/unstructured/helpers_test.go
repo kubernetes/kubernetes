@@ -225,3 +225,78 @@ func TestSetNestedMap(t *testing.T) {
 	assert.Len(t, obj["x"].(map[string]interface{})["z"], 1)
 	assert.Equal(t, obj["x"].(map[string]interface{})["z"].(map[string]interface{})["b"], "bar")
 }
+
+func TestNestedSlice(t *testing.T) {
+	target := []interface{}{"foo", map[string]interface{}{"bar": "baz"}}
+
+	obj := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": target,
+			"c": "not-a-slice",
+			"d": nil, // nil is the zero value of a slice
+		},
+	}
+
+	// case 1: field exists and is a slice
+	res, exists, err := NestedSlice(obj, "a", "b")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, target, res)
+	// Result is a deep copy, changing it does not change the original
+	res[1].(map[string]interface{})["bar"] = "qux"
+	assert.Equal(t, target[1].(map[string]interface{})["bar"], "baz")
+
+	// case 2: field does not exist
+	res, exists, err = NestedSlice(obj, "x")
+	assert.False(t, exists)
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	// case 3: field is not a slice
+	res, exists, err = NestedSlice(obj, "a", "c")
+	assert.False(t, exists)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+
+	// case 4: field is nil
+	res, exists, err = NestedSlice(obj, "a", "d")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+}
+
+func TestNestedStringSlice(t *testing.T) {
+	target := []interface{}{"foo", "bar"}
+
+	obj := map[string]interface{}{
+		"a": map[string]interface{}{
+			"b": target,
+			"c": "not-a-slice",
+			"d": nil, // nil is the zero value of a slice
+		},
+	}
+
+	// case 1: field exists and is a slice
+	res, exists, err := NestedSlice(obj, "a", "b")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Equal(t, target, res)
+
+	// case 2: field does not exist
+	res, exists, err = NestedSlice(obj, "x")
+	assert.False(t, exists)
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	// case 3: field is not a slice
+	res, exists, err = NestedSlice(obj, "a", "c")
+	assert.False(t, exists)
+	assert.Error(t, err)
+	assert.Nil(t, res)
+
+	// case 4: field is nil
+	res, exists, err = NestedSlice(obj, "a", "d")
+	assert.True(t, exists)
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+}

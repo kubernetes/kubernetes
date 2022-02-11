@@ -132,6 +132,9 @@ func NestedStringSlice(obj map[string]interface{}, fields ...string) ([]string, 
 	if !found || err != nil {
 		return nil, found, err
 	}
+	if val == nil {
+		return nil, true, nil
+	}
 	m, ok := val.([]interface{})
 	if !ok {
 		return nil, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected []interface{}", jsonPath(fields), val, val)
@@ -153,6 +156,9 @@ func NestedSlice(obj map[string]interface{}, fields ...string) ([]interface{}, b
 	val, found, err := NestedFieldNoCopy(obj, fields...)
 	if !found || err != nil {
 		return nil, found, err
+	}
+	if val == nil {
+		return nil, true, nil
 	}
 	_, ok := val.([]interface{})
 	if !ok {
