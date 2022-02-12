@@ -22,15 +22,91 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/cmd/get"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-
-	// cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
+
+func TestClusterCompletionFunc(t *testing.T) {
+	setMockFactory(api.Config{
+		Clusters: map[string]*api.Cluster{
+			"bar": {},
+			"baz": {},
+			"foo": {},
+		},
+	})
+
+	comps, directive := ClusterCompletionFunc(nil, []string{}, "")
+	checkCompletion(t, comps, []string{"bar", "baz", "foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ClusterCompletionFunc(nil, []string{}, "b")
+	checkCompletion(t, comps, []string{"bar", "baz"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ClusterCompletionFunc(nil, []string{}, "ba")
+	checkCompletion(t, comps, []string{"bar", "baz"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ClusterCompletionFunc(nil, []string{}, "bar")
+	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ClusterCompletionFunc(nil, []string{}, "bart")
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestContextCompletionFunc(t *testing.T) {
+	setMockFactory(api.Config{
+		Contexts: map[string]*api.Context{
+			"bar": {},
+			"baz": {},
+			"foo": {},
+		},
+	})
+
+	comps, directive := ContextCompletionFunc(nil, []string{}, "")
+	checkCompletion(t, comps, []string{"bar", "baz", "foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ContextCompletionFunc(nil, []string{}, "b")
+	checkCompletion(t, comps, []string{"bar", "baz"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ContextCompletionFunc(nil, []string{}, "ba")
+	checkCompletion(t, comps, []string{"bar", "baz"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ContextCompletionFunc(nil, []string{}, "bar")
+	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = ContextCompletionFunc(nil, []string{}, "bart")
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestUserCompletionFunc(t *testing.T) {
+	setMockFactory(api.Config{
+		AuthInfos: map[string]*api.AuthInfo{
+			"bar": {},
+			"baz": {},
+			"foo": {},
+		},
+	})
+
+	comps, directive := UserCompletionFunc(nil, []string{}, "")
+	checkCompletion(t, comps, []string{"bar", "baz", "foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = UserCompletionFunc(nil, []string{}, "b")
+	checkCompletion(t, comps, []string{"bar", "baz"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = UserCompletionFunc(nil, []string{}, "ba")
+	checkCompletion(t, comps, []string{"bar", "baz"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = UserCompletionFunc(nil, []string{}, "bar")
+	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+
+	comps, directive = UserCompletionFunc(nil, []string{}, "bart")
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
 
 func TestResourceTypeAndNameCompletionFuncOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
@@ -132,6 +208,12 @@ func TestPodResourceNameAndContainerCompletionFuncTooManyArgs(t *testing.T) {
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod-name", "container-name"}, "")
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func setMockFactory(config api.Config) {
+	clientConfig := clientcmd.NewDefaultClientConfig(config, nil)
+	testFactory := cmdtesting.NewTestFactory().WithClientConfig(clientConfig)
+	SetFactoryForCompletion(testFactory)
 }
 
 func prepareCompletionTest() (*cmdtesting.TestFactory, *cobra.Command) {
