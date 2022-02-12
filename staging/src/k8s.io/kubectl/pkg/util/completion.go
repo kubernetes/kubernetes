@@ -131,6 +131,15 @@ func ClusterCompletionFunc(cmd *cobra.Command, args []string, toComplete string)
 	return nil, cobra.ShellCompDirectiveNoFileComp
 }
 
+// UserCompletionFunc is a completion function that completes as a first argument the
+// user names that match the toComplete prefix
+func UserCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		return ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+	}
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
 // ListContextsInConfig returns a list of context names which begin with `toComplete`
 func ListContextsInConfig(toComplete string) []string {
 	config, err := factory.ToRawKubeConfigLoader().RawConfig()
