@@ -21,14 +21,56 @@ import (
 	"reflect"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/securitycontext"
 	utilpointer "k8s.io/utils/pointer"
 )
+
+var (
+	simpleDaemonSetLabel = map[string]string{"name": "simple-daemon", "type": "production"}
+)
+
+func newDaemonSet(name string) *apps.DaemonSet {
+	two := int32(2)
+	return &apps.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       uuid.NewUUID(),
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: apps.DaemonSetSpec{
+			RevisionHistoryLimit: &two,
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.OnDeleteDaemonSetStrategyType,
+			},
+			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: simpleDaemonSetLabel,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Image:                  "foo/bar",
+							TerminationMessagePath: v1.TerminationMessagePathDefault,
+							ImagePullPolicy:        v1.PullIfNotPresent,
+							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+						},
+					},
+					DNSPolicy: v1.DNSDefault,
+				},
+			},
+		},
+	}
+}
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
@@ -48,6 +90,176 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	}
 	pod.Name = podName
 	return pod
+}
+
+func TestAllowsSurge(t *testing.T) {
+	ds1 := newDaemonSet("ds-test-1")
+	ds2 := newDaemonSet("ds-test-2")
+	maxUnavailable := intstr.FromInt(0)
+	maxSurge := intstr.FromInt(1)
+	ds2.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{
+		MaxUnavailable: &maxUnavailable,
+		MaxSurge:       &maxSurge,
+	}
+
+	tests := []struct {
+		name string
+		ds   *apps.DaemonSet
+		want bool
+	}{
+		{
+			name: "maxSurge = 0",
+			ds:   ds1,
+			want: false,
+		},
+		{
+			name: "maxSurge = 1",
+			ds:   ds2,
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := AllowsSurge(tt.ds)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("AllowsSurge: got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSurgeCount(t *testing.T) {
+	maxUnavailable := intstr.FromInt(1)
+	ds1 := newDaemonSet("ds-test-1")
+	ds2 := newDaemonSet("ds-test-2")
+	ds3 := newDaemonSet("ds-test-3")
+	ds4 := newDaemonSet("ds-test-4")
+
+	ds1.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.OnDeleteDaemonSetStrategyType,
+	}
+
+	ds2.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+	}
+
+	ds3.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateDaemonSet{
+			MaxUnavailable: &maxUnavailable,
+		},
+	}
+
+	maxUnavailable = intstr.FromInt(0)
+	maxSurge := intstr.FromInt(1)
+	ds4.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{
+		MaxUnavailable: &maxUnavailable,
+		MaxSurge:       &maxSurge,
+	}
+
+	tests := []struct {
+		name    string
+		ds      *apps.DaemonSet
+		want    int
+		wantErr error
+	}{
+		{
+			name:    "UpdateStrategy：OnDelete",
+			ds:      ds1,
+			want:    0,
+			wantErr: nil,
+		},
+		{
+			name:    "ds.Spec.UpdateStrategy.RollingUpdate = nil",
+			ds:      ds2,
+			want:    0,
+			wantErr: nil,
+		},
+		{
+			name:    "MaxSurge == nil",
+			ds:      ds3,
+			want:    0,
+			wantErr: nil,
+		},
+		{
+			name:    "MaxSurge = 1",
+			ds:      ds4,
+			want:    1,
+			wantErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := SurgeCount(tt.ds, 1)
+			if err != tt.wantErr {
+				t.Errorf("SurgeCount error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SurgeCount got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnavailableCount(t *testing.T) {
+	maxUnavailable := intstr.FromInt(1)
+	ds1 := newDaemonSet("ds-test-1")
+	ds2 := newDaemonSet("ds-test-2")
+	ds3 := newDaemonSet("ds-test-3")
+
+	ds1.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.OnDeleteDaemonSetStrategyType,
+	}
+
+	ds2.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+	}
+
+	ds3.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateDaemonSet{
+			MaxUnavailable: &maxUnavailable,
+		},
+	}
+
+	tests := []struct {
+		name    string
+		ds      *apps.DaemonSet
+		want    int
+		wantErr error
+	}{
+		{
+			name:    "UpdateStrategy：OnDelete",
+			ds:      ds1,
+			want:    0,
+			wantErr: nil,
+		},
+		{
+			name:    "ds.Spec.UpdateStrategy.RollingUpdate = nil",
+			ds:      ds2,
+			want:    0,
+			wantErr: nil,
+		},
+		{
+			name:    "MaxUnavailable == 1",
+			ds:      ds3,
+			want:    1,
+			wantErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := UnavailableCount(tt.ds, 1)
+			if err != tt.wantErr {
+				t.Errorf("UnavailableCount error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("UnavailableCount got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestIsPodUpdated(t *testing.T) {
