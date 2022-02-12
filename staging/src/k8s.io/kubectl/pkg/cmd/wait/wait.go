@@ -329,8 +329,6 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 	}
 	if initObjGetErr != nil {
 		// TODO this could do something slightly fancier if we wish
-		fmt.Println("unknown error getting object initially")
-		fmt.Println(initObjGetErr)
 		return info.Object, false, initObjGetErr
 	}
 	resourceLocation := ResourceLocation{
@@ -340,7 +338,6 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 	}
 	if uid, ok := o.UIDMap[resourceLocation]; ok {
 		if gottenObj.GetUID() != uid {
-			fmt.Println("UID did not match on first check")
 			return gottenObj, true, nil
 		}
 	}

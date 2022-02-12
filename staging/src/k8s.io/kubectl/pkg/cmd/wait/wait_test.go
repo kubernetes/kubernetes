@@ -319,7 +319,7 @@ func TestWaitForDeletion(t *testing.T) {
 						count++
 						fakeWatch := watch.NewRaceFreeFake()
 						go func() {
-							time.Sleep(100 * time.Millisecond)
+							time.Sleep(1 * time.Second)
 							fakeWatch.Stop()
 						}()
 						return true, fakeWatch, nil
@@ -416,7 +416,7 @@ func TestWaitForDeletion(t *testing.T) {
 						count++
 						fakeWatch := watch.NewRaceFreeFake()
 						go func() {
-							time.Sleep(100 * time.Millisecond)
+							time.Sleep(1 * time.Second)
 							fakeWatch.Stop()
 						}()
 						return true, fakeWatch, nil
@@ -774,7 +774,7 @@ func TestWaitForCondition(t *testing.T) {
 						count++
 						fakeWatch := watch.NewRaceFreeFake()
 						go func() {
-							time.Sleep(100 * time.Millisecond)
+							time.Sleep(1 * time.Second)
 							fakeWatch.Stop()
 						}()
 						return true, fakeWatch, nil
@@ -1320,7 +1320,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 			o := &WaitOptions{
 				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(infos...),
 				DynamicClient:  fakeClient,
-				Timeout:        1 * time.Millisecond,
+				Timeout:        1 * time.Second,
 
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
@@ -1497,7 +1497,7 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 						count++
 						fakeWatch := watch.NewRaceFreeFake()
 						go func() {
-							time.Sleep(100 * time.Millisecond)
+							time.Sleep(1 * time.Second)
 							fakeWatch.Stop()
 						}()
 						return true, fakeWatch, nil
