@@ -261,7 +261,8 @@ spec:
 	"apiVersion": "%s",
 	"kind": "%s",
 	"metadata": {
-		"name": "%s"
+		"name": "%s",
+		"resourceVersion": "%s"
 	},
 	"spec": {
 		"knownField1": "val1",
@@ -294,6 +295,20 @@ spec:
     hostPort: 8081
     hostPort: 8082
     unknownNested: val`
+
+	crdValidBodyYAML = `
+apiVersion: "%s"
+kind: "%s"
+metadata:
+  name: "%s"
+  resourceVersion: "%s"
+spec:
+  knownField1: val1
+  ports:
+  - name: portName
+    containerPort: 8080
+    protocol: TCP
+    hostPort: 8081`
 
 	crdApplyInvalidBody = `
 {
@@ -329,6 +344,24 @@ spec:
 			"containerPort": 8080,
 			"protocol": "TCP",
 			"hostPort": 8082
+		}]
+	}
+}`
+
+	crdApplyValidBody2 = `
+{
+	"apiVersion": "%s",
+	"kind": "%s",
+	"metadata": {
+		"name": "%s"
+	},
+	"spec": {
+		"knownField1": "val2",
+		"ports": [{
+			"name": "portName",
+			"containerPort": 8080,
+			"protocol": "TCP",
+			"hostPort": 8083
 		}]
 	}
 }`
@@ -2914,7 +2947,7 @@ func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interfa
 	}
 }
 
-func setupCRD(t *testing.T, config *rest.Config, apiGroup string, schemaless bool) *apiextensionsv1.CustomResourceDefinition {
+func setupCRD(t testing.TB, config *rest.Config, apiGroup string, schemaless bool) *apiextensionsv1.CustomResourceDefinition {
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -2970,12 +3003,50 @@ func BenchmarkFieldValidation(b *testing.B) {
 
 	client := clientset.NewForConfigOrDie(config)
 
+	schemaCRD := setupCRD(b, config, "schema.example.com", false)
+	schemaGVR := schema.GroupVersionResource{
+		Group:    schemaCRD.Spec.Group,
+		Version:  schemaCRD.Spec.Versions[0].Name,
+		Resource: schemaCRD.Spec.Names.Plural,
+	}
+	schemaGVK := schema.GroupVersionKind{
+		Group:   schemaCRD.Spec.Group,
+		Version: schemaCRD.Spec.Versions[0].Name,
+		Kind:    schemaCRD.Spec.Names.Kind,
+	}
+
+	schemalessCRD := setupCRD(b, config, "schemaless.example.com", true)
+	schemalessGVR := schema.GroupVersionResource{
+		Group:    schemalessCRD.Spec.Group,
+		Version:  schemalessCRD.Spec.Versions[0].Name,
+		Resource: schemalessCRD.Spec.Names.Plural,
+	}
+	schemalessGVK := schema.GroupVersionKind{
+		Group:   schemalessCRD.Spec.Group,
+		Version: schemalessCRD.Spec.Versions[0].Name,
+		Kind:    schemalessCRD.Spec.Names.Kind,
+	}
+
+	rest := client.Discovery().RESTClient()
+
 	b.Run("Post", func(b *testing.B) { benchFieldValidationPost(b, client) })
 	b.Run("Put", func(b *testing.B) { benchFieldValidationPut(b, client) })
 	b.Run("PatchTyped", func(b *testing.B) { benchFieldValidationPatchTyped(b, client) })
 	b.Run("SMP", func(b *testing.B) { benchFieldValidationSMP(b, client) })
 	b.Run("ApplyCreate", func(b *testing.B) { benchFieldValidationApplyCreate(b, client) })
 	b.Run("ApplyUpdate", func(b *testing.B) { benchFieldValidationApplyUpdate(b, client) })
+
+	b.Run("PostCRD", func(b *testing.B) { benchFieldValidationPostCRD(b, rest, schemaGVK, schemaGVR) })
+	b.Run("PutCRD", func(b *testing.B) { benchFieldValidationPutCRD(b, rest, schemaGVK, schemaGVR) })
+	b.Run("PatchCRD", func(b *testing.B) { benchFieldValidationPatchCRD(b, rest, schemaGVK, schemaGVR) })
+	b.Run("ApplyCreateCRD", func(b *testing.B) { benchFieldValidationApplyCreateCRD(b, rest, schemaGVK, schemaGVR) })
+	b.Run("ApplyUpdateCRD", func(b *testing.B) { benchFieldValidationApplyUpdateCRD(b, rest, schemaGVK, schemaGVR) })
+
+	b.Run("PostCRDSchemaless", func(b *testing.B) { benchFieldValidationPostCRD(b, rest, schemalessGVK, schemalessGVR) })
+	b.Run("PutCRDSchemaless", func(b *testing.B) { benchFieldValidationPutCRD(b, rest, schemalessGVK, schemalessGVR) })
+	b.Run("PatchCRDSchemaless", func(b *testing.B) { benchFieldValidationPatchCRD(b, rest, schemalessGVK, schemalessGVR) })
+	b.Run("ApplyCreateCRDSchemaless", func(b *testing.B) { benchFieldValidationApplyCreateCRD(b, rest, schemalessGVK, schemalessGVR) })
+	b.Run("ApplyUpdateCRDSchemaless", func(b *testing.B) { benchFieldValidationApplyUpdateCRD(b, rest, schemalessGVK, schemalessGVR) })
 
 }
 
@@ -3474,6 +3545,470 @@ func benchFieldValidationApplyUpdate(b *testing.B, client clientset.Interface) {
 					b.Fatalf("unexpected request err: %v", result.Error())
 				}
 			}
+		})
+	}
+}
+
+func benchFieldValidationPostCRD(b *testing.B, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
+	var testcases = []struct {
+		name        string
+		opts        metav1.PatchOptions
+		body        string
+		contentType string
+	}{
+		{
+			name: "crd-post-strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			body: crdValidBody,
+		},
+		{
+			name: "crd-post-warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			body: crdValidBody,
+		},
+		{
+			name: "crd-post-ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			body: crdValidBody,
+		},
+		{
+			name: "crd-post-no-validation",
+			body: crdValidBody,
+		},
+		{
+			name: "crd-post-strict-validation-yaml",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			body:        crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "crd-post-warn-validation-yaml",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			body:        crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "crd-post-ignore-validation-yaml",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			body:        crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name:        "crd-post-no-validation-yaml",
+			body:        crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+	}
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				kind := gvk.Kind
+				apiVersion := gvk.Group + "/" + gvk.Version
+
+				// create the CR as specified by the test case
+				jsonBody := []byte(fmt.Sprintf(tc.body, apiVersion, kind, fmt.Sprintf("test-dep-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())))
+				req := rest.Post().
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					SetHeader("Content-Type", tc.contentType).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				result := req.Body([]byte(jsonBody)).Do(context.TODO())
+
+				if result.Error() != nil {
+					b.Fatalf("unexpected post err: %v", result.Error())
+				}
+			}
+		})
+	}
+}
+
+func benchFieldValidationPutCRD(b *testing.B, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
+	var testcases = []struct {
+		name        string
+		opts        metav1.PatchOptions
+		putBody     string
+		contentType string
+	}{
+		{
+			name: "crd-put-strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			putBody: crdValidBody,
+		},
+		{
+			name: "crd-put-warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			putBody: crdValidBody,
+		},
+		{
+			name: "crd-put-ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			putBody: crdValidBody,
+		},
+		{
+			name:    "crd-put-no-validation",
+			putBody: crdValidBody,
+		},
+		{
+			name: "crd-put-strict-validation-yaml",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			putBody:     crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "crd-put-warn-validation-yaml",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			putBody:     crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name: "crd-put-ignore-validation-yaml",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			putBody:     crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+		{
+			name:        "crd-put-no-validation-yaml",
+			putBody:     crdValidBodyYAML,
+			contentType: "application/yaml",
+		},
+	}
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
+			names := make([]string, b.N)
+			resourceVersions := make([]string, b.N)
+			for n := 0; n < b.N; n++ {
+				deployName := fmt.Sprintf("test-dep-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				names[n] = deployName
+
+				// create the CR as specified by the test case
+				jsonPostBody := []byte(fmt.Sprintf(crdValidBody, apiVersion, kind, deployName))
+				postReq := rest.Post().
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				postResult, err := postReq.Body([]byte(jsonPostBody)).Do(context.TODO()).Raw()
+				if err != nil {
+					b.Fatalf("unexpeted error on CR creation: %v", err)
+				}
+				postUnstructured := &unstructured.Unstructured{}
+				if err := postUnstructured.UnmarshalJSON(postResult); err != nil {
+					b.Fatalf("unexpeted error unmarshalling created CR: %v", err)
+				}
+				resourceVersions[n] = postUnstructured.GetResourceVersion()
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				// update the CR as specified by the test case
+				putBody := []byte(fmt.Sprintf(tc.putBody, apiVersion, kind, names[n], resourceVersions[n]))
+				putReq := rest.Put().
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					Name(names[n]).
+					SetHeader("Content-Type", tc.contentType).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				result := putReq.Body([]byte(putBody)).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected put err: %v", result.Error())
+				}
+			}
+		})
+	}
+}
+
+func benchFieldValidationPatchCRD(b *testing.B, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
+	patchYAMLBody := `
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+  finalizers:
+  - test-finalizer
+spec:
+  cronSpec: "* * * * */5"
+  ports:
+  - name: x
+    containerPort: 80
+    protocol: TCP`
+
+	mergePatchBody := `
+{
+	"spec": {
+		"knownField1": "val1",
+			"ports": [{
+				"name": "portName",
+				"containerPort": 8080,
+				"protocol": "TCP",
+				"hostPort": 8081
+			}]
+	}
+}
+	`
+	jsonPatchBody := `
+			[
+				{"op": "add", "path": "/spec/knownField1", "value": "val1"},
+				{"op": "add", "path": "/spec/ports/0/name", "value": "portName"},
+				{"op": "add", "path": "/spec/ports/0/containerPort", "value": 8080},
+				{"op": "add", "path": "/spec/ports/0/protocol", "value": "TCP"},
+				{"op": "add", "path": "/spec/ports/0/hostPort", "value": 8081}
+			]
+			`
+	var testcases = []struct {
+		name      string
+		patchType types.PatchType
+		opts      metav1.PatchOptions
+		body      string
+	}{
+		{
+			name:      "crd-merge-patch-strict-validation",
+			patchType: types.MergePatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			body: mergePatchBody,
+		},
+		{
+			name:      "crd-merge-patch-warn-validation",
+			patchType: types.MergePatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			body: mergePatchBody,
+		},
+		{
+			name:      "crd-merge-patch-ignore-validation",
+			patchType: types.MergePatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			body: mergePatchBody,
+		},
+		{
+			name:      "crd-merge-patch-no-validation",
+			patchType: types.MergePatchType,
+			body:      mergePatchBody,
+		},
+		{
+			name:      "crd-json-patch-strict-validation",
+			patchType: types.JSONPatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+			},
+			body: jsonPatchBody,
+		},
+		{
+			name:      "crd-json-patch-warn-validation",
+			patchType: types.JSONPatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+			},
+			body: jsonPatchBody,
+		},
+		{
+			name:      "crd-json-patch-ignore-validation",
+			patchType: types.JSONPatchType,
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+			},
+			body: jsonPatchBody,
+		},
+		{
+			name:      "crd-json-patch-no-validation",
+			patchType: types.JSONPatchType,
+			body:      jsonPatchBody,
+		},
+	}
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
+			names := make([]string, b.N)
+			for n := 0; n < b.N; n++ {
+				deployName := fmt.Sprintf("test-dep-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				names[n] = deployName
+
+				// create a CR
+				yamlBody := []byte(fmt.Sprintf(string(patchYAMLBody), apiVersion, kind, deployName))
+				createResult, err := rest.Patch(types.ApplyPatchType).
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					Name(deployName).
+					Param("fieldManager", "apply_test").
+					Body(yamlBody).
+					DoRaw(context.TODO())
+				if err != nil {
+					b.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(createResult))
+				}
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				// patch the CR as specified by the test case
+				req := rest.Patch(tc.patchType).
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					Name(names[n]).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				result := req.Body([]byte(tc.body)).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected patch err: %v", result.Error())
+				}
+			}
+
+		})
+	}
+}
+
+func benchFieldValidationApplyCreateCRD(b *testing.B, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
+	var testcases = []struct {
+		name string
+		opts metav1.PatchOptions
+	}{
+		{
+			name: "strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "no-validation",
+			opts: metav1.PatchOptions{
+				FieldManager: "mgr",
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				kind := gvk.Kind
+				apiVersion := gvk.Group + "/" + gvk.Version
+				name := fmt.Sprintf("test-dep-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+
+				// create the CR as specified by the test case
+				applyCreateBody := []byte(fmt.Sprintf(crdApplyValidBody, apiVersion, kind, name))
+
+				req := rest.Patch(types.ApplyPatchType).
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					Name(name).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				result := req.Body(applyCreateBody).Do(context.TODO())
+				if result.Error() != nil {
+					b.Fatalf("unexpected apply err: %v", result.Error())
+				}
+
+			}
+		})
+	}
+}
+
+func benchFieldValidationApplyUpdateCRD(b *testing.B, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
+	var testcases = []struct {
+		name string
+		opts metav1.PatchOptions
+	}{
+		{
+			name: "strict-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Strict",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "warn-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Warn",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "ignore-validation",
+			opts: metav1.PatchOptions{
+				FieldValidation: "Ignore",
+				FieldManager:    "mgr",
+			},
+		},
+		{
+			name: "no-validation",
+			opts: metav1.PatchOptions{
+				FieldManager: "mgr",
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		b.Run(tc.name, func(b *testing.B) {
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
+			names := make([]string, b.N)
+
+			for n := 0; n < b.N; n++ {
+				names[n] = fmt.Sprintf("apply-update-crd-%s-%d-%d-%d", tc.name, n, b.N, time.Now().UnixNano())
+				applyCreateBody := []byte(fmt.Sprintf(crdApplyValidBody, apiVersion, kind, names[n]))
+				createReq := rest.Patch(types.ApplyPatchType).
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					Name(names[n]).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				createResult := createReq.Body(applyCreateBody).Do(context.TODO())
+				if createResult.Error() != nil {
+					b.Fatalf("unexpected apply create err: %v", createResult.Error())
+				}
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				applyUpdateBody := []byte(fmt.Sprintf(crdApplyValidBody2, apiVersion, kind, names[n]))
+				updateReq := rest.Patch(types.ApplyPatchType).
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					Name(names[n]).
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				result := updateReq.Body(applyUpdateBody).Do(context.TODO())
+
+				if result.Error() != nil {
+					b.Fatalf("unexpected apply err: %v", result.Error())
+				}
+			}
+
 		})
 	}
 }
