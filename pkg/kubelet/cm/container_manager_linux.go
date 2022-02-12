@@ -62,7 +62,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -501,12 +500,12 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 		}
 
 		cont.ensureStateFunc = func(_ cgroups.Manager) error {
-			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, cont.manager)
+			return ensureProcessInContainerWithOOMScore(os.Getpid(), int(cm.KubeletOOMScoreAdj), cont.manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
 		cm.periodicTasks = append(cm.periodicTasks, func() {
-			if err := ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, nil); err != nil {
+			if err := ensureProcessInContainerWithOOMScore(os.Getpid(), int(cm.KubeletOOMScoreAdj), nil); err != nil {
 				klog.ErrorS(err, "Failed to ensure process in container with oom score")
 				return
 			}

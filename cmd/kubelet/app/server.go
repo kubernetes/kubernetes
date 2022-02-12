@@ -702,6 +702,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				RuntimeCgroupsName:    s.RuntimeCgroups,
 				SystemCgroupsName:     s.SystemCgroups,
 				KubeletCgroupsName:    s.KubeletCgroups,
+				KubeletOOMScoreAdj:    s.OOMScoreAdj,
 				CgroupsPerQOS:         s.CgroupsPerQOS,
 				CgroupRoot:            s.CgroupRoot,
 				CgroupDriver:          s.CgroupDriver,
