@@ -237,6 +237,11 @@ func visitContainerConfigmapNames(container *api.Container, visitor Visitor) boo
 	return true
 }
 
+// IsPodRunning returns true if the phase of the pod is PodRunning; false otherwise.
+func IsPodRunning(pod *api.Pod) bool {
+	return pod.Status.Phase == api.PodRunning
+}
+
 // IsPodReady returns true if a pod is ready; false otherwise.
 func IsPodReady(pod *api.Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)

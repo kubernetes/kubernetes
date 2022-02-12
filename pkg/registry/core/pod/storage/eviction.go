@@ -19,6 +19,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"reflect"
 	"time"
 
@@ -219,10 +221,23 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		pdb := &pdbs[0]
 		pdbName = pdb.Name
 
-		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-		if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
-			updateDeletionOptions = true
-			return nil
+		// If the pod healthy policy is not enabled, or no pod healthy policy is specified,
+		// just continue to use the original behavior.
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PDBPodHealthyPolicy) || pdb.Spec.PodHealthyPolicy == "" {
+			// If the pod is not ready, it doesn't count towards healthy and we should not decrement
+			if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
+				updateDeletionOptions = true
+				return nil
+			}
+		} else {
+			// If the user has specified a pod healthy policy, check if the pod is healthy according to the
+			// provided policy. If it is not, it can be deleted without consulting the pdb. But make sure
+			// the pod status hasn't changed status.
+			podHealthy := podHealthyFunc(pdb)
+			if !podHealthy(pod) {
+				updateDeletionOptions = true
+				return nil
+			}
 		}
 
 		refresh := false
@@ -291,6 +306,17 @@ func setPreconditionsResourceVersion(deleteOptions *metav1.DeleteOptions, resour
 		deleteOptions.Preconditions = &metav1.Preconditions{}
 	}
 	deleteOptions.Preconditions.ResourceVersion = resourceVersion
+}
+
+func podHealthyFunc(pdb *policyv1.PodDisruptionBudget) func(*api.Pod) bool {
+	podHealthyPolicy := pdb.Spec.PodHealthyPolicy
+	var podHealthy func(*api.Pod) bool
+	if podHealthyPolicy == "" || podHealthyPolicy == policyv1.PodReady {
+		podHealthy = podutil.IsPodReady
+	} else {
+		podHealthy = podutil.IsPodRunning
+	}
+	return podHealthy
 }
 
 // canIgnorePDB returns true for pod conditions that allow the pod to be deleted

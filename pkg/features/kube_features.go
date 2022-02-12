@@ -858,6 +858,13 @@ const (
 	//
 	// Allow pods to failover to a different node in case of non graceful node shutdown
 	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
+
+	// owner: @mortent
+	// kep: http://kep.k8s.io/3018
+	// alpha: v1.24
+	//
+	// Enables PodHealthyPolicy for PodDisruptionBudgets
+	PDBPodHealthyPolicy featuregate.Feature = "PDBPodHealthyPolicy"
 )
 
 func init() {
@@ -982,6 +989,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MinDomainsInPodTopologySpread:                  {Default: false, PreRelease: featuregate.Alpha},
 	ServiceIPStaticSubrange:                        {Default: false, PreRelease: featuregate.Alpha},
 	NodeOutOfServiceVolumeDetach:                   {Default: false, PreRelease: featuregate.Alpha},
+	PDBPodHealthyPolicy:                            {Default: false, PreRelease: featuregate.Alpha},
+
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	genericfeatures.AdvancedAuditing:                    {Default: true, PreRelease: featuregate.GA},
