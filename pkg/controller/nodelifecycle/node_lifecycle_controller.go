@@ -653,7 +653,7 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 		return found
 	})
 	taintsToAdd, taintsToDel := taintutils.TaintSetDiff(taints, nodeTaints)
-	// If nothing to add not delete, return true directly.
+	// If nothing to add or delete, return true directly.
 	if len(taintsToAdd) == 0 && len(taintsToDel) == 0 {
 		return nil
 	}
