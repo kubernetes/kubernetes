@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"os"
 	"testing"
 )
 
@@ -59,5 +60,24 @@ func TestValueOfAllocatableResources(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v, %v", test.name, err1, err2)
 			}
 		}
+	}
+}
+
+func TestWriteConfigTo(t *testing.T) {
+	if err := os.MkdirAll("testdata", 0755); err != nil {
+		t.Fatalf("failed to create temporary testdata directory: %v", err)
+	}
+	defer os.Remove("testdata/kubelet.conf")
+	cmd := NewKubeletCommand()
+	if err := cmd.RunE(cmd, []string{"--write-config-to", "testdata/kubelet.conf", "--port", "13131", "--container-runtime-endpoint", "/var/run/containerd.sock"}); err != nil {
+		t.Fatalf("failed to run kubelet: %v", err)
+	}
+
+	kubeletConfig, err := loadConfigFile("testdata/kubelet.conf")
+	if err != nil {
+		t.Fatalf("failed to load kubelet.conf: %v", err)
+	}
+	if kubeletConfig.Port != 13131 {
+		t.Fatalf("expected port to be %q, but it was %q instead", 13131, kubeletConfig.Port)
 	}
 }

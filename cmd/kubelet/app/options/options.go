@@ -141,6 +141,8 @@ type KubeletFlags struct {
 	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads on the node.
 	// To use this flag, the corresponding SeccompDefault feature gate must be enabled.
 	SeccompDefault bool
+	// WriteConfigTo is the path where the parsed configuration will be written.
+	WriteConfigTo string
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -354,6 +356,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("cloud-config", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
 	fs.BoolVar(&f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "experimental-allocatable-ignore-eviction", f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "When set to 'true', Hard Eviction Thresholds will be ignored while calculating Node Allocatable. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details. [default=false]")
 	fs.MarkDeprecated("experimental-allocatable-ignore-eviction", "will be removed in 1.25 or later.")
+	fs.StringVar(&f.WriteConfigTo, "write-config-to", f.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 }
 
 // AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
@@ -376,6 +379,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 			"v":                   true,
 			"vmodule":             true,
 			"log-flush-frequency": true,
+			"write-config-to":     true,
 		}
 		fs.VisitAll(func(f *pflag.Flag) {
 			if notDeprecated[f.Name] {

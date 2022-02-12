@@ -96,6 +96,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
+	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
@@ -222,6 +223,19 @@ is checked every 20 seconds (also configurable with a flag).`,
 				return fmt.Errorf("initialize logging: %v", err)
 			}
 			cliflag.PrintFlags(cleanFlagSet)
+
+			if f := kubeletFlags.WriteConfigTo; f != "" {
+				b, err := utilcodec.EncodeKubeletConfig(kubeletConfig, kubeletconfigv1beta1.SchemeGroupVersion)
+				if err != nil {
+					return fmt.Errorf("failed to encode kubelet configuration: %w", err)
+				}
+				if err := os.WriteFile(f, b, 0666); err != nil {
+					return fmt.Errorf("failed to write kubelet configuration file: %w", err)
+				}
+				klog.InfoS("Wrote config file", "file", f)
+
+				return nil
+			}
 
 			// We always validate the local configuration (command line + config file).
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
