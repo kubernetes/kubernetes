@@ -28,6 +28,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/opencontainers/selinux/go-selinux"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
@@ -48,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
 const nodeWithoutTopology = -1
@@ -259,7 +259,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	if err = os.MkdirAll(m.socketdir, 0750); err != nil {
 		return err
 	}
-	if selinux.SELinuxEnabled() {
+	if selinux.GetEnabled() {
 		if err := selinux.SetFileLabel(m.socketdir, config.KubeletPluginsDirSELinuxLabel); err != nil {
 			klog.InfoS("Unprivileged containerized plugins might not work. Could not set selinux context on socket dir", "path", m.socketdir, "err", err)
 		}
