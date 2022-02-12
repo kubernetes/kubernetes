@@ -167,7 +167,12 @@ func getCmdToProcessMap() (map[string][]process, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer root.Close()
+	defer func(root *os.File) {
+		err := root.Close()
+		if err != nil {
+			fmt.Errorf("unable to close the file")
+		}
+	}(root)
 	dirs, err := root.Readdirnames(0)
 	if err != nil {
 		return nil, err
