@@ -703,6 +703,14 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container completed; all app containers should be running")
 
 	// 4. should restart the init container if needed to create a new podsandbox
+	// Set fake containers to fakeRuntime.
+	templates := []containerTemplate{
+		{pod: pod, container: &initContainers[0], attempt: 0, createdAt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &containers[0], attempt: 0, createdAt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		{pod: pod, container: &containers[1], attempt: 0, createdAt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	fakes := makeFakeContainers(t, m, templates)
+	fakeRuntime.SetFakeContainers(fakes)
 	// Stop the pod sandbox.
 	fakeRuntime.StopPodSandbox(sandboxID)
 	// Sync again.
