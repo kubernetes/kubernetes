@@ -227,16 +227,16 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
-	sleepTime := time.Duration(0)
+	tick := time.After(time.Duration(0))
 	millicores := 0
 	for {
 		select {
 		case millicores = <-rc.cpu:
 			framework.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
-		case <-time.After(sleepTime):
+		case <-tick:
 			framework.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
 			rc.sendConsumeCPURequest(millicores)
-			sleepTime = rc.sleepTime
+			tick = time.After(rc.sleepTime)
 		case <-rc.stopCPU:
 			framework.Logf("RC %s: stopping CPU consumer", rc.name)
 			return
@@ -248,16 +248,16 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
-	sleepTime := time.Duration(0)
+	tick := time.After(time.Duration(0))
 	megabytes := 0
 	for {
 		select {
 		case megabytes = <-rc.mem:
 			framework.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
-		case <-time.After(sleepTime):
+		case <-tick:
 			framework.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
 			rc.sendConsumeMemRequest(megabytes)
-			sleepTime = rc.sleepTime
+			tick = time.After(rc.sleepTime)
 		case <-rc.stopMem:
 			framework.Logf("RC %s: stopping mem consumer", rc.name)
 			return
@@ -269,16 +269,16 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
-	sleepTime := time.Duration(0)
+	tick := time.After(time.Duration(0))
 	delta := 0
 	for {
 		select {
 		case delta = <-rc.customMetric:
 			framework.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
-		case <-time.After(sleepTime):
+		case <-tick:
 			framework.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
 			rc.sendConsumeCustomMetric(delta)
-			sleepTime = rc.sleepTime
+			tick = time.After(rc.sleepTime)
 		case <-rc.stopCustomMetric:
 			framework.Logf("RC %s: stopping metric consumer", rc.name)
 			return
