@@ -457,13 +457,7 @@ message List {
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 message ListMeta {
-  // selfLink is a URL representing this object.
-  // Populated by the system.
-  // Read-only.
-  //
-  // DEPRECATED
-  // Kubernetes will stop propagating this field in 1.20 release and the field is planned
-  // to be removed in 1.21 release.
+  // selfLink is DEPRECATED read-only field that is no longer populated by the system.
   // +optional
   optional string selfLink = 1;
 
@@ -683,13 +677,7 @@ message ObjectMeta {
   // +optional
   optional string namespace = 3;
 
-  // SelfLink is a URL representing this object.
-  // Populated by the system.
-  // Read-only.
-  //
-  // DEPRECATED
-  // Kubernetes will stop propagating this field in 1.20 release and the field is planned
-  // to be removed in 1.21 release.
+  // selfLink is DEPRECATED read-only field that is no longer populated by the system.
   // +optional
   optional string selfLink = 4;
 

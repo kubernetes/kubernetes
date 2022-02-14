@@ -1117,7 +1117,7 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 				Properties: map[string]spec.Schema{
 					"selfLink": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selfLink is a URL representing this object. Populated by the system. Read-only.\n\nDEPRECATED Kubernetes will stop propagating this field in 1.20 release and the field is planned to be removed in 1.21 release.",
+							Description: "selfLink is DEPRECATED read-only field that is no longer populated by the system.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1343,7 +1343,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					},
 					"selfLink": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SelfLink is a URL representing this object. Populated by the system. Read-only.\n\nDEPRECATED Kubernetes will stop propagating this field in 1.20 release and the field is planned to be removed in 1.21 release.",
+							Description: "selfLink is DEPRECATED read-only field that is no longer populated by the system.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
