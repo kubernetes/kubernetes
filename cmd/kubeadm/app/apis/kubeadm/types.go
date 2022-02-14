@@ -218,7 +218,7 @@ type NodeRegistrationOptions struct {
 	Taints []v1.Taint
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
-	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
+	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	// A key in this map is the flag name as it appears on the
 	// command line except without leading dash(es).
