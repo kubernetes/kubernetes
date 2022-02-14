@@ -7992,6 +7992,27 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 		},
+		"zero MaxSkew in TopologySpreadConstraint": {
+			TopologySpreadConstraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew: 0,
+				},
+			},
+		},
+		"empty TopologyKey in TopologySpreadConstraint": {
+			TopologySpreadConstraints: []core.TopologySpreadConstraint{
+				{
+					TopologyKey: "",
+				},
+			},
+		},
+		"unsupported WhenUnsatisfiable action in TopologySpreadConstraint": {
+			TopologySpreadConstraints: []core.TopologySpreadConstraint{
+				{
+					WhenUnsatisfiable: "Unknown",
+				},
+			},
+		},
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
