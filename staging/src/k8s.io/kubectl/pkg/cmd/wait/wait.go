@@ -379,23 +379,19 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		return false, nil
 	}
 
-	var result runtime.Object
 	intr := interrupt.New(nil, cancel)
 	err := intr.Run(func() error {
-		ev, err := watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, preconditionFunc, Wait{errOut: o.ErrOut}.IsDeleted)
-		if ev != nil {
-			result = ev.Object
-		}
+		_, err := watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, preconditionFunc, Wait{errOut: o.ErrOut}.IsDeleted)
 		return err
 	})
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
-			return result, false, errWaitTimeoutWithName
+			return gottenObj, false, errWaitTimeoutWithName
 		}
-		return result, false, err
+		return gottenObj, false, err
 	}
 
-	return result, true, nil
+	return gottenObj, true, nil
 }
 
 // Wait has helper methods for handling watches, including error handling.
