@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -62,7 +63,9 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ClusterRoleAggregator"),
 	}
-	c.syncHandler = c.syncClusterRole
+	// note: the name doesn't match the workqueue name so that it is more consistent with
+	// the other controller names -- e.g. "certificate".
+	c.syncHandler = metrics.SyncAndRecordWithCtx("clusterroleaggregator", c.syncClusterRole)
 
 	clusterRoleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {

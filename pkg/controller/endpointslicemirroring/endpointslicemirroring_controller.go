@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	ctrlmetrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
@@ -240,7 +241,7 @@ func (c *Controller) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(cKey)
 
-	err := c.syncEndpoints(cKey.(string))
+	err := ctrlmetrics.RunSyncAndRecord("endpointslicemirroring", cKey.(string), c.syncEndpoints)
 	c.handleErr(err, cKey)
 
 	return true

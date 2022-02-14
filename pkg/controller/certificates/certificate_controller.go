@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -143,7 +144,8 @@ func (cc *CertificateController) processNextWorkItem() bool {
 	}
 	defer cc.queue.Done(cKey)
 
-	if err := cc.syncFunc(cKey.(string)); err != nil {
+	err := metrics.RunSyncAndRecord(fmt.Sprintf("%s_%s", "certificate", cc.name), cKey.(string), cc.syncFunc)
+	if err != nil {
 		cc.queue.AddRateLimited(cKey)
 		if _, ignorable := err.(ignorableError); !ignorable {
 			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))

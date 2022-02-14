@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -133,7 +134,7 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 		DeleteFunc: dc.deletePod,
 	})
 
-	dc.syncHandler = dc.syncDeployment
+	dc.syncHandler = metrics.SyncAndRecordWithCtx("deployment", dc.syncDeployment)
 	dc.enqueueDeployment = dc.enqueue
 
 	dc.dLister = dInformer.Lister()

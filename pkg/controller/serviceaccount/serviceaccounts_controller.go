@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -32,6 +32,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 )
@@ -87,7 +88,7 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 	e.nsLister = nsInformer.Lister()
 	e.nsListerSynced = nsInformer.Informer().HasSynced
 
-	e.syncHandler = e.syncNamespace
+	e.syncHandler = metrics.SyncAndRecordWithCtx("serviceaccount", e.syncNamespace)
 
 	return e, nil
 }

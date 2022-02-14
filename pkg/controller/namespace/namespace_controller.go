@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
@@ -145,7 +146,7 @@ func (nm *NamespaceController) worker() {
 		}
 		defer nm.queue.Done(key)
 
-		err := nm.syncNamespaceFromKey(key.(string))
+		err := metrics.RunSyncAndRecord("namespace", key.(string), nm.syncNamespaceFromKey)
 		if err == nil {
 			// no error, forget this entry and return
 			nm.queue.Forget(key)

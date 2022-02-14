@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -412,7 +413,8 @@ func (ssc *StatefulSetController) processNextWorkItem(ctx context.Context) bool 
 		return false
 	}
 	defer ssc.queue.Done(key)
-	if err := ssc.sync(ctx, key.(string)); err != nil {
+	err := metrics.RunSyncAndRecordWithCtx(ctx, "statefulset", key.(string), ssc.sync)
+	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %v", key.(string), err))
 		ssc.queue.AddRateLimited(key)
 	} else {

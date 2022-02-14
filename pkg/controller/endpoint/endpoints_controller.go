@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -347,7 +348,7 @@ func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer e.queue.Done(eKey)
 
-	err := e.syncService(ctx, eKey.(string))
+	err := metrics.RunSyncAndRecordWithCtx(ctx, "endpoints", eKey.(string), e.syncService)
 	e.handleErr(err, eKey)
 
 	return true

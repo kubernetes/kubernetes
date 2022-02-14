@@ -34,6 +34,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 
 	"k8s.io/klog/v2"
@@ -94,7 +95,8 @@ func (gcc *PodGCController) Run(ctx context.Context) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, gcc.gc, gcCheckPeriod)
+	sync := metrics.SyncAndRecordAll("podgc", gcc.gc)
+	go wait.UntilWithContext(ctx, sync, gcCheckPeriod)
 
 	<-ctx.Done()
 }

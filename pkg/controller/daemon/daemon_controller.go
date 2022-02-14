@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -201,7 +202,7 @@ func NewDaemonSetsController(
 	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
 	dsc.nodeLister = nodeInformer.Lister()
 
-	dsc.syncHandler = dsc.syncDaemonSet
+	dsc.syncHandler = metrics.SyncAndRecordWithCtx("daemonset", dsc.syncDaemonSet)
 	dsc.enqueueDaemonSet = dsc.enqueue
 
 	dsc.failedPodsBackoff = failedPodsBackoff

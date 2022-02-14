@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	ctrlmetrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -221,7 +222,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer a.queue.Done(key)
 
-	deleted, err := a.reconcileKey(ctx, key.(string))
+	deleted, err := ctrlmetrics.RunHasSyncedAndRecordedWithCtx(ctx, "horizontalpodautoscaler", key.(string), a.reconcileKey)
 	if err != nil {
 		utilruntime.HandleError(err)
 	}

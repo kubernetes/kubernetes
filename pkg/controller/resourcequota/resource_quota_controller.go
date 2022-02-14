@@ -42,6 +42,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -114,7 +115,7 @@ func NewController(options *ControllerOptions) (*Controller, error) {
 		registry:            options.Registry,
 	}
 	// set the synchronization handler
-	rq.syncHandler = rq.syncResourceQuotaFromKey
+	rq.syncHandler = metrics.SyncAndRecordWithCtx("resourcequota", rq.syncResourceQuotaFromKey)
 
 	options.ResourceQuotaInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{

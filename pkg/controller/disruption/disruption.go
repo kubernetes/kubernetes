@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metrics "k8s.io/component-base/metrics/prometheus/controller"
 	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -525,7 +526,7 @@ func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer dc.queue.Done(dKey)
 
-	err := dc.sync(ctx, dKey.(string))
+	err := metrics.RunSyncAndRecordWithCtx(ctx, "disruption", dKey.(string), dc.sync)
 	if err == nil {
 		dc.queue.Forget(dKey)
 		return true

@@ -56,6 +56,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/legacyregistry"
+	ctrlmetrics "k8s.io/component-base/metrics/prometheus/controller"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -164,7 +165,7 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
 
-	rsc.syncHandler = rsc.syncReplicaSet
+	rsc.syncHandler = ctrlmetrics.SyncAndRecordWithCtx("replicaset", rsc.syncReplicaSet)
 
 	return rsc
 }
