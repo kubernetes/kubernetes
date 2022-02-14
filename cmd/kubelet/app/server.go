@@ -914,6 +914,17 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		if err != nil {
 			return nil, nil, err
 		}
+		// Kubelet needs to be able to recover from stale http connections.
+		// HTTP2 has a mechanism to detect broken connections by sending periodical pings.
+		// HTTP1 only can have one persistent connection, and it will close all Idle connections
+		// once the Kubelet heartbeat fails. However, since there are many edge cases that we can't
+		// control, users can still opt-in to the previous behavior for closing the connections by
+		// setting the environment variable DISABLE_HTTP2.
+		if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
+			klog.InfoS("HTTP2 has been explicitly disabled, Kubelet will forcefully close active connections on heartbeat failures")
+		} else {
+			closeAllConns = func() { utilnet.CloseIdleConnectionsFor(transportConfig.Transport) }
+		}
 
 		klog.V(2).InfoS("Starting client certificate rotation")
 		clientCertificateManager.Start()
