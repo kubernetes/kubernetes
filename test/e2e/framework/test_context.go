@@ -82,8 +82,7 @@ type TestContextType struct {
 	Host               string
 	BearerToken        string `datapolicy:"token"`
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
-	RepoRoot                string
-	DockershimCheckpointDir string
+	RepoRoot string
 	// ListImages will list off all images that are used then quit
 	ListImages bool
 
@@ -312,7 +311,6 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
 	flags.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
-	flags.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	// TODO: remove the node-role.kubernetes.io/master taint in 1.25 or later.
 	// The change will likely require an action for some users that do not
 	// use k8s originated tools like kubeadm or kOps for creating clusters
