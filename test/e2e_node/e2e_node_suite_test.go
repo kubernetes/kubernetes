@@ -162,7 +162,7 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if _, err := system.ValidateSpec(*spec, framework.TestContext.ContainerRuntime); len(err) != 0 {
+		if _, err := system.ValidateSpec(*spec, "remote"); len(err) != 0 {
 			klog.Exitf("system validation failed: %v", err)
 		}
 		return
