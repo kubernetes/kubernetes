@@ -281,11 +281,11 @@ func (sl portsInOrder) Less(i, j int) bool {
 // but excludes equality checks that would have already been covered with
 // endpoint hashing (see hashEndpoint func for more info).
 func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
-	if stringPtrChanged(ep1.NodeName, ep1.NodeName) {
+	if stringPtrChanged(ep1.NodeName, ep2.NodeName) {
 		return false
 	}
 
-	if stringPtrChanged(ep1.Zone, ep1.Zone) {
+	if stringPtrChanged(ep1.Zone, ep2.Zone) {
 		return false
 	}
 
