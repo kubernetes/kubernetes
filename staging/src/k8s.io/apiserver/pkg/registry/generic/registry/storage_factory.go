@@ -77,7 +77,7 @@ func StorageWithCacher() generic.StorageDecorator {
 		// TODO : Remove RegisterStorageCleanup below when PR
 		// https://github.com/kubernetes/kubernetes/pull/50690
 		// merges as that shuts down storage properly
-		RegisterStorageCleanup(destroyFunc)
+		// RegisterStorageCleanup(destroyFunc)
 
 		return cacher, destroyFunc, nil
 	}
