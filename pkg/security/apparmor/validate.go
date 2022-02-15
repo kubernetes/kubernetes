@@ -74,9 +74,18 @@ func (v *validator) Validate(pod *v1.Pod) error {
 
 	var retErr error
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
-		retErr = ValidateProfileFormat(GetProfileName(pod, container.Name))
+		profile := GetProfileName(pod, container.Name)
+		retErr = ValidateProfileFormat(profile)
 		if retErr != nil {
 			return false
+		}
+		// TODO(#64841): This would ideally be part of ValidateProfileFormat, but that is called for
+		// API validation, and this is tightening validation.
+		if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
+			if strings.TrimSpace(strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)) == "" {
+				retErr = fmt.Errorf("invalid empty AppArmor profile name: %q", profile)
+				return false
+			}
 		}
 		return true
 	})
