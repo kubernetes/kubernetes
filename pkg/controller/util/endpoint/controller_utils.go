@@ -281,11 +281,13 @@ func (sl portsInOrder) Less(i, j int) bool {
 // but excludes equality checks that would have already been covered with
 // endpoint hashing (see hashEndpoint func for more info).
 func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
-	if stringPtrChanged(ep1.NodeName, ep1.NodeName) {
+	// To prevent updating all EndpointSlices on upgrade, the equal check ignores difference of NodeName and Zone if the
+	// existing value is nil and the new value is non-nil.
+	if ep1.NodeName != nil && ep2.NodeName != nil && *ep1.NodeName != *ep2.NodeName {
 		return false
 	}
 
-	if stringPtrChanged(ep1.Zone, ep1.Zone) {
+	if ep1.Zone != nil && ep2.Zone != nil && *ep1.Zone != *ep2.Zone {
 		return false
 	}
 
@@ -318,17 +320,6 @@ func objectRefPtrChanged(ref1, ref2 *v1.ObjectReference) bool {
 		return true
 	}
 	if ref1 != nil && ref2 != nil && !apiequality.Semantic.DeepEqual(*ref1, *ref2) {
-		return true
-	}
-	return false
-}
-
-// stringPtrChanged returns true if a set of string pointers have different values.
-func stringPtrChanged(ptr1, ptr2 *string) bool {
-	if (ptr1 == nil) != (ptr2 == nil) {
-		return true
-	}
-	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
 		return true
 	}
 	return false
