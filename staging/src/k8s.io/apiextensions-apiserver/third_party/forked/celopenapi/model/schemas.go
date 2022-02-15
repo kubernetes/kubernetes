@@ -15,6 +15,8 @@
 package model
 
 import (
+	"github.com/google/cel-go/checker/decls"
+	"github.com/google/cel-go/common/types"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
@@ -61,8 +63,16 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 	case "array":
 		if s.Items != nil {
 			itemsType := SchemaDeclType(s.Items, s.Items.XEmbeddedResource)
+			// TODO(DangerOnTheRanger): calculate maxLength if not given in the schema
+			// TODO(DangerOnTheRanger): refactor -1 (indicating no length given) out into a constant
+			maxItems := int64(-1)
+			if s.Items.ValueValidation != nil {
+				if s.Items.ValueValidation.MaxItems != nil {
+					maxItems = *s.Items.ValueValidation.MaxItems
+				}
+			}
 			if itemsType != nil {
-				return NewListType(itemsType)
+				return NewListType(itemsType, maxItems)
 			}
 		}
 		return nil
@@ -70,7 +80,14 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
 			propsType := SchemaDeclType(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource)
 			if propsType != nil {
-				return NewMapType(StringType, propsType)
+				// TODO(DangerOnTheRanger): refactor -1 (indicating no length given) out into a constant
+				maxProperties := int64(-1)
+				if s.ValueValidation != nil {
+					if s.ValueValidation.MaxProperties != nil {
+						maxProperties = *s.ValueValidation.MaxProperties
+					}
+				}
+				return NewMapType(StringType, propsType, maxProperties)
 			}
 			return nil
 		}
@@ -106,6 +123,11 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.ValueValidation != nil {
 			switch s.ValueValidation.Format {
 			case "byte":
+				if s.ValueValidation.MaxLength != nil {
+					byteWithMaxLength := newSimpleType("bytes", decls.Bytes, types.Bytes([]byte{}))
+					byteWithMaxLength.MaxLength = *s.ValueValidation.MaxLength
+					return byteWithMaxLength
+				}
 				return BytesType
 			case "duration":
 				return DurationType
@@ -137,8 +159,8 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 		return s
 	}
 	result := &schema.Structural{
-		Generic: s.Generic,
-		Extensions: s.Extensions,
+		Generic:         s.Generic,
+		Extensions:      s.Extensions,
 		ValueValidation: s.ValueValidation,
 	}
 	props := make(map[string]schema.Structural, len(s.Properties))
@@ -151,7 +173,7 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 	props["metadata"] = schema.Structural{
 		Generic: schema.Generic{Type: "object"},
 		Properties: map[string]schema.Structural{
-			"name": stringType,
+			"name":         stringType,
 			"generateName": stringType,
 		},
 	}

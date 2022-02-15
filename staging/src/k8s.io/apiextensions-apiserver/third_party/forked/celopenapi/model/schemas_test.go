@@ -238,3 +238,105 @@ func testSchema() *schema.Structural {
 	}
 	return ts
 }
+
+func TestCELSchema(t *testing.T) {
+	ts := celSchema()
+	cust := SchemaDeclType(ts, true).MaybeAssignTypeName("CustomObject")
+	list, ok := cust.FindField("listWithLength")
+	if !ok {
+		t.Error("could not find listWithLength")
+	}
+
+	if list.Type.MaxLength != 10 {
+		t.Errorf("Wrong MaxLength found (got %d, expected %d)", list.Type.MaxLength, 10)
+	}
+
+	str, ok := cust.FindField("stringWithLength")
+	if !ok {
+		t.Error("could not find stringWithLength")
+	}
+	if str.Type.MaxLength != 20 {
+		t.Errorf("Wrong MaxLength found (got %d, expected %d)", str.Type.MaxLength, 20)
+	}
+
+	celMap, ok := cust.FindField("mapWithLength")
+	if !ok {
+		t.Error("could not find mapWithLength")
+	}
+	if celMap.Type.MaxLength != 15 {
+		t.Errorf("Wrong MaxLength found (got %d, expected %d)", celMap.Type.MaxLength, 15)
+	}
+}
+
+func maxPtr(max int64) *int64 {
+	return &max
+}
+
+func celSchema() *schema.Structural {
+	// Manual construction of a schema with the following definition:
+	//
+	// schema:
+	//   type: object
+	//   metadata:
+	//     custom_type: "CustomObject"
+	//   properties:
+	//     listWithLength:
+	//       type: array
+	//       maxItems: 10
+	//       default: [1, 2, 3, 4, 5]
+	//     stringWithLength:
+	//       type: string
+	//       maxLength: 20
+	//       default: "test-data"
+	//     mapWithLength:
+	//       type: object
+	//       maxProperties: 15
+	//       additionalProperties: true
+	ts := &schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"listWithLength": {
+				Generic: schema.Generic{
+					Type:    "array",
+					Default: schema.JSON{Object: [5]int64{1, 2, 3, 4, 5}},
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "integer",
+					},
+					ValueValidation: &schema.ValueValidation{
+						Format:   "int64",
+						MaxItems: maxPtr(10),
+					},
+				},
+			},
+			"stringWithLength": {
+				Generic: schema.Generic{
+					Type:    "string",
+					Default: schema.JSON{Object: "test-data"},
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format:    "byte",
+					MaxLength: maxPtr(20),
+				},
+			},
+			"mapWithLength": {
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					}},
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format:        "string",
+					MaxProperties: maxPtr(15),
+				},
+			},
+		},
+	}
+	return ts
+}

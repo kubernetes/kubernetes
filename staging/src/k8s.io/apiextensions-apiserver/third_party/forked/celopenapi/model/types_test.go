@@ -24,7 +24,7 @@ import (
 )
 
 func TestTypes_ListType(t *testing.T) {
-	list := NewListType(StringType)
+	list := NewListType(StringType, -1)
 	if !list.IsList() {
 		t.Error("list type not identifiable as list")
 	}
@@ -43,7 +43,7 @@ func TestTypes_ListType(t *testing.T) {
 }
 
 func TestTypes_MapType(t *testing.T) {
-	mp := NewMapType(StringType, IntType)
+	mp := NewMapType(StringType, IntType, -1)
 	if !mp.IsMap() {
 		t.Error("map type not identifiable as map")
 	}
