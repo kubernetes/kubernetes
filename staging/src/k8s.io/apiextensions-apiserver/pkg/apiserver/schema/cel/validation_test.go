@@ -1682,12 +1682,17 @@ func TestValidationExpressions(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for i := range tests {
+		i := i
+		t.Run(tests[i].name, func(t *testing.T) {
+			t.Parallel()
 			// set costBudget to maxInt64 for current test
+			tt := tests[i]
 			tt.costBudget = math.MaxInt64
-			for _, validRule := range tt.valid {
+			for j := range tt.valid {
+				validRule := tt.valid[j]
 				t.Run(validRule, func(t *testing.T) {
+					t.Parallel()
 					s := withRule(*tt.schema, validRule)
 					celValidator := NewValidator(&s, PerCallLimit)
 					if celValidator == nil {

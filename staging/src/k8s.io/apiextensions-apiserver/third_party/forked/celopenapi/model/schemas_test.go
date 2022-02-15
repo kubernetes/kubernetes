@@ -238,3 +238,267 @@ func testSchema() *schema.Structural {
 	}
 	return ts
 }
+
+func arraySchema(arrayType, format string, maxItems *int64) *schema.Structural {
+	return &schema.Structural{
+		Generic: schema.Generic{
+			Type: "array",
+		},
+		Items: &schema.Structural{
+			Generic: schema.Generic{
+				Type: arrayType,
+			},
+			ValueValidation: &schema.ValueValidation{
+				Format: format,
+			},
+		},
+		ValueValidation: &schema.ValueValidation{
+			MaxItems: maxItems,
+		},
+	}
+}
+
+func TestEstimateMaxLengthJSON(t *testing.T) {
+	type maxLengthTest struct {
+		Name                string
+		InputSchema         *schema.Structural
+		ExpectedMaxElements int64
+	}
+	tests := []maxLengthTest{
+		{
+			Name:        "booleanArray",
+			InputSchema: arraySchema("boolean", "", nil),
+			// expected JSON is [true,true,...], so our length should be (maxRequestSizeBytes - 2) / 5
+			ExpectedMaxElements: 629145,
+		},
+		{
+			Name:        "durationArray",
+			InputSchema: arraySchema("string", "duration", nil),
+			// expected JSON is ["0","0",...] so our length should be (maxRequestSizeBytes - 2) / 4
+			ExpectedMaxElements: 786431,
+		},
+		{
+			Name:        "datetimeArray",
+			InputSchema: arraySchema("string", "date-time", nil),
+			// expected JSON is ["2000-01-01T01:01:01","2000-01-01T01:01:01",...] so our length should be (maxRequestSizeBytes - 2) / 22
+			ExpectedMaxElements: 142987,
+		},
+		{
+			Name:        "dateArray",
+			InputSchema: arraySchema("string", "date", nil),
+			// expected JSON is ["2000-01-01","2000-01-02",...] so our length should be (maxRequestSizeBytes - 2) / 13
+			ExpectedMaxElements: 241978,
+		},
+		{
+			Name:        "numberArray",
+			InputSchema: arraySchema("integer", "", nil),
+			// expected JSON is [0,0,...] so our length should be (maxRequestSizeBytes - 2) / 2
+			ExpectedMaxElements: 1572863,
+		},
+		{
+			Name:        "stringArray",
+			InputSchema: arraySchema("string", "", nil),
+			// expected JSON is ["","",...] so our length should be (maxRequestSizeBytes - 2) / 3
+			ExpectedMaxElements: 1048575,
+		},
+		{
+			Name: "stringMap",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					}},
+				},
+			},
+			// expected JSON is {"":"","":"",...} so our length should be (3000000 - 2) / 6
+			ExpectedMaxElements: 393215,
+		},
+		{
+			Name: "objectOptionalPropertyArray",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "object",
+					},
+					Properties: map[string]schema.Structural{
+						"required": schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
+							},
+						},
+						"optional": schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
+							},
+						},
+					},
+					ValueValidation: &schema.ValueValidation{
+						Required: []string{"required"},
+					},
+				},
+			},
+			// expected JSON is [{"required":"",},{"required":"",},...] so our length should be (maxRequestSizeBytes - 2) / 17
+			ExpectedMaxElements: 185042,
+		},
+		{
+			Name:        "arrayWithLength",
+			InputSchema: arraySchema("integer", "int64", maxPtr(10)),
+			// manually set by MaxItems
+			ExpectedMaxElements: 10,
+		},
+		{
+			Name: "stringWithLength",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					MaxLength: maxPtr(20),
+				},
+			},
+			// manually set by MaxLength, but we expect a 4x multiplier compared to the original input
+			// since OpenAPIv3 maxLength uses code points, but DeclType works with bytes
+			ExpectedMaxElements: 80,
+		},
+		{
+			Name: "mapWithLength",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					}},
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format:        "string",
+					MaxProperties: maxPtr(15),
+				},
+			},
+			// manually set by MaxProperties
+			ExpectedMaxElements: 15,
+		},
+		{
+			Name: "durationMaxSize",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "duration",
+				},
+			},
+			// should be exactly equal to maxDurationSizeJSON
+			ExpectedMaxElements: maxDurationSizeJSON,
+		},
+		{
+			Name: "dateSize",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "date",
+				},
+			},
+			// should be exactly equal to dateSizeJSON
+			ExpectedMaxElements: dateSizeJSON,
+		},
+		{
+			Name: "maxdatetimeSize",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "date-time",
+				},
+			},
+			// should be exactly equal to maxDatetimeSizeJSON
+			ExpectedMaxElements: maxDatetimeSizeJSON,
+		},
+		{
+			Name: "maxintOrStringSize",
+			InputSchema: &schema.Structural{
+				Extensions: schema.Extensions{
+					XIntOrString: true,
+				},
+			},
+			// should be exactly equal to maxRequestSizeBytes - 2 (to allow for quotes in the case of a string)
+			ExpectedMaxElements: maxRequestSizeBytes - 2,
+		},
+		{
+			Name: "objectDefaultFieldArray",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "object",
+					},
+					Properties: map[string]schema.Structural{
+						"field": schema.Structural{
+							Generic: schema.Generic{
+								Type:    "string",
+								Default: schema.JSON{Object: "default"},
+							},
+						},
+					},
+					ValueValidation: &schema.ValueValidation{
+						Required: []string{"field"},
+					},
+				},
+			},
+			// expected JSON is [{},{},...] so our length should be (maxRequestSizeBytes - 2) / 3
+			ExpectedMaxElements: 1048575,
+		},
+		{
+			Name: "byteStringSize",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "byte",
+				},
+			},
+			// expected JSON is "" so our length should be (maxRequestSizeBytes - 2)
+			ExpectedMaxElements: 3145726,
+		},
+		{
+			Name: "byteStringSetMaxLength",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format:    "byte",
+					MaxLength: maxPtr(20),
+				},
+			},
+			// note that unlike regular strings we don't have to take unicode into account,
+			// so we we expect the max length to be exactly equal to the user-supplied one
+			ExpectedMaxElements: 20,
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.Name, func(t *testing.T) {
+			decl := SchemaDeclType(testCase.InputSchema, false)
+			if decl.MaxElements != testCase.ExpectedMaxElements {
+				t.Errorf("wrong maxElements (got %d, expected %d)", decl.MaxElements, testCase.ExpectedMaxElements)
+			}
+		})
+	}
+}
+
+func maxPtr(max int64) *int64 {
+	return &max
+}
