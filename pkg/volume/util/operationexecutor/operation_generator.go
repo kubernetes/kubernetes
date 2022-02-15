@@ -952,6 +952,12 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		}
 		// The device is still in use elsewhere. Caller will log and retry.
 		if deviceOpened {
+			// Mark the device as uncertain, so MountDevice is called for new pods.
+			markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(deviceToDetach.VolumeName, deviceToDetach.DevicePath, deviceMountPath)
+			if markDeviceUncertainErr != nil {
+				// There is nothing else we can do. Hope that UnmountDevice will be re-tried shortly.
+				klog.Errorf(deviceToDetach.GenerateErrorDetailed("UnmountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainErr).Error())
+			}
 			eventErr, detailedErr := deviceToDetach.GenerateError(
 				"UnmountDevice failed",
 				goerrors.New("the device is in use when it was no longer expected to be in use"))
