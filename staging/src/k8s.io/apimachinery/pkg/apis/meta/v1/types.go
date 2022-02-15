@@ -58,13 +58,7 @@ type TypeMeta struct {
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 type ListMeta struct {
-	// selfLink is a URL representing this object.
-	// Populated by the system.
-	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
+	// selfLink is DEPRECATED read-only field that is no longer populated by the system.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
 
@@ -152,13 +146,7 @@ type ObjectMeta struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
-	// SelfLink is a URL representing this object.
-	// Populated by the system.
-	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
+	// selfLink is DEPRECATED read-only field that is no longer populated by the system.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,4,opt,name=selfLink"`
 

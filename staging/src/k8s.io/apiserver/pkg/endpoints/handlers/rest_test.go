@@ -300,22 +300,6 @@ func (p *testNamer) ObjectName(obj runtime.Object) (namespace, name string, err 
 	return p.namespace, p.name, nil
 }
 
-// SetSelfLink sets the provided URL onto the object. The method should return nil if the object
-// does not support selfLinks.
-func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
-	return errors.New("not implemented")
-}
-
-// GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(requestInfo *request.RequestInfo, obj runtime.Object) (uri string, err error) {
-	return "", errors.New("not implemented")
-}
-
-// GenerateListLink creates a path and query for a list that represents the canonical path.
-func (p *testNamer) GenerateListLink(req *http.Request) (uri string, err error) {
-	return "", errors.New("not implemented")
-}
-
 type patchTestCase struct {
 	name string
 

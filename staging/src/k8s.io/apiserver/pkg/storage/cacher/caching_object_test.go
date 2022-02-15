@@ -83,36 +83,39 @@ func TestCachingObject(t *testing.T) {
 	}
 }
 
-func TestSelfLink(t *testing.T) {
+func TestCachingObjectFieldAccessors(t *testing.T) {
 	object, err := newCachingObject(&v1.Pod{})
 	if err != nil {
 		t.Fatalf("couldn't create cachingObject: %v", err)
 	}
-	selfLink := "selfLink"
-	object.SetSelfLink(selfLink)
 
-	encodeSelfLink := func(obj runtime.Object, w io.Writer) error {
+	// Given accessors for all fields implement the same logic,
+	// we are choosing an arbitrary one to test.
+	clusterName := "clusterName"
+	object.SetClusterName(clusterName)
+
+	encodeClusterName := func(obj runtime.Object, w io.Writer) error {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			t.Fatalf("failed to get accessor for %#v: %v", obj, err)
 		}
-		_, err = w.Write([]byte(accessor.GetSelfLink()))
+		_, err = w.Write([]byte(accessor.GetClusterName()))
 		return err
 	}
 	buffer := bytes.NewBuffer(nil)
-	if err := object.CacheEncode("", encodeSelfLink, buffer); err != nil {
+	if err := object.CacheEncode("", encodeClusterName, buffer); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if a, e := buffer.String(), selfLink; a != e {
+	if a, e := buffer.String(), clusterName; a != e {
 		t.Errorf("unexpected serialization: %s, expected: %s", a, e)
 	}
 
-	// GetObject should also set selfLink.
+	// GetObject should also set clusterName.
 	buffer.Reset()
-	if err := encodeSelfLink(object.GetObject(), buffer); err != nil {
+	if err := encodeClusterName(object.GetObject(), buffer); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if a, e := buffer.String(), selfLink; a != e {
+	if a, e := buffer.String(), clusterName; a != e {
 		t.Errorf("unexpected serialization: %s, expected: %s", a, e)
 	}
 }
@@ -136,7 +139,7 @@ func TestCachingObjectRaces(t *testing.T) {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			defer wg.Done()
-			object.SetSelfLink("selfLink")
+			object.SetClusterName("clusterName")
 			buffer := bytes.NewBuffer(nil)
 			for _, encoder := range encoders {
 				buffer.Reset()
@@ -152,8 +155,8 @@ func TestCachingObjectRaces(t *testing.T) {
 				t.Errorf("failed to get accessor: %v", err)
 				return
 			}
-			if selfLink := accessor.GetSelfLink(); selfLink != "selfLink" {
-				t.Errorf("unexpected selfLink: %s", selfLink)
+			if clusterName := accessor.GetClusterName(); clusterName != "clusterName" {
+				t.Errorf("unexpected clusterName: %s", clusterName)
 			}
 		}()
 	}

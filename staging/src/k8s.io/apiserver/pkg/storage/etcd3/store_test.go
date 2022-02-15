@@ -135,7 +135,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("output should have non-empty resource version")
 	}
 	if out.SelfLink != "" {
-		t.Errorf("output should have empty self link")
+		t.Errorf("output should have empty selfLink")
 	}
 
 	checkStorageInvariants(ctx, t, etcdClient, store, key)
@@ -158,7 +158,7 @@ func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clien
 		t.Errorf("stored object should have empty resource version")
 	}
 	if obj.SelfLink != "" {
-		t.Errorf("stored output should have empty self link")
+		t.Errorf("stored output should have empty selfLink")
 	}
 }
 
@@ -686,7 +686,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectNotFoundErr:   false,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
-	}, { // GuaranteedUpdate with same data AND a self link
+	}, { // GuaranteedUpdate with same data AND a selfLink
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -768,7 +768,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 			t.Errorf("#%d: pod name want=%s, get=%s", i, name, out.ObjectMeta.Name)
 		}
 		if out.SelfLink != "" {
-			t.Errorf("#%d: selflink should not be set", i)
+			t.Errorf("#%d: selfLink should not be set", i)
 		}
 
 		// verify that kv pair is not empty after set and that the underlying data matches expectations
@@ -2359,7 +2359,7 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 	})
 	ctx := context.Background()
 
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	out := &example.Pod{}
 
 	testCases := []struct {

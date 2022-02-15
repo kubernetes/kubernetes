@@ -29,7 +29,6 @@ type ObjectMetaApplyConfiguration struct {
 	Name                       *string                            `json:"name,omitempty"`
 	GenerateName               *string                            `json:"generateName,omitempty"`
 	Namespace                  *string                            `json:"namespace,omitempty"`
-	SelfLink                   *string                            `json:"selfLink,omitempty"`
 	UID                        *types.UID                         `json:"uid,omitempty"`
 	ResourceVersion            *string                            `json:"resourceVersion,omitempty"`
 	Generation                 *int64                             `json:"generation,omitempty"`
@@ -70,14 +69,6 @@ func (b *ObjectMetaApplyConfiguration) WithGenerateName(value string) *ObjectMet
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ObjectMetaApplyConfiguration) WithNamespace(value string) *ObjectMetaApplyConfiguration {
 	b.Namespace = &value
-	return b
-}
-
-// WithSelfLink sets the SelfLink field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SelfLink field is set to the value of the last call.
-func (b *ObjectMetaApplyConfiguration) WithSelfLink(value string) *ObjectMetaApplyConfiguration {
-	b.SelfLink = &value
 	return b
 }
 

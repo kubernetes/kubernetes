@@ -46,7 +46,6 @@ var benchmarkPod = api.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:              "etcd-server-e2e-test-wojtekt-master",
 		Namespace:         "default",
-		SelfLink:          "/api/v1/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",
 		UID:               types.UID("a671734a-e8e5-11e4-8fde-42010af09327"),
 		ResourceVersion:   "22",
 		CreationTimestamp: parseTimeOrDie("2015-04-22T11:49:36Z"),
