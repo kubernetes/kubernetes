@@ -329,6 +329,49 @@ foo    baz           <none>
 ^[ \r
 `,
 		},
+		{
+			columns: []Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "API_VERSION",
+					FieldSpec: "{.apiVersion}",
+				},
+				{
+					Header:    "TERMINATION_GRACE_PERIOD_SECONDS",
+					FieldSpec: "{.spec.terminationGracePeriodSeconds}",
+				},
+			},
+			obj: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}, Spec: corev1.PodSpec{TerminationGracePeriodSeconds: func() *int64 {
+				result := int64(42)
+				return &result
+			}()}},
+			expectedOutput: `NAME   API_VERSION   TERMINATION_GRACE_PERIOD_SECONDS
+foo    baz           42
+`,
+		},
+		{
+			columns: []Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "API_VERSION",
+					FieldSpec: "{.apiVersion}",
+				},
+				{
+					Header:    "TERMINATION_GRACE_PERIOD_SECONDS",
+					FieldSpec: "{.spec.terminationGracePeriodSeconds}",
+				},
+			},
+			obj: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
+			expectedOutput: `NAME   API_VERSION   TERMINATION_GRACE_PERIOD_SECONDS
+foo    baz           <nil>
+`,
+		},
 	}
 
 	for _, test := range tests {
