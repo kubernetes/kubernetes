@@ -34,12 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
@@ -280,9 +278,7 @@ func NewPriorityQueue(
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector) {
-		pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
-	}
+	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 
 	return pq
 }
@@ -656,15 +652,13 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 // any affinity term that matches "pod".
 // NOTE: this function assumes lock has been acquired in caller.
 func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) []*framework.QueuedPodInfo {
-	nsSelectorEnabled := p.nsLister != nil
 	var nsLabels labels.Set
-	if nsSelectorEnabled {
-		nsLabels = interpodaffinity.GetNamespaceLabelsSnapshot(pod.Namespace, p.nsLister)
-	}
+	nsLabels = interpodaffinity.GetNamespaceLabelsSnapshot(pod.Namespace, p.nsLister)
+
 	var podsToMove []*framework.QueuedPodInfo
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		for _, term := range pInfo.RequiredAffinityTerms {
-			if term.Matches(pod, nsLabels, nsSelectorEnabled) {
+			if term.Matches(pod, nsLabels) {
 				podsToMove = append(podsToMove, pInfo)
 				break
 			}

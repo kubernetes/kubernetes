@@ -27,9 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
-	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -371,13 +369,12 @@ func TestPreferredAffinity(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod               *v1.Pod
-		pods              []*v1.Pod
-		nodes             []*v1.Node
-		expectedList      framework.NodeScoreList
-		name              string
-		wantStatus        *framework.Status
-		disableNSSelector bool
+		pod          *v1.Pod
+		pods         []*v1.Pod
+		nodes        []*v1.Node
+		expectedList framework.NodeScoreList
+		name         string
+		wantStatus   *framework.Status
 	}{
 		{
 			name: "all machines are same priority as Affinity is nil",
@@ -745,8 +742,7 @@ func TestPreferredAffinity(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			state := framework.NewCycleState()
-			fts := feature.Features{EnablePodAffinityNamespaceSelector: !test.disableNSSelector}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(fts, New), &config.InterPodAffinityArgs{HardPodAffinityWeight: 1}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
+			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				if !strings.Contains(status.Message(), test.wantStatus.Message()) {
@@ -825,7 +821,6 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		hardPodAffinityWeight int32
 		expectedList          framework.NodeScoreList
 		name                  string
-		disableNSSelector     bool
 	}{
 		{
 			name: "with default weight",
@@ -908,8 +903,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			state := framework.NewCycleState()
-			fts := feature.Features{EnablePodAffinityNamespaceSelector: !test.disableNSSelector}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(fts, New), &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
+			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)

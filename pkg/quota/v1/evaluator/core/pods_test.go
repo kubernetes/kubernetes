@@ -576,10 +576,9 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 	evaluator := NewPodEvaluator(nil, fakeClock)
 	activeDeadlineSeconds := int64(30)
 	testCases := map[string]struct {
-		pod                      *api.Pod
-		selectors                []corev1.ScopedResourceSelectorRequirement
-		wantSelectors            []corev1.ScopedResourceSelectorRequirement
-		disableNamespaceSelector bool
+		pod           *api.Pod
+		selectors     []corev1.ScopedResourceSelectorRequirement
+		wantSelectors []corev1.ScopedResourceSelectorRequirement
 	}{
 		"EmptyPod": {
 			pod: &api.Pod{},
@@ -762,29 +761,9 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
 			},
 		},
-		"NamespaceSelectorFeatureDisabled": {
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
-					Affinity: &api.Affinity{
-						PodAntiAffinity: &api.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-								{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}},
-							},
-						},
-					},
-				},
-			},
-			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
-				{ScopeName: corev1.ResourceQuotaScopeTerminating},
-				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
-			},
-			disableNamespaceSelector: true,
-		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, !testCase.disableNamespaceSelector)()
 			if testCase.selectors == nil {
 				testCase.selectors = []corev1.ScopedResourceSelectorRequirement{
 					{ScopeName: corev1.ResourceQuotaScopeTerminating},

@@ -46,8 +46,8 @@ func (s *preScoreState) Clone() framework.StateData {
 	return s
 }
 
-func (m scoreMap) processTerm(term *framework.AffinityTerm, weight int32, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, multiplier int32, enableNamespaceSelector bool) {
-	if term.Matches(pod, nsLabels, enableNamespaceSelector) {
+func (m scoreMap) processTerm(term *framework.AffinityTerm, weight int32, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, multiplier int32) {
+	if term.Matches(pod, nsLabels) {
 		if tpValue, tpValueExist := node.Labels[term.TopologyKey]; tpValueExist {
 			if m[term.TopologyKey] == nil {
 				m[term.TopologyKey] = make(map[string]int64)
@@ -57,9 +57,9 @@ func (m scoreMap) processTerm(term *framework.AffinityTerm, weight int32, pod *v
 	}
 }
 
-func (m scoreMap) processTerms(terms []framework.WeightedAffinityTerm, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, multiplier int32, enableNamespaceSelector bool) {
+func (m scoreMap) processTerms(terms []framework.WeightedAffinityTerm, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, multiplier int32) {
 	for _, term := range terms {
-		m.processTerm(&term.AffinityTerm, term.Weight, pod, nsLabels, node, multiplier, enableNamespaceSelector)
+		m.processTerm(&term.AffinityTerm, term.Weight, pod, nsLabels, node, multiplier)
 	}
 }
 
@@ -93,33 +93,33 @@ func (pl *InterPodAffinity) processExistingPod(
 	// value as that of <existingPods>`s node by the term`s weight.
 	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-	topoScore.processTerms(state.podInfo.PreferredAffinityTerms, existingPod.Pod, nil, existingPodNode, 1, pl.enableNamespaceSelector)
+	topoScore.processTerms(state.podInfo.PreferredAffinityTerms, existingPod.Pod, nil, existingPodNode, 1)
 
 	// For every soft pod anti-affinity term of <pod>, if <existingPod> matches the term,
 	// decrement <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>`s node by the term`s weight.
 	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-	topoScore.processTerms(state.podInfo.PreferredAntiAffinityTerms, existingPod.Pod, nil, existingPodNode, -1, pl.enableNamespaceSelector)
+	topoScore.processTerms(state.podInfo.PreferredAntiAffinityTerms, existingPod.Pod, nil, existingPodNode, -1)
 
 	// For every hard pod affinity term of <existingPod>, if <pod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>'s node by the constant <args.hardPodAffinityWeight>
 	if pl.args.HardPodAffinityWeight > 0 && len(existingPodNode.Labels) != 0 {
 		for _, t := range existingPod.RequiredAffinityTerms {
-			topoScore.processTerm(&t, pl.args.HardPodAffinityWeight, incomingPod, state.namespaceLabels, existingPodNode, 1, pl.enableNamespaceSelector)
+			topoScore.processTerm(&t, pl.args.HardPodAffinityWeight, incomingPod, state.namespaceLabels, existingPodNode, 1)
 		}
 	}
 
 	// For every soft pod affinity term of <existingPod>, if <pod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>'s node by the term's weight.
-	topoScore.processTerms(existingPod.PreferredAffinityTerms, incomingPod, state.namespaceLabels, existingPodNode, 1, pl.enableNamespaceSelector)
+	topoScore.processTerms(existingPod.PreferredAffinityTerms, incomingPod, state.namespaceLabels, existingPodNode, 1)
 
 	// For every soft pod anti-affinity term of <existingPod>, if <pod> matches the term,
 	// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>'s node by the term's weight.
-	topoScore.processTerms(existingPod.PreferredAntiAffinityTerms, incomingPod, state.namespaceLabels, existingPodNode, -1, pl.enableNamespaceSelector)
+	topoScore.processTerms(existingPod.PreferredAntiAffinityTerms, incomingPod, state.namespaceLabels, existingPodNode, -1)
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
@@ -168,19 +168,17 @@ func (pl *InterPodAffinity) PreScore(
 		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", state.podInfo.ParseError))
 	}
 
-	if pl.enableNamespaceSelector {
-		for i := range state.podInfo.PreferredAffinityTerms {
-			if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&state.podInfo.PreferredAffinityTerms[i].AffinityTerm); err != nil {
-				return framework.AsStatus(fmt.Errorf("updating PreferredAffinityTerms: %w", err))
-			}
+	for i := range state.podInfo.PreferredAffinityTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&state.podInfo.PreferredAffinityTerms[i].AffinityTerm); err != nil {
+			return framework.AsStatus(fmt.Errorf("updating PreferredAffinityTerms: %w", err))
 		}
-		for i := range state.podInfo.PreferredAntiAffinityTerms {
-			if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&state.podInfo.PreferredAntiAffinityTerms[i].AffinityTerm); err != nil {
-				return framework.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
-			}
-		}
-		state.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
 	}
+	for i := range state.podInfo.PreferredAntiAffinityTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&state.podInfo.PreferredAntiAffinityTerms[i].AffinityTerm); err != nil {
+			return framework.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
+		}
+	}
+	state.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
 
 	topoScores := make([]scoreMap, len(allNodes))
 	index := int32(-1)
