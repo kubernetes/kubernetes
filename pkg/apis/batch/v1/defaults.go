@@ -49,7 +49,7 @@ func SetDefaults_Job(obj *batchv1.Job) {
 		mode := batchv1.NonIndexedCompletion
 		obj.Spec.CompletionMode = &mode
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) && obj.Spec.Suspend == nil {
+	if obj.Spec.Suspend == nil {
 		obj.Spec.Suspend = utilpointer.BoolPtr(false)
 	}
 }

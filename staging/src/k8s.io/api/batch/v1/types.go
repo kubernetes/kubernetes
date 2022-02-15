@@ -190,9 +190,6 @@ type JobSpec struct {
 	// Suspending a Job will reset the StartTime field of the Job, effectively
 	// resetting the ActiveDeadlineSeconds timer too. Defaults to false.
 	//
-	// This field is beta-level, gated by SuspendJob feature flag (enabled by
-	// default).
-	//
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,10,opt,name=suspend"`
 }

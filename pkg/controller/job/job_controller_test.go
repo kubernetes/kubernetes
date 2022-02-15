@@ -225,7 +225,6 @@ func TestControllerSyncJob(t *testing.T) {
 
 		// features
 		indexedJobEnabled   bool
-		suspendJobEnabled   bool
 		jobReadyPodsEnabled bool
 	}{
 		"job start": {
@@ -659,7 +658,6 @@ func TestControllerSyncJob(t *testing.T) {
 		"suspending a job with satisfied expectations": {
 			// Suspended Job should delete active pods when expectations are
 			// satisfied.
-			suspendJobEnabled:       true,
 			suspend:                 true,
 			parallelism:             2,
 			activePods:              2, // parallelism == active, expectations satisfied
@@ -679,7 +677,6 @@ func TestControllerSyncJob(t *testing.T) {
 			// Job in the syncJob call because the controller will wait for
 			// expectations to be satisfied first. The next syncJob call (not tested
 			// here) will be the same as the previous test.
-			suspendJobEnabled:         true,
 			suspend:                   true,
 			parallelism:               2,
 			activePods:                3,  // active > parallelism, expectations unsatisfied
@@ -692,7 +689,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:            3,
 		},
 		"resuming a suspended job": {
-			suspendJobEnabled:       true,
 			wasSuspended:            true,
 			suspend:                 false,
 			parallelism:             2,
@@ -711,7 +707,6 @@ func TestControllerSyncJob(t *testing.T) {
 			// cases above), but since this job is being deleted, we don't expect
 			// anything changed here from before the job was suspended. The
 			// JobSuspended condition is also missing.
-			suspendJobEnabled:  true,
 			suspend:            true,
 			deleting:           true,
 			parallelism:        2,
@@ -733,7 +728,6 @@ func TestControllerSyncJob(t *testing.T) {
 					t.Skip("Can't track status if finalizers can't be removed")
 				}
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
 
@@ -1696,9 +1690,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		expectedFailed          int32
 		expectedCondition       batch.JobConditionType
 		expectedConditionReason string
-
-		// features
-		suspendJobEnabled bool
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			parallelism:             1,
@@ -1750,7 +1741,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedConditionReason: "BackoffLimitExceeded",
 		},
 		"activeDeadlineSeconds is not triggered when Job is suspended": {
-			suspendJobEnabled:       true,
 			suspend:                 true,
 			parallelism:             1,
 			completions:             2,
@@ -1765,8 +1755,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
-
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
