@@ -270,7 +270,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 
 	assert.EqualValues(t, p0Time.Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
-	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, ps.EphemeralStorage)
+	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, nil, ps.EphemeralStorage)
 	if ps.CPU != nil {
 		checkCPUStats(t, "Pod0", seedPod0Infra, ps.CPU)
 	}
