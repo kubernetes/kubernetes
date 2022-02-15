@@ -218,7 +218,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.5"}
 	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.5"}
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.5"}
-	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v2.2.2"}
+	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v3.0.1"}
 	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-2"}
 	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-2"}
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
