@@ -205,10 +205,10 @@ func TestFromV1alpha2VersionResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2PodSandboxStatus(t *testing.T) {
-	from := &v1alpha2.PodSandboxStatus{}
+func TestFromV1alpha2PodSandboxStatusResponse(t *testing.T) {
+	from := &v1alpha2.PodSandboxStatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2PodSandboxStatus(from)
+	to := fromV1alpha2PodSandboxStatusResponse(from)
 	assertEqual(t, from, to)
 }
 
@@ -226,10 +226,10 @@ func TestFromV1alpha2ListContainersResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2ContainerStatus(t *testing.T) {
-	from := &v1alpha2.ContainerStatus{}
+func TestFromV1alpha2ContainerStatusResponse(t *testing.T) {
+	from := &v1alpha2.ContainerStatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2ContainerStatus(from)
+	to := fromV1alpha2ContainerStatusResponse(from)
 	assertEqual(t, from, to)
 }
 
@@ -254,10 +254,10 @@ func TestFromV1alpha2PortForwardResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2RuntimeStatus(t *testing.T) {
-	from := &v1alpha2.RuntimeStatus{}
+func TestFromV1alpha2StatusResponse(t *testing.T) {
+	from := &v1alpha2.StatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2RuntimeStatus(from)
+	to := fromV1alpha2StatusResponse(from)
 	assertEqual(t, from, to)
 }
 
@@ -296,11 +296,10 @@ func TestFromV1alpha2ListPodSandboxStatsResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2Image(t *testing.T) {
-	from := &v1alpha2.Image{}
+func TestFromV1alpha2ImageStatusResponse(t *testing.T) {
+	from := &v1alpha2.ImageStatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2Image(from)
-	fmt.Printf(":%+v\n", to)
+	to := fromV1alpha2ImageStatusResponse(from)
 	assertEqual(t, from, to)
 }
 

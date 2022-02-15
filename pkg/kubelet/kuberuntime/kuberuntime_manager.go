@@ -327,11 +327,14 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 // Status returns the status of the runtime. An error is returned if the Status
 // function itself fails, nil otherwise.
 func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, error) {
-	status, err := m.runtimeService.Status()
+	resp, err := m.runtimeService.Status(false)
 	if err != nil {
 		return nil, err
 	}
-	return toKubeRuntimeStatus(status), nil
+	if resp.GetStatus() == nil {
+		return nil, errors.New("runtime status is nil")
+	}
+	return toKubeRuntimeStatus(resp.GetStatus()), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter
@@ -816,7 +819,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		}
 		klog.V(4).InfoS("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 
-		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
+		resp, err := m.runtimeService.PodSandboxStatus(podSandboxID, false)
 		if err != nil {
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
@@ -827,12 +830,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			result.Fail(err)
 			return
 		}
+		if resp.GetStatus() == nil {
+			result.Fail(errors.New("pod sandbox status is nil"))
+			return
+		}
 
 		// If we ever allow updating a pod from non-host-network to
 		// host-network, we may use a stale IP.
 		if !kubecontainer.IsHostNetworkPod(pod) {
 			// Overwrite the podIPs passed in the pod status, since we just started the pod sandbox.
-			podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, podSandboxStatus)
+			podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, resp.GetStatus())
 			klog.V(4).InfoS("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
 		}
 	}
@@ -1029,16 +1036,20 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(podSandboxIDs))
 	podIPs := []string{}
 	for idx, podSandboxID := range podSandboxIDs {
-		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
+		resp, err := m.runtimeService.PodSandboxStatus(podSandboxID, false)
 		if err != nil {
 			klog.ErrorS(err, "PodSandboxStatus of sandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 			return nil, err
 		}
-		sandboxStatuses[idx] = podSandboxStatus
+		if resp.GetStatus() == nil {
+			return nil, errors.New("pod sandbox status is nil")
+
+		}
+		sandboxStatuses[idx] = resp.Status
 
 		// Only get pod IP from latest sandbox
-		if idx == 0 && podSandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			podIPs = m.determinePodSandboxIPs(namespace, name, podSandboxStatus)
+		if idx == 0 && resp.Status.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
 	}
 
