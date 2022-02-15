@@ -54,9 +54,8 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible value: 'remote'.")
 	fs.MarkDeprecated("container-runtime", "will be removed in 1.27 as the only valid value is 'remote'")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
-
-	// Docker-specific settings.
 	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image."))
+	fs.MarkDeprecated("pod-infra-container-image", "will be removed in 1.27. Image garbage collector will get sandbox image information from CRI.")
 
 	// Image credential provider settings.
 	fs.StringVar(&s.ImageCredentialProviderConfigFile, "image-credential-provider-config", s.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")
