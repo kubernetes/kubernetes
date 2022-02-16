@@ -239,8 +239,8 @@ func testSchema() *schema.Structural {
 	return ts
 }
 
-func TestCELSchema(t *testing.T) {
-	ts := celSchema()
+func TestMaxLengths(t *testing.T) {
+	ts := schemaWithMaxLengths()
 	cust := SchemaDeclType(ts, true).MaybeAssignTypeName("CustomObject")
 	list, ok := cust.FindField("listWithLength")
 	if !ok {
@@ -272,7 +272,7 @@ func maxPtr(max int64) *int64 {
 	return &max
 }
 
-func celSchema() *schema.Structural {
+func schemaWithMaxLengths() *schema.Structural {
 	// Manual construction of a schema with the following definition:
 	//
 	// schema:
