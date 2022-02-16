@@ -65,6 +65,7 @@ func TestZapLoggerInfo(t *testing.T) {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
 		sampleInfoLogger, _ := NewJSONLogger(writer, nil, nil)
+		// nolint:logcheck // The linter cannot and doesn't need to check the key/value pairs.
 		sampleInfoLogger.Info(data.msg, data.keysValues...)
 		logStr := buffer.String()
 
