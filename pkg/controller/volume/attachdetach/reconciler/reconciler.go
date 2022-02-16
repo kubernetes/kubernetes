@@ -202,7 +202,7 @@ func (rc *reconciler) reconcile() {
 			}
 
 			// Update Node Status to indicate volume is no longer safe to mount.
-			err = rc.nodeStatusUpdater.UpdateNodeStatuses()
+			err = rc.nodeStatusUpdater.UpdateNodeStatusForNode(attachedVolume.NodeName)
 			if err != nil {
 				// Skip detaching this volume if unable to update node status
 				klog.ErrorS(err, "UpdateNodeStatuses failed while attempting to report volume as attached", "volume", attachedVolume)
