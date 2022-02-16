@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,7 +30,8 @@ import (
 )
 
 const (
-	controlPlaneTaint = "node-role.kubernetes.io/master"
+	controlPlaneLabelTaint       = "node-role.kubernetes.io/control-plane"
+	controlPlaneLabelTaintLegacy = "node-role.kubernetes.io/master"
 )
 
 // Define container for all the test specification aimed at verifying
@@ -50,20 +52,30 @@ var _ = Describe("control-plane node", func() {
 		controlPlanes := getControlPlaneNodes(f.ClientSet)
 
 		// checks if there is at least one control-plane node
-		gomega.Expect(controlPlanes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneTaint)
+		gomega.Expect(controlPlanes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneLabelTaint)
 
-		// checks that the control-plane nodes have the expected taint
+		// check for either the new or legacy taint to support running the suite on both 1.23 and 1.24 clusters.
+		// 1.23 has only the legacy taint, while 1.24 has the new and legacy taint.
+		newTaint := corev1.Taint{Key: controlPlaneLabelTaint, Effect: corev1.TaintEffectNoSchedule}
+		legacyTaint := corev1.Taint{Key: controlPlaneLabelTaintLegacy, Effect: corev1.TaintEffectNoSchedule}
 		for _, cp := range controlPlanes.Items {
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneTaint, Effect: corev1.TaintEffectNoSchedule})
+			foundTaints := 0
+			for _, taint := range cp.Spec.Taints {
+				if taint == newTaint || taint == legacyTaint {
+					foundTaints++
+				}
+			}
+			gomega.Expect(foundTaints).NotTo(gomega.BeZero(),
+				"did not found either %+v or %+v on control plane node %s", newTaint, legacyTaint, cp.GetName())
 		}
 	})
 })
 
 func getControlPlaneNodes(c clientset.Interface) *corev1.NodeList {
-	selector := labels.Set{controlPlaneTaint: ""}.AsSelector()
-	masters, err := c.CoreV1().Nodes().
+	selector := labels.Set{controlPlaneLabelTaint: ""}.AsSelector()
+	controlPLaneNodes, err := c.CoreV1().Nodes().
 		List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "error reading control-plane nodes")
 
-	return masters
+	return controlPLaneNodes
 }
