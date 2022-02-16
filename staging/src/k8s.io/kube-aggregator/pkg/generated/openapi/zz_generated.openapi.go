@@ -1117,7 +1117,7 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 				Properties: map[string]spec.Schema{
 					"selfLink": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selfLink is DEPRECATED read-only field that is no longer populated by the system.",
+							Description: "Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1343,7 +1343,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					},
 					"selfLink": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selfLink is DEPRECATED read-only field that is no longer populated by the system.",
+							Description: "Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
