@@ -201,6 +201,8 @@ func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
 			for i := 1; i < len(diffCommand); i++ {
 				if isValidChar(diffCommand[i]) {
 					args = append(args, diffCommand[i])
+				} else {
+					klog.Warningf("invalid argument is ignored: %s, only Alphanumeric (case-insensitive), dash and equal are allowed", diffCommand[i])
 				}
 			}
 		}
