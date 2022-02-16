@@ -1357,20 +1357,6 @@ func TestList(t *testing.T) {
 			expectRV:       "1",
 		},
 		{
-			name:   "test List with limit at old resource version and match=Exact",
-			prefix: "/two-level/",
-			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
-				Limit: 1,
-			},
-			expectedOut:    []*example.Pod{},
-			expectContinue: false,
-			rv:             "1",
-			rvMatch:        metav1.ResourceVersionMatchExact,
-			expectRV:       "1",
-		},
-		{
 			name:          "test List with limit when paging disabled",
 			disablePaging: true,
 			prefix:        "/two-level/",
