@@ -457,7 +457,7 @@ message List {
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 message ListMeta {
-  // selfLink is DEPRECATED read-only field that is no longer populated by the system.
+  // Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
   // +optional
   optional string selfLink = 1;
 
@@ -677,7 +677,7 @@ message ObjectMeta {
   // +optional
   optional string namespace = 3;
 
-  // selfLink is DEPRECATED read-only field that is no longer populated by the system.
+  // Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
   // +optional
   optional string selfLink = 4;
 
