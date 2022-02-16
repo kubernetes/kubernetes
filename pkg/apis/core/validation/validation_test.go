@@ -18,6 +18,7 @@ package validation
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	asserttestify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -20132,5 +20134,28 @@ func TestValidateOS(t *testing.T) {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
+	}
+}
+
+func TestValidateAppArmorProfileFormat(t *testing.T) {
+	tests := []struct {
+		profile     string
+		expectValid bool
+	}{
+		{"", true},
+		{v1.AppArmorBetaProfileRuntimeDefault, true},
+		{v1.AppArmorBetaProfileNameUnconfined, true},
+		{"baz", false}, // Missing local prefix.
+		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
+		{v1.AppArmorBetaProfileNamePrefix + "foo-bar", true},
+	}
+
+	for _, test := range tests {
+		err := ValidateAppArmorProfileFormat(test.profile)
+		if test.expectValid {
+			assert.NoError(t, err, "Profile %s should be valid", test.profile)
+		} else {
+			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
+		}
 	}
 }
