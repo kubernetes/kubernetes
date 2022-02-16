@@ -1374,7 +1374,7 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPod, "fakePlugin"), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&midPod, "fakePlugin"), q.SchedulingCycle())
-	c.Step(unschedulableQTimeInterval + time.Second)
+	c.Step(DefaultPodMaxUnschedulableQDuration + time.Second)
 	q.flushUnschedulableQLeftover()
 
 	if p, err := q.Pop(); err != nil || p.Pod != &highPod {
@@ -1382,6 +1382,109 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	}
 	if p, err := q.Pop(); err != nil || p.Pod != &midPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
+	}
+}
+
+func TestPriorityQueue_initPodMaxUnschedulableQDuration(t *testing.T) {
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-1",
+			Namespace: "ns1",
+			UID:       types.UID("tp-1"),
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node1",
+		},
+	}
+
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-2",
+			Namespace: "ns2",
+			UID:       types.UID("tp-2"),
+		},
+		Status: v1.PodStatus{
+			NominatedNodeName: "node2",
+		},
+	}
+
+	var timestamp = time.Now()
+	pInfo1 := &framework.QueuedPodInfo{
+		PodInfo:   framework.NewPodInfo(pod1),
+		Timestamp: timestamp.Add(-time.Second),
+	}
+	pInfo2 := &framework.QueuedPodInfo{
+		PodInfo:   framework.NewPodInfo(pod2),
+		Timestamp: timestamp.Add(-2 * time.Second),
+	}
+
+	tests := []struct {
+		name                         string
+		podMaxUnschedulableQDuration time.Duration
+		operations                   []operation
+		operands                     []*framework.QueuedPodInfo
+		expected                     []*framework.QueuedPodInfo
+	}{
+		{
+			name: "New priority queue by the default value of podMaxUnschedulableQDuration",
+			operations: []operation{
+				addPodUnschedulableQ,
+				addPodUnschedulableQ,
+				flushUnschedulerQ,
+			},
+			operands: []*framework.QueuedPodInfo{pInfo1, pInfo2, nil},
+			expected: []*framework.QueuedPodInfo{pInfo2, pInfo1},
+		},
+		{
+			name:                         "New priority queue by user-defined value of podMaxUnschedulableQDuration",
+			podMaxUnschedulableQDuration: 30 * time.Second,
+			operations: []operation{
+				addPodUnschedulableQ,
+				addPodUnschedulableQ,
+				flushUnschedulerQ,
+			},
+			operands: []*framework.QueuedPodInfo{pInfo1, pInfo2, nil},
+			expected: []*framework.QueuedPodInfo{pInfo2, pInfo1},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var queue *PriorityQueue
+			if test.podMaxUnschedulableQDuration > 0 {
+				queue = NewTestQueue(ctx, newDefaultQueueSort(),
+					WithClock(testingclock.NewFakeClock(timestamp)),
+					WithPodMaxUnschedulableQDuration(test.podMaxUnschedulableQDuration))
+			} else {
+				queue = NewTestQueue(ctx, newDefaultQueueSort(),
+					WithClock(testingclock.NewFakeClock(timestamp)))
+			}
+
+			var podInfoList []*framework.QueuedPodInfo
+
+			for i, op := range test.operations {
+				op(queue, test.operands[i])
+			}
+
+			expectedLen := len(test.expected)
+			if queue.activeQ.Len() != expectedLen {
+				t.Fatalf("Expected %v items to be in activeQ, but got: %v", expectedLen, queue.activeQ.Len())
+			}
+
+			for i := 0; i < expectedLen; i++ {
+				if pInfo, err := queue.activeQ.Pop(); err != nil {
+					t.Errorf("Error while popping the head of the queue: %v", err)
+				} else {
+					podInfoList = append(podInfoList, pInfo.(*framework.QueuedPodInfo))
+				}
+			}
+
+			if diff := cmp.Diff(test.expected, podInfoList); diff != "" {
+				t.Errorf("Unexpected QueuedPodInfo list (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -1425,6 +1528,10 @@ var (
 	}
 	moveClockForward = func(queue *PriorityQueue, _ *framework.QueuedPodInfo) {
 		queue.clock.(*testingclock.FakeClock).Step(2 * time.Second)
+	}
+	flushUnschedulerQ = func(queue *PriorityQueue, _ *framework.QueuedPodInfo) {
+		queue.clock.(*testingclock.FakeClock).Step(queue.podMaxUnschedulableQDuration)
+		queue.flushUnschedulableQLeftover()
 	}
 )
 
@@ -1727,9 +1834,9 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 		t.Fatalf("Failed to pop a pod %v", err)
 	}
 	queue.AddUnschedulableIfNotPresent(pInfo, 1)
-	// Override clock to exceed the unschedulableQTimeInterval so that unschedulable pods
+	// Override clock to exceed the DefaultPodMaxUnschedulableQDuration so that unschedulable pods
 	// will be moved to activeQ
-	c.SetTime(timestamp.Add(unschedulableQTimeInterval + 1))
+	c.SetTime(timestamp.Add(DefaultPodMaxUnschedulableQDuration + 1))
 	queue.flushUnschedulableQLeftover()
 	pInfo, err = queue.Pop()
 	if err != nil {
@@ -1747,9 +1854,9 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 		t.Fatalf("Failed to pop a pod %v", err)
 	}
 	queue.AddUnschedulableIfNotPresent(pInfo, 1)
-	// Override clock to exceed the unschedulableQTimeInterval so that unschedulable pods
+	// Override clock to exceed the DefaultPodMaxUnschedulableQDuration so that unschedulable pods
 	// will be moved to activeQ
-	c.SetTime(timestamp.Add(unschedulableQTimeInterval + 1))
+	c.SetTime(timestamp.Add(DefaultPodMaxUnschedulableQDuration + 1))
 	queue.flushUnschedulableQLeftover()
 	newPod := pod.DeepCopy()
 	newPod.Generation = 1
