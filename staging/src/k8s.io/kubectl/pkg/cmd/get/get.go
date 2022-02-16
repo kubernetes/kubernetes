@@ -813,7 +813,6 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		}
 		if listMeta, err := meta.ListAccessor(obj); err == nil {
 			list.Object["metadata"] = map[string]interface{}{
-				"selfLink":        listMeta.GetSelfLink(),
 				"resourceVersion": listMeta.GetResourceVersion(),
 			}
 		}

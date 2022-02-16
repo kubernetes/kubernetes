@@ -3929,16 +3929,14 @@ func TestDescribeEvents(t *testing.T) {
 		"NodeDescriber": &NodeDescriber{
 			fake.NewSimpleClientset(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:     "bar",
-					SelfLink: "/api/v1/nodes/bar",
+					Name: "bar",
 				},
 			}, events),
 		},
 		"PersistentVolumeDescriber": &PersistentVolumeDescriber{
 			fake.NewSimpleClientset(&corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:     "bar",
-					SelfLink: "/api/v1/persistentvolumes/bar",
+					Name: "bar",
 				},
 			}, events),
 		},
@@ -3947,7 +3945,6 @@ func TestDescribeEvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
-					SelfLink:  "/api/v1/namespaces/foo/pods/bar",
 				},
 			}, events),
 		},
