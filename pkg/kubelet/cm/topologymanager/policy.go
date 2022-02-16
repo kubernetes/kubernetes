@@ -94,7 +94,40 @@ func filterProvidersHints(providersHints []map[string][]TopologyHint) [][]Topolo
 	return allProviderHints
 }
 
-func compareHints(current *TopologyHint, candidate *TopologyHint) *TopologyHint {
+func narrowestHint(hints []TopologyHint) *TopologyHint {
+	if len(hints) == 0 {
+		return nil
+	}
+	var narrowestHint *TopologyHint
+	for i := range hints {
+		if hints[i].NUMANodeAffinity == nil {
+			continue
+		}
+		if narrowestHint == nil {
+			narrowestHint = &hints[i]
+		}
+		if hints[i].NUMANodeAffinity.IsNarrowerThan(narrowestHint.NUMANodeAffinity) {
+			narrowestHint = &hints[i]
+		}
+	}
+	return narrowestHint
+}
+
+func maxOfMinAffinityCounts(filteredHints [][]TopologyHint) int {
+	maxOfMinCount := 0
+	for _, resourceHints := range filteredHints {
+		narrowestHint := narrowestHint(resourceHints)
+		if narrowestHint == nil {
+			continue
+		}
+		if narrowestHint.NUMANodeAffinity.Count() > maxOfMinCount {
+			maxOfMinCount = narrowestHint.NUMANodeAffinity.Count()
+		}
+	}
+	return maxOfMinCount
+}
+
+func compareHints(bestNonPreferredAffinityCount int, current *TopologyHint, candidate *TopologyHint) *TopologyHint {
 	// Only consider candidates that result in a NUMANodeAffinity > 0 to
 	// replace the current bestHint.
 	if candidate.NUMANodeAffinity.Count() == 0 {
@@ -119,18 +152,121 @@ func compareHints(current *TopologyHint, candidate *TopologyHint) *TopologyHint 
 		return current
 	}
 
-	// If the current bestHint and the candidate hint have the same
-	// preference, only consider candidate hints that have a narrower
+	// If the current bestHint and the candidate hint are both preferred,
+	// then only consider candidate hints that have a narrower
 	// NUMANodeAffinity than the NUMANodeAffinity in the current bestHint.
-	if !candidate.NUMANodeAffinity.IsNarrowerThan(current.NUMANodeAffinity) {
+	if current.Preferred && candidate.Preferred {
+		if candidate.NUMANodeAffinity.IsNarrowerThan(current.NUMANodeAffinity) {
+			return candidate
+		}
 		return current
 	}
 
-	// In all other cases, update the bestHint to the candidate hint.
-	return candidate
+	// The only case left is if the current best bestHint and the candidate
+	// hint are both non-preferred. In this case, try and find a hint whose
+	// affinity count is as close to (but not higher than) the
+	// bestNonPreferredAffinityCount as possible. To do this we need to
+	// consider the following cases and react accordingly:
+	//
+	//   1. current.NUMANodeAffinity.Count() >  bestNonPreferredAffinityCount
+	//   2. current.NUMANodeAffinity.Count() == bestNonPreferredAffinityCount
+	//   3. current.NUMANodeAffinity.Count() <  bestNonPreferredAffinityCount
+	//
+	// For case (1), the current bestHint is larger than the
+	// bestNonPreferredAffinityCount, so updating to any narrower mergeHint
+	// is preferred over staying where we are.
+	//
+	// For case (2), the current bestHint is equal to the
+	// bestNonPreferredAffinityCount, so we would like to stick with what
+	// we have *unless* the candidate hint is also equal to
+	// bestNonPreferredAffinityCount and it is narrower.
+	//
+	// For case (3), the current bestHint is less than
+	// bestNonPreferredAffinityCount, so we would like to creep back up to
+	// bestNonPreferredAffinityCount as close as we can. There are three
+	// cases to consider here:
+	//
+	//   3a. candidate.NUMANodeAffinity.Count() >  bestNonPreferredAffinityCount
+	//   3b. candidate.NUMANodeAffinity.Count() == bestNonPreferredAffinityCount
+	//   3c. candidate.NUMANodeAffinity.Count() <  bestNonPreferredAffinityCount
+	//
+	// For case (3a), we just want to stick with the current bestHint
+	// because choosing a new hint that is greater than
+	// bestNonPreferredAffinityCount would be counter-productive.
+	//
+	// For case (3b), we want to immediately update bestHint to the
+	// candidate hint, making it now equal to bestNonPreferredAffinityCount.
+	//
+	// For case (3c), we know that *both* the current bestHint and the
+	// candidate hint are less than bestNonPreferredAffinityCount, so we
+	// want to choose one that brings us back up as close to
+	// bestNonPreferredAffinityCount as possible. There are three cases to
+	// consider here:
+	//
+	//   3ca. candidate.NUMANodeAffinity.Count() >  current.NUMANodeAffinity.Count()
+	//   3cb. candidate.NUMANodeAffinity.Count() <  current.NUMANodeAffinity.Count()
+	//   3cc. candidate.NUMANodeAffinity.Count() == current.NUMANodeAffinity.Count()
+	//
+	// For case (3ca), we want to immediately update bestHint to the
+	// candidate hint because that will bring us closer to the (higher)
+	// value of bestNonPreferredAffinityCount.
+	//
+	// For case (3cb), we want to stick with the current bestHint because
+	// choosing the candidate hint would strictly move us further away from
+	// the bestNonPreferredAffinityCount.
+	//
+	// Finally, for case (3cc), we know that the current bestHint and the
+	// candidate hint are equal, so we simply choose the narrower of the 2.
+
+	// Case 1
+	if current.NUMANodeAffinity.Count() > bestNonPreferredAffinityCount {
+		if candidate.NUMANodeAffinity.IsNarrowerThan(current.NUMANodeAffinity) {
+			return candidate
+		}
+		return current
+	}
+	// Case 2
+	if current.NUMANodeAffinity.Count() == bestNonPreferredAffinityCount {
+		if candidate.NUMANodeAffinity.Count() != bestNonPreferredAffinityCount {
+			return current
+		}
+		if candidate.NUMANodeAffinity.IsNarrowerThan(current.NUMANodeAffinity) {
+			return candidate
+		}
+		return current
+	}
+	// Case 3a
+	if candidate.NUMANodeAffinity.Count() > bestNonPreferredAffinityCount {
+		return current
+	}
+	// Case 3b
+	if candidate.NUMANodeAffinity.Count() == bestNonPreferredAffinityCount {
+		return candidate
+	}
+	// Case 3ca
+	if candidate.NUMANodeAffinity.Count() > current.NUMANodeAffinity.Count() {
+		return candidate
+	}
+	// Case 3cb
+	if candidate.NUMANodeAffinity.Count() < current.NUMANodeAffinity.Count() {
+		return current
+	}
+	// Case 3cc
+	if candidate.NUMANodeAffinity.IsNarrowerThan(current.NUMANodeAffinity) {
+		return candidate
+	}
+	return current
 }
 
 func mergeFilteredHints(numaNodes []int, filteredHints [][]TopologyHint) TopologyHint {
+	// Set bestNonPreferredAffinityCount to help decide which affinity mask is
+	// preferred amongst all non-preferred hints. We calculate this value as
+	// the maximum of the minimum affinity counts supplied for any given hint
+	// provider. In other words, prefer a hint that has an affinity mask that
+	// includes all of the NUMA nodes from the provider that requires the most
+	// NUMA nodes to satisfy its allocation.
+	bestNonPreferredAffinityCount := maxOfMinAffinityCounts(filteredHints)
+
 	var bestHint *TopologyHint
 	iterateAllProviderTopologyHints(filteredHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
@@ -139,7 +275,7 @@ func mergeFilteredHints(numaNodes []int, filteredHints [][]TopologyHint) Topolog
 
 		// Compare the current bestHint with the candidate mergedHint and
 		// update bestHint if appropriate.
-		bestHint = compareHints(bestHint, &mergedHint)
+		bestHint = compareHints(bestNonPreferredAffinityCount, bestHint, &mergedHint)
 	})
 
 	if bestHint == nil {
