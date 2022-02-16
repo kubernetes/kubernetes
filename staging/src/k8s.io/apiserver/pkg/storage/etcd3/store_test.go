@@ -341,32 +341,37 @@ func TestConditionalDelete(t *testing.T) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
+		name string
 		precondition        *storage.Preconditions
 		expectInvalidObjErr bool
-	}{{ // test conditional delete with UID match
+	}{{
+		name: "test conditional delete with UID match",
 		precondition:        storage.NewUIDPreconditions("A"),
 		expectInvalidObjErr: false,
-	}, { // test conditional delete with UID mismatch
+	}, {
+		name: "test conditional delete with UID mismatch",
 		precondition:        storage.NewUIDPreconditions("B"),
 		expectInvalidObjErr: true,
 	}}
 
-	for i, tt := range tests {
-		out := &example.Pod{}
-		err := store.Delete(ctx, key, out, tt.precondition, storage.ValidateAllObjectFunc, nil)
-		if tt.expectInvalidObjErr {
-			if err == nil || !storage.IsInvalidObj(err) {
-				t.Errorf("#%d: expecting invalid UID error, but get: %s", i, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &example.Pod{}
+			err := store.Delete(ctx, key, out, tt.precondition, storage.ValidateAllObjectFunc, nil)
+			if tt.expectInvalidObjErr {
+				if err == nil || !storage.IsInvalidObj(err) {
+					t.Errorf("%s: expecting invalid UID error, but get: %s", tt.name, err)
+				}
+				return
 			}
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Delete failed: %v", err)
-		}
-		if !reflect.DeepEqual(storedObj, out) {
-			t.Errorf("#%d: pod want=%#v, get=%#v", i, storedObj, out)
-		}
-		key, storedObj = testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+			if err != nil {
+				t.Fatalf("%s: Delete failed: %v", tt.name, err)
+			}
+			if !reflect.DeepEqual(storedObj, out) {
+				t.Errorf("%s: pod want=%#v, get=%#v", tt.name, storedObj, out)
+			}
+			key, storedObj = testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+		})
 	}
 }
 
