@@ -664,6 +664,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	key := "/testkey"
 
 	tests := []struct {
+		name                string
 		key                 string
 		ignoreNotFound      bool
 		precondition        *storage.Preconditions
@@ -672,35 +673,40 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectNoUpdate      bool
 		transformStale      bool
 		hasSelfLink         bool
-	}{{ // GuaranteedUpdate on non-existing key with ignoreNotFound=false
+	}{{
+		name:                "GuaranteedUpdate on non-existing key with ignoreNotFound=false",
 		key:                 "/non-existing",
 		ignoreNotFound:      false,
 		precondition:        nil,
 		expectNotFoundErr:   true,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
-	}, { // GuaranteedUpdate on non-existing key with ignoreNotFound=true
+	}, {
+		name:                "GuaranteedUpdate on non-existing key with ignoreNotFound=true",
 		key:                 "/non-existing",
 		ignoreNotFound:      true,
 		precondition:        nil,
 		expectNotFoundErr:   false,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
-	}, { // GuaranteedUpdate on existing key
+	}, {
+		name:                "GuaranteedUpdate on existing key",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
 		expectNotFoundErr:   false,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
-	}, { // GuaranteedUpdate with same data
+	}, {
+		name:                "GuaranteedUpdate with same data",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
 		expectNotFoundErr:   false,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
-	}, { // GuaranteedUpdate with same data AND a selfLink
+	}, {
+		name:                "GuaranteedUpdate with same data AND a selfLink",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -708,7 +714,8 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
 		hasSelfLink:         true,
-	}, { // GuaranteedUpdate with same data but stale
+	}, {
+		name:                "GuaranteedUpdate with same data but stale",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -716,14 +723,16 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
 		transformStale:      true,
-	}, { // GuaranteedUpdate with UID match
+	}, {
+		name:                "GuaranteedUpdate with UID match",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        storage.NewUIDPreconditions("A"),
 		expectNotFoundErr:   false,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
-	}, { // GuaranteedUpdate with UID mismatch
+	}, {
+		name:                "GuaranteedUpdate with UID mismatch",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        storage.NewUIDPreconditions("B"),
@@ -733,71 +742,73 @@ func TestGuaranteedUpdate(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
-		key, storeObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+		t.Run(tt.name, func(t *testing.T) {
+			key, storeObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
-		out := &example.Pod{}
-		name := fmt.Sprintf("foo-%d", i)
-		if tt.expectNoUpdate {
-			name = storeObj.Name
-		}
-		originalTransformer := store.transformer.(*prefixTransformer)
-		if tt.transformStale {
-			transformer := *originalTransformer
-			transformer.stale = true
-			store.transformer = &transformer
-		}
-		version := storeObj.ResourceVersion
-		err := store.GuaranteedUpdate(ctx, tt.key, out, tt.ignoreNotFound, tt.precondition,
-			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-				if tt.expectNotFoundErr && tt.ignoreNotFound {
-					if pod := obj.(*example.Pod); pod.Name != "" {
-						t.Errorf("#%d: expecting zero value, but get=%#v", i, pod)
+			out := &example.Pod{}
+			name := fmt.Sprintf("foo-%d", i)
+			if tt.expectNoUpdate {
+				name = storeObj.Name
+			}
+			originalTransformer := store.transformer.(*prefixTransformer)
+			if tt.transformStale {
+				transformer := *originalTransformer
+				transformer.stale = true
+				store.transformer = &transformer
+			}
+			version := storeObj.ResourceVersion
+			err := store.GuaranteedUpdate(ctx, tt.key, out, tt.ignoreNotFound, tt.precondition,
+				storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					if tt.expectNotFoundErr && tt.ignoreNotFound {
+						if pod := obj.(*example.Pod); pod.Name != "" {
+							t.Errorf("%s: expecting zero value, but get=%#v", tt.name, pod)
+						}
 					}
+					pod := *storeObj
+					if tt.hasSelfLink {
+						pod.SelfLink = "testlink"
+					}
+					pod.Name = name
+					return &pod, nil
+				}), nil)
+			store.transformer = originalTransformer
+
+			if tt.expectNotFoundErr {
+				if err == nil || !storage.IsNotFound(err) {
+					t.Errorf("%s: expecting not found error, but get: %v", tt.name, err)
 				}
-				pod := *storeObj
-				if tt.hasSelfLink {
-					pod.SelfLink = "testlink"
+				return
+			}
+			if tt.expectInvalidObjErr {
+				if err == nil || !storage.IsInvalidObj(err) {
+					t.Errorf("%s: expecting invalid UID error, but get: %s", tt.name, err)
 				}
-				pod.Name = name
-				return &pod, nil
-			}), nil)
-		store.transformer = originalTransformer
+				return
+			}
+			if err != nil {
+				t.Fatalf("%s: GuaranteedUpdate failed: %v", tt.name, err)
+			}
+			if out.ObjectMeta.Name != name {
+				t.Errorf("%s: pod name want=%s, get=%s", tt.name, name, out.ObjectMeta.Name)
+			}
+			if out.SelfLink != "" {
+				t.Errorf("%s: selfLink should not be set", tt.name)
+			}
 
-		if tt.expectNotFoundErr {
-			if err == nil || !storage.IsNotFound(err) {
-				t.Errorf("#%d: expecting not found error, but get: %v", i, err)
-			}
-			continue
-		}
-		if tt.expectInvalidObjErr {
-			if err == nil || !storage.IsInvalidObj(err) {
-				t.Errorf("#%d: expecting invalid UID error, but get: %s", i, err)
-			}
-			continue
-		}
-		if err != nil {
-			t.Fatalf("GuaranteedUpdate failed: %v", err)
-		}
-		if out.ObjectMeta.Name != name {
-			t.Errorf("#%d: pod name want=%s, get=%s", i, name, out.ObjectMeta.Name)
-		}
-		if out.SelfLink != "" {
-			t.Errorf("#%d: selfLink should not be set", i)
-		}
+			// verify that kv pair is not empty after set and that the underlying data matches expectations
+			checkStorageInvariants(ctx, t, etcdClient, store, key)
 
-		// verify that kv pair is not empty after set and that the underlying data matches expectations
-		checkStorageInvariants(ctx, t, etcdClient, store, key)
-
-		switch tt.expectNoUpdate {
-		case true:
-			if version != out.ResourceVersion {
-				t.Errorf("#%d: expect no version change, before=%s, after=%s", i, version, out.ResourceVersion)
+			switch tt.expectNoUpdate {
+			case true:
+				if version != out.ResourceVersion {
+					t.Errorf("%s: expect no version change, before=%s, after=%s", tt.name, version, out.ResourceVersion)
+				}
+			case false:
+				if version == out.ResourceVersion {
+					t.Errorf("%s: expect version change, but get the same version=%s", tt.name, version)
+				}
 			}
-		case false:
-			if version == out.ResourceVersion {
-				t.Errorf("#%d: expect version change, but get the same version=%s", i, version)
-			}
-		}
+		})
 	}
 }
 
