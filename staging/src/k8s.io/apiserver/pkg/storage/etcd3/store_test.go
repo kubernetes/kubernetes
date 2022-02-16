@@ -300,34 +300,39 @@ func TestUnconditionalDelete(t *testing.T) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
+		name string
 		key               string
 		expectedObj       *example.Pod
 		expectNotFoundErr bool
-	}{{ // test unconditional delete on existing key
+	}{{
+		name: "test unconditional delete on existing key",
 		key:               key,
 		expectedObj:       storedObj,
 		expectNotFoundErr: false,
-	}, { // test unconditional delete on non-existing key
+	}, {
+		name: "test unconditional delete on non-existing key",
 		key:               "/non-existing",
 		expectedObj:       nil,
 		expectNotFoundErr: true,
 	}}
 
-	for i, tt := range tests {
-		out := &example.Pod{} // reset
-		err := store.Delete(ctx, tt.key, out, nil, storage.ValidateAllObjectFunc, nil)
-		if tt.expectNotFoundErr {
-			if err == nil || !storage.IsNotFound(err) {
-				t.Errorf("#%d: expecting not found error, but get: %s", i, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &example.Pod{} // reset
+			err := store.Delete(ctx, tt.key, out, nil, storage.ValidateAllObjectFunc, nil)
+			if tt.expectNotFoundErr {
+				if err == nil || !storage.IsNotFound(err) {
+					t.Errorf("%s: expecting not found error, but get: %s", tt.name, err)
+				}
+				return
 			}
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Delete failed: %v", err)
-		}
-		if !reflect.DeepEqual(tt.expectedObj, out) {
-			t.Errorf("#%d: pod want=%#v, get=%#v", i, tt.expectedObj, out)
-		}
+			if err != nil {
+				t.Fatalf("%s: Delete failed: %v", tt.name, err)
+			}
+			if !reflect.DeepEqual(tt.expectedObj, out) {
+				t.Errorf("%s: pod want=%#v, get=%#v", tt.name, tt.expectedObj, out)
+			}
+		})
 	}
 }
 
