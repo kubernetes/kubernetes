@@ -96,11 +96,12 @@ type Scheduler struct {
 }
 
 type schedulerOptions struct {
-	componentConfigVersion   string
-	kubeConfig               *restclient.Config
-	percentageOfNodesToScore int32
-	podInitialBackoffSeconds int64
-	podMaxBackoffSeconds     int64
+	componentConfigVersion       string
+	kubeConfig                   *restclient.Config
+	percentageOfNodesToScore     int32
+	podInitialBackoffSeconds     int64
+	podMaxBackoffSeconds         int64
+	podMaxUnschedulableQDuration time.Duration
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
@@ -175,6 +176,13 @@ func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
 	}
 }
 
+// WithPodMaxUnschedulableQDuration sets PodMaxUnschedulableQDuration for PriorityQueue.
+func WithPodMaxUnschedulableQDuration(duration time.Duration) Option {
+	return func(o *schedulerOptions) {
+		o.podMaxUnschedulableQDuration = duration
+	}
+}
+
 // WithExtenders sets extenders for the Scheduler
 func WithExtenders(e ...schedulerapi.Extender) Option {
 	return func(o *schedulerOptions) {
@@ -193,10 +201,11 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 }
 
 var defaultSchedulerOptions = schedulerOptions{
-	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
-	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	parallelism:              int32(parallelize.DefaultParallelism),
+	percentageOfNodesToScore:     schedulerapi.DefaultPercentageOfNodesToScore,
+	podInitialBackoffSeconds:     int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:         int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
+	podMaxUnschedulableQDuration: internalqueue.DefaultPodMaxUnschedulableQDuration,
+	parallelism:                  int32(parallelize.DefaultParallelism),
 	// Ideally we would statically set the default profile here, but we can't because
 	// creating the default profile may require testing feature gates, which may get
 	// set dynamically in tests. Therefore, we delay creating it until New is actually
@@ -242,23 +251,24 @@ func New(client clientset.Interface,
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
 	configurator := &Configurator{
-		componentConfigVersion:   options.componentConfigVersion,
-		client:                   client,
-		kubeConfig:               options.kubeConfig,
-		recorderFactory:          recorderFactory,
-		informerFactory:          informerFactory,
-		schedulerCache:           schedulerCache,
-		StopEverything:           stopEverything,
-		percentageOfNodesToScore: options.percentageOfNodesToScore,
-		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
-		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
-		profiles:                 append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
-		registry:                 registry,
-		nodeInfoSnapshot:         snapshot,
-		extenders:                options.extenders,
-		frameworkCapturer:        options.frameworkCapturer,
-		parallellism:             options.parallelism,
-		clusterEventMap:          clusterEventMap,
+		componentConfigVersion:       options.componentConfigVersion,
+		client:                       client,
+		kubeConfig:                   options.kubeConfig,
+		recorderFactory:              recorderFactory,
+		informerFactory:              informerFactory,
+		schedulerCache:               schedulerCache,
+		StopEverything:               stopEverything,
+		percentageOfNodesToScore:     options.percentageOfNodesToScore,
+		podInitialBackoffSeconds:     options.podInitialBackoffSeconds,
+		podMaxBackoffSeconds:         options.podMaxBackoffSeconds,
+		podMaxUnschedulableQDuration: options.podMaxUnschedulableQDuration,
+		profiles:                     append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
+		registry:                     registry,
+		nodeInfoSnapshot:             snapshot,
+		extenders:                    options.extenders,
+		frameworkCapturer:            options.frameworkCapturer,
+		parallellism:                 options.parallelism,
+		clusterEventMap:              clusterEventMap,
 	}
 
 	metrics.Register()

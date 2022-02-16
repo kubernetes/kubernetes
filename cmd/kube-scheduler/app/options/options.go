@@ -79,7 +79,9 @@ func NewOptions() *Options {
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
-		Deprecated:     &DeprecatedOptions{},
+		Deprecated: &DeprecatedOptions{
+			PodMaxUnschedulableQDuration: 60 * time.Second,
+		},
 		LeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
@@ -231,6 +233,12 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 	o.Metrics.Apply()
+
+	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
+	if o.Deprecated != nil {
+		c.PodMaxUnschedulableQDuration = o.Deprecated.PodMaxUnschedulableQDuration
+	}
+
 	return nil
 }
 

@@ -17,6 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"time"
+
 	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -49,6 +51,12 @@ type Config struct {
 
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig
+
+	// PodMaxUnschedulableQDuration is the maximum time a pod can stay in
+	// unschedulableQ. If a pod stays in unschedulableQ for longer than this
+	// value, the pod will be moved from unschedulableQ to backoffQ or activeQ.
+	// If this value is empty, the default value (60s) will be used.
+	PodMaxUnschedulableQDuration time.Duration
 }
 
 type completedConfig struct {
