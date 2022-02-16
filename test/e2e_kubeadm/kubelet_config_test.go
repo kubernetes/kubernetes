@@ -17,10 +17,11 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
 	"fmt"
 
-	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -37,12 +38,12 @@ var (
 	kubeletConfigRoleName        string
 	kubeletConfigRoleBindingName string
 
-	kubeletConfigConfigMapResource = &authv1.ResourceAttributes{
-		Namespace: kubeSystemNamespace,
-		Name:      "",
-		Resource:  "configmaps",
-		Verb:      "get",
-	}
+	// TODO: remove these versioned strings and related logic once the UnversionedKubeletConfigMap
+	// feature gate goes GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
+	kubeletConfigConfigMapNameVersioned   string
+	kubeletConfigRoleNameVersioned        string
+	kubeletConfigRoleBindingNameVersioned string
 )
 
 // Define container for all the test specification aimed at verifying
@@ -79,46 +80,54 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 			framework.Failf("error reading kubernetesVersion from %s ConfigMap: %v", kubeadmConfigName, err)
 		}
 
-		// Extract the value of the UnversionedKubeletConfigMap feature gate if its present.
-		// TODO: remove this after the UnversionedKubeletConfigMap feature gate goes GA:
-		// https://github.com/kubernetes/kubeadm/issues/1582
-		UnversionedKubeletConfigMap := true
-		if _, ok := m["featureGates"]; ok {
-			if featureGates, ok := m["featureGates"].(map[interface{}]interface{}); ok {
-				if val, ok := featureGates["UnversionedKubeletConfigMap"]; ok {
-					if valBool, ok := val.(bool); ok {
-						UnversionedKubeletConfigMap = valBool
-					} else {
-						framework.Failf("unable to cast the value of feature gate UnversionedKubeletConfigMap to bool")
-					}
-				}
-			} else {
-				framework.Failf("unable to cast the featureGates field in the %s ConfigMap", kubeadmConfigName)
-			}
-		}
-
-		// Computes all the names derived from the kubernetesVersion
 		kubeletConfigConfigMapName = "kubelet-config"
 		kubeletConfigRoleName = "kubeadm:kubelet-config"
-		// TODO: remove this after the UnversionedKubeletConfigMap feature gate goes GA:
-		// https://github.com/kubernetes/kubeadm/issues/1582
-		if !UnversionedKubeletConfigMap {
-			kubeletConfigConfigMapName = fmt.Sprintf("kubelet-config-%d.%d", k8sVersion.Major(), k8sVersion.Minor())
-			kubeletConfigRoleName = fmt.Sprintf("kubeadm:kubelet-config-%d.%d", k8sVersion.Major(), k8sVersion.Minor())
-		}
 		kubeletConfigRoleBindingName = kubeletConfigRoleName
-		kubeletConfigConfigMapResource.Name = kubeletConfigConfigMapName
+
+		kubeletConfigConfigMapNameVersioned = fmt.Sprintf("kubelet-config-%d.%d", k8sVersion.Major(), k8sVersion.Minor())
+		kubeletConfigRoleNameVersioned = fmt.Sprintf("kubeadm:kubelet-config-%d.%d", k8sVersion.Major(), k8sVersion.Minor())
+		kubeletConfigRoleBindingNameVersioned = kubeletConfigRoleNameVersioned
 	})
 
 	ginkgo.It("should exist and be properly configured", func() {
-		cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeletConfigConfigMapName)
-
+		// TODO: switch to GetConfigMap once UnversionedKubeletConfigMap feature gate goes GA:
+		// https://github.com/kubernetes/kubeadm/issues/1582
+		cm, err := f.ClientSet.CoreV1().
+			ConfigMaps(kubeSystemNamespace).
+			Get(context.TODO(), kubeletConfigConfigMapName, metav1.GetOptions{})
+		if err != nil {
+			cm, err = f.ClientSet.CoreV1().
+				ConfigMaps(kubeSystemNamespace).
+				Get(context.TODO(), kubeletConfigConfigMapNameVersioned, metav1.GetOptions{})
+			framework.ExpectNoError(err, "error getting ConfigMap %q or %q from namespace %q",
+				kubeletConfigConfigMapName, kubeletConfigConfigMapNameVersioned, kubeSystemNamespace)
+		}
 		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeletConfigConfigMapKey))
 	})
 
 	ginkgo.It("should have related Role and RoleBinding", func() {
-		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeletConfigRoleName)
-		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeletConfigRoleBindingName)
+		// TODO: switch to ExpectRole(Binding) once UnversionedKubeletConfigMap feature gate goes GA:
+		// https://github.com/kubernetes/kubeadm/issues/1582
+		_, err := f.ClientSet.RbacV1().
+			Roles(kubeSystemNamespace).
+			Get(context.TODO(), kubeletConfigRoleName, metav1.GetOptions{})
+		if err != nil {
+			_, err = f.ClientSet.RbacV1().
+				Roles(kubeSystemNamespace).
+				Get(context.TODO(), kubeletConfigRoleNameVersioned, metav1.GetOptions{})
+			framework.ExpectNoError(err, "error getting Role %q or %q from namespace %q",
+				kubeletConfigRoleName, kubeletConfigRoleNameVersioned, kubeSystemNamespace)
+		}
+		_, err = f.ClientSet.RbacV1().
+			Roles(kubeSystemNamespace).
+			Get(context.TODO(), kubeletConfigRoleBindingName, metav1.GetOptions{})
+		if err != nil {
+			_, err = f.ClientSet.RbacV1().
+				Roles(kubeSystemNamespace).
+				Get(context.TODO(), kubeletConfigRoleBindingNameVersioned, metav1.GetOptions{})
+			framework.ExpectNoError(err, "error getting RoleBinding %q or %q from namespace %q",
+				kubeletConfigRoleBindingName, kubeletConfigRoleBindingNameVersioned, kubeSystemNamespace)
+		}
 	})
 
 	ginkgo.It("should be accessible for bootstrap tokens", func() {
