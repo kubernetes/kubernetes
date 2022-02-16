@@ -1043,16 +1043,18 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
-	start := time.Now()
-	defer func() {
-		SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		klog.V(4).InfoS("syncProxyRules complete", "elapsed", time.Since(start))
-	}()
 	// don't sync rules till we've received services and endpoints
 	if !proxier.isInitialized() {
 		klog.V(2).InfoS("Not syncing hns until Services and Endpoints have been received from master")
 		return
 	}
+
+	// Keep track of how long syncs take.
+	start := time.Now()
+	defer func() {
+		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		klog.V(4).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
+	}()
 
 	hnsNetworkName := proxier.network.name
 	hns := proxier.hns
@@ -1396,7 +1398,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.Updated()
 	}
-	SyncProxyRulesLastTimestamp.SetToCurrentTime()
+	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
 
 	// Update service healthchecks.  The endpoints list might include services that are
 	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
