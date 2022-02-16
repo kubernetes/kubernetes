@@ -2263,6 +2263,7 @@ func (t *fancyTransformer) createObject(ctx context.Context) error {
 func TestConsistentList(t *testing.T) {
 	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	ctx := context.Background()
 
 	transformer := &fancyTransformer{
 		transformer: &prefixTransformer{prefix: []byte(defaultTestPrefix)},
@@ -2271,7 +2272,7 @@ func TestConsistentList(t *testing.T) {
 	transformer.store = store
 
 	for i := 0; i < 5; i++ {
-		if err := transformer.createObject(context.TODO()); err != nil {
+		if err := transformer.createObject(ctx); err != nil {
 			t.Fatalf("failed to create object: %v", err)
 		}
 	}
@@ -2293,7 +2294,7 @@ func TestConsistentList(t *testing.T) {
 	options := storage.ListOptions{
 		Predicate: predicate,
 	}
-	if err := store.List(context.TODO(), "/", options, &result1); err != nil {
+	if err := store.List(ctx, "/", options, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2305,7 +2306,7 @@ func TestConsistentList(t *testing.T) {
 	}
 
 	result2 := example.PodList{}
-	if err := store.List(context.TODO(), "/", options, &result2); err != nil {
+	if err := store.List(ctx, "/", options, &result2); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2317,7 +2318,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 
 	result3 := example.PodList{}
-	if err := store.List(context.TODO(), "/", options, &result3); err != nil {
+	if err := store.List(ctx, "/", options, &result3); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2325,7 +2326,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 
 	result4 := example.PodList{}
-	if err := store.List(context.TODO(), "/", options, &result4); err != nil {
+	if err := store.List(ctx, "/", options, &result4); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
