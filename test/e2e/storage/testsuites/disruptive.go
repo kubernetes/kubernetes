@@ -17,7 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	errors "k8s.io/apimachinery/pkg/util/errors"

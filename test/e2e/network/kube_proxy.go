@@ -36,7 +36,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)

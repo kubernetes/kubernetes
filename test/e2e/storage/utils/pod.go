@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +81,7 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		framework.ExpectNoError(err, "create pod log directory")
 		f, err := os.Create(path.Join(logDir, "pod-event.log"))
 		framework.ExpectNoError(err, "create pod events log file")
-		podEventLog = f
+		//podEventLog = f
 		podEventLogCloser = f
 	}
 	podlogs.CopyAllLogs(ctx, cs, ns, to)

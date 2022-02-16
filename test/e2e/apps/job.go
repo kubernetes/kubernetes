@@ -37,7 +37,7 @@ import (
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	"k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 

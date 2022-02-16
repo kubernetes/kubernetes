@@ -23,7 +23,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -63,7 +63,7 @@ func Fail(msg string, callerSkip ...int) {
 	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 }
 
-var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)
+var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/v2/`)
 
 // PrunedStack is a wrapper around debug.Stack() that removes information
 // about the current goroutine and optionally skips some of the initial stack entries.
@@ -71,7 +71,7 @@ var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)
 // From the remaining entries it automatically filters out useless ones like
 // entries coming from Ginkgo.
 //
-// This is a modified copy of PruneStack in https://github.com/onsi/ginkgo/blob/f90f37d87fa6b1dd9625e2b1e83c23ffae3de228/internal/codelocation/code_location.go#L25:
+// This is a modified copy of PruneStack in https://github.com/onsi/ginkgo/v2/blob/f90f37d87fa6b1dd9625e2b1e83c23ffae3de228/internal/codelocation/code_location.go#L25:
 // - simplified API and thus renamed (calls debug.Stack() instead of taking a parameter)
 // - source code filtering updated to be specific to Kubernetes
 // - optimized to use bytes and in-place slice filtering from

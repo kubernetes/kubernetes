@@ -12,6 +12,7 @@ require (
 )
 
 replace (
+	github.com/nxadm/tail => github.com/nxadm/tail v1.4.4
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/csi-translation-lib => ../csi-translation-lib
