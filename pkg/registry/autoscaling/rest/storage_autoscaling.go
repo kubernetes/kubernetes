@@ -37,33 +37,28 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.VersionEnabled(autoscalingapiv2beta2.SchemeGroupVersion) {
-		if storageMap, err := p.v2beta2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2beta2.SchemeGroupVersion.Version] = storageMap
-		}
+	if storageMap, err := p.v2beta2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, false, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2beta2.SchemeGroupVersion.Version] = storageMap
 	}
-	if apiResourceConfigSource.VersionEnabled(autoscalingapiv2.SchemeGroupVersion) {
-		if storageMap, err := p.v2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2.SchemeGroupVersion.Version] = storageMap
-		}
+
+	if storageMap, err := p.v2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, false, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2.SchemeGroupVersion.Version] = storageMap
 	}
-	if apiResourceConfigSource.VersionEnabled(autoscalingapiv2beta1.SchemeGroupVersion) {
-		if storageMap, err := p.v2beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2beta1.SchemeGroupVersion.Version] = storageMap
-		}
+
+	if storageMap, err := p.v2beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, false, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv2beta1.SchemeGroupVersion.Version] = storageMap
 	}
-	if apiResourceConfigSource.VersionEnabled(autoscalingapiv1.SchemeGroupVersion) {
-		if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv1.SchemeGroupVersion.Version] = storageMap
-		}
+
+	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, false, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, true, nil
@@ -71,54 +66,65 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// horizontalpodautoscalers
-	hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["horizontalpodautoscalers"] = hpaStorage
-	storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 
-	return storage, err
+	// horizontalpodautoscalers
+	if resource := "horizontalpodautoscalers"; apiResourceConfigSource.ResourceEnabled(autoscalingapiv1.SchemeGroupVersion.WithResource(resource)) {
+		hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = hpaStorage
+		storage[resource+"/status"] = hpaStatusStorage
+	}
+
+	return storage, nil
 }
 
 func (p RESTStorageProvider) v2beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// horizontalpodautoscalers
-	hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["horizontalpodautoscalers"] = hpaStorage
-	storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 
-	return storage, err
+	// horizontalpodautoscalers
+	if resource := "horizontalpodautoscalers"; apiResourceConfigSource.ResourceEnabled(autoscalingapiv2beta1.SchemeGroupVersion.WithResource(resource)) {
+		hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = hpaStorage
+		storage[resource+"/status"] = hpaStatusStorage
+	}
+
+	return storage, nil
 }
 
 func (p RESTStorageProvider) v2beta2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// horizontalpodautoscalers
-	hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["horizontalpodautoscalers"] = hpaStorage
-	storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 
-	return storage, err
+	// horizontalpodautoscalers
+	if resource := "horizontalpodautoscalers"; apiResourceConfigSource.ResourceEnabled(autoscalingapiv2beta2.SchemeGroupVersion.WithResource(resource)) {
+		hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = hpaStorage
+		storage[resource+"/status"] = hpaStatusStorage
+	}
+	return storage, nil
 }
 
 func (p RESTStorageProvider) v2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	// horizontalpodautoscalers
-	hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["horizontalpodautoscalers"] = hpaStorage
-	storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 
-	return storage, err
+	// horizontalpodautoscalers
+	if resource := "horizontalpodautoscalers"; apiResourceConfigSource.ResourceEnabled(autoscalingapiv2.SchemeGroupVersion.WithResource(resource)) {
+		hpaStorage, hpaStatusStorage, err := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = hpaStorage
+		storage[resource+"/status"] = hpaStatusStorage
+	}
+
+	return storage, nil
 }
 
 func (p RESTStorageProvider) GroupName() string {

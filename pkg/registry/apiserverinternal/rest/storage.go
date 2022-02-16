@@ -34,24 +34,26 @@ type StorageProvider struct{}
 func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiserverinternal.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
-	if apiResourceConfigSource.VersionEnabled(apiserverv1alpha1.SchemeGroupVersion) {
-		storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
-		if err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		}
+	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, false, err
+	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[apiserverv1alpha1.SchemeGroupVersion.Version] = storageMap
 	}
+
 	return apiGroupInfo, true, nil
 }
 
 func (p StorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	s, status, err := storageversionstorage.NewREST(restOptionsGetter)
-	if err != nil {
-		return nil, err
+
+	if resource := "storageversions"; apiResourceConfigSource.ResourceEnabled(apiserverv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		s, status, err := storageversionstorage.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = s
+		storage[resource+"/status"] = status
 	}
-	storage["storageversions"] = s
-	storage["storageversions/status"] = status
 
 	return storage, nil
 }
