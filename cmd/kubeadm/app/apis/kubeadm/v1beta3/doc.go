@@ -176,7 +176,7 @@ limitations under the License.
 // 	  criSocket: "unix:///var/run/containerd/containerd.sock"
 // 	  taints:
 // 	  - key: "kubeadmNode"
-// 	    value: "master"
+// 	    value: "someValue"
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
 // 	    v: 4
