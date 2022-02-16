@@ -300,17 +300,17 @@ func TestUnconditionalDelete(t *testing.T) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
-		name string
+		name              string
 		key               string
 		expectedObj       *example.Pod
 		expectNotFoundErr bool
 	}{{
-		name: "test unconditional delete on existing key",
+		name:              "existing key",
 		key:               key,
 		expectedObj:       storedObj,
 		expectNotFoundErr: false,
 	}, {
-		name: "test unconditional delete on non-existing key",
+		name:              "non-existing key",
 		key:               "/non-existing",
 		expectedObj:       nil,
 		expectNotFoundErr: true,
@@ -341,15 +341,15 @@ func TestConditionalDelete(t *testing.T) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
-		name string
+		name                string
 		precondition        *storage.Preconditions
 		expectInvalidObjErr bool
 	}{{
-		name: "test conditional delete with UID match",
+		name:                "UID match",
 		precondition:        storage.NewUIDPreconditions("A"),
 		expectInvalidObjErr: false,
 	}, {
-		name: "test conditional delete with UID mismatch",
+		name:                "UID mismatch",
 		precondition:        storage.NewUIDPreconditions("B"),
 		expectInvalidObjErr: true,
 	}}
@@ -560,71 +560,71 @@ func TestGetToList(t *testing.T) {
 		rvMatch          metav1.ResourceVersionMatch
 		expectRVTooLarge bool
 	}{{
-		name:        "test GetToList on existing key",
+		name:        "existing key",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 	}, {
-		name:        "test GetToList on existing key with minimum resource version set to 0",
+		name:        "existing key, resourceVersion=0",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          "0",
 	}, {
-		name:        "test GetToList on existing key with minimum resource version set to 0, match=minimum",
+		name:        "existing key, resourceVersion=0, resourceVersionMatch=notOlderThan",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          "0",
 		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 	}, {
-		name:        "test GetToList on existing key with minimum resource version set to current resource version",
+		name:        "existing key, resourceVersion=current",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          fmt.Sprintf("%d", currentRV),
 	}, {
-		name:        "test GetToList on existing key with minimum resource version set to current resource version, match=minimum",
+		name:        "existing key, resourceVersion=current, resourceVersionMatch=notOlderThan",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          fmt.Sprintf("%d", currentRV),
 		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 	}, {
-		name:        "test GetToList on existing key with minimum resource version set to previous resource version, match=minimum",
+		name:        "existing key, resourceVersion=previous, resourceVersionMatch=notOlderThan",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          fmt.Sprintf("%d", prevRV),
 		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 	}, {
-		name:        "test GetToList on existing key with resource version set to current resource version, match=exact",
+		name:        "existing key, resourceVersion=current, resourceVersionMatch=exact",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
 		rv:          fmt.Sprintf("%d", currentRV),
 		rvMatch:     metav1.ResourceVersionMatchExact,
 	}, {
-		name:        "test GetToList on existing key with resource version set to previous resource version, match=exact",
+		name:        "existing key, resourceVersion=current, resourceVersionMatch=exact",
 		key:         prevKey,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{prevStoredObj},
 		rv:          fmt.Sprintf("%d", prevRV),
 		rvMatch:     metav1.ResourceVersionMatchExact,
 	}, {
-		name:             "test GetToList on existing key with minimum resource version set too high",
+		name:             "existing key, resourceVersion=too high",
 		key:              key,
 		pred:             storage.Everything,
 		expectedOut:      []*example.Pod{storedObj},
 		rv:               fmt.Sprintf("%d", currentRV+1),
 		expectRVTooLarge: true,
 	}, {
-		name:        "test GetToList on non-existing key",
+		name:        "non-existing key",
 		key:         "/non-existing",
 		pred:        storage.Everything,
 		expectedOut: nil,
 	}, {
-		name: "test GetToList with matching pod name",
+		name: "with matching pod name",
 		key:  "/non-existing",
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
@@ -650,7 +650,7 @@ func TestGetToList(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("GetToList failed: %v", err)
+				t.Fatalf("%s: GetToList failed: %v", tt.name, err)
 			}
 			if len(out.ResourceVersion) == 0 {
 				t.Errorf("%s: unset resourceVersion", tt.name)
@@ -684,7 +684,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		transformStale      bool
 		hasSelfLink         bool
 	}{{
-		name:                "GuaranteedUpdate on non-existing key with ignoreNotFound=false",
+		name:                "non-existing key, ignoreNotFound=false",
 		key:                 "/non-existing",
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -692,7 +692,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
 	}, {
-		name:                "GuaranteedUpdate on non-existing key with ignoreNotFound=true",
+		name:                "non-existing key, ignoreNotFound=true",
 		key:                 "/non-existing",
 		ignoreNotFound:      true,
 		precondition:        nil,
@@ -700,7 +700,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
 	}, {
-		name:                "GuaranteedUpdate on existing key",
+		name:                "existing key",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -708,7 +708,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
 	}, {
-		name:                "GuaranteedUpdate with same data",
+		name:                "same data",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -716,7 +716,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
 	}, {
-		name:                "GuaranteedUpdate with same data AND a selfLink",
+		name:                "same data, a selfLink",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -725,7 +725,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectNoUpdate:      true,
 		hasSelfLink:         true,
 	}, {
-		name:                "GuaranteedUpdate with same data but stale",
+		name:                "same data, stale",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        nil,
@@ -734,7 +734,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectNoUpdate:      false,
 		transformStale:      true,
 	}, {
-		name:                "GuaranteedUpdate with UID match",
+		name:                "UID match",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        storage.NewUIDPreconditions("A"),
@@ -742,7 +742,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
 	}, {
-		name:                "GuaranteedUpdate with UID mismatch",
+		name:                "UID mismatch",
 		key:                 key,
 		ignoreNotFound:      false,
 		precondition:        storage.NewUIDPreconditions("B"),
