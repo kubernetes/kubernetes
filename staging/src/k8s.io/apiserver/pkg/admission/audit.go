@@ -43,7 +43,7 @@ var _ ValidationInterface = &auditHandler{}
 // Validate function must be instance of privateAnnotationsGetter or
 // AnnotationsGetter, otherwise an error is returned.
 func WithAudit(i Interface, ae *auditinternal.Event) Interface {
-	if i == nil {
+	if i == nil || ae == nil {
 		return i
 	}
 	return &auditHandler{Interface: i, ae: ae}
