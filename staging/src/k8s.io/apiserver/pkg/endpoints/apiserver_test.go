@@ -3505,6 +3505,7 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Name = populateName
+	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -3583,6 +3584,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -3644,6 +3646,7 @@ func TestCreateYAML(t *testing.T) {
 	}
 
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -3695,6 +3698,7 @@ func TestCreateInNamespace(t *testing.T) {
 	}
 
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+	simple.Namespace = "other" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
