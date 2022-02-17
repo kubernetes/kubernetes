@@ -24,7 +24,6 @@ import (
 	"context"
 	"crypto/aes"
 	"encoding/binary"
-
 	"fmt"
 	"net/http"
 	"strings"
@@ -83,9 +82,10 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to initialize AES Cipher: %v", err)
 	}
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
-	ctx := value.DefaultContext([]byte(secretETCDPath))
+	ctx := context.Background()
+	dataCtx := value.DefaultContext([]byte(secretETCDPath))
 	aescbcTransformer := aestransformer.NewCBCTransformer(block)
-	plainSecret, _, err := aescbcTransformer.TransformFromStorage(r.cipherTextPayload(), ctx)
+	plainSecret, _, err := aescbcTransformer.TransformFromStorage(ctx, r.cipherTextPayload(), dataCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform from storage via AESCBC, err: %v", err)
 	}

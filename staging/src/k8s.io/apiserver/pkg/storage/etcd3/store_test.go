@@ -79,24 +79,24 @@ type prefixTransformer struct {
 	reads  uint64
 }
 
-func (p *prefixTransformer) TransformFromStorage(b []byte, ctx value.Context) ([]byte, bool, error) {
+func (p *prefixTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	atomic.AddUint64(&p.reads, 1)
-	if ctx == nil {
+	if dataCtx == nil {
 		panic("no context provided")
 	}
-	if !bytes.HasPrefix(b, p.prefix) {
-		return nil, false, fmt.Errorf("value does not have expected prefix %q: %s,", p.prefix, string(b))
+	if !bytes.HasPrefix(data, p.prefix) {
+		return nil, false, fmt.Errorf("value does not have expected prefix %q: %s,", p.prefix, string(data))
 	}
-	return bytes.TrimPrefix(b, p.prefix), p.stale, p.err
+	return bytes.TrimPrefix(data, p.prefix), p.stale, p.err
 }
-func (p *prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
-	if ctx == nil {
+func (p *prefixTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	if dataCtx == nil {
 		panic("no context provided")
 	}
-	if len(b) > 0 {
-		return append(append([]byte{}, p.prefix...), b...), p.err
+	if len(data) > 0 {
+		return append(append([]byte{}, p.prefix...), data...), p.err
 	}
-	return b, p.err
+	return data, p.err
 }
 
 func (p *prefixTransformer) resetReads() {
@@ -2231,18 +2231,18 @@ type fancyTransformer struct {
 	index int
 }
 
-func (t *fancyTransformer) TransformFromStorage(b []byte, ctx value.Context) ([]byte, bool, error) {
-	if err := t.createObject(); err != nil {
+func (t *fancyTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	if err := t.createObject(ctx); err != nil {
 		return nil, false, err
 	}
-	return t.transformer.TransformFromStorage(b, ctx)
+	return t.transformer.TransformFromStorage(ctx, data, dataCtx)
 }
 
-func (t *fancyTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
-	return t.transformer.TransformToStorage(b, ctx)
+func (t *fancyTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	return t.transformer.TransformToStorage(ctx, data, dataCtx)
 }
 
-func (t *fancyTransformer) createObject() error {
+func (t *fancyTransformer) createObject(ctx context.Context) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -2257,7 +2257,7 @@ func (t *fancyTransformer) createObject() error {
 		},
 	}
 	out := &example.Pod{}
-	return t.store.Create(context.TODO(), key, obj, out, 0)
+	return t.store.Create(ctx, key, obj, out, 0)
 }
 
 func TestConsistentList(t *testing.T) {
@@ -2271,7 +2271,7 @@ func TestConsistentList(t *testing.T) {
 	transformer.store = store
 
 	for i := 0; i < 5; i++ {
-		if err := transformer.createObject(); err != nil {
+		if err := transformer.createObject(context.TODO()); err != nil {
 			t.Fatalf("failed to create object: %v", err)
 		}
 	}
