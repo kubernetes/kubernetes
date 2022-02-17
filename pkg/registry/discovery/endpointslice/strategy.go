@@ -19,11 +19,13 @@ package endpointslice
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -186,11 +188,41 @@ func dropTopologyOnV1(ctx context.Context, oldEPS, newEPS *discovery.EndpointSli
 			return
 		}
 
+		// Only node names that exist in previous version of the EndpointSlice
+		// deprecatedTopology fields may be retained in new version of the
+		// EndpointSlice.
+		prevNodeNames := getDeprecatedTopologyNodeNames(oldEPS)
+
 		for i := range newEPS.Endpoints {
 			ep := &newEPS.Endpoints[i]
 
-			//Silently clear out DeprecatedTopology
-			ep.DeprecatedTopology = nil
+			newTopologyNodeName, ok := ep.DeprecatedTopology[corev1.LabelHostname]
+			if ep.NodeName == nil && ok && prevNodeNames.Has(newTopologyNodeName) {
+				// Retain the label previously used to store the node name until
+				// the nodeName field is populated
+				ep.DeprecatedTopology = map[string]string{corev1.LabelHostname: newTopologyNodeName}
+			} else {
+				// Drop writes to this field via the v1 API as documented
+				ep.DeprecatedTopology = nil
+			}
 		}
 	}
+}
+
+// getDeprecatedTopologyNodeNames returns a set of node names present in
+// deprecatedTopology fields within the provided EndpointSlice.
+func getDeprecatedTopologyNodeNames(eps *discovery.EndpointSlice) sets.String {
+	if eps == nil {
+		return nil
+	}
+	var names sets.String
+	for _, ep := range eps.Endpoints {
+		if nodeName, ok := ep.DeprecatedTopology[corev1.LabelHostname]; ok && len(nodeName) > 0 {
+			if names == nil {
+				names = sets.NewString()
+			}
+			names.Insert(nodeName)
+		}
+	}
+	return names
 }
