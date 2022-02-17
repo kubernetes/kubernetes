@@ -151,7 +151,10 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 		return done, nil
 	}, stopCh)
 	dswp.hasAddedPodsLock.Lock()
-	dswp.hasAddedPods = true
+	if !dswp.hasAddedPods {
+		klog.InfoS("Finished populating initial desired state of world")
+		dswp.hasAddedPods = true
+	}
 	dswp.hasAddedPodsLock.Unlock()
 	wait.Until(dswp.populatorLoop, dswp.loopSleepDuration, stopCh)
 }

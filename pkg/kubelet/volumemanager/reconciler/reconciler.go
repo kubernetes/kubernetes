@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -109,6 +110,8 @@ func NewReconciler(
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
 		timeOfLastSync:                time.Time{},
+		volumesFailedReconstruction:   make([]podVolume, 0),
+		volumesNeedDevicePath:         make([]v1.UniqueVolumeName, 0),
 	}
 }
 
@@ -127,9 +130,16 @@ type reconciler struct {
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	kubeletPodsDir                string
 	timeOfLastSync                time.Time
+	volumesFailedReconstruction   []podVolume
+	volumesNeedDevicePath         []v1.UniqueVolumeName
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		rc.runNew(stopCh)
+		return
+	}
+
 	wait.Until(rc.reconciliationLoopFunc(), rc.loopSleepDuration, stopCh)
 }
 
