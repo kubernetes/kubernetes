@@ -111,6 +111,7 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 
 		args = append([]string{"-i", key}, args...)
 	}
+	args = append([]string{"-vvvvvv"}, args...)
 	if env, found := sshOptionsMap[*sshEnv]; found {
 		args = append(strings.Split(env, " "), args...)
 	}
