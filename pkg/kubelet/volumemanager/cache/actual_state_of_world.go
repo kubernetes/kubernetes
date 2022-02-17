@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
@@ -284,6 +285,9 @@ type attachedVolume struct {
 	// volumeInUseErrorForExpansion indicates volume driver has previously returned volume-in-use error
 	// for this volume and volume expansion on this node should not be retried
 	volumeInUseErrorForExpansion bool
+
+	// persistentVolumeSize records size of the volume when pod was started.
+	persistentVolumeSize resource.Quantity
 }
 
 // The mountedPod object represents a pod for which the kubelet volume manager

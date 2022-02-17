@@ -186,6 +186,9 @@ type volumeToMount struct {
 	// desiredSizeLimit indicates the desired upper bound on the size of the volume
 	// (if so implemented)
 	desiredSizeLimit *resource.Quantity
+
+	// persistentVolumeSize records desired size of a persistent volume.
+	persistentVolumeSize resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -274,7 +277,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				}
 			}
 		}
-		dsw.volumesToMount[volumeName] = volumeToMount{
+		vmt := volumeToMount{
 			volumeName:              volumeName,
 			podsToMount:             make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable:      attachable,
@@ -283,6 +286,15 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			reportedInUse:           false,
 			desiredSizeLimit:        sizeLimit,
 		}
+		// record desired size of the volume
+		if volumeSpec.PersistentVolume != nil {
+			pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
+			if pvCap != nil {
+				vmt.persistentVolumeSize = *pvCap
+			}
+		}
+
+		dsw.volumesToMount[volumeName] = vmt
 	}
 	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
 	mountRequestTime := time.Now()
