@@ -302,7 +302,9 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 		}
 
 		// verify the validity of the YAML
-		strict.VerifyUnmarshalStrict(fileContent, gvk)
+		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme, componentconfigs.Scheme}, gvk, fileContent); err != nil {
+			klog.Warning(err.Error())
+		}
 
 		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {
 			// Set initcfg to an empty struct value the deserializer will populate
