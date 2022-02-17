@@ -33,12 +33,11 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
@@ -357,9 +356,6 @@ func (s *Server) InstallDefaultHandlers() {
 	s.addMetricsBucketMatcher("metrics/resource")
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
-	// cAdvisor metrics are exposed under the secured handler as well
-	r := prometheus.NewRegistry()
-
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
@@ -371,31 +367,36 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.ProcessMetrics:      struct{}{},
 	}
 
-	// Only add the Accelerator metrics if the feature is inactive
+	// Only add the Accelerator metrics if the feature is inactive.
 	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
 		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
+	// cAdvisor metrics are exposed under the secured handler as well.
 	container := metrics.NewContainerCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{})
 	machine := metrics.NewMachineCollector(prometheusHostAdapter{s.host}, includedMetrics)
-	nameTypeCache := metrics.NewCachedGatherer(container.Collect, machine.Collect)
-	nameTypeGatherer := prometheus.NewMultiTRegistry(prometheus.ToTransactionalGatherer(r), nameTypeCache)
 
-	s.restfulCont.Handle(cadvisorMetricsPath,
-		promhttp.HandlerForTransactional(nameTypeGatherer, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
-	)
+	cadvisorOpts := cadvisorv2.RequestOptions{
+		IdType:    cadvisorv2.TypeName,
+		Count:     1,
+		Recursive: true,
+		// Set MaxAge to ensure that scrapes coming within 5 seconds does not need to re-update cache (e.g. two-replica Prometheus scrapes).
+		// This allows some savings in kubelet CPU usage. Typical Prometheus configuration scrapes this in longer intervals.
+		MaxAge: func() *time.Duration { maxAge := 5 * time.Second; return &maxAge }(),
+	}
+	s.restfulCont.Handle(cadvisorMetricsPath, promhttp.HandlerForTransactional(
+		metrics.UpdateOnMaxAgeGatherer(cadvisorOpts, metrics.NewCachedGatherer(container.Collect, machine.Collect)),
+		promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError},
+	))
 
-	s.addMetricsBucketMatcher("metrics/resource")
 	resourceRegistry := compbasemetrics.NewKubeRegistry()
 	resourceRegistry.CustomMustRegister(collectors.NewResourceMetricsCollector(s.resourceAnalyzer))
 	s.restfulCont.Handle(resourceMetricsPath,
 		compbasemetrics.HandlerFor(resourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
-	// prober metrics are exposed under a different endpoint
-
-	s.addMetricsBucketMatcher("metrics/probes")
+	// prober metrics are exposed under a different endpoint.
 	p := compbasemetrics.NewKubeRegistry()
 	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
@@ -404,7 +405,7 @@ func (s *Server) InstallDefaultHandlers() {
 	)
 }
 
-// InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
+// InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers.
 func (s *Server) InstallDebuggingHandlers() {
 	klog.InfoS("Adding debug handlers to kubelet server")
 

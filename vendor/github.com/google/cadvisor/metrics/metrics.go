@@ -15,11 +15,14 @@
 package metrics
 
 import (
+	"sync"
 	"time"
 
 	info "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/cache"
+	dto "github.com/prometheus/client_model/go"
 )
 
 // metricValue describes a single metric value for a given set of label values
@@ -44,12 +47,16 @@ type infoProvider interface {
 
 type CollectFn func(opts v2.RequestOptions, inserts []cache.Insert) []cache.Insert
 
+var _ prometheus.TransactionalGatherer = &CachedGatherer{}
+
+// CachedGatherer is an TransactionalGatherer that is able to cache and update in place metrics from defined Cadvisor collectors.
+// Caller has responsibility to use `UpdateOnMaxAge` whenever cache has to be updated.
 type CachedGatherer struct {
 	*cache.CachedTGatherer
 	buf []cache.Insert
 
+	mu         sync.Mutex
 	collectFns []CollectFn
-
 	lastUpdate time.Time
 }
 
@@ -60,7 +67,12 @@ func NewCachedGatherer(cfs ...CollectFn) *CachedGatherer {
 	}
 }
 
-func (c *CachedGatherer) Update(opts v2.RequestOptions) {
+// UpdateOnMaxAge updates cache using provided collectorFns whenever cache is older than provided `MaxAge`. If `MaxAge` is nil, we always update cache.
+// UpdateOnMaxAge is goroutine safe.
+func (c *CachedGatherer) UpdateOnMaxAge(opts v2.RequestOptions) {
+	c.mu.Lock() // CachedTGatherer.Update is goroutine safe, but collectFns and lastUpdate are not, so lock it.
+	defer c.mu.Unlock()
+
 	if opts.MaxAge == nil || time.Since(c.lastUpdate) > *opts.MaxAge {
 		c.lastUpdate = time.Now()
 
@@ -72,4 +84,20 @@ func (c *CachedGatherer) Update(opts v2.RequestOptions) {
 			panic(err) // Programmatic error.
 		}
 	}
+}
+
+// UpdateOnMaxAgeGatherer makes `TransactionalGatherer` that updates cache on every `Gather` call according to provided `MaxAge`.
+func UpdateOnMaxAgeGatherer(opts v2.RequestOptions, g *CachedGatherer) prometheus.TransactionalGatherer {
+	return &callUpdateCG{opts: opts, CachedGatherer: g}
+}
+
+type callUpdateCG struct {
+	*CachedGatherer
+
+	opts v2.RequestOptions
+}
+
+func (c *callUpdateCG) Gather() (_ []*dto.MetricFamily, done func(), err error) {
+	c.UpdateOnMaxAge(c.opts)
+	return c.CachedTGatherer.Gather()
 }

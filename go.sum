@@ -75,8 +75,8 @@ github.com/blang/semver v3.5.1+incompatible h1:cQNTCjp13qL8KC3Nbxr/y2Bqb63oX6wdn
 github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/boltdb/bolt v1.3.1 h1:JQmyP4ZBrce+ZQu0dY660FMfatumYDLun9hBCUVIkF4=
 github.com/boltdb/bolt v1.3.1/go.mod h1:clJnj/oiGkjum5o1McbSZDSLxVThjynRyGBgiAx27Ps=
-github.com/bwplotka/cadvisor v0.42.1-0.20220127113621-0d76a7d092f5 h1:qsbyj9LqSTULV4qyzwrJ/ngRUgiEwhJCbNCM1l7EmTo=
-github.com/bwplotka/cadvisor v0.42.1-0.20220127113621-0d76a7d092f5/go.mod h1:TsLSsztaeSYE4689JMAMT1FY8zOS4hSo1KIrqp/kHBI=
+github.com/bwplotka/cadvisor v0.42.1-0.20220217184120-b98e3bbd0a2f h1:+6xwXVvAGXhOie+HrAjiuani/pRPBMP+WRUJqFbvT84=
+github.com/bwplotka/cadvisor v0.42.1-0.20220217184120-b98e3bbd0a2f/go.mod h1:uJmuEBYzHzvdVa+KTJfeidIUKX/yL5yUWyHs5SkjW/o=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054 h1:uH66TXeswKn5PW5zdZ39xEwfS9an067BirqA+P4QaLI=
 github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054/go.mod h1:sGbDF6GwGcLpkNXPUTkMRoywsNa/ol15pxFe6ERfguA=

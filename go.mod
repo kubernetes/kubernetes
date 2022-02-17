@@ -31,7 +31,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/distribution v2.8.0+incompatible
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful v2.9.5+incompatible
@@ -267,7 +267,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/bwplotka/cadvisor v0.42.1-0.20220127113621-0d76a7d092f5
+	github.com/google/cadvisor => github.com/bwplotka/cadvisor v0.42.1-0.20220217184120-b98e3bbd0a2f
 	github.com/google/cel-go => github.com/google/cel-go v0.9.0
 	github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
