@@ -263,24 +263,29 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  if [[ "${HOST_ARCH}" == "amd64" ]]; then
-    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_AMD64}
-  elif [[ "${HOST_ARCH}" == "arm64" ]]; then
-    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_ARM64}
-  else
-    # no other architectures are supported currently.
-    # Assumption is that this script only runs on linux,
-    # see cluster/gce/windows/k8s-node-setup.psm1 for windows
-    # https://github.com/kubernetes/node-problem-detector/releases/
-    DEFAULT_NPD_HASH='N/A'
-  fi
-
   if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
   else
       local -r npd_version="${DEFAULT_NPD_VERSION}"
-      local -r npd_hash="${DEFAULT_NPD_HASH}"
+      case "${HOST_PLATFORM}/${HOST_ARCH}" in
+        linux/amd64)
+          local -r npd_hash="${DEFAULT_NPD_HASH_AMD64}"
+          ;;
+        linux/arm64)
+          local -r npd_hash="${DEFAULT_NPD_HASH_ARM64}"
+          ;;
+        # no other architectures are supported currently.
+        # Assumption is that this script only runs on linux,
+        # see cluster/gce/windows/k8s-node-setup.psm1 for windows
+        # https://github.com/kubernetes/node-problem-detector/releases/
+        *)
+          echo "Unrecognized version and platform/arch combination:"
+          echo "$DEFAULT_NPD_VERSION $HOST_PLATFORM/$HOST_ARCH"
+          echo "Set NODE_PROBLEM_DETECTOR_VERSION and NODE_PROBLEM_DETECTOR_TAR_HASH to overwrite"
+          exit 1
+          ;;
+      esac
   fi
   local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
 
