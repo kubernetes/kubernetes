@@ -472,44 +472,6 @@ function load-docker-images {
   fi
 }
 
-# If we are on ubuntu we can try to install docker
-function install-docker {
-  # bailout if we are not on ubuntu
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo "Unable to automatically install docker. Bailing out..."
-    return
-  fi
-  # Install Docker deps, some of these are already installed in the image but
-  # that's fine since they won't re-install and we can reuse the code below
-  # for another image someday.
-  apt-get update
-  apt-get install -y --no-install-recommends \
-    apt-transport-https \
-    ca-certificates \
-    socat \
-    curl \
-    gnupg2 \
-    software-properties-common \
-    lsb-release
-
-  release=$(lsb_release -cs)
-
-  # Add the Docker apt-repository
-  # shellcheck disable=SC2086
-  curl ${CURL_FLAGS} \
-    --location \
-    "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
-  | apt-key add -
-  add-apt-repository \
-    "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
-    $release stable"
-
-  # Install Docker
-  apt-get update && \
-    apt-get install -y --no-install-recommends "${GCI_DOCKER_VERSION:-"docker-ce=5:19.03.*"}"
-  rm -rf /var/lib/apt/lists/*
-}
-
 # If we are on ubuntu we can try to install containerd
 function install-containerd-ubuntu {
   # bailout if we are not on ubuntu
@@ -591,7 +553,7 @@ function ensure-container-runtime {
   if [[ -e "/etc/profile.d/containerd_env.sh" ]]; then
    log-wrap 'SourceContainerdEnv' source "/etc/profile.d/containerd_env.sh"
   fi
-    
+
   # Verify presence and print versions of ctr, containerd, runc
   if ! command -v ctr >/dev/null 2>&1; then
     echo "ERROR ctr not found. Aborting."

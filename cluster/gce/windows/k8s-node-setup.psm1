@@ -982,7 +982,7 @@ function Configure-GcePdTools {
   Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 }
 
-# Setup cni network. This function supports both Docker and containerd.
+# Setup cni network for containerd.
 function Prepare-CniNetworking {
     Configure_Containerd_CniNetworking
 }
@@ -1213,8 +1213,7 @@ function Pull-InfraContainer {
   Log-Output "Infra/pause container:`n$inspect"
 }
 
-# Setup the container runtime on the node. It supports both
-# Docker and containerd.
+# Setup the containerd on the node.
 function Setup-ContainerRuntime {
   Install-Pigz
   Install_Containerd
@@ -1249,35 +1248,6 @@ function Enable-HyperVFeature {
   Log-Output "Enabling Windows 'HyperV' feature"
   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Management-PowerShell -All -NoRestart
-}
-
-function Test-DockerIsInstalled {
-  return ((Get-Package `
-               -ProviderName DockerMsftProvider `
-               -ErrorAction SilentlyContinue |
-           Where-Object Name -eq 'docker') -ne $null)
-}
-
-function Test-DockerIsRunning {
-  return ((Get-Service docker).Status -eq 'Running')
-}
-
-# Installs Docker EE via the DockerMsftProvider. Ensure that the Windows
-# Containers feature is installed before calling this function; otherwise,
-# a restart may be needed after this function returns.
-function Install-Docker {
-  Log-Output 'Installing NuGet module'
-  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-
-  Log-Output 'Installing DockerMsftProvider module'
-  Install-Module -Name DockerMsftProvider -Repository PSGallery -Force
-
-  Log-Output "Installing latest Docker EE version"
-  Install-Package `
-      -Name docker `
-      -ProviderName DockerMsftProvider `
-      -Force `
-      -Verbose
 }
 
 # Configures the TCP/IP parameters to be in sync with the GCP recommendation.
@@ -1518,7 +1488,7 @@ function Install-Pigz {
       Expand-Archive -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip" `
         -DestinationPath $PIGZ_ROOT
       Remove-Item -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip"
-      # Docker and Containerd search for unpigz.exe on the first container image
+      # Containerd search for unpigz.exe on the first container image
       # pull request after the service is started. If unpigz.exe is in the
       # Windows path it'll use it instead of the default unzipper.
       # See: https://github.com/containerd/containerd/issues/1896
