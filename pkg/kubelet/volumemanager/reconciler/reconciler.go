@@ -23,13 +23,14 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
@@ -121,6 +122,9 @@ func NewReconciler(
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
 		timeOfLastSync:                time.Time{},
+		volumesFailedReconstruction:   make([]podVolume, 0),
+		volumesNeedDevicePath:         make([]v1.UniqueVolumeName, 0),
+		volumesNeedReportedInUse:      make([]v1.UniqueVolumeName, 0),
 	}
 }
 
@@ -140,9 +144,17 @@ type reconciler struct {
 	skippedDuringReconstruction   map[v1.UniqueVolumeName]*globalVolumeInfo
 	kubeletPodsDir                string
 	timeOfLastSync                time.Time
+	volumesFailedReconstruction   []podVolume
+	volumesNeedDevicePath         []v1.UniqueVolumeName
+	volumesNeedReportedInUse      []v1.UniqueVolumeName
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		rc.runNew(stopCh)
+		return
+	}
+
 	wait.Until(rc.reconciliationLoopFunc(), rc.loopSleepDuration, stopCh)
 }
 
