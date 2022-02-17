@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -212,6 +213,10 @@ func init() {
 type defaultAPIServer struct {
 	http.Handler
 	container *restful.Container
+}
+
+func handleWithWarnings(storage map[string]rest.Storage) http.Handler {
+	return genericapifilters.WithWarningRecorder(handle(storage))
 }
 
 // uses the default settings
@@ -3965,7 +3970,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 
 // runRequest is used by TestDryRun since it runs the test twice in a
 // row with a slightly different URL (one has ?dryRun, one doesn't).
-func runRequest(t *testing.T, path, verb string, data []byte, contentType string) *http.Response {
+func runRequest(t testing.TB, path, verb string, data []byte, contentType string) *http.Response {
 	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3998,6 +4003,257 @@ type SimpleRESTStorageWithDeleteCollection struct {
 func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	return nil, nil
+}
+
+// shared vars used by both TestFieldValidation and BenchmarkFieldValidation
+var (
+	strictFieldValidation = "?fieldValidation=Strict"
+	warnFieldValidation   = "?fieldValidation=Warn"
+	ignoreFieldValidation = "?fieldValidation=Ignore"
+)
+
+// TestFieldValidation tests the create, update, and patch handlers for correctness when faced with field validation errors.
+func TestFieldValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
+	var (
+		strictDecodingErr          = `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
+		strictDecodingWarns        = []string{`duplicate field "other"`, `unknown field "unknown"`}
+		strictDecodingErrYAML      = `strict decoding error: yaml: unmarshal errors:\n  line 6: key \"other\" already set in map, unknown field \"unknown\"`
+		strictDecodingWarnsYAML    = []string{`line 6: key "other" already set in map`, `unknown field "unknown"`}
+		strictDecodingErrYAMLPut   = `strict decoding error: yaml: unmarshal errors:\n  line 7: key \"other\" already set in map, unknown field \"unknown\"`
+		strictDecodingWarnsYAMLPut = []string{`line 7: key "other" already set in map`, `unknown field "unknown"`}
+
+		invalidJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+		invalidYAMLDataPost = []byte(`apiVersion: test.group/version
+kind: Simple
+metadata:
+  creationTimestamp: null
+other: foo
+other: bar
+unknown: baz`)
+
+		invalidJSONDataPut = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id", "creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+		invalidYAMLDataPut = []byte(`apiVersion: test.group/version
+kind: Simple
+metadata:
+  name: id
+  creationTimestamp: null
+other: foo
+other: bar
+unknown: baz`)
+
+		invalidMergePatch = []byte(`{"labels":{"foo":"bar"}, "unknown": "foo", "other": "foo", "other": "bar"}`)
+		invalidJSONPatch  = []byte(`
+[
+	{"op": "add", "path": "/unknown", "value": "foo"},
+	{"op": "add", "path": "/other", "value": "foo"},
+	{"op": "add", "path": "/other", "value": "bar"}
+	]
+	`)
+		// note: duplicate fields in the patch itself
+		// are dropped by the
+		// evanphx/json-patch library and is expected.
+		jsonPatchStrictDecodingErr   = `strict decoding error: unknown field \"unknown\"`
+		jsonPatchStrictDecodingWarns = []string{`unknown field "unknown"`}
+
+		invalidSMP = []byte(`{"unknown": "foo", "other":"foo", "other": "bar"}`)
+
+		fieldValidationTests = []struct {
+			name               string
+			path               string
+			verb               string
+			data               []byte
+			queryParams        string
+			contentType        string
+			expectedErr        string
+			expectedWarns      []string
+			expectedStatusCode int
+		}{
+			// Create
+			{name: "post-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
+			{name: "post-warn-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarns},
+			{name: "post-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
+
+			{name: "post-strict-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAML},
+			{name: "post-warn-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarnsYAML},
+			{name: "post-ignore-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+
+			// Update
+			{name: "put-strict-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
+			{name: "put-warn-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: warnFieldValidation, expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+			{name: "put-ignore-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusOK},
+
+			{name: "put-strict-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAMLPut},
+			{name: "put-warn-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarnsYAMLPut},
+			{name: "put-ignore-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+
+			// MergePatch
+			{name: "merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: strictFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
+			{name: "merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: warnFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+			{name: "merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: ignoreFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+
+			// JSON Patch
+			{name: "json-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: strictFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: jsonPatchStrictDecodingErr},
+			{name: "json-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: warnFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: jsonPatchStrictDecodingWarns},
+			{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+
+			// SMP
+			{name: "strategic-merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: strictFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
+			{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+			{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+		}
+	)
+
+	server := httptest.NewServer(handleWithWarnings(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "baz",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+	for _, test := range fieldValidationTests {
+		t.Run(test.name, func(t *testing.T) {
+			baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+			response := runRequest(t, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(response.Body)
+
+			if response.StatusCode != test.expectedStatusCode || !strings.Contains(buf.String(), test.expectedErr) {
+				t.Fatalf("unexpected response: %#v, expected err: %#v", response, test.expectedErr)
+			}
+
+			warnings, _ := net.ParseWarningHeaders(response.Header["Warning"])
+			if len(warnings) != len(test.expectedWarns) {
+				t.Fatalf("unexpected number of warnings. Got count %d, expected %d. Got warnings %#v, expected %#v", len(warnings), len(test.expectedWarns), warnings, test.expectedWarns)
+
+			}
+			for i, warn := range warnings {
+				if warn.Text != test.expectedWarns[i] {
+					t.Fatalf("unexpected warning: %#v, expected warning: %#v", warn.Text, test.expectedWarns[i])
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkFieldValidation benchmarks the create, update, and patch handlers for performance distinctions between
+// strict, warn, and ignore field validation handling.
+func BenchmarkFieldValidation(b *testing.B) {
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
+	var (
+		validJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo"}`)
+		validYAMLDataPost = []byte(`apiVersion: test.group/version
+kind: Simple
+metadata:
+  creationTimestamp: null
+other: foo`)
+
+		validJSONDataPut = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id", "creationTimestamp":null}, "other":"bar"}`)
+		validYAMLDataPut = []byte(`apiVersion: test.group/version
+kind: Simple
+metadata:
+  name: id
+  creationTimestamp: null
+other: bar`)
+
+		validMergePatch = []byte(`{"labels":{"foo":"bar"}, "other": "bar"}`)
+		validJSONPatch  = []byte(`
+[
+	{"op": "add", "path": "/other", "value": "bar"}
+	]
+	`)
+		validSMP = []byte(`{"other": "bar"}`)
+
+		fieldValidationBenchmarks = []struct {
+			name               string
+			path               string
+			verb               string
+			data               []byte
+			queryParams        string
+			contentType        string
+			expectedStatusCode int
+		}{
+			// Create
+			{name: "post-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: validJSONDataPost, queryParams: strictFieldValidation, expectedStatusCode: http.StatusCreated},
+			{name: "post-warn-validation", path: "/namespaces/default/simples", verb: "POST", data: validJSONDataPost, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated},
+			{name: "post-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: validJSONDataPost, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
+
+			{name: "post-strict-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: validYAMLDataPost, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+			{name: "post-warn-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: validYAMLDataPost, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+			{name: "post-ignore-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: validYAMLDataPost, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+
+			// Update
+			{name: "put-strict-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: validJSONDataPut, queryParams: strictFieldValidation, expectedStatusCode: http.StatusOK},
+			{name: "put-warn-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: validJSONDataPut, queryParams: warnFieldValidation, expectedStatusCode: http.StatusOK},
+			{name: "put-ignore-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: validJSONDataPut, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusOK},
+
+			{name: "put-strict-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: validYAMLDataPut, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+			{name: "put-warn-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: validYAMLDataPut, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+			{name: "put-ignore-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: validYAMLDataPut, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+
+			// MergePatch
+			{name: "merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validMergePatch, queryParams: strictFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validMergePatch, queryParams: warnFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validMergePatch, queryParams: ignoreFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+
+			// JSON Patch
+			{name: "json-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validJSONPatch, queryParams: strictFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "json-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validJSONPatch, queryParams: warnFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+
+			// SMP
+			{name: "strategic-merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validSMP, queryParams: strictFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+		}
+	)
+
+	server := httptest.NewServer(handleWithWarnings(map[string]rest.Storage{
+		"simples": &SimpleRESTStorageWithDeleteCollection{
+			SimpleRESTStorage{
+				item: genericapitesting.Simple{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "id",
+						Namespace: "",
+						UID:       "uid",
+					},
+					Other: "bar",
+				},
+			},
+		},
+		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
+			item: genericapitesting.SimpleXGSubresource{
+				SubresourceInfo: "foo",
+			},
+			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
+		},
+	}))
+	defer server.Close()
+	for _, test := range fieldValidationBenchmarks {
+		b.Run(test.name, func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+				response := runRequest(b, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
+				if response.StatusCode != test.expectedStatusCode {
+					b.Fatalf("unexpected status code: %d, expected: %d", response.StatusCode, test.expectedStatusCode)
+				}
+			}
+		})
+	}
 }
 
 func TestDryRunDisabled(t *testing.T) {
