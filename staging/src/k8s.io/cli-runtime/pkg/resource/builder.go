@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
@@ -262,7 +261,6 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 				b.errs = append(b.errs, fmt.Errorf("pattern %q is not valid: %v", s, err))
 				continue
 			}
-			klog.V(4).Infof("Processing path %q, matched with %q", s, matches)
 			if !recursive && len(matches) == 1 {
 				b.singleItemImplied = true
 			}
@@ -1198,11 +1196,16 @@ func HasNames(args []string) (bool, error) {
 // or the filename if it is a specific filename and not a pattern.
 // If the input is a pattern and it yields no result it will result in an error.
 func expandIfFilePattern(pattern string) ([]string, error) {
-	matches, err := filepath.Glob(pattern)
-	if err == nil && len(matches) == 0 {
-		return nil, fmt.Errorf("no match")
+	if _, err := os.Stat(pattern); os.IsNotExist(err) {
+		matches, err := filepath.Glob(pattern)
+		if err == nil && len(matches) == 0 {
+			return nil, fmt.Errorf("no match")
+		}
+		if err == nil || err != filepath.ErrBadPattern {
+			return matches, err
+		}
 	}
-	return matches, err
+	return []string{pattern}, nil
 }
 
 type cachingCategoryExpanderFunc struct {
