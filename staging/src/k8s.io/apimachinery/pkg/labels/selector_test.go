@@ -734,17 +734,17 @@ func TestAdd(t *testing.T) {
 			"key",
 			selection.In,
 			[]string{"value"},
-			internalSelector{Requirement{"key", selection.In, []string{"value"}}},
+			internalSelector{Requirement{"key", selection.In, nil, []string{"value"}}},
 		},
 		{
 			"keyEqualsOperator",
-			internalSelector{Requirement{"key", selection.In, []string{"value"}}},
+			internalSelector{Requirement{"key", selection.In, nil, []string{"value"}}},
 			"key2",
 			selection.Equals,
 			[]string{"value2"},
 			internalSelector{
-				Requirement{"key", selection.In, []string{"value"}},
-				Requirement{"key2", selection.Equals, []string{"value2"}},
+				Requirement{"key", selection.In, nil, []string{"value"}},
+				Requirement{"key2", selection.Equals, nil, []string{"value2"}},
 			},
 		},
 	}
@@ -827,14 +827,14 @@ func TestRequiresExactMatch(t *testing.T) {
 	}{
 		{
 			name:          "keyInOperatorExactMatch",
-			sel:           internalSelector{Requirement{"key", selection.In, []string{"value"}}},
+			sel:           internalSelector{Requirement{"key", selection.In, nil, []string{"value"}}},
 			label:         "key",
 			expectedFound: true,
 			expectedValue: "value",
 		},
 		{
 			name:          "keyInOperatorNotExactMatch",
-			sel:           internalSelector{Requirement{"key", selection.In, []string{"value", "value2"}}},
+			sel:           internalSelector{Requirement{"key", selection.In, nil, []string{"value", "value2"}}},
 			label:         "key",
 			expectedFound: false,
 			expectedValue: "",
@@ -842,8 +842,8 @@ func TestRequiresExactMatch(t *testing.T) {
 		{
 			name: "keyInOperatorNotExactMatch",
 			sel: internalSelector{
-				Requirement{"key", selection.In, []string{"value", "value1"}},
-				Requirement{"key2", selection.In, []string{"value2"}},
+				Requirement{"key", selection.In, nil, []string{"value", "value1"}},
+				Requirement{"key2", selection.In, nil, []string{"value2"}},
 			},
 			label:         "key2",
 			expectedFound: true,
@@ -851,21 +851,21 @@ func TestRequiresExactMatch(t *testing.T) {
 		},
 		{
 			name:          "keyEqualOperatorExactMatch",
-			sel:           internalSelector{Requirement{"key", selection.Equals, []string{"value"}}},
+			sel:           internalSelector{Requirement{"key", selection.Equals, nil, []string{"value"}}},
 			label:         "key",
 			expectedFound: true,
 			expectedValue: "value",
 		},
 		{
 			name:          "keyDoubleEqualOperatorExactMatch",
-			sel:           internalSelector{Requirement{"key", selection.DoubleEquals, []string{"value"}}},
+			sel:           internalSelector{Requirement{"key", selection.DoubleEquals, nil, []string{"value"}}},
 			label:         "key",
 			expectedFound: true,
 			expectedValue: "value",
 		},
 		{
 			name:          "keyNotEqualOperatorExactMatch",
-			sel:           internalSelector{Requirement{"key", selection.NotEquals, []string{"value"}}},
+			sel:           internalSelector{Requirement{"key", selection.NotEquals, nil, []string{"value"}}},
 			label:         "key",
 			expectedFound: false,
 			expectedValue: "",
@@ -873,8 +873,8 @@ func TestRequiresExactMatch(t *testing.T) {
 		{
 			name: "keyEqualOperatorExactMatchFirst",
 			sel: internalSelector{
-				Requirement{"key", selection.In, []string{"value"}},
-				Requirement{"key2", selection.In, []string{"value2"}},
+				Requirement{"key", selection.In, nil, []string{"value"}},
+				Requirement{"key2", selection.In, nil, []string{"value2"}},
 			},
 			label:         "key",
 			expectedFound: true,

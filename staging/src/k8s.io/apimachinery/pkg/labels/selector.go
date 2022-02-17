@@ -40,10 +40,24 @@ var (
 		string(selection.GreaterThan), string(selection.LessThan),
 	}
 	validRequirementOperators = append(binaryOperators, unaryOperators...)
+
+	operatorMapMatch = map[selection.Operator]matchFunc{
+		selection.DoesNotExist: doseNotExists,
+		selection.Equals:       inEqualsDoubleEquals,
+		selection.DoubleEquals: inEqualsDoubleEquals,
+		selection.In:           inEqualsDoubleEquals,
+		selection.NotEquals:    notInNotEquals,
+		selection.NotIn:        notInNotEquals,
+		selection.Exists:       exists,
+		selection.GreaterThan:  gtLt,
+		selection.LessThan:     gtLt,
+	}
 )
 
 // Requirements is AND of all requirements.
 type Requirements []Requirement
+
+type matchFunc func(*Requirement, Labels) bool
 
 // Selector represents a label selector.
 type Selector interface {
@@ -127,14 +141,15 @@ func (a ByKey) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
 
-// Requirement contains values, a key, and an operator that relates the key and values.
+// Requirement contains values, a key, a match function, and an operator that relates the key and values.
 // The zero value of Requirement is invalid.
 // Requirement implements both set based match and exact match
 // Requirement should be initialized via NewRequirement constructor for creating a valid Requirement.
-// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen=false
 type Requirement struct {
-	key      string
-	operator selection.Operator
+	key       string
+	operator  selection.Operator
+	matchFunc matchFunc
 	// In huge majority of cases we have at most one value here.
 	// It is generally faster to operate on a single-element slice
 	// than on a single-element map, so we have a slice here.
@@ -193,7 +208,9 @@ func NewRequirement(key string, op selection.Operator, vals []string, opts ...fi
 			allErrs = append(allErrs, err)
 		}
 	}
-	return &Requirement{key: key, operator: op, strValues: vals}, allErrs.ToAggregate()
+
+	matchF := operatorMapMatch[op]
+	return &Requirement{key: key, operator: op, matchFunc: matchF, strValues: vals}, allErrs.ToAggregate()
 }
 
 func (r *Requirement) hasValue(value string) bool {
@@ -224,49 +241,10 @@ func (r *Requirement) hasValue(value string) bool {
 //
 //	the Requirement's key and the corresponding value satisfies mathematical inequality.
 func (r *Requirement) Matches(ls Labels) bool {
-	switch r.operator {
-	case selection.In, selection.Equals, selection.DoubleEquals:
-		if !ls.Has(r.key) {
-			return false
-		}
-		return r.hasValue(ls.Get(r.key))
-	case selection.NotIn, selection.NotEquals:
-		if !ls.Has(r.key) {
-			return true
-		}
-		return !r.hasValue(ls.Get(r.key))
-	case selection.Exists:
-		return ls.Has(r.key)
-	case selection.DoesNotExist:
-		return !ls.Has(r.key)
-	case selection.GreaterThan, selection.LessThan:
-		if !ls.Has(r.key) {
-			return false
-		}
-		lsValue, err := strconv.ParseInt(ls.Get(r.key), 10, 64)
-		if err != nil {
-			klog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
-			return false
-		}
-
-		// There should be only one strValue in r.strValues, and can be converted to an integer.
-		if len(r.strValues) != 1 {
-			klog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
-			return false
-		}
-
-		var rValue int64
-		for i := range r.strValues {
-			rValue, err = strconv.ParseInt(r.strValues[i], 10, 64)
-			if err != nil {
-				klog.V(10).Infof("ParseInt failed for value %+v in requirement %#v, for 'Gt', 'Lt' operators, the value must be an integer", r.strValues[i], r)
-				return false
-			}
-		}
-		return (r.operator == selection.GreaterThan && lsValue > rValue) || (r.operator == selection.LessThan && lsValue < rValue)
-	default:
-		return false
+	if r.matchFunc != nil {
+		return r.matchFunc(r, ls)
 	}
+	return false
 }
 
 // Key returns requirement key
@@ -962,4 +940,74 @@ func SelectorFromValidatedSet(ls Set) Selector {
 // TODO: Consider exporting the internalSelector type instead.
 func ParseToRequirements(selector string, opts ...field.PathOption) ([]Requirement, error) {
 	return parse(selector, field.ToPath(opts...))
+}
+
+func inEqualsDoubleEquals(r *Requirement, ls Labels) bool {
+	if !ls.Has(r.key) {
+		return false
+	}
+	return r.hasValue(ls.Get(r.key))
+}
+
+func notInNotEquals(r *Requirement, ls Labels) bool {
+	if !ls.Has(r.key) {
+		return true
+	}
+	return !r.hasValue(ls.Get(r.key))
+}
+
+func exists(r *Requirement, ls Labels) bool {
+	return ls.Has(r.key)
+}
+
+func doseNotExists(r *Requirement, ls Labels) bool {
+	return !ls.Has(r.key)
+}
+
+func gtLt(r *Requirement, ls Labels) bool {
+	if !ls.Has(r.key) {
+		return false
+	}
+	lsValue, err := strconv.ParseInt(ls.Get(r.key), 10, 64)
+	if err != nil {
+		klog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
+		return false
+	}
+
+	// There should be only one strValue in r.strValues, and can be converted to an integer.
+	if len(r.strValues) != 1 {
+		klog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
+		return false
+	}
+
+	var rValue int64
+	for i := range r.strValues {
+		rValue, err = strconv.ParseInt(r.strValues[i], 10, 64)
+		if err != nil {
+			klog.V(10).Infof("ParseInt failed for value %+v in requirement %#v, for 'Gt', 'Lt' operators, the value must be an integer", r.strValues[i], r)
+			return false
+		}
+	}
+	return (r.operator == selection.GreaterThan && lsValue > rValue) || (r.operator == selection.LessThan && lsValue < rValue)
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *Requirement) DeepCopyInto(out *Requirement) {
+	*out = *in
+	if in.strValues != nil {
+		in, out := &in.strValues, &out.strValues
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Requirement.
+func (in *Requirement) DeepCopy() *Requirement {
+	if in == nil {
+		return nil
+	}
+	out := new(Requirement)
+	in.DeepCopyInto(out)
+	return out
 }
