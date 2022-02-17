@@ -69,6 +69,24 @@ type Encoder interface {
 	Identifier() Identifier
 }
 
+// MemoryAllocator is responsible for allocating memory.
+// By encapsulating memory allocation into its own interface, we can reuse the memory
+// across many operations in places we know it can significantly improve the performance.
+type MemoryAllocator interface {
+	// Allocate reserves memory for n bytes.
+	// Note that implementations of this method are not required to zero the returned array.
+	// It is the caller's responsibility to clean the memory if needed.
+	Allocate(n uint64) []byte
+}
+
+// EncoderWithAllocator  serializes objects in a way that allows callers to manage any additional memory allocations.
+type EncoderWithAllocator interface {
+	Encoder
+	// EncodeWithAllocator writes an object to a stream as Encode does.
+	// In addition, it allows for providing a memory allocator for efficient memory usage during object serialization
+	EncodeWithAllocator(obj Object, w io.Writer, memAlloc MemoryAllocator) error
+}
+
 // Decoder attempts to load an object from data.
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
