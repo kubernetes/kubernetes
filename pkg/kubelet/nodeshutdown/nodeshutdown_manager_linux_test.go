@@ -614,6 +614,23 @@ func Test_groupByPriority(t *testing.T) {
 	}
 }
 
+type buffer struct {
+	b  bytes.Buffer
+	rw sync.RWMutex
+}
+
+func (b *buffer) String() string {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+	return b.b.String()
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	b.rw.Lock()
+	defer b.rw.Unlock()
+	return b.b.Write(p)
+}
+
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
 		probeManager   = probetest.FakeManager{}
@@ -681,7 +698,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 			l := klog.Level(1)
 			l.Set("1")
 			// hijack the klog output
-			tmpWriteBuffer := bytes.NewBuffer(nil)
+			tmpWriteBuffer := new(buffer)
 			klog.SetOutput(tmpWriteBuffer)
 			klog.LogToStderr(false)
 
