@@ -18,6 +18,7 @@ limitations under the License.
 package secretbox
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 
@@ -41,7 +42,7 @@ func NewSecretboxTransformer(key [32]byte) value.Transformer {
 	return &secretboxTransformer{key: key}
 }
 
-func (t *secretboxTransformer) TransformFromStorage(data []byte, context value.Context) ([]byte, bool, error) {
+func (t *secretboxTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	if len(data) < (secretbox.Overhead + nonceSize) {
 		return nil, false, fmt.Errorf("the stored data was shorter than the required size")
 	}
@@ -56,7 +57,7 @@ func (t *secretboxTransformer) TransformFromStorage(data []byte, context value.C
 	return result, false, nil
 }
 
-func (t *secretboxTransformer) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
+func (t *secretboxTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	var nonce [nonceSize]byte
 	n, err := rand.Read(nonce[:])
 	if err != nil {

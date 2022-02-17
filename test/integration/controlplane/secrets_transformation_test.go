@@ -17,6 +17,7 @@ limitations under the License.
 package controlplane
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
@@ -131,7 +132,7 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 	test.printMetrics()
 }
 
-func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
+func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
 	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
@@ -141,7 +142,7 @@ func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
 
 	gcmTransformer := aestransformer.NewGCMTransformer(block)
 
-	clearText, _, err := gcmTransformer.TransformFromStorage(cipherText, ctx)
+	clearText, _, err := gcmTransformer.TransformFromStorage(ctx, cipherText, dataCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decypt secret: %v", err)
 	}
@@ -149,7 +150,7 @@ func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
 	return clearText, nil
 }
 
-func unSealWithCBCTransformer(cipherText []byte, ctx value.Context,
+func unSealWithCBCTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
 	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
@@ -159,7 +160,7 @@ func unSealWithCBCTransformer(cipherText []byte, ctx value.Context,
 
 	cbcTransformer := aestransformer.NewCBCTransformer(block)
 
-	clearText, _, err := cbcTransformer.TransformFromStorage(cipherText, ctx)
+	clearText, _, err := cbcTransformer.TransformFromStorage(ctx, cipherText, dataCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decypt secret: %v", err)
 	}
