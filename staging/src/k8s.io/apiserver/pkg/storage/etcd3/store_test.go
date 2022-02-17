@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc/grpclog"
 
@@ -288,9 +289,7 @@ func TestGet(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get failed: %v", err)
 			}
-			if !reflect.DeepEqual(tt.expectedOut, out) {
-				t.Errorf("pod want=\n%#v\nget=\n%#v", tt.expectedOut, out)
-			}
+			expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), tt.expectedOut, out)
 		})
 	}
 }
@@ -329,9 +328,7 @@ func TestUnconditionalDelete(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: Delete failed: %v", tt.name, err)
 			}
-			if !reflect.DeepEqual(tt.expectedObj, out) {
-				t.Errorf("%s: pod want=%#v, get=%#v", tt.name, tt.expectedObj, out)
-			}
+			expectNoDiff(t, fmt.Sprintf("%s: incorrect pod:", tt.name), tt.expectedObj, out)
 		})
 	}
 }
@@ -367,9 +364,7 @@ func TestConditionalDelete(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: Delete failed: %v", tt.name, err)
 			}
-			if !reflect.DeepEqual(storedObj, out) {
-				t.Errorf("%s: pod want=%#v, get=%#v", tt.name, storedObj, out)
-			}
+			expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), storedObj, out)
 			key, storedObj = testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 		})
 	}
@@ -661,9 +656,7 @@ func TestGetToList(t *testing.T) {
 			}
 			for j, wantPod := range tt.expectedOut {
 				getPod := &out.Items[j]
-				if !reflect.DeepEqual(wantPod, getPod) {
-					t.Errorf("%s: pod want=%#v, get=%#v", tt.name, wantPod, getPod)
-				}
+				expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
 			}
 		})
 	}
@@ -1589,14 +1582,12 @@ func TestList(t *testing.T) {
 			if len(tt.expectedOut) != len(out.Items) {
 				t.Fatalf("length of list want=%d, got=%d", len(tt.expectedOut), len(out.Items))
 			}
-			if e, a := tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount(); (e == nil) != (a == nil) || (e != nil && a != nil && *e != *a) {
-				t.Errorf("remainingItemCount want=%#v, got=%#v", e, a)
+			if diff := cmp.Diff(tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount()); diff != "" {
+				t.Errorf("incorrect remainingItemCount: %s", diff)
 			}
 			for j, wantPod := range tt.expectedOut {
 				getPod := &out.Items[j]
-				if !reflect.DeepEqual(wantPod, getPod) {
-					t.Errorf("pod want=%#v, got=%#v", wantPod, getPod)
-				}
+				expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
 			}
 		})
 	}
@@ -1674,9 +1665,7 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[0].storedObj) {
-		t.Fatalf("Unexpected first page: %#v", out.Items)
-	}
+	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1700,11 +1689,9 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	if !reflect.DeepEqual(out.Items, []example.Pod{*preset[1].storedObj, *preset[2].storedObj}) {
-		key, rv, err := decodeContinue(continueFromSecondItem, "/")
-		t.Logf("continue token was %d %s %v", rv, key, err)
-		t.Fatalf("Unexpected second page: %#v", out.Items)
-	}
+	key, rv, err := decodeContinue(continueFromSecondItem, "/")
+	t.Logf("continue token was %d %s %v", rv, key, err)
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if transformer.reads != 2 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1726,9 +1713,7 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[1].storedObj) {
-		t.Fatalf("Unexpected second page: %#v", out.Items)
-	}
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1751,9 +1736,7 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[2].storedObj) {
-		t.Fatalf("Unexpected third page: %#v", out.Items)
-	}
+	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1845,9 +1828,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Errorf("No continuation token set")
 	}
-	if len(out.Items) != 2 || !reflect.DeepEqual(&out.Items[0], preset[0].storedObj) || !reflect.DeepEqual(&out.Items[1], preset[2].storedObj) {
-		t.Errorf("Unexpected first page, len=%d: %#v", len(out.Items), out.Items)
-	}
+	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
 	if transformer.reads != 3 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1878,9 +1859,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Errorf("Unexpected continuation token set")
 	}
-	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[3].storedObj) {
-		t.Errorf("Unexpected second page, len=%d: %#v", len(out.Items), out.Items)
-	}
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[3].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1960,9 +1939,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[0].storedObj) {
-		t.Fatalf("Unexpected first page: %#v", out.Items)
-	}
+	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
 
 	continueFromSecondItem := out.Continue
 
@@ -2026,9 +2003,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[1].storedObj) {
-		t.Fatalf("Unexpected second page: %#v", out.Items)
-	}
+	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
 	if out.ResourceVersion != lastRVString {
 		t.Fatalf("Expected list resource version to be %s, got %s", lastRVString, out.ResourceVersion)
 	}
@@ -2044,9 +2019,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[2].storedObj) {
-		t.Fatalf("Unexpected third page: %#v", out.Items)
-	}
+	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
 	if out.ResourceVersion != lastRVString {
 		t.Fatalf("Expected list resource version to be %s, got %s", lastRVString, out.ResourceVersion)
 	}
@@ -2309,9 +2282,7 @@ func TestConsistentList(t *testing.T) {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
-	if !reflect.DeepEqual(result1, result2) {
-		t.Errorf("inconsistent lists: %#v, %#v", result1, result2)
-	}
+	expectNoDiff(t, "incorrect lists", result1, result2)
 
 	// Now also verify the  ResourceVersionMatchNotOlderThan.
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
@@ -2329,9 +2300,7 @@ func TestConsistentList(t *testing.T) {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
-	if !reflect.DeepEqual(result3, result4) {
-		t.Errorf("inconsistent lists: %#v, %#v", result3, result4)
-	}
+	expectNoDiff(t, "incorrect lists", result3, result4)
 }
 
 func TestCount(t *testing.T) {
@@ -2410,6 +2379,17 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 		}
 		if store.leaseManager.leaseAttachedObjectCount != tc.expectAttachedCount {
 			t.Errorf("Lease manager recorded count %v should be %v", store.leaseManager.leaseAttachedObjectCount, tc.expectAttachedCount)
+		}
+	}
+}
+
+func expectNoDiff(t *testing.T, msg string, expected, got interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(expected, got) {
+		if diff := cmp.Diff(expected, got); diff != "" {
+			t.Errorf("%s: %s", msg, diff)
+		} else {
+			t.Errorf("%s:\nexpected: %#v\ngot: %#v", msg, expected, got)
 		}
 	}
 }
