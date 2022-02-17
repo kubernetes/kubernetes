@@ -63,9 +63,10 @@ func testPod(namespace string, id int, nPorts int, isReady bool, ipFamilies []v1
 	p := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      fmt.Sprintf("pod%d", id),
-			Labels:    map[string]string{"foo": "bar"},
+			Namespace:       namespace,
+			Name:            fmt.Sprintf("pod%d", id),
+			Labels:          map[string]string{"foo": "bar"},
+			ResourceVersion: fmt.Sprint(id),
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{Ports: []v1.ContainerPort{}}},
@@ -1430,16 +1431,16 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", "Pod", epa.TargetRef.Kind)
 			}
 			if epa.TargetRef.Namespace != pod.ObjectMeta.Namespace {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.Namespace, epa.TargetRef.Namespace)
+				t.Fatalf("TargetRef.Namespace: expected: %s, got: %s", pod.ObjectMeta.Namespace, epa.TargetRef.Namespace)
 			}
 			if epa.TargetRef.Name != pod.ObjectMeta.Name {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.Name, epa.TargetRef.Name)
+				t.Fatalf("TargetRef.Name: expected: %s, got: %s", pod.ObjectMeta.Name, epa.TargetRef.Name)
 			}
 			if epa.TargetRef.UID != pod.ObjectMeta.UID {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.UID, epa.TargetRef.UID)
+				t.Fatalf("TargetRef.UID: expected: %s, got: %s", pod.ObjectMeta.UID, epa.TargetRef.UID)
 			}
-			if epa.TargetRef.ResourceVersion != pod.ObjectMeta.ResourceVersion {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.ResourceVersion, epa.TargetRef.ResourceVersion)
+			if epa.TargetRef.ResourceVersion != "" {
+				t.Fatalf("TargetRef.ResourceVersion: expected empty, got: %s", epa.TargetRef.ResourceVersion)
 			}
 		})
 	}
