@@ -22,22 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-)
-
-const (
-	// KubeMarkMasqChain is the mark-for-masquerade chain
-	// TODO: clean up this logic in kube-proxy
-	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
-
-	// KubeMarkDropChain is the mark-for-drop chain
-	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
-
-	// KubePostroutingChain is kubernetes postrouting rules
-	KubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
-
-	// KubeFirewallChain is kubernetes firewall rules
-	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
