@@ -43,15 +43,11 @@ var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Deta
 func TestJobStrategy(t *testing.T) {
 	cases := map[string]struct {
 		indexedJobEnabled             bool
-		suspendJobEnabled             bool
 		trackingWithFinalizersEnabled bool
 	}{
 		"features disabled": {},
 		"indexed job enabled": {
 			indexedJobEnabled: true,
-		},
-		"suspend job enabled": {
-			suspendJobEnabled: true,
 		},
 		"new job tracking enabled": {
 			trackingWithFinalizersEnabled: true,
@@ -60,7 +56,6 @@ func TestJobStrategy(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
 			testJobStrategy(t)
 		})
@@ -69,7 +64,6 @@ func TestJobStrategy(t *testing.T) {
 
 func testJobStrategy(t *testing.T) {
 	indexedJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob)
-	suspendJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob)
 	trackingWithFinalizersEnabled := utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
@@ -129,9 +123,6 @@ func testJobStrategy(t *testing.T) {
 	}
 	if indexedJobEnabled != (job.Spec.CompletionMode != nil) {
 		t.Errorf("Job should allow setting .spec.completionMode only when %v feature is enabled", features.IndexedJob)
-	}
-	if !suspendJobEnabled && (job.Spec.Suspend != nil) {
-		t.Errorf("Job should allow setting .spec.suspend only when %v feature is enabled", features.SuspendJob)
 	}
 	wantAnnotations := map[string]string{"foo": "bar"}
 	if trackingWithFinalizersEnabled {
@@ -210,14 +201,8 @@ func testJobStrategy(t *testing.T) {
 	// disabled. We don't care about other combinations.
 	job.Spec.Suspend, updatedJob.Spec.Suspend = pointer.BoolPtr(false), pointer.BoolPtr(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	if !suspendJobEnabled && *updatedJob.Spec.Suspend {
-		t.Errorf("[SuspendJob=%v] .spec.suspend should not be updated from false to true", suspendJobEnabled)
-	}
 	job.Spec.Suspend, updatedJob.Spec.Suspend = nil, pointer.BoolPtr(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	if !suspendJobEnabled && updatedJob.Spec.Suspend != nil {
-		t.Errorf("[SuspendJob=%v] .spec.suspend should not be updated from nil to non-nil", suspendJobEnabled)
-	}
 
 	// Make sure we correctly implement the interface.
 	// Otherwise a typo could silently change the default.

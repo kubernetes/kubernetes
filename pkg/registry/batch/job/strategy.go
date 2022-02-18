@@ -97,10 +97,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.CompletionMode = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
-		job.Spec.Suspend = nil
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) {
 		// Until this feature graduates to GA and soaks in clusters, we use an
 		// annotation to mark whether jobs are tracked with it.
@@ -141,15 +137,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		newJob.Spec.CompletionMode = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
-		// There are 3 possible values (nil, true, false) for each flag, so 9
-		// combinations. We want to disallow everything except true->false and
-		// true->nil when the feature gate is disabled. Or, basically allow this
-		// only when oldJob is true.
-		if oldJob.Spec.Suspend == nil || !*oldJob.Spec.Suspend {
-			newJob.Spec.Suspend = oldJob.Spec.Suspend
-		}
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) && !hasJobTrackingAnnotation(oldJob) {
 		dropJobTrackingAnnotation(newJob)
 	}
