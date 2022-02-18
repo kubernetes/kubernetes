@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/metrics/pkg/apis/metrics/v1beta1";
 
 // ContainerMetrics sets resource usage metrics of a container.
 message ContainerMetrics {

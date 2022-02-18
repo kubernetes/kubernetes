@@ -22,7 +22,7 @@ syntax = "proto2";
 package k8s.io.apimachinery.pkg.api.resource;
 
 // Package-wide variables from generator "generated".
-option go_package = "resource";
+option go_package = "k8s.io/apimachinery/pkg/api/resource";
 
 // Quantity is a fixed-point representation of a number.
 // It provides convenient marshaling/unmarshaling in JSON and YAML,
