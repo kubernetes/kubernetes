@@ -200,7 +200,7 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 	})
 
 	ctx := context.TODO()
-	tunnel, err := client.CreateSingleUseGrpcTunnel(ctx, udsName, dialOption, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(ctx, udsName, dialOption, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
