@@ -19,11 +19,11 @@ package etcd3
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
@@ -390,8 +390,8 @@ func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Inte
 			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
 			return
 		}
-		if !reflect.DeepEqual(expectObj, res.Object) {
-			t.Errorf("obj want=\n%#v\nget=\n%#v", expectObj, res.Object)
+		if diff := cmp.Diff(expectObj, res.Object); diff != "" {
+			t.Errorf("incorrect obj: %s", diff)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
