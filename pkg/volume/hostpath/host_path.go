@@ -47,9 +47,20 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 	}
 }
 
+func FakeProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
+	return []volume.VolumePlugin{
+		&hostPathPlugin{
+			host:          nil,
+			config:        volumeConfig,
+			noTypeChecker: true,
+		},
+	}
+}
+
 type hostPathPlugin struct {
-	host   volume.VolumeHost
-	config volume.VolumeConfig
+	host          volume.VolumeHost
+	config        volume.VolumeConfig
+	noTypeChecker bool
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
@@ -121,10 +132,11 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
 	return &hostPathMounter{
-		hostPath: &hostPath{path: path, pathType: pathType},
-		readOnly: readOnly,
-		mounter:  plugin.host.GetMounter(plugin.GetPluginName()),
-		hu:       kvh.GetHostUtil(),
+		hostPath:      &hostPath{path: path, pathType: pathType},
+		readOnly:      readOnly,
+		mounter:       plugin.host.GetMounter(plugin.GetPluginName()),
+		hu:            kvh.GetHostUtil(),
+		noTypeChecker: plugin.noTypeChecker,
 	}, nil
 }
 
@@ -203,9 +215,10 @@ func (hp *hostPath) GetPath() string {
 
 type hostPathMounter struct {
 	*hostPath
-	readOnly bool
-	mounter  mount.Interface
-	hu       hostutil.HostUtils
+	readOnly      bool
+	mounter       mount.Interface
+	hu            hostutil.HostUtils
+	noTypeChecker bool
 }
 
 var _ volume.Mounter = &hostPathMounter{}
@@ -235,7 +248,11 @@ func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	if *b.pathType == v1.HostPathUnset {
 		return nil
 	}
-	return checkType(b.GetPath(), b.pathType, b.hu)
+	if b.noTypeChecker {
+		return nil
+	} else {
+		return checkType(b.GetPath(), b.pathType, b.hu)
+	}
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
