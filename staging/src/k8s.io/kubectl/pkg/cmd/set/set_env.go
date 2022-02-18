@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 var (
@@ -130,6 +131,7 @@ type EnvOptions struct {
 	clientset              *kubernetes.Clientset
 
 	genericclioptions.IOStreams
+	warningPrinter *printers.WarningPrinter
 }
 
 // NewEnvOptions returns an EnvOptions indicating all containers in the selected
@@ -140,14 +142,14 @@ func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 
 		ContainerSelector: "*",
 		Overwrite:         true,
-
-		IOStreams: streams,
+		IOStreams:         streams,
 	}
 }
 
 // NewCmdEnv implements the OpenShift cli env command
 func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewEnvOptions(streams)
+
 	cmd := &cobra.Command{
 		Use:                   "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
 		DisableFlagsInUseLine: true,
@@ -206,7 +208,7 @@ func contains(key string, keyList []string) bool {
 func (o *EnvOptions) keyToEnvName(key string) string {
 	envName := strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 	if envName != key {
-		fmt.Fprintf(o.ErrOut, "warning: key %s transferred to %s\n", key, envName)
+		o.warningPrinter.Print(fmt.Sprintf("key %s transferred to %s", key, envName))
 	}
 	return envName
 }
@@ -251,6 +253,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return err
 	}
 	o.builder = f.NewBuilder
+	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 
 	return nil
 }
@@ -268,6 +271,9 @@ func (o *EnvOptions) Validate() error {
 	}
 	if len(o.Keys) > 0 && len(o.From) == 0 {
 		return fmt.Errorf("when specifying --keys, a configmap or secret must be provided with --from")
+	}
+	if o.warningPrinter == nil {
+		return fmt.Errorf("warningPrinter can not be used without initialization")
 	}
 	return nil
 }
@@ -421,7 +427,7 @@ func (o *EnvOptions) RunEnv() error {
 						}
 					}
 
-					fmt.Fprintf(o.ErrOut, "warning: %s/%s does not have any containers matching %q\n", objKind, objName, o.ContainerSelector)
+					o.warningPrinter.Print(fmt.Sprintf("%s/%s does not have any containers matching %q", objKind, objName, o.ContainerSelector))
 				}
 				return nil
 			}
