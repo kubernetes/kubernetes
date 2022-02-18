@@ -78,6 +78,37 @@ func BuildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]string {
 	return portsToEndpoints
 }
 
+// ContainsIPv4Loopback returns true if the input is empty or one of the CIDR contains an IPv4 loopback address.
+func ContainsIPv4Loopback(cidrStrings []string) bool {
+	if len(cidrStrings) == 0 {
+		return true
+	}
+	// RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
+	ipv4LoopbackStart := netutils.ParseIPSloppy("127.0.0.0")
+	for _, cidr := range cidrStrings {
+		if IsZeroCIDR(cidr) {
+			return true
+		}
+
+		ip, ipnet, err := netutils.ParseCIDRSloppy(cidr)
+		if err != nil {
+			continue
+		}
+
+		if netutils.IsIPv6CIDR(ipnet) {
+			continue
+		}
+
+		if ip.IsLoopback() {
+			return true
+		}
+		if ipnet.Contains(ipv4LoopbackStart) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
 func IsZeroCIDR(cidr string) bool {
