@@ -849,7 +849,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginAWSUnregister:                      {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureDisk:                          {Default: true, PreRelease: featuregate.Beta}, // On by default in 1.23 (requires Azure Disk CSI driver)
 	InTreePluginAzureDiskUnregister:                {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureFile:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure File CSI driver)
+	CSIMigrationAzureFile:                          {Default: true, PreRelease: featuregate.Beta}, // On by default in 1.24 (requires Azure File CSI driver)
 	InTreePluginAzureFileUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationvSphere:                            {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires vSphere CSI driver)
 	InTreePluginvSphereUnregister:                  {Default: false, PreRelease: featuregate.Alpha},
