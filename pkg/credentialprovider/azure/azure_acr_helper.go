@@ -80,7 +80,7 @@ const dockerTokenLoginUsernameGUID = "00000000-0000-0000-0000-000000000000"
 
 var client = &http.Client{
 	Transport: utilnet.SetTransportDefaults(&http.Transport{}),
-	Timeout:   time.Second * 10,
+	Timeout:   time.Second * 60,
 }
 
 func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, error) {
