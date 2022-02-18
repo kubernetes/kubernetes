@@ -1164,6 +1164,13 @@ func TestList(t *testing.T) {
 		},
 	}
 
+	// we want to figure out the resourceVersion before we create anything
+	initialList := &example.PodList{}
+	if err := store.List(ctx, "/", storage.ListOptions{Predicate: storage.Everything}, initialList); err != nil {
+		t.Errorf("Unexpected List error: %v", err)
+	}
+	initialRV := initialList.ResourceVersion
+
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
@@ -1244,16 +1251,16 @@ func TestList(t *testing.T) {
 			rv:          "0",
 		},
 		{
-			name:        "test List on existing key with resource version set to 1, match=Exact",
+			name:        "test List on existing key with resource version set before first write, match=Exact",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{},
-			rv:          "1",
+			rv:          initialRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    "1",
+			expectRV:    initialRV,
 		},
 		{
-			name:        "test List on existing key with resource version set to 1, match=NotOlderThan",
+			name:        "test List on existing key with resource version set to 0, match=NotOlderThan",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
@@ -1261,10 +1268,26 @@ func TestList(t *testing.T) {
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 		},
 		{
-			name:        "test List on existing key with resource version set to 1, match=Invalid",
+			name:        "test List on existing key with resource version set to 0, match=Invalid",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			rv:          "0",
+			rvMatch:     "Invalid",
+			expectError: true,
+		},
+		{
+			name:        "test List on existing key with resource version set before first write, match=NotOlderThan",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          initialRV,
+			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+		},
+		{
+			name:        "test List on existing key with resource version set before first write, match=Invalid",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			rv:          initialRV,
 			rvMatch:     "Invalid",
 			expectError: true,
 		},
@@ -1378,7 +1401,7 @@ func TestList(t *testing.T) {
 			expectRV:                   list.ResourceVersion,
 		},
 		{
-			name:   "test List with limit at resource version 1 and match=Exact",
+			name:   "test List with limit at resource version before first write and match=Exact",
 			prefix: "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
@@ -1387,9 +1410,9 @@ func TestList(t *testing.T) {
 			},
 			expectedOut:    []*example.Pod{},
 			expectContinue: false,
-			rv:             "1",
+			rv:             initialRV,
 			rvMatch:        metav1.ResourceVersionMatchExact,
-			expectRV:       "1",
+			expectRV:       initialRV,
 		},
 		{
 			name:          "test List with limit when paging disabled",
