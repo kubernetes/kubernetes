@@ -30,6 +30,21 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
+const (
+	// KubeMarkMasqChain is the mark-for-masquerade chain
+	// TODO: clean up this logic in kube-proxy
+	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
+
+	// KubeMarkDropChain is the mark-for-drop chain
+	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
+
+	// KubePostroutingChain is kubernetes postrouting rules
+	KubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
+
+	// KubeFirewallChain is kubernetes firewall rules
+	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
+)
+
 func (kl *Kubelet) initNetworkUtil() {
 	exec := utilexec.New()
 	// TODO: @khenidak review when there is no IPv6 iptables exec  what should happen here (note: no error returned from this func)
