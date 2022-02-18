@@ -27,7 +27,6 @@ import (
 	"k8s.io/klog/v2"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
-	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -51,29 +50,15 @@ const (
 
 func (kl *Kubelet) initNetworkUtil() {
 	exec := utilexec.New()
-	// TODO: @khenidak review when there is no IPv6 iptables exec  what should happen here (note: no error returned from this func)
-	ipv6Primary := kl.nodeIPs != nil && utilnet.IsIPv6(kl.nodeIPs[0])
-
-	var iptClients []utiliptables.Interface
-	var protocols []utiliptables.Protocol
-
-	// assume 4,6
-	protocols = append(protocols, utiliptables.ProtocolIPv4)
-	iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv4))
-
-	protocols = append(protocols, utiliptables.ProtocolIPv6)
-	iptClients = append(iptClients, utiliptables.New(exec, utiliptables.ProtocolIPv6))
-
-	// and if they are not
-	if ipv6Primary {
-		protocols[0], protocols[1] = protocols[1], protocols[0]
-		iptClients[0], iptClients[1] = iptClients[1], iptClients[0]
+	iptClients := []utiliptables.Interface{
+		utiliptables.New(exec, utiliptables.ProtocolIPv4),
+		utiliptables.New(exec, utiliptables.ProtocolIPv6),
 	}
 
 	for i := range iptClients {
 		iptClient := iptClients[i]
 		if kl.syncNetworkUtil(iptClient) {
-			klog.InfoS("Initialized protocol iptables rules.", "protocol", protocols[i])
+			klog.InfoS("Initialized protocol iptables rules.", "protocol", iptClient.Protocol())
 			go iptClient.Monitor(
 				utiliptables.Chain("KUBE-KUBELET-CANARY"),
 				[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
@@ -81,7 +66,7 @@ func (kl *Kubelet) initNetworkUtil() {
 				1*time.Minute, wait.NeverStop,
 			)
 		} else {
-			klog.InfoS("Failed to initialize protocol iptables rules; some functionality may be missing.", "protocol", protocols[i])
+			klog.InfoS("Failed to initialize protocol iptables rules; some functionality may be missing.", "protocol", iptClient.Protocol())
 		}
 	}
 }
