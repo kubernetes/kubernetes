@@ -45,6 +45,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -953,31 +954,18 @@ func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
 		return err
 	}
 
-	// Remove the container log.
-	// TODO: Separate log and container lifecycle management.
-	if err := m.removeContainerLog(containerID); err != nil {
-		return err
-	}
 	// Remove the container.
 	return m.runtimeService.RemoveContainer(containerID)
 }
 
 // removeContainerLog removes the container log.
-func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error {
+func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string, status *runtimeapi.ContainerStatus) error {
 	// Use log manager to remove rotated logs.
 	err := m.logManager.Clean(containerID)
 	if err != nil {
 		return err
 	}
 
-	resp, err := m.runtimeService.ContainerStatus(containerID, false)
-	if err != nil {
-		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
-	}
-	status := resp.GetStatus()
-	if status == nil {
-		return remote.ErrContainerStatusNil
-	}
 	// Remove the legacy container log symlink.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
@@ -990,7 +978,47 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 	return nil
 }
 
+// removeTerminationLog removes the container termination log.
+func (m *kubeGenericRuntimeManager) removeTerminationLog(containerID string, status *runtimeapi.ContainerStatus) error {
+	// read from the status and remove container termination log
+	mounts := status.GetMounts()
+	for _, mount := range mounts {
+		if mount.GetContainerPath() == v1.TerminationMessagePathDefault {
+			hostPath := mount.GetHostPath()
+			if err := m.osInterface.Remove(hostPath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to remove container %q termination log: %v",
+					containerID, err)
+			}
+			break
+		}
+	}
+
+	return nil
+}
+
 // DeleteContainer removes a container.
 func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
-	return m.removeContainer(containerID.ID)
+	resp, err := m.runtimeService.ContainerStatus(containerID.ID, false)
+	if err != nil {
+		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+	}
+	status := resp.GetStatus()
+	if status == nil {
+		return remote.ErrContainerStatusNil
+	}
+
+	var errs []error
+	// Remove the container log.
+	if err := m.removeContainerLog(containerID.ID, status); err != nil {
+		errs = append(errs, err)
+	}
+	// Remove the container termination log.
+	if err := m.removeTerminationLog(containerID.ID, status); err != nil {
+		errs = append(errs, err)
+	}
+	// Remove the container.
+	if err := m.removeContainer(containerID.ID); err != nil {
+		errs = append(errs, err)
+	}
+	return utilerrors.NewAggregate(errs)
 }

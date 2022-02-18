@@ -17,6 +17,8 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
+	"math/rand"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -43,6 +45,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -172,6 +175,16 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
 	containerID := apitest.BuildContainerName(containerConfig.Metadata, podSandboxID)
 	imageRef := containerConfig.Image.Image
+
+	const defaultRootDir = "/var/lib/kubelet"
+	// termination log path
+	hostPath := filepath.Join(defaultRootDir,
+		config.DefaultKubeletPodsDirName,
+		string(template.pod.GetUID()),
+		config.DefaultKubeletContainersDirName,
+		template.container.Name,
+		fmt.Sprintf("%08x", rand.Uint32()))
+
 	return &apitest.FakeContainer{
 		ContainerStatus: runtimeapi.ContainerStatus{
 			Id:          containerID,
@@ -182,7 +195,11 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 			State:       template.state,
 			Labels:      containerConfig.Labels,
 			Annotations: containerConfig.Annotations,
-			LogPath:     filepath.Join(sandboxConfig.GetLogDirectory(), containerConfig.GetLogPath()),
+			Mounts: []*runtimeapi.Mount{{
+				HostPath:      hostPath,
+				ContainerPath: v1.TerminationMessagePathDefault,
+			}},
+			LogPath: filepath.Join(sandboxConfig.GetLogDirectory(), containerConfig.GetLogPath()),
 		},
 		SandboxID: podSandboxID,
 	}
