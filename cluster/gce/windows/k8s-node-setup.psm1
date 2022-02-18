@@ -282,6 +282,7 @@ function Set-EnvironmentVars {
     "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
     "CSI_PROXY_STORAGE_PATH" = ${kube_env}['CSI_PROXY_STORAGE_PATH']
     "CSI_PROXY_VERSION" = ${kube_env}['CSI_PROXY_VERSION']
+    "CSI_PROXY_FLAGS" = ${kube_env}['CSI_PROXY_FLAGS']
     "ENABLE_CSI_PROXY" = ${kube_env}['ENABLE_CSI_PROXY']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
@@ -446,7 +447,7 @@ function DownloadAndInstall-CSIProxyBinaries {
 function Start-CSIProxy {
   if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
     Log-Output "Creating CSI Proxy Service"
-    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
+    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false ${env:CSI_PROXY_FLAGS}"
     & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
     & sc.exe failure csiproxy reset= 0 actions= restart/10000
     Log-Output "Starting CSI Proxy Service"
