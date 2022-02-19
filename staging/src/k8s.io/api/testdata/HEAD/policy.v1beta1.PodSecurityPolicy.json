@@ -2,144 +2,149 @@
   "kind": "PodSecurityPolicy",
   "apiVersion": "policy/v1beta1",
   "metadata": {
-    "name": "2",
-    "generateName": "3",
-    "namespace": "4",
-    "selfLink": "5",
-    "uid": "7",
-    "resourceVersion": "11042405498087606203",
-    "generation": 8071137005907523419,
-    "creationTimestamp": "2061-09-19T18:13:36Z",
-    "deletionGracePeriodSeconds": -4955867275792137171,
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
     "labels": {
-      "7": "8"
+      "labelsKey": "labelsValue"
     },
     "annotations": {
-      "9": "10"
+      "annotationsKey": "annotationsValue"
     },
     "ownerReferences": [
       {
-        "apiVersion": "11",
-        "kind": "12",
-        "name": "13",
-        "uid": "Dz廔ȇ{sŊƏp",
-        "controller": false,
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
         "blockOwnerDeletion": true
       }
     ],
     "finalizers": [
-      "14"
+      "finalizersValue"
     ],
-    "clusterName": "15",
+    "clusterName": "clusterNameValue",
     "managedFields": [
       {
-        "manager": "16",
-        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17",
-        "fieldsType": "18",
-        "subresource": "19"
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
       }
     ]
   },
   "spec": {
     "privileged": true,
     "defaultAddCapabilities": [
-      "qJ枊a8衍`Ĩ"
+      "defaultAddCapabilitiesValue"
     ],
     "requiredDropCapabilities": [
-      ".蘯6ċV夸"
+      "requiredDropCapabilitiesValue"
     ],
     "allowedCapabilities": [
-      "ɑ"
+      "allowedCapabilitiesValue"
     ],
     "volumes": [
-      "ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕\u003eŽ"
+      "volumesValue"
     ],
     "hostNetwork": true,
     "hostPorts": [
       {
-        "min": -321835912,
-        "max": 1575426699
+        "min": 1,
+        "max": 2
       }
     ],
+    "hostPID": true,
     "hostIPC": true,
     "seLinux": {
-      "rule": "S",
+      "rule": "ruleValue",
       "seLinuxOptions": {
-        "user": "20",
-        "role": "21",
-        "type": "22",
-        "level": "23"
+        "user": "userValue",
+        "role": "roleValue",
+        "type": "typeValue",
+        "level": "levelValue"
       }
     },
     "runAsUser": {
-      "rule": "+½H牗洝尿彀亞螩",
+      "rule": "ruleValue",
       "ranges": [
         {
-          "min": 8901768137137123048,
-          "max": -90233536926144532
+          "min": 1,
+          "max": 2
         }
       ]
     },
     "runAsGroup": {
-      "rule": "³;Ơ歿:狞夌碕ʂɭîcP",
+      "rule": "ruleValue",
       "ranges": [
         {
-          "min": -8679730194918865907,
-          "max": 2607109693095207331
+          "min": 1,
+          "max": 2
         }
       ]
     },
     "supplementalGroups": {
-      "rule": "ɖ橙9",
+      "rule": "ruleValue",
       "ranges": [
         {
-          "min": -5498021643263379468,
-          "max": -236027028483226507
+          "min": 1,
+          "max": 2
         }
       ]
     },
     "fsGroup": {
-      "rule": "UɦOŖ",
+      "rule": "ruleValue",
       "ranges": [
         {
-          "min": 8572633303645749270,
-          "max": 3058121789713366904
+          "min": 1,
+          "max": 2
         }
       ]
     },
-    "defaultAllowPrivilegeEscalation": false,
-    "allowPrivilegeEscalation": false,
+    "readOnlyRootFilesystem": true,
+    "defaultAllowPrivilegeEscalation": true,
+    "allowPrivilegeEscalation": true,
     "allowedHostPaths": [
       {
-        "pathPrefix": "24",
+        "pathPrefix": "pathPrefixValue",
         "readOnly": true
       }
     ],
     "allowedFlexVolumes": [
       {
-        "driver": "25"
+        "driver": "driverValue"
       }
     ],
     "allowedCSIDrivers": [
       {
-        "name": "26"
+        "name": "nameValue"
       }
     ],
     "allowedUnsafeSysctls": [
-      "27"
+      "allowedUnsafeSysctlsValue"
     ],
     "forbiddenSysctls": [
-      "28"
+      "forbiddenSysctlsValue"
     ],
     "allowedProcMountTypes": [
-      "ǣ偐圠=l畣潁"
+      "allowedProcMountTypesValue"
     ],
     "runtimeClass": {
       "allowedRuntimeClassNames": [
-        "29"
+        "allowedRuntimeClassNamesValue"
       ],
-      "defaultRuntimeClassName": "30"
+      "defaultRuntimeClassName": "defaultRuntimeClassNameValue"
     }
   }
 }

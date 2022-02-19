@@ -1,18 +1,21 @@
 apiVersion: v1
-code: -467962515
+code: 6
 details:
   causes:
-  - field: "8"
-    message: "7"
-    reason: 桰]]æȌ殸2爟¼ªov鈶Ƒ
-  group: "5"
-  kind: "6"
-  name: "4"
-  retryAfterSeconds: -309161244
+  - field: fieldValue
+    message: messageValue
+    reason: reasonValue
+  group: groupValue
+  kind: kindValue
+  name: nameValue
+  retryAfterSeconds: 5
+  uid: uidValue
 kind: Status
-message: "3"
+message: messageValue
 metadata:
-  resourceVersion: "17435791464288618533"
-  selfLink: ȉŏ軂:鹼(c螂z=lx*
-reason: '>渽蝧抰鹐ȾZȢXQ輂]'
-status: "2"
+  continue: continueValue
+  remainingItemCount: 4
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+reason: reasonValue
+status: statusValue

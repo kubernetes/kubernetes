@@ -1,14 +1,14 @@
 {
   "kind": "DeleteOptions",
   "apiVersion": "v1",
-  "gracePeriodSeconds": 4518808233936994290,
+  "gracePeriodSeconds": 1,
   "preconditions": {
-    "uid": "ȕHH壬%龺ǟ橸章蒪ʤǎ\u003e渽蝧抰",
-    "resourceVersion": "2"
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue"
   },
-  "orphanDependents": false,
-  "propagationPolicy": "ZȢXQ",
+  "orphanDependents": true,
+  "propagationPolicy": "propagationPolicyValue",
   "dryRun": [
-    "3"
+    "dryRunValue"
   ]
 }

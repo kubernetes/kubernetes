@@ -1,13 +1,13 @@
 apiVersion: admission.k8s.io/v1beta1
 kind: AdmissionReview
 request:
-  dryRun: false
+  dryRun: true
   kind:
-    group: "2"
-    kind: "4"
-    version: "3"
-  name: "16"
-  namespace: "17"
+    group: groupValue
+    kind: kindValue
+    version: versionValue
+  name: nameValue
+  namespace: namespaceValue
   object:
     apiVersion: example.com/v1
     kind: CustomType
@@ -22,7 +22,7 @@ request:
       replicas: 1
     status:
       available: 1
-  operation: ¡ıŵDz
+  operation: operationValue
   options:
     apiVersion: example.com/v1
     kind: CustomType
@@ -31,52 +31,54 @@ request:
     status:
       available: 1
   requestKind:
-    group: "9"
-    kind: "11"
-    version: "10"
+    group: groupValue
+    kind: kindValue
+    version: versionValue
   requestResource:
-    group: "12"
-    resource: "14"
-    version: "13"
-  requestSubResource: "15"
+    group: groupValue
+    resource: resourceValue
+    version: versionValue
+  requestSubResource: requestSubResourceValue
   resource:
-    group: "5"
-    resource: "7"
-    version: "6"
-  subResource: "8"
-  uid: ő岅ȕHH壬%龺ǟ橸章蒪ʤǎ
+    group: groupValue
+    resource: resourceValue
+    version: versionValue
+  subResource: subResourceValue
+  uid: uidValue
   userInfo:
     extra:
-      "21":
-      - "22"
+      extraKey:
+      - extraValue
     groups:
-    - "20"
-    uid: "19"
-    username: "18"
+    - groupsValue
+    uid: uidValue
+    username: usernameValue
 response:
-  allowed: false
+  allowed: true
   auditAnnotations:
-    "30": "31"
-  patch: fQ==
-  patchType: -Ǐ忄*齧獚敆Ȏțê
+    auditAnnotationsKey: auditAnnotationsValue
+  patch: BA==
+  patchType: patchTypeValue
   status:
-    code: 153738858
+    code: 6
     details:
       causes:
-      - field: "29"
-        message: "28"
-        reason: 颋ǅ
-      group: "26"
-      kind: "27"
-      name: "25"
-      retryAfterSeconds: 1001983654
-      uid: Ƣ6/ʕVŚ(ĿȊ甞
-    message: "24"
+      - field: fieldValue
+        message: messageValue
+        reason: reasonValue
+      group: groupValue
+      kind: kindValue
+      name: nameValue
+      retryAfterSeconds: 5
+      uid: uidValue
+    message: messageValue
     metadata:
-      resourceVersion: "71208173751669476"
-      selfLink: (湗Ć]ʪƬ滈憴Uą飋ī
-    reason: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
-    status: "23"
-  uid: 輂]¨&桰]]æȌ殸2爟¼ªov鈶
+      continue: continueValue
+      remainingItemCount: 4
+      resourceVersion: resourceVersionValue
+      selfLink: selfLinkValue
+    reason: reasonValue
+    status: statusValue
+  uid: uidValue
   warnings:
-  - "32"
+  - warningsValue

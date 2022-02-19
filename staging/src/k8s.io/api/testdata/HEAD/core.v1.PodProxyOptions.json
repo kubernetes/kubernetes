@@ -1,5 +1,5 @@
 {
   "kind": "PodProxyOptions",
   "apiVersion": "v1",
-  "path": "2"
+  "path": "pathValue"
 }
