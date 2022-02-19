@@ -15,7 +15,7 @@ production workloads at scale using a system called [Borg],
 combined with best-of-breed ideas and practices from the community.
 
 Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
-If your company wants to help shape the evolution of
+If your company wants to help in shaping the evolution of
 technologies that are container-packaged, dynamically scheduled,
 and microservices-oriented, consider joining the CNCF.
 For details about who's involved and how Kubernetes plays a role,
@@ -67,8 +67,8 @@ For the full story, head over to the [developer's documentation].
 If you need support, start with the [troubleshooting guide],
 and work your way through the process that we've outlined.
 
-That said, if you have questions, reach out to us
-[one way or another][communication].
+That said, if you have any questions, feel free to
+[reach out to us][communication].
 
 [announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
 [Borg]: https://research.google.com/pubs/pub43438.html
