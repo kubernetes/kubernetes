@@ -29,7 +29,7 @@ import (
 	"strings"
 	"testing"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapiv2 "github.com/googleapis/gnostic/openapiv2"
 	"github.com/spf13/cobra"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -82,7 +82,7 @@ type testOpenAPISchema struct {
 
 type alwaysErrorsOpenAPISchema struct{}
 
-func (o *alwaysErrorsOpenAPISchema) OpenAPISchema() (*openapi_v2.Document, error) {
+func (o *alwaysErrorsOpenAPISchema) OpenAPISchema() (*openapiv2.Document, error) {
 	return nil, errors.New("cannot get openapi schema")
 }
 
@@ -202,7 +202,7 @@ func readServiceFromFile(t *testing.T, filename string) *corev1.Service {
 	return &svc
 }
 
-func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object, kind string) (string, []byte) {
+func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object) (string, []byte) {
 	originalAccessor, err := meta.Accessor(originalObj)
 	if err != nil {
 		t.Fatal(err)
@@ -244,19 +244,19 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 func readAndAnnotateReplicationController(t *testing.T, filename string) (string, []byte) {
 	rc1 := readReplicationControllerFromFile(t, filename)
 	rc2 := readReplicationControllerFromFile(t, filename)
-	return annotateRuntimeObject(t, rc1, rc2, "ReplicationController")
+	return annotateRuntimeObject(t, rc1, rc2)
 }
 
 func readAndAnnotateService(t *testing.T, filename string) (string, []byte) {
 	svc1 := readServiceFromFile(t, filename)
 	svc2 := readServiceFromFile(t, filename)
-	return annotateRuntimeObject(t, svc1, svc2, "Service")
+	return annotateRuntimeObject(t, svc1, svc2)
 }
 
 func readAndAnnotateUnstructured(t *testing.T, filename string) (string, []byte) {
 	obj1 := readUnstructuredFromFile(t, filename)
 	obj2 := readUnstructuredFromFile(t, filename)
-	return annotateRuntimeObject(t, obj1, obj2, "Widget")
+	return annotateRuntimeObject(t, obj1, obj2)
 }
 
 func validatePatchApplication(t *testing.T, req *http.Request) {
