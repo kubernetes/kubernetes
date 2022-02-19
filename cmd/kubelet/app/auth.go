@@ -98,7 +98,7 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 		if dynamicCAContentFromFile != nil {
 			go dynamicCAContentFromFile.Run(1, stopCh)
 		}
-	}, err
+	}, nil
 }
 
 // BuildAuthz creates an authorizer compatible with the kubelet's needs
