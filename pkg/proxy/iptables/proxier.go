@@ -1522,7 +1522,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Write(proxier.natChains.Bytes())
 	proxier.iptablesData.Write(proxier.natRules.Bytes())
 
-	klog.V(5).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
+	klog.V(9).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {
