@@ -26,10 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -855,8 +852,6 @@ func TestInterPodAffinity(t *testing.T) {
 }
 
 // TestInterPodAffinityWithNamespaceSelector verifies that inter pod affinity with NamespaceSelector works as expected.
-// TODO(https://github.com/kubernetes/enhancements/issues/2249): merge with TestInterPodAffinity once NamespaceSelector
-// graduates to GA.
 func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 	podLabel := map[string]string{"service": "securityscan"}
 	tests := []struct {
@@ -865,7 +860,6 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 		existingPod *v1.Pod
 		fits        bool
 		errorType   string
-		disabled    bool
 	}{
 		{
 			name: "MatchingNamespaces",
@@ -915,56 +909,6 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 				},
 			},
 			fits: true,
-		},
-		{
-			name: "Disabled",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-ns-selector",
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-					Affinity: &v1.Affinity{
-						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "service",
-												Operator: metav1.LabelSelectorOpIn,
-												Values:   []string{"securityscan"},
-											},
-										},
-									},
-									NamespaceSelector: &metav1.LabelSelector{
-										MatchExpressions: []metav1.LabelSelectorRequirement{
-											{
-												Key:      "team",
-												Operator: metav1.LabelSelectorOpIn,
-												Values:   []string{"team1"},
-											},
-										},
-									},
-									TopologyKey: "region",
-								},
-							},
-						},
-					},
-				},
-			},
-			existingPod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "fakename2",
-					Labels:    podLabel,
-					Namespace: "ns2",
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
-				},
-			},
-			fits:     false,
-			disabled: true,
 		},
 		{
 			name: "MismatchingNamespaces",
@@ -1019,7 +963,6 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, !test.disabled)()
 			testCtx := initTest(t, "")
 			defer testutils.CleanupTest(t, testCtx)
 

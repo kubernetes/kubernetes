@@ -4933,7 +4933,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 		Spec: spec,
 	}
 
-	if errs := ValidateResourceQuota(resourceQuota, ResourceQuotaValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -16212,10 +16212,9 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		rq                       core.ResourceQuota
-		errDetail                string
-		errField                 string
-		disableNamespaceSelector bool
+		rq        core.ResourceQuota
+		errDetail string
+		errField  string
 	}{
 		"no-scope": {
 			rq: core.ResourceQuota{
@@ -16333,17 +16332,10 @@ func TestValidateResourceQuota(t *testing.T) {
 			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
 			errDetail: "must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
 		},
-		"cross-namespace-affinity-disabled": {
-			rq:                       core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: crossNamespaceAffinitySpec},
-			errDetail:                "unsupported scope",
-			disableNamespaceSelector: true,
-		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateResourceQuota(&tc.rq, ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: !tc.disableNamespaceSelector,
-			})
+			errs := ValidateResourceQuota(&tc.rq)
 			if len(tc.errDetail) == 0 && len(tc.errField) == 0 && len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			} else if (len(tc.errDetail) != 0 || len(tc.errField) != 0) && len(errs) == 0 {

@@ -426,9 +426,6 @@ func crossNamespaceWeightedPodAffinityTerms(terms []corev1.WeightedPodAffinityTe
 }
 
 func usesCrossNamespacePodAffinity(pod *corev1.Pod) bool {
-	if !feature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector) {
-		return false
-	}
 	if pod == nil || pod.Spec.Affinity == nil {
 		return false
 	}
