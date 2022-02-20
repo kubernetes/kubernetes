@@ -178,8 +178,8 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				},
 				"spec": {
 					"containers": [{
-						"name":  "nginx",
-						"image": "nginx:latest",
+						"name":  "webserver",
+						"image": imageutils.GetE2EImage(imageutils.Httpd),
 					}]
 				}
 			}`,
