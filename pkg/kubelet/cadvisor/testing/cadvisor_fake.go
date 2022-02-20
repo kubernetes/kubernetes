@@ -25,7 +25,9 @@ import (
 
 // Fake cadvisor.Interface implementation.
 type Fake struct {
-	NodeName string
+	NodeName       string
+	NumCores       int
+	MemoryCapacity uint64
 }
 
 const (
