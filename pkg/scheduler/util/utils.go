@@ -56,7 +56,7 @@ func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	if len(victims.Pods) == 0 {
 		// should not reach here.
-		klog.Errorf("victims.Pods is empty. Should not reach here.")
+		klog.ErrorS(fmt.Errorf("victims.Pods is empty. Should not reach here"), "")
 		return nil
 	}
 

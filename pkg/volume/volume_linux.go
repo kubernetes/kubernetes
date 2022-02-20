@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -26,9 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -46,24 +45,10 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		return nil
 	}
 
-	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy)
-
 	timer := time.AfterFunc(30*time.Second, func() {
 		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
 	})
 	defer timer.Stop()
-
-	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
-	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
-	if !fsGroupPolicyEnabled {
-		err := legacyOwnershipChange(mounter, fsGroup)
-		if completeFunc != nil {
-			completeFunc(types.CompleteFuncParam{
-				Err: &err,
-			})
-		}
-		return err
-	}
 
 	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
 		klog.V(3).InfoS("Skipping permission and ownership change for volume", "path", mounter.GetPath())
@@ -82,15 +67,6 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		})
 	}
 	return err
-}
-
-func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
-	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
-	})
 }
 
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
@@ -122,7 +98,7 @@ func changeFilePermission(filename string, fsGroup *int64, readonly bool, info o
 
 	err = os.Chmod(filename, info.Mode()|mask)
 	if err != nil {
-		klog.ErrorS(err, "Chown failed", "path", filename)
+		klog.ErrorS(err, "chmod failed", "path", filename)
 	}
 
 	return nil

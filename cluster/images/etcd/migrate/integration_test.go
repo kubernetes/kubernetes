@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 /*
@@ -27,7 +28,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -39,6 +39,7 @@ import (
 
 	"github.com/blang/semver"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -290,13 +291,13 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 	}
 
 	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0777))
+	err = os.WriteFile(certFileName, certPem, os.FileMode(0777))
 	if err != nil {
 		return err
 	}
 
 	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0777))
+	err = os.WriteFile(keyFileName, keyPem, os.FileMode(0777))
 	if err != nil {
 		return err
 	}
@@ -307,7 +308,7 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 func parseIPList(ips []string) []net.IP {
 	var netIPs []net.IP
 	for _, ip := range ips {
-		netIPs = append(netIPs, net.ParseIP(ip))
+		netIPs = append(netIPs, netutils.ParseIPSloppy(ip))
 	}
 	return netIPs
 }
@@ -335,7 +336,7 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 		IsCA:                  true,
 	}
 
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := netutils.ParseIPSloppy(host); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, host)

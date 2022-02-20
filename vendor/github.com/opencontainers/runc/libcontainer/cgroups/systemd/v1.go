@@ -6,14 +6,17 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
+	"github.com/godbus/dbus/v5"
+	"github.com/sirupsen/logrus"
+
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/sirupsen/logrus"
 )
 
 type legacyManager struct {
@@ -61,7 +64,7 @@ var legacySubsystems = []subsystem{
 func genV1ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
 	var properties []systemdDbus.Property
 
-	deviceProperties, err := generateDeviceProperties(r.Devices)
+	deviceProperties, err := generateDeviceProperties(r)
 	if err != nil {
 		return nil, err
 	}
@@ -207,9 +210,10 @@ func (m *legacyManager) Destroy() error {
 
 	stopErr := stopUnit(m.dbus, getUnitName(m.cgroups))
 
-	// Both on success and on error, cleanup all the cgroups we are aware of.
-	// Some of them were created directly by Apply() and are not managed by systemd.
-	if err := cgroups.RemovePaths(m.paths); err != nil {
+	// Both on success and on error, cleanup all the cgroups
+	// we are aware of, as some of them were created directly
+	// by Apply() and are not managed by systemd.
+	if err := cgroups.RemovePaths(m.paths); err != nil && stopErr == nil {
 		return err
 	}
 
@@ -237,7 +241,7 @@ func (m *legacyManager) joinCgroups(pid int) error {
 			}
 		default:
 			if path, ok := m.paths[name]; ok {
-				if err := os.MkdirAll(path, 0755); err != nil {
+				if err := os.MkdirAll(path, 0o755); err != nil {
 					return err
 				}
 				if err := cgroups.WriteCgroupProc(path, pid); err != nil {
@@ -277,18 +281,23 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 }
 
 func (m *legacyManager) Freeze(state configs.FreezerState) error {
+	err := m.doFreeze(state)
+	if err == nil {
+		m.cgroups.Resources.Freezer = state
+	}
+	return err
+}
+
+// doFreeze is the same as Freeze but without
+// changing the m.cgroups.Resources.Frozen field.
+func (m *legacyManager) doFreeze(state configs.FreezerState) error {
 	path, ok := m.paths["freezer"]
 	if !ok {
 		return errSubsystemDoesNotExist
 	}
-	prevState := m.cgroups.Resources.Freezer
-	m.cgroups.Resources.Freezer = state
 	freezer := &fs.FreezerGroup{}
-	if err := freezer.Set(path, m.cgroups.Resources); err != nil {
-		m.cgroups.Resources.Freezer = prevState
-		return err
-	}
-	return nil
+	resources := &configs.Resources{Freezer: state}
+	return freezer.Set(path, resources)
 }
 
 func (m *legacyManager) GetPids() ([]int, error) {
@@ -324,6 +333,71 @@ func (m *legacyManager) GetStats() (*cgroups.Stats, error) {
 	return stats, nil
 }
 
+// freezeBeforeSet answers whether there is a need to freeze the cgroup before
+// applying its systemd unit properties, and thaw after, while avoiding
+// unnecessary freezer state changes.
+//
+// The reason why we have to freeze is that systemd's application of device
+// rules is done disruptively, resulting in spurious errors to common devices
+// (unlike our fs driver, they will happily write deny-all rules to running
+// containers). So we have to freeze the container to avoid the container get
+// an occasional "permission denied" error.
+func (m *legacyManager) freezeBeforeSet(unitName string, r *configs.Resources) (needsFreeze, needsThaw bool, err error) {
+	// Special case for SkipDevices, as used by Kubernetes to create pod
+	// cgroups with allow-all device policy).
+	if r.SkipDevices {
+		if r.SkipFreezeOnSet {
+			// Both needsFreeze and needsThaw are false.
+			return
+		}
+
+		// No need to freeze if SkipDevices is set, and either
+		// (1) systemd unit does not (yet) exist, or
+		// (2) it has DevicePolicy=auto and empty DeviceAllow list.
+		//
+		// Interestingly, (1) and (2) are the same here because
+		// a non-existent unit returns default properties,
+		// and settings in (2) are the defaults.
+		//
+		// Do not return errors from getUnitTypeProperty, as they alone
+		// should not prevent Set from working.
+
+		unitType := getUnitType(unitName)
+
+		devPolicy, e := getUnitTypeProperty(m.dbus, unitName, unitType, "DevicePolicy")
+		if e == nil && devPolicy.Value == dbus.MakeVariant("auto") {
+			devAllow, e := getUnitTypeProperty(m.dbus, unitName, unitType, "DeviceAllow")
+			if e == nil {
+				if rv := reflect.ValueOf(devAllow.Value.Value()); rv.Kind() == reflect.Slice && rv.Len() == 0 {
+					needsFreeze = false
+					needsThaw = false
+					return
+				}
+			}
+		}
+	}
+
+	needsFreeze = true
+	needsThaw = true
+
+	// Check the current freezer state.
+	freezerState, err := m.GetFreezerState()
+	if err != nil {
+		return
+	}
+	if freezerState == configs.Frozen {
+		// Already frozen, and should stay frozen.
+		needsFreeze = false
+		needsThaw = false
+	}
+
+	if r.Freezer == configs.Frozen {
+		// Will be frozen anyway -- no need to thaw.
+		needsThaw = false
+	}
+	return
+}
+
 func (m *legacyManager) Set(r *configs.Resources) error {
 	// If Paths are set, then we are just joining cgroups paths
 	// and there is no need to set any values.
@@ -338,37 +412,27 @@ func (m *legacyManager) Set(r *configs.Resources) error {
 		return err
 	}
 
-	// We have to freeze the container while systemd sets the cgroup settings.
-	// The reason for this is that systemd's application of DeviceAllow rules
-	// is done disruptively, resulting in spurrious errors to common devices
-	// (unlike our fs driver, they will happily write deny-all rules to running
-	// containers). So we freeze the container to avoid them hitting the cgroup
-	// error. But if the freezer cgroup isn't supported, we just warn about it.
-	targetFreezerState := configs.Undefined
-	if !m.cgroups.SkipDevices {
-		// Figure out the current freezer state, so we can revert to it after we
-		// temporarily freeze the container.
-		targetFreezerState, err = m.GetFreezerState()
-		if err != nil {
-			return err
-		}
-		if targetFreezerState == configs.Undefined {
-			targetFreezerState = configs.Thawed
-		}
-
-		if err := m.Freeze(configs.Frozen); err != nil {
-			logrus.Infof("freeze container before SetUnitProperties failed: %v", err)
-		}
-	}
-
-	if err := setUnitProperties(m.dbus, getUnitName(m.cgroups), properties...); err != nil {
-		_ = m.Freeze(targetFreezerState)
+	unitName := getUnitName(m.cgroups)
+	needsFreeze, needsThaw, err := m.freezeBeforeSet(unitName, r)
+	if err != nil {
 		return err
 	}
 
-	// Reset freezer state before we apply the configuration, to avoid clashing
-	// with the freezer setting in the configuration.
-	_ = m.Freeze(targetFreezerState)
+	if needsFreeze {
+		if err := m.doFreeze(configs.Frozen); err != nil {
+			// If freezer cgroup isn't supported, we just warn about it.
+			logrus.Infof("freeze container before SetUnitProperties failed: %v", err)
+		}
+	}
+	setErr := setUnitProperties(m.dbus, unitName, properties...)
+	if needsThaw {
+		if err := m.doFreeze(configs.Thawed); err != nil {
+			logrus.Infof("thaw container after SetUnitProperties failed: %v", err)
+		}
+	}
+	if setErr != nil {
+		return setErr
+	}
 
 	for _, sys := range legacySubsystems {
 		// Get the subsystem path, but don't error out for not found cgroups.

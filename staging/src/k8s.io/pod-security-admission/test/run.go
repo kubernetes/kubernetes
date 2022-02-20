@@ -73,8 +73,8 @@ func toJSON(pod *corev1.Pod) string {
 // checksForLevelAndVersion returns the set of check IDs that apply when evaluating the given level and version.
 // checks are assumed to be well-formed and valid to pass to policy.NewEvaluator().
 // level must be api.LevelRestricted or api.LevelBaseline
-func checksForLevelAndVersion(checks []policy.Check, level api.Level, version api.Version) ([]string, error) {
-	retval := []string{}
+func checksForLevelAndVersion(checks []policy.Check, level api.Level, version api.Version) ([]policy.CheckID, error) {
+	retval := []policy.CheckID{}
 	for _, check := range checks {
 		if !version.Older(check.Versions[0].MinimumVersion) && (level == check.Level || level == api.LevelRestricted) {
 			retval = append(retval, check.ID)
@@ -118,10 +118,10 @@ func computeVersionsToTest(t *testing.T, checks []policy.Check) []api.Version {
 	alwaysIncludeVersions := []api.Version{
 		// include the oldest version by default
 		api.MajorMinorVersion(1, 0),
-		// include the release under development (1.22 at time of writing).
+		// include the release under development (1.23 at time of writing).
 		// this can be incremented to the current version whenever is convenient.
 		// TODO: find a way to use api.LatestVersion() here
-		api.MajorMinorVersion(1, 22),
+		api.MajorMinorVersion(1, 23),
 	}
 	for _, version := range alwaysIncludeVersions {
 		seenVersions[version] = true
@@ -296,7 +296,7 @@ func Run(t *testing.T, opts Options) {
 				}
 			}
 
-			minimalValidPod, err := getMinimalValidPod(level, version)
+			minimalValidPod, err := GetMinimalValidPod(level, version)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -318,7 +318,7 @@ func Run(t *testing.T, opts Options) {
 					t.Fatal(err)
 				}
 
-				t.Run(ns+"_pass_"+checkID, func(t *testing.T) {
+				t.Run(ns+"_pass_"+string(checkID), func(t *testing.T) {
 					for i, pod := range checkData.pass {
 						createPod(t, i, pod, true, "")
 						createController(t, i, pod, true, "")
@@ -332,7 +332,7 @@ func Run(t *testing.T, opts Options) {
 						disabledRequiredFeatures = append(disabledRequiredFeatures, f)
 					}
 				}
-				t.Run(ns+"_fail_"+checkID, func(t *testing.T) {
+				t.Run(ns+"_fail_"+string(checkID), func(t *testing.T) {
 					if len(disabledRequiredFeatures) > 0 {
 						t.Skipf("features required for failure cases are disabled: %v", disabledRequiredFeatures)
 					}

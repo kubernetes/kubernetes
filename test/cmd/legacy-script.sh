@@ -50,6 +50,7 @@ source "${KUBE_ROOT}/test/cmd/plugins.sh"
 source "${KUBE_ROOT}/test/cmd/proxy.sh"
 source "${KUBE_ROOT}/test/cmd/rbac.sh"
 source "${KUBE_ROOT}/test/cmd/request-timeout.sh"
+source "${KUBE_ROOT}/test/cmd/results.sh"
 source "${KUBE_ROOT}/test/cmd/run.sh"
 source "${KUBE_ROOT}/test/cmd/save-config.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
@@ -105,6 +106,11 @@ daemonsets="daemonsets"
 controllerrevisions="controllerrevisions"
 job="jobs"
 
+# A junit-style XML test report will be generated in the directory specified by KUBE_JUNIT_REPORT_DIR, if set.
+# If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then use what is set in ARTIFACTS.
+if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
+  export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
+fi
 
 # include shell2junit library
 sh2ju="${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
@@ -377,7 +383,7 @@ runTests() {
   export container_name_field="(index .spec.template.spec.containers 0).name"
   export hpa_min_field=".spec.minReplicas"
   export hpa_max_field=".spec.maxReplicas"
-  export hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
+  export hpa_cpu_field="(index .spec.metrics 0).resource.target.averageUtilization"
   export template_labels=".spec.template.metadata.labels.name"
   export statefulset_replicas_field=".spec.replicas"
   export statefulset_observed_generation=".status.observedGeneration"
@@ -435,6 +441,12 @@ runTests() {
   #########################
 
   record_command run_kubectl_version_tests
+
+  ############################
+  # Kubectl result reporting #
+  ############################
+
+  record_command run_kubectl_results_tests
 
   #######################
   # kubectl config set #
@@ -599,7 +611,7 @@ runTests() {
   #####################################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    run_recursive_resources_tests
+    record_command run_recursive_resources_tests
   fi
 
 
@@ -885,6 +897,13 @@ runTests() {
     record_command run_kubectl_explain_tests
   fi
 
+  ##############################
+  # CRD Deletion / Re-creation #
+  ##############################
+
+  if kube::test::if_supports_resource "${namespaces}" ; then
+      record_command run_crd_deletion_recreation_tests
+  fi
 
   ###########
   # Swagger #
@@ -915,7 +934,7 @@ runTests() {
   ############################
 
   if kube::test::if_supports_resource "${podsecuritypolicies}" ; then
-    run_deprecated_api_tests
+    record_command run_deprecated_api_tests
   fi
 
 

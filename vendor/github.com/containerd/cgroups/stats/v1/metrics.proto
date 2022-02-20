@@ -13,6 +13,7 @@ message Metrics {
 	RdmaStat rdma = 6;
 	repeated NetworkStat network = 7;
 	CgroupStats cgroup_stats = 8;
+	MemoryOomControl memory_oom_control = 9;
 }
 
 message HugetlbStat {
@@ -92,6 +93,12 @@ message MemoryEntry {
 	uint64 usage = 2;
 	uint64 max = 3;
 	uint64 failcnt = 4;
+}
+
+message MemoryOomControl {
+	uint64 oom_kill_disable = 1;
+	uint64 under_oom = 2;
+	uint64 oom_kill = 3;
 }
 
 message BlkIOStat {

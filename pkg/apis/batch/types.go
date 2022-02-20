@@ -173,8 +173,6 @@ type JobSpec struct {
 	// guarantees (e.g. finalizers) will be honored. If this field is unset,
 	// the Job won't be automatically deleted. If this field is set to zero,
 	// the Job becomes eligible to be deleted immediately after it finishes.
-	// This field is alpha-level and is only honored by servers that enable the
-	// TTLAfterFinished feature.
 	// +optional
 	TTLSecondsAfterFinished *int32
 
@@ -210,9 +208,6 @@ type JobSpec struct {
 	// Suspending a Job will reset the StartTime field of the Job, effectively
 	// resetting the ActiveDeadlineSeconds timer too. Defaults to false.
 	//
-	// This field is beta-level, gated by SuspendJob feature flag (enabled by
-	// default).
-	//
 	// +optional
 	Suspend *bool
 }
@@ -243,9 +238,16 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time
 
-	// The number of actively running pods.
+	// The number of pending and running pods.
 	// +optional
 	Active int32
+
+	// The number of active pods which have a Ready condition.
+	//
+	// This field is alpha-level. The job controller populates the field when
+	// the feature gate JobReadyPods is enabled (disabled by default).
+	// +optional
+	Ready *int32
 
 	// The number of pods which reached phase Succeeded.
 	// +optional
@@ -276,8 +278,9 @@ type JobStatus struct {
 	// (3) Remove the pod UID from the array while increasing the corresponding
 	//     counter.
 	//
-	// This field is alpha-level. The job controller only makes use of this field
-	// when the feature gate PodTrackingWithFinalizers is enabled.
+	// This field is beta-level. The job controller only makes use of this field
+	// when the feature gate JobTrackingWithFinalizers is enabled (enabled
+	// by default).
 	// Old jobs might not be tracked using this field, in which case the field
 	// remains null.
 	// +optional

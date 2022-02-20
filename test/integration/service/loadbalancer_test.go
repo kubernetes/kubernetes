@@ -37,7 +37,6 @@ import (
 // Test_ServiceLoadBalancerAllocateNodePorts tests that a Service with spec.allocateLoadBalancerNodePorts=false
 // does not allocate node ports for the Service.
 func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
@@ -78,10 +77,62 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 	}
 }
 
+// Test_ServiceUpdateLoadBalancerAllocateNodePorts tests that a Service that is updated from ClusterIP to LoadBalancer
+// with spec.allocateLoadBalancerNodePorts=false does not allocate node ports for the Service
+func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
+
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if serviceHasNodePorts(service) {
+		t.Error("found node ports when none was expected")
+	}
+
+	service.Spec.Type = corev1.ServiceTypeLoadBalancer
+	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error updating test service: %v", err)
+	}
+
+	if serviceHasNodePorts(service) {
+		t.Error("found node ports when none was expected")
+	}
+}
+
 // Test_ServiceLoadBalancerSwitchToDeallocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=false, does not de-allocate existing node ports.
 func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
@@ -132,6 +183,59 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 	}
 }
 
+// Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts test that switching a Service
+// to spec.allocateLoadBalancerNodePorts=true from false, allocate new node ports.
+func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
+
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateTestingNamespace("test-service-reallocate-node-ports", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type:                          corev1.ServiceTypeLoadBalancer,
+			AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if serviceHasNodePorts(service) {
+		t.Error("not expected node ports but found one")
+	}
+
+	service.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error updating test service: %v", err)
+	}
+
+	if !serviceHasNodePorts(service) {
+		t.Error("expected node ports but found none")
+	}
+}
+
 func serviceHasNodePorts(svc *corev1.Service) bool {
 	for _, port := range svc.Spec.Ports {
 		if port.NodePort > 0 {
@@ -162,10 +266,10 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	stopCh := make(chan struct{})
-	informer.Start(stopCh)
-	go controller.Run(stopCh, 1)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informer.Start(ctx.Done())
+	go controller.Run(ctx, 1)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -180,7 +284,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -211,10 +315,10 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	stopCh := make(chan struct{})
-	informer.Start(stopCh)
-	go controller.Run(stopCh, 1)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informer.Start(ctx.Done())
+	go controller.Run(ctx, 1)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -229,7 +333,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -239,7 +343,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 	}
 
 	service.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/update")
-	_, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatal("Error updating test service load balancer class should throw error")
 	}

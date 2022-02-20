@@ -17,7 +17,7 @@ limitations under the License.
 package staticpod
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -25,12 +25,12 @@ import (
 	"strconv"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestComponentResources(t *testing.T) {
@@ -577,13 +577,11 @@ func TestGetExtraParameters(t *testing.T) {
 				"admission-control": "NamespaceLifecycle,LimitRanger",
 			},
 			defaults: map[string]string{
-				"admission-control":     "NamespaceLifecycle",
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
+				"admission-control": "NamespaceLifecycle",
+				"allow-privileged":  "true",
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 		},
@@ -593,12 +591,10 @@ func TestGetExtraParameters(t *testing.T) {
 				"admission-control": "NamespaceLifecycle,LimitRanger",
 			},
 			defaults: map[string]string{
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
+				"allow-privileged": "true",
 			},
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 		},
@@ -668,7 +664,7 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 
 			manifestPath := filepath.Join(tmpdir, "pod.yaml")
 			if rt.writeManifest {
-				err := ioutil.WriteFile(manifestPath, []byte(rt.podYaml), 0644)
+				err := os.WriteFile(manifestPath, []byte(rt.podYaml), 0644)
 				if err != nil {
 					t.Fatalf("Failed to write pod manifest\n%s\n\tfatal error: %v", rt.description, err)
 				}
@@ -730,7 +726,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			for i := 0; i < 2; i++ {
 				if rt.podYamls[i] != "" {
 					manifestPath := filepath.Join(tmpdir, strconv.Itoa(i)+".yaml")
-					err := ioutil.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)
+					err := os.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)
 					if err != nil {
 						t.Fatalf("Failed to write manifest file\n%s\n\tfatal error: %v", rt.description, err)
 					}
@@ -812,7 +808,7 @@ func TestPatchStaticPod(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", "patch-files")
+			tempDir, err := os.MkdirTemp("", "patch-files")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -820,13 +816,13 @@ func TestPatchStaticPod(t *testing.T) {
 
 			for _, file := range tc.files {
 				filePath := filepath.Join(tempDir, file.name)
-				err := ioutil.WriteFile(filePath, []byte(file.data), 0644)
+				err := os.WriteFile(filePath, []byte(file.data), 0644)
 				if err != nil {
 					t.Fatalf("could not write temporary file %q", filePath)
 				}
 			}
 
-			pod, err := PatchStaticPod(tc.pod, tempDir, ioutil.Discard)
+			pod, err := PatchStaticPod(tc.pod, tempDir, io.Discard)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, (err != nil), err)
 			}

@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/apps/v1";
 
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
@@ -165,8 +165,8 @@ message DaemonSetStatus {
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
   optional int32 desiredNumberScheduled = 3;
 
-  // The number of nodes that should be running the daemon pod and have one
-  // or more of the daemon pod running and ready.
+  // numberReady is the number of nodes that should be running the daemon pod and have one
+  // or more of the daemon pod running with a Ready Condition.
   optional int32 numberReady = 4;
 
   // The most recent generation observed by the daemon set controller.
@@ -322,7 +322,7 @@ message DeploymentStatus {
   // +optional
   optional int32 updatedReplicas = 3;
 
-  // Total number of ready pods targeted by this deployment.
+  // readyReplicas is the number of pods targeted by this Deployment with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 7;
 
@@ -457,7 +457,7 @@ message ReplicaSetStatus {
   // +optional
   optional int32 fullyLabeledReplicas = 2;
 
-  // The number of ready replicas for this replica set.
+  // readyReplicas is the number of pods targeted by this ReplicaSet with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 4;
 
@@ -715,7 +715,7 @@ message StatefulSetStatus {
   // replicas is the number of Pods created by the StatefulSet controller.
   optional int32 replicas = 2;
 
-  // readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
+  // readyReplicas is the number of pods created for this StatefulSet with a Ready Condition.
   optional int32 readyReplicas = 3;
 
   // currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
@@ -747,9 +747,7 @@ message StatefulSetStatus {
   repeated StatefulSetCondition conditions = 10;
 
   // Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
-  // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
-  // Remove omitempty when graduating to beta
-  // +optional
+  // This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
   optional int32 availableReplicas = 11;
 }
 

@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/apps/v1beta1";
 
 // DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1beta2/ControllerRevision. See the
 // release notes for more information.
@@ -190,7 +190,7 @@ message DeploymentStatus {
   // +optional
   optional int32 updatedReplicas = 3;
 
-  // Total number of ready pods targeted by this deployment.
+  // readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 7;
 
@@ -469,7 +469,7 @@ message StatefulSetStatus {
   // replicas is the number of Pods created by the StatefulSet controller.
   optional int32 replicas = 2;
 
-  // readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
+  // readyReplicas is the number of pods created by this StatefulSet controller with a Ready Condition.
   optional int32 readyReplicas = 3;
 
   // currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
@@ -501,9 +501,7 @@ message StatefulSetStatus {
   repeated StatefulSetCondition conditions = 10;
 
   // Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.
-  // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
-  // Remove omitempty when graduating to beta
-  // +optional
+  // This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
   optional int32 availableReplicas = 11;
 }
 

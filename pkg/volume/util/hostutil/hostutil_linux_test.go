@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -156,27 +157,37 @@ func TestGetSELinuxSupport(t *testing.T) {
 	tests := []struct {
 		name           string
 		mountPoint     string
+		selinuxEnabled bool
 		expectedResult bool
 	}{
 		{
+			"ext4 on / with disabled SELinux",
+			"/",
+			false,
+			false,
+		},
+		{
 			"ext4 on /",
 			"/",
+			true,
 			true,
 		},
 		{
 			"tmpfs on /var/lib/bar",
 			"/var/lib/bar",
+			true,
 			false,
 		},
 		{
 			"nfsv4",
 			"/media/nfs_vol",
+			true,
 			false,
 		},
 	}
 
 	for _, test := range tests {
-		out, err := GetSELinux(test.mountPoint, filename)
+		out, err := GetSELinux(test.mountPoint, filename, func() bool { return test.selinuxEnabled })
 		if err != nil {
 			t.Errorf("Test %s failed with error: %s", test.name, err)
 		}

@@ -1,3 +1,4 @@
+//go:build !coverage
 // +build !coverage
 
 /*

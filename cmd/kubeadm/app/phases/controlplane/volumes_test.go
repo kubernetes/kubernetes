@@ -18,15 +18,14 @@ package controlplane
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
-	"k8s.io/api/core/v1"
 )
 
 func TestGetEtcdCertVolumes(t *testing.T) {
@@ -507,7 +506,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		},
 	}
 
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

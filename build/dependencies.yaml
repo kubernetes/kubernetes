@@ -16,36 +16,20 @@ dependencies:
     - path: hack/tools/go.mod
       match: sigs.k8s.io/zeitgeist\ v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
 
-  # agnhost: bump this one first
-  - name: "agnhost"
-    version: "2.32"
-    refPaths:
-    - path: test/images/agnhost/VERSION
-      match: \d.\d
-    - path: test/images/agnhost/agnhost.go
-      match: "Version:"
-
-  # then after merge and successful postsubmit image push / promotion, bump this
-  - name: "agnhost: dependents"
-    version: "2.32"
-    refPaths:
-    - path: test/utils/image/manifest.go
-      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+"}
-
   # CNI plugins
   - name: "cni"
     version: 0.9.1
     refPaths:
-    - path: cluster/gce/gci/configure.sh
-      match: DEFAULT_CNI_VERSION=
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CNI_VERSION=
     - path: test/e2e_node/remote/utils.go
       match: cniVersion[\t\n\f\r ]*=
 
   # CoreDNS
   - name: "coredns-kube-up"
-    version: 1.8.0
+    version: 1.8.6
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns
@@ -55,30 +39,23 @@ dependencies:
       match: k8s.gcr.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.8.4
+    version: 1.8.6
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
 
   # CRI Tools
   - name: "crictl"
-    version: 1.21.0
+    version: 1.23.0
     refPaths:
-    - path: cluster/gce/gci/configure.sh
-      match: DEFAULT_CRICTL_VERSION=
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
-
-  # Docker
-  - name: "docker"
-    version: 20.10
-    refPaths:
-    - path: vendor/k8s.io/system-validators/validators/docker_validator.go
-      match: latestValidatedDockerVersion
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CRICTL_VERSION=
 
   # etcd
   - name: "etcd"
-    version: 3.5.0
+    version: 3.5.1
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -91,9 +68,11 @@ dependencies:
       match: quay.io/coreos/etcd
     - path: test/e2e/framework/nodes_util.go
       match: const etcdImage
+    - path: test/utils/image/manifest.go
+      match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.0
+    version: 3.5.1
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
@@ -101,36 +80,40 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.16.6
+    version: 1.17.7
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
-      match: 'FROM golang\:\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
-    - path: test/images/Makefile
-      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
+    - path: test/images/Makefile
+      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
 
-  # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
+  # Golang pre-releases are denoted as `1.y<pre-release stage>`
   # Example: go1.16rc1
   #
-  # This entry is a stub of the major and minor version to allow dependency
-  # checks to pass when building Kubernetes using a pre-release of Golang.
-  - name: "golang: <major>.<minor>"
-    version: 1.16
+  # This entry is a stub of the major version to allow dependency checks to
+  # pass when building Kubernetes using a pre-release of Golang.
+  - name: "golang: 1.<major>"
+    version: 1.17
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: hack/lib/golang.sh
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
+  - name: "golang: etcd release version"
+    version: 1.16.12
+    refPaths:
+    - path: cluster/images/etcd/Makefile
+      match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
+
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.16.6-1
+    version: v1.24.0-go1.17.7-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: buster-v1.8.0
+    version: bullseye-v1.0.0
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
@@ -142,9 +125,11 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/conformance/image/Makefile
+      match: BASE_IMAGE_VERSION\?=
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: buster-v1.6.5
+    version: bullseye-v1.1.0
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=
@@ -152,7 +137,7 @@ dependencies:
       match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: v2.3.1-go1.16.6-buster.0
+    version: v2.3.1-go1.17.7-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
@@ -161,10 +146,10 @@ dependencies:
     version: 3.6
     refPaths:
     - path: build/pause/Makefile
-      match: TAG =
+      match: TAG\s*\?=
 
   - name: "k8s.gcr.io/pause: dependents"
-    version: 3.5
+    version: 3.6
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
@@ -177,8 +162,6 @@ dependencies:
     - path: cmd/kubelet/app/options/container_runtime.go
       match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
-      match: k8s.gcr.io\/pause:\d+\.\d+
-    - path: pkg/kubelet/dockershim/docker_sandbox.go
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: staging/src/k8s.io/kubectl/testdata/set/multi-resource-yaml.yaml
       match: k8s.gcr.io\/pause:\d+\.\d+
@@ -216,7 +199,7 @@ dependencies:
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
 
   - name: "k8s.gcr.io/setcap: dependents"
-    version: buster-v2.0.3
+    version: bullseye-v1.0.0
     refPaths:
     - path: build/common.sh
       match: __default_setcap_version=
@@ -234,3 +217,12 @@ dependencies:
     refPaths:
     - path: test/utils/image/manifest.go
       match: configs\[CheckMetadataConcealment\] = Config{list\.PromoterE2eRegistry, "metadata-concealment", "\d+\.\d+"}
+
+  # cadvisor
+  - name: "gcr.io/cadvisor/cadvisor: dependents"
+    version: "v0.43.0"
+    refPaths:
+    - path: test/e2e_node/resource_collector.go
+      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+    - path: test/e2e_node/image_list.go
+      mathc: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+

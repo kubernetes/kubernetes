@@ -57,4 +57,6 @@ type FnPluginLoadingOptions struct {
 	Env []string
 	// Run as uid and gid of the command executor
 	AsCurrentUser bool
+	// Run in this working directory
+	WorkingDir string
 }

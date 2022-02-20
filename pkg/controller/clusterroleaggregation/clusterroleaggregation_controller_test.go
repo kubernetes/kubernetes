@@ -17,6 +17,7 @@ limitations under the License.
 package clusterroleaggregation
 
 import (
+	"context"
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -181,7 +182,7 @@ func TestSyncClusterRole(t *testing.T) {
 					clusterRoleClient: fakeClient.RbacV1(),
 					clusterRoleLister: rbaclisters.NewClusterRoleLister(indexer),
 				}
-				err := c.syncClusterRole(test.clusterRoleToSync)
+				err := c.syncClusterRole(context.TODO(), test.clusterRoleToSync)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.21.0'
-$CRICTL_SHA256 = '437d5301f6f5b9848ef057cee98474ce11a6679c91b4d4e83677a8c1f2415143'
+$CRICTL_VERSION = 'v1.23.0'
+$CRICTL_SHA256 = '9c5a270f1c23878f247fb9846b8046cb3fd3cd55066ea767d68dfc9c30a7871c'
 
 Import-Module -Force C:\common.psm1
 
@@ -229,6 +229,13 @@ function Fetch-KubeEnv {
   # The type of kube_env is a powershell String.
   $kube_env = Get-InstanceMetadataAttribute 'kube-env'
   $kube_env_table = ConvertFrom_Yaml_KubeEnv ${kube_env}
+
+  Log-Output "Logging kube-env key-value pairs except CERT and KEY values"
+  foreach ($entry in $kube_env_table.GetEnumerator()) {
+    if ((-not ($entry.Name.contains("CERT"))) -and (-not ($entry.Name.contains("KEY")))) {
+      Log-Output "$($entry.Name): $($entry.Value)"
+    }
+  }
   return ${kube_env_table}
 }
 
@@ -255,12 +262,10 @@ function Set_CurrentShellEnvironmentVar {
 # Sets environment variables used by Kubernetes binaries and by other functions
 # in this module. Depends on numerous ${kube_env} keys.
 function Set-EnvironmentVars {
-  if ($kube_env.ContainsKey('WINDOWS_CONTAINER_RUNTIME')) {
-      $container_runtime = ${kube_env}['WINDOWS_CONTAINER_RUNTIME']
+  if ($kube_env.ContainsKey('WINDOWS_CONTAINER_RUNTIME_ENDPOINT')) {
       $container_runtime_endpoint = ${kube_env}['WINDOWS_CONTAINER_RUNTIME_ENDPOINT']
   } else {
-      Log-Output "ERROR: WINDOWS_CONTAINER_RUNTIME not set in kube-env, falling back in CONTAINER_RUNTIME"
-      $container_runtime = ${kube_env}['CONTAINER_RUNTIME']
+      Log-Output "ERROR: WINDOWS_CONTAINER_RUNTIME_ENDPOINT not set in kube-env, falling back in CONTAINER_RUNTIME_ENDPOINT"
       $container_runtime_endpoint = ${kube_env}['CONTAINER_RUNTIME_ENDPOINT']
   }
   # Turning the kube-env values into environment variables is not required but
@@ -277,6 +282,7 @@ function Set-EnvironmentVars {
     "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
     "CSI_PROXY_STORAGE_PATH" = ${kube_env}['CSI_PROXY_STORAGE_PATH']
     "CSI_PROXY_VERSION" = ${kube_env}['CSI_PROXY_VERSION']
+    "CSI_PROXY_FLAGS" = ${kube_env}['CSI_PROXY_FLAGS']
     "ENABLE_CSI_PROXY" = ${kube_env}['ENABLE_CSI_PROXY']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
@@ -288,6 +294,7 @@ function Set-EnvironmentVars {
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
     "WINDOWS_ENABLE_PIGZ" = ${kube_env}['WINDOWS_ENABLE_PIGZ']
+    "WINDOWS_ENABLE_HYPERV" = ${kube_env}['WINDOWS_ENABLE_HYPERV']
     "ENABLE_NODE_PROBLEM_DETECTOR" = ${kube_env}['ENABLE_NODE_PROBLEM_DETECTOR']
     "NODEPROBLEMDETECTOR_KUBECONFIG_FILE" = ${kube_env}['WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE']
 
@@ -296,7 +303,6 @@ function Set-EnvironmentVars {
     "KUBELET_CERT_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.crt'
     "KUBELET_KEY_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.key'
 
-    "CONTAINER_RUNTIME" = $container_runtime
     "CONTAINER_RUNTIME_ENDPOINT" = $container_runtime_endpoint
 
     'LICENSE_DIR' = 'C:\Program Files\Google\Compute Engine\THIRD_PARTY_NOTICES'
@@ -441,7 +447,7 @@ function DownloadAndInstall-CSIProxyBinaries {
 function Start-CSIProxy {
   if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
     Log-Output "Creating CSI Proxy Service"
-    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
+    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false ${env:CSI_PROXY_FLAGS}"
     & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
     & sc.exe failure csiproxy reset= 0 actions= restart/10000
     Log-Output "Starting CSI Proxy Service"
@@ -977,155 +983,9 @@ function Configure-GcePdTools {
   Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 }
 
-# Setup cni network. This function supports both Docker and containerd.
+# Setup cni network for containerd.
 function Prepare-CniNetworking {
-  if (${env:CONTAINER_RUNTIME} -eq "containerd") {
-    # For containerd the CNI binaries have already been installed along with
-    # the runtime.
     Configure_Containerd_CniNetworking
-  } else {
-    Install_Cni_Binaries
-    Configure_Dockerd_CniNetworking
-  }
-}
-
-# Downloads the Windows CNI binaries and puts them in $env:CNI_DIR.
-function Install_Cni_Binaries {
-  if (-not (ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -and
-      -not (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
-    return
-  }
-
-  $tmp_dir = 'C:\cni_tmp'
-  New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
-
-  $release_url = "${env:WINDOWS_CNI_STORAGE_PATH}/${env:WINDOWS_CNI_VERSION}/"
-  $tgz_url = ($release_url +
-              "cni-plugins-windows-amd64-${env:WINDOWS_CNI_VERSION}.tgz")
-  $sha_url = ($tgz_url + ".sha512")
-  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha512
-  $sha512_val = ($(Get-Content $tmp_dir\cni-plugins.sha512) -split ' ',2)[0]
-  MustDownload-File `
-      -URLs $tgz_url `
-      -OutFile $tmp_dir\cni-plugins.tgz `
-      -Hash $sha512_val
-
-  tar xzvf $tmp_dir\cni-plugins.tgz -C $tmp_dir
-  Move-Item -Force $tmp_dir\host-local.exe ${env:CNI_DIR}\
-  Move-Item -Force $tmp_dir\win-bridge.exe ${env:CNI_DIR}\
-  Remove-Item -Force -Recurse $tmp_dir
-
-  if (-not ((Test-Path ${env:CNI_DIR}\win-bridge.exe) -and `
-            (Test-Path ${env:CNI_DIR}\host-local.exe))) {
-    Log-Output `
-        "win-bridge.exe and host-local.exe not found in ${env:CNI_DIR}" `
-        -Fatal
-  }
-}
-
-# Writes a CNI config file under $env:CNI_CONFIG_DIR.
-#
-# Prerequisites:
-#   $env:POD_CIDR is set (by Set-PodCidr).
-#   The "management" interface exists (Configure-HostNetworkingService).
-#   The HNS network for pod networking has been configured
-#     (Configure-HostNetworkingService).
-#
-# Required ${kube_env} keys:
-#   DNS_SERVER_IP
-#   DNS_DOMAIN
-#   SERVICE_CLUSTER_IP_RANGE
-function Configure_Dockerd_CniNetworking {
-  $l2bridge_conf = "${env:CNI_CONFIG_DIR}\l2bridge.conf"
-  if (-not (ShouldWrite-File ${l2bridge_conf})) {
-    return
-  }
-
-  $mgmt_ip = (Get_MgmtNetAdapter |
-              Get-NetIPAddress -AddressFamily IPv4).IPAddress
-
-  $cidr_range_start = Get_PodIP_Range_Start(${env:POD_CIDR})
-
-  # Explanation of the CNI config values:
-  #   POD_CIDR: the pod CIDR assigned to this node.
-  #   CIDR_RANGE_START: start of the pod CIDR range.
-  #   MGMT_IP: the IP address assigned to the node's primary network interface
-  #     (i.e. the internal IP of the GCE VM).
-  #   SERVICE_CIDR: the CIDR used for kubernetes services.
-  #   DNS_SERVER_IP: the cluster's DNS server IP address.
-  #   DNS_DOMAIN: the cluster's DNS domain, e.g. "cluster.local".
-  #
-  # OutBoundNAT ExceptionList: No SNAT for CIDRs in the list, the same as default GKE non-masquerade destination ranges listed at https://cloud.google.com/kubernetes-engine/docs/how-to/ip-masquerade-agent#default-non-masq-dests
-
-  New-Item -Force -ItemType file ${l2bridge_conf} | Out-Null
-  Set-Content ${l2bridge_conf} `
-'{
-  "cniVersion":  "0.2.0",
-  "name":  "l2bridge",
-  "type":  "win-bridge",
-  "capabilities":  {
-    "portMappings":  true,
-    "dns": true
-  },
-  "ipam":  {
-    "type": "host-local",
-    "subnet": "POD_CIDR",
-    "rangeStart": "CIDR_RANGE_START"
-  },
-  "dns":  {
-    "Nameservers":  [
-      "DNS_SERVER_IP"
-    ],
-    "Search": [
-      "DNS_DOMAIN"
-    ]
-  },
-  "Policies":  [
-    {
-      "Name":  "EndpointPolicy",
-      "Value":  {
-        "Type":  "OutBoundNAT",
-        "ExceptionList":  [
-          "169.254.0.0/16",
-          "10.0.0.0/8",
-          "172.16.0.0/12",
-          "192.168.0.0/16",
-          "100.64.0.0/10",
-          "192.0.0.0/24",
-          "192.0.2.0/24",
-          "192.88.99.0/24",
-          "198.18.0.0/15",
-          "198.51.100.0/24",
-          "203.0.113.0/24",
-          "240.0.0.0/4"
-        ]
-      }
-    },
-    {
-      "Name":  "EndpointPolicy",
-      "Value":  {
-        "Type":  "ROUTE",
-        "DestinationPrefix":  "SERVICE_CIDR",
-        "NeedEncap":  true
-      }
-    },
-    {
-      "Name":  "EndpointPolicy",
-      "Value":  {
-        "Type":  "ROUTE",
-        "DestinationPrefix":  "MGMT_IP/32",
-        "NeedEncap":  true
-      }
-    }
-  ]
-}'.replace('POD_CIDR', ${env:POD_CIDR}).`
-  replace('CIDR_RANGE_START', ${cidr_range_start}).`
-  replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
-  replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
-  replace('MGMT_IP', ${mgmt_ip}).`
-  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE'])
-
-  Log-Output "CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
 }
 
 # Obtain the host dns conf and save it to a file so that kubelet/CNI
@@ -1248,7 +1108,7 @@ function Start-WorkerServices {
         "A kubelet process is already running, don't know what to do"
   }
   Log-Output "Creating kubelet service"
-  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
+  & sc.exe create kubelet binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kubelet.log ${env:NODE_DIR}\kubelet.exe ${kubelet_args}" start= demand
   & sc.exe failure kubelet reset= 0 actions= restart/10000
   Log-Output "Starting kubelet service"
   & sc.exe start kubelet
@@ -1262,7 +1122,7 @@ function Start-WorkerServices {
         "A kube-proxy process is already running, don't know what to do"
   }
   Log-Output "Creating kube-proxy service"
-  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
+  & sc.exe create kube-proxy binPath= "${env:NODE_DIR}\kube-log-runner.exe -log-file=${env:LOGS_DIR}\kube-proxy.log ${env:NODE_DIR}\kube-proxy.exe ${kubeproxy_args}" start= demand
   & sc.exe failure kube-proxy reset= 0 actions= restart/10000
   Log-Output "Starting kube-proxy service"
   & sc.exe start kube-proxy
@@ -1277,6 +1137,12 @@ function Start-WorkerServices {
   WaitFor_KubeletAndKubeProxyReady
   Verify_GceMetadataServerRouteIsPresent
   Log-Output "Kubernetes components started successfully"
+}
+
+# Stop and unregister both kubelet & kube-proxy services.
+function Unregister-WorkerServices {
+  & sc.exe delete kube-proxy
+  & sc.exe delete kubelet
 }
 
 # Wait for kubelet and kube-proxy to be ready within 10s.
@@ -1348,18 +1214,12 @@ function Pull-InfraContainer {
   Log-Output "Infra/pause container:`n$inspect"
 }
 
-# Setup the container runtime on the node. It supports both
-# Docker and containerd.
+# Setup the containerd on the node.
 function Setup-ContainerRuntime {
   Install-Pigz
-  if (${env:CONTAINER_RUNTIME} -eq "containerd") {
-    Install_Containerd
-    Configure_Containerd
-    Start_Containerd
-  } else {
-    Create_DockerRegistryKey
-    Configure_Dockerd
-  }
+  Install_Containerd
+  Configure_Containerd
+  Start_Containerd
 }
 
 function Test-ContainersFeatureInstalled {
@@ -1373,69 +1233,22 @@ function Install-ContainersFeature {
   Install-WindowsFeature Containers
 }
 
-function Test-DockerIsInstalled {
-  return ((Get-Package `
-               -ProviderName DockerMsftProvider `
-               -ErrorAction SilentlyContinue |
-           Where-Object Name -eq 'docker') -ne $null)
+# Verifies if Hyper-V should be enabled in the node
+function Test-ShouldEnableHyperVFeature {
+  return "${env:WINDOWS_ENABLE_HYPERV}" -eq "true"
 }
 
-function Test-DockerIsRunning {
-  return ((Get-Service docker).Status -eq 'Running')
+# Check if Hyper-V feature is enabled
+function Test-HyperVFeatureEnabled {
+  return ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V).State -eq 'Enabled')
 }
 
-# Installs Docker EE via the DockerMsftProvider. Ensure that the Windows
-# Containers feature is installed before calling this function; otherwise,
-# a restart may be needed after this function returns.
-function Install-Docker {
-  Log-Output 'Installing NuGet module'
-  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-
-  Log-Output 'Installing DockerMsftProvider module'
-  Install-Module -Name DockerMsftProvider -Repository PSGallery -Force
-
-  Log-Output "Installing latest Docker EE version"
-  Install-Package `
-      -Name docker `
-      -ProviderName DockerMsftProvider `
-      -Force `
-      -Verbose
-}
-
-# Add a registry key for docker in EventLog so that log messages are mapped
-# correctly. This is a workaround since the key is missing in the base image.
-# https://github.com/MicrosoftDocs/Virtualization-Documentation/pull/503
-# TODO: Fix this in the base image.
-# TODO(random-liu): Figure out whether we need this for containerd.
-function Create_DockerRegistryKey {
-  $tmp_dir = 'C:\tmp_docker_reg'
-  New-Item -Force -ItemType 'directory' ${tmp_dir} | Out-Null
-  $reg_file = 'docker.reg'
-  Set-Content ${tmp_dir}\${reg_file} `
-'Windows Registry Editor Version 5.00
- [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog\Application\docker]
-"CustomSource"=dword:00000001
-"EventMessageFile"="C:\\Program Files\\docker\\dockerd.exe"
-"TypesSupported"=dword:00000007'
-
-  Log-Output "Importing registry key for Docker"
-  reg import ${tmp_dir}\${reg_file}
-  Remove-Item -Force -Recurse ${tmp_dir}
-}
-
-# Configure Docker daemon and restart the service.
-function Configure_Dockerd {
-  Set-Content "C:\ProgramData\docker\config\daemon.json" @'
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "1m",
-    "max-file": "5"
-  }
-}
-'@
-
- Restart-Service Docker
+# After this function returns, the computer must be restarted to complete
+# the installation!
+function Enable-HyperVFeature {
+  Log-Output "Enabling Windows 'HyperV' feature"
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
+  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Management-PowerShell -All -NoRestart
 }
 
 # Configures the TCP/IP parameters to be in sync with the GCP recommendation.
@@ -1585,7 +1398,7 @@ function Install_Containerd {
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
 
   # TODO(ibrahimab) Change this to a gcs bucket with CI maintained and accessible by community.
-  $version = '1.4.4'
+  $version = '1.5.4'
   $tar_url = ("https://github.com/containerd/containerd/releases/download/v${version}/" +
               "cri-containerd-cni-${version}-windows-amd64.tar.gz")
   $sha_url = $tar_url + ".sha256sum"
@@ -1676,7 +1489,7 @@ function Install-Pigz {
       Expand-Archive -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip" `
         -DestinationPath $PIGZ_ROOT
       Remove-Item -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip"
-      # Docker and Containerd search for unpigz.exe on the first container image
+      # Containerd search for unpigz.exe on the first container image
       # pull request after the service is started. If unpigz.exe is in the
       # Windows path it'll use it instead of the default unzipper.
       # See: https://github.com/containerd/containerd/issues/1896
@@ -1692,9 +1505,9 @@ function Install-Pigz {
 
 # Node Problem Detector Resources
 $NPD_SERVICE = "node-problem-detector"
-$DEFAULT_NPD_VERSION = '0.8.9'
-$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/kubernetes-release'
-$DEFAULT_NPD_HASH = 'f87a01d344e16d16511c5160d7d0f3b8a694e00452f50ffbb550deb10460a1ffa7e170233401ae11df5d58cf070e746feea3bd0407af95ba00d6362630da620c'
+$DEFAULT_NPD_VERSION = '0.8.10-gke0.1'
+$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/gke-release/winnode'
+$DEFAULT_NPD_HASH = '97ddfe3544da9e02a1cfb55d24f329eb29d606fca7fbbf800415d5de9dbc29a00563f8e0d1919595c8e316fd989d45b09b13c07be528841fc5fd37e21d016a2d'
 
 # Install Node Problem Detector (NPD).
 # NPD analyzes the host for problems that can disrupt workloads.
@@ -1779,12 +1592,8 @@ function Configure-NodeProblemDetector {
         $system_stats_monitors += @("${npd_dir}\config\windows-system-stats-monitor.json")
 
         # NPD Configuration for CRI monitor
-        if (${env:CONTAINER_RUNTIME} -eq "containerd") {
-          $system_log_monitors += @("${npd_dir}\config\windows-containerd-monitor-filelog.json")
-          $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-containerd.json")
-        } else {
-          $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-docker.json")
-        }
+        $system_log_monitors += @("${npd_dir}\config\windows-containerd-monitor-filelog.json")
+        $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-containerd.json")
 
         $flags="--v=2 --port=20256 --log_dir=${npd_logs_dir}"
         if ($system_log_monitors.count -gt 0) {
@@ -1820,7 +1629,7 @@ function Configure-NodeProblemDetector {
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$LOGGINGAGENT_VERSION = '1.7.7'
+$LOGGINGAGENT_VERSION = '1.8.10'
 $LOGGINGAGENT_ROOT = 'C:\fluent-bit'
 $LOGGINGAGENT_SERVICE = 'fluent-bit'
 $LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
@@ -2243,7 +2052,6 @@ $PARSERS_CONFIG = @'
 # This section would be deprecated soon
 #
 
-$STACKDRIVER_VERSION = 'v1-11'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
 # Restarts the Stackdriver logging agent, or starts it if it is not currently

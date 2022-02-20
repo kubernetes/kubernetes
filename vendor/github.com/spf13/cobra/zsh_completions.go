@@ -95,7 +95,7 @@ _%[1]s()
     local shellCompDirectiveFilterFileExt=%[6]d
     local shellCompDirectiveFilterDirs=%[7]d
 
-    local lastParam lastChar flagPrefix requestComp out directive compCount comp lastComp
+    local lastParam lastChar flagPrefix requestComp out directive comp lastComp noSpace
     local -a completions
 
     __%[1]s_debug "\n========= starting completion logic =========="
@@ -163,7 +163,6 @@ _%[1]s()
         return
     fi
 
-    compCount=0
     while IFS='\n' read -r comp; do
         if [ -n "$comp" ]; then
             # If requested, completions are returned with a description.
@@ -175,12 +174,16 @@ _%[1]s()
             local tab=$(printf '\t')
             comp=${comp//$tab/:}
 
-            ((compCount++))
             __%[1]s_debug "Adding completion: ${comp}"
             completions+=${comp}
             lastComp=$comp
         fi
     done < <(printf "%%s\n" "${out[@]}")
+
+    if [ $((directive & shellCompDirectiveNoSpace)) -ne 0 ]; then
+        __%[1]s_debug "Activating nospace."
+        noSpace="-S ''"
+    fi
 
     if [ $((directive & shellCompDirectiveFilterFileExt)) -ne 0 ]; then
         # File extension filtering
@@ -208,25 +211,40 @@ _%[1]s()
             __%[1]s_debug "Listing directories in ."
         fi
 
+        local result
         _arguments '*:dirname:_files -/'" ${flagPrefix}"
+        result=$?
         if [ -n "$subdir" ]; then
             popd >/dev/null 2>&1
         fi
-    elif [ $((directive & shellCompDirectiveNoSpace)) -ne 0 ] && [ ${compCount} -eq 1 ]; then
-        __%[1]s_debug "Activating nospace."
-        # We can use compadd here as there is no description when
-        # there is only one completion.
-        compadd -S '' "${lastComp}"
-    elif [ ${compCount} -eq 0 ]; then
-        if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
-            __%[1]s_debug "deactivating file completion"
-        else
-            # Perform file completion
-            __%[1]s_debug "activating file completion"
-            _arguments '*:filename:_files'" ${flagPrefix}"
-        fi
+        return $result
     else
-        _describe "completions" completions $(echo $flagPrefix)
+        __%[1]s_debug "Calling _describe"
+        if eval _describe "completions" completions $flagPrefix $noSpace; then
+            __%[1]s_debug "_describe found some completions"
+
+            # Return the success of having called _describe
+            return 0
+        else
+            __%[1]s_debug "_describe did not find completions."
+            __%[1]s_debug "Checking if we should do file completion."
+            if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
+                __%[1]s_debug "deactivating file completion"
+
+                # We must return an error code here to let zsh know that there were no
+                # completions found by _describe; this is what will trigger other
+                # matching algorithms to attempt to find completions.
+                # For example zsh can match letters in the middle of words.
+                return 1
+            else
+                # Perform file completion
+                __%[1]s_debug "Activating file completion"
+
+                # We must return the result of this command, so it must be the
+                # last command, or else we must store its result to return it.
+                _arguments '*:filename:_files'" ${flagPrefix}"
+            fi
+        fi
     fi
 }
 

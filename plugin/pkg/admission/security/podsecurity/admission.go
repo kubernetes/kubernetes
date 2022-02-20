@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -51,6 +52,7 @@ import (
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
 	podsecurityadmissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/pod-security-admission/metrics"
 	"k8s.io/pod-security-admission/policy"
 )
 
@@ -82,6 +84,20 @@ var _ admission.ValidationInterface = &Plugin{}
 var _ genericadmissioninit.WantsExternalKubeInformerFactory = &Plugin{}
 var _ genericadmissioninit.WantsExternalKubeClientSet = &Plugin{}
 
+var (
+	defaultRecorder     *metrics.PrometheusRecorder
+	defaultRecorderInit sync.Once
+)
+
+func getDefaultRecorder() metrics.Recorder {
+	// initialize and register to legacy metrics once
+	defaultRecorderInit.Do(func() {
+		defaultRecorder = metrics.NewPrometheusRecorder(podsecurityadmissionapi.GetAPIVersion())
+		defaultRecorder.MustRegister(legacyregistry.MustRegister)
+	})
+	return defaultRecorder
+}
+
 // newPlugin creates a new admission plugin.
 func newPlugin(reader io.Reader) (*Plugin, error) {
 	config, err := podsecurityconfigloader.LoadFromReader(reader)
@@ -99,7 +115,7 @@ func newPlugin(reader io.Reader) (*Plugin, error) {
 		delegate: &podsecurityadmission.Admission{
 			Configuration:    config,
 			Evaluator:        evaluator,
-			Metrics:          nil, // TODO: wire to default prometheus metrics
+			Metrics:          getDefaultRecorder(),
 			PodSpecExtractor: podsecurityadmission.DefaultPodSpecExtractor{},
 		},
 	}, nil

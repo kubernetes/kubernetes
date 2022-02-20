@@ -21,10 +21,18 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -39,15 +47,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	fakediscovery "k8s.io/client-go/discovery/fake"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
-	"github.com/pkg/errors"
 )
 
 // isKubeadmConfigPresent checks if a kubeadm config type is found in the provided document map
@@ -76,7 +75,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	}
 
 	// Otherwise, we have a config file. Let's load it.
-	configBytes, err := ioutil.ReadFile(cfgPath)
+	configBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
 	}

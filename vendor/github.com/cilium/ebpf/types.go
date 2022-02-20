@@ -85,6 +85,10 @@ const (
 	SkStorage
 	// DevMapHash - Hash-based indexing scheme for references to network devices.
 	DevMapHash
+	StructOpts
+	RingBuf
+	InodeStorage
+	TaskStorage
 )
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.

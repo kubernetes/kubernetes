@@ -55,6 +55,9 @@ const (
 	// should be changed appropriately.
 	minRetryDelay = 5 * time.Second
 	maxRetryDelay = 300 * time.Second
+	// ToBeDeletedTaint is a taint used by the CLuster Autoscaler before marking a node for deletion. Defined in
+	// https://github.com/kubernetes/autoscaler/blob/e80ab518340f88f364fe3ef063f8303755125971/cluster-autoscaler/utils/deletetaint/delete.go#L36
+	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"
 )
 
 type cachedService struct {
@@ -223,25 +226,25 @@ func (s *Controller) enqueueService(obj interface{}) {
 //
 // It's an error to call Run() more than once for a given ServiceController
 // object.
-func (s *Controller) Run(stopCh <-chan struct{}, workers int) {
+func (s *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer s.queue.ShutDown()
 
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
-	if !cache.WaitForNamedCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("service", ctx.Done(), s.serviceListerSynced, s.nodeListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(s.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, s.worker, time.Second)
 	}
 
-	go s.nodeSyncLoop(workers)
-	go wait.Until(s.triggerNodeSync, nodeSyncPeriod, stopCh)
+	go s.nodeSyncLoop(ctx, workers)
+	go wait.Until(s.triggerNodeSync, nodeSyncPeriod, ctx.Done())
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // triggerNodeSync triggers a nodeSync asynchronously
@@ -276,29 +279,29 @@ func (s *Controller) triggerNodeSync() {
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (s *Controller) worker() {
-	for s.processNextWorkItem() {
+func (s *Controller) worker(ctx context.Context) {
+	for s.processNextWorkItem(ctx) {
 	}
 }
 
 // nodeSyncLoop takes nodeSync signal and triggers nodeSync
-func (s *Controller) nodeSyncLoop(workers int) {
+func (s *Controller) nodeSyncLoop(ctx context.Context, workers int) {
 	klog.V(4).Info("nodeSyncLoop Started")
 	for range s.nodeSyncCh {
 		klog.V(4).Info("nodeSync has been triggered")
-		s.nodeSyncInternal(workers)
+		s.nodeSyncInternal(ctx, workers)
 	}
 	klog.V(2).Info("s.nodeSyncCh is closed. Exiting nodeSyncLoop")
 }
 
-func (s *Controller) processNextWorkItem() bool {
+func (s *Controller) processNextWorkItem(ctx context.Context) bool {
 	key, quit := s.queue.Get()
 	if quit {
 		return false
 	}
 	defer s.queue.Done(key)
 
-	err := s.syncService(key.(string))
+	err := s.syncService(ctx, key.(string))
 	if err == nil {
 		s.queue.Forget(key)
 		return true
@@ -325,7 +328,7 @@ func (s *Controller) init() error {
 
 // processServiceCreateOrUpdate operates loadbalancers for the incoming service accordingly.
 // Returns an error if processing the service update failed.
-func (s *Controller) processServiceCreateOrUpdate(service *v1.Service, key string) error {
+func (s *Controller) processServiceCreateOrUpdate(ctx context.Context, service *v1.Service, key string) error {
 	// TODO(@MrHohn): Remove the cache once we get rid of the non-finalizer deletion
 	// path. Ref https://github.com/kubernetes/enhancements/issues/980.
 	cachedService := s.cache.getOrCreate(key)
@@ -333,14 +336,14 @@ func (s *Controller) processServiceCreateOrUpdate(service *v1.Service, key strin
 		// This happens only when a service is deleted and re-created
 		// in a short period, which is only possible when it doesn't
 		// contain finalizer.
-		if err := s.processLoadBalancerDelete(cachedService.state, key); err != nil {
+		if err := s.processLoadBalancerDelete(ctx, cachedService.state, key); err != nil {
 			return err
 		}
 	}
 	// Always cache the service, we need the info for service deletion in case
 	// when load balancer cleanup is not handled via finalizer.
 	cachedService.state = service
-	op, err := s.syncLoadBalancerIfNeeded(service, key)
+	op, err := s.syncLoadBalancerIfNeeded(ctx, service, key)
 	if err != nil {
 		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "SyncLoadBalancerFailed", "Error syncing load balancer: %v", err)
 		return err
@@ -363,7 +366,7 @@ const (
 // syncLoadBalancerIfNeeded ensures that service's status is synced up with loadbalancer
 // i.e. creates loadbalancer for service if requested and deletes loadbalancer if the service
 // doesn't want a loadbalancer no more. Returns whatever error occurred.
-func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (loadBalancerOperation, error) {
+func (s *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.Service, key string) (loadBalancerOperation, error) {
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
@@ -377,14 +380,14 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 		// Delete the load balancer if service no longer wants one, or if service needs cleanup.
 		op = deleteLoadBalancer
 		newStatus = &v1.LoadBalancerStatus{}
-		_, exists, err := s.balancer.GetLoadBalancer(context.TODO(), s.clusterName, service)
+		_, exists, err := s.balancer.GetLoadBalancer(ctx, s.clusterName, service)
 		if err != nil {
 			return op, fmt.Errorf("failed to check if load balancer exists before cleanup: %v", err)
 		}
 		if exists {
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-			if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
+			if err := s.balancer.EnsureLoadBalancerDeleted(ctx, s.clusterName, service); err != nil {
 				return op, fmt.Errorf("failed to delete load balancer: %v", err)
 			}
 		}
@@ -404,7 +407,7 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 		if err := s.addFinalizer(service); err != nil {
 			return op, fmt.Errorf("failed to add load balancer cleanup finalizer: %v", err)
 		}
-		newStatus, err = s.ensureLoadBalancer(service)
+		newStatus, err = s.ensureLoadBalancer(ctx, service)
 		if err != nil {
 			if err == cloudprovider.ImplementedElsewhere {
 				// ImplementedElsewhere indicates that the ensureLoadBalancer is a nop and the
@@ -435,7 +438,7 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 	return op, nil
 }
 
-func (s *Controller) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
+func (s *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service) (*v1.LoadBalancerStatus, error) {
 	nodes, err := listWithPredicate(s.nodeLister, s.getNodeConditionPredicate())
 	if err != nil {
 		return nil, err
@@ -449,7 +452,7 @@ func (s *Controller) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerSt
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	return s.balancer.EnsureLoadBalancer(context.TODO(), s.clusterName, service, nodes)
+	return s.balancer.EnsureLoadBalancer(ctx, s.clusterName, service, nodes)
 }
 
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
@@ -671,6 +674,14 @@ func (s *Controller) getNodeConditionPredicate() NodeConditionPredicate {
 			return false
 		}
 
+		// Remove nodes that are about to be deleted by the cluster autoscaler.
+		for _, taint := range node.Spec.Taints {
+			if taint.Key == ToBeDeletedTaint {
+				klog.V(4).Infof("Ignoring node %v with autoscaler taint %+v", node.Name, taint)
+				return false
+			}
+		}
+
 		// If we have no info, don't accept
 		if len(node.Status.Conditions) == 0 {
 			return false
@@ -713,7 +724,7 @@ func nodeReadyConditionStatus(node *v1.Node) v1.ConditionStatus {
 
 // nodeSyncInternal handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
-func (s *Controller) nodeSyncInternal(workers int) {
+func (s *Controller) nodeSyncInternal(ctx context.Context, workers int) {
 	startTime := time.Now()
 	defer func() {
 		latency := time.Since(startTime).Seconds()
@@ -724,7 +735,7 @@ func (s *Controller) nodeSyncInternal(workers int) {
 	if !s.needFullSyncAndUnmark() {
 		// The set of nodes in the cluster hasn't changed, but we can retry
 		// updating any services that we failed to update last time around.
-		s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, workers)
+		s.servicesToUpdate = s.updateLoadBalancerHosts(ctx, s.servicesToUpdate, workers)
 		return
 	}
 	klog.V(2).Infof("Syncing backends for all LB services.")
@@ -733,7 +744,7 @@ func (s *Controller) nodeSyncInternal(workers int) {
 	// round.
 	s.servicesToUpdate = s.cache.allServices()
 	numServices := len(s.servicesToUpdate)
-	s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, workers)
+	s.servicesToUpdate = s.updateLoadBalancerHosts(ctx, s.servicesToUpdate, workers)
 	klog.V(2).Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
 		numServices-len(s.servicesToUpdate), numServices)
 }
@@ -761,7 +772,7 @@ func (s *Controller) nodeSyncService(svc *v1.Service) bool {
 // updateLoadBalancerHosts updates all existing load balancers so that
 // they will match the latest list of nodes with input number of workers.
 // Returns the list of services that couldn't be updated.
-func (s *Controller) updateLoadBalancerHosts(services []*v1.Service, workers int) (servicesToRetry []*v1.Service) {
+func (s *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1.Service, workers int) (servicesToRetry []*v1.Service) {
 	klog.V(4).Infof("Running updateLoadBalancerHosts(len(services)==%d, workers==%d)", len(services), workers)
 
 	// lock for servicesToRetry
@@ -775,7 +786,7 @@ func (s *Controller) updateLoadBalancerHosts(services []*v1.Service, workers int
 		servicesToRetry = append(servicesToRetry, services[piece])
 	}
 
-	workqueue.ParallelizeUntil(context.TODO(), workers, len(services), doWork)
+	workqueue.ParallelizeUntil(ctx, workers, len(services), doWork)
 	klog.V(4).Infof("Finished updateLoadBalancerHosts")
 	return servicesToRetry
 }
@@ -831,7 +842,7 @@ func loadBalancerIPsAreEqual(oldService, newService *v1.Service) bool {
 // syncService will sync the Service with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
-func (s *Controller) syncService(key string) error {
+func (s *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
@@ -847,17 +858,17 @@ func (s *Controller) syncService(key string) error {
 	switch {
 	case errors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
-		err = s.processServiceDeletion(key)
+		err = s.processServiceDeletion(ctx, key)
 	case err != nil:
 		runtime.HandleError(fmt.Errorf("Unable to retrieve service %v from store: %v", key, err))
 	default:
-		err = s.processServiceCreateOrUpdate(service, key)
+		err = s.processServiceCreateOrUpdate(ctx, service, key)
 	}
 
 	return err
 }
 
-func (s *Controller) processServiceDeletion(key string) error {
+func (s *Controller) processServiceDeletion(ctx context.Context, key string) error {
 	cachedService, ok := s.cache.get(key)
 	if !ok {
 		// Cache does not contains the key means:
@@ -867,20 +878,20 @@ func (s *Controller) processServiceDeletion(key string) error {
 		return nil
 	}
 	klog.V(2).Infof("Service %v has been deleted. Attempting to cleanup load balancer resources", key)
-	if err := s.processLoadBalancerDelete(cachedService.state, key); err != nil {
+	if err := s.processLoadBalancerDelete(ctx, cachedService.state, key); err != nil {
 		return err
 	}
 	s.cache.delete(key)
 	return nil
 }
 
-func (s *Controller) processLoadBalancerDelete(service *v1.Service, key string) error {
+func (s *Controller) processLoadBalancerDelete(ctx context.Context, service *v1.Service, key string) error {
 	// delete load balancer info only if the service type is LoadBalancer
 	if !wantsLoadBalancer(service) {
 		return nil
 	}
 	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-	if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
+	if err := s.balancer.EnsureLoadBalancerDeleted(ctx, s.clusterName, service); err != nil {
 		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "DeleteLoadBalancerFailed", "Error deleting load balancer: %v", err)
 		return err
 	}

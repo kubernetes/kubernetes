@@ -24,15 +24,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/component-base/metrics/legacyregistry"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	compbasemetrics "k8s.io/component-base/metrics"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func TestRecordOperation(t *testing.T) {
-	legacyregistry.MustRegister(metrics.RuntimeOperations)
-	legacyregistry.MustRegister(metrics.RuntimeOperationsDuration)
-	legacyregistry.MustRegister(metrics.RuntimeOperationsErrors)
+	// Use local registry
+	var registry = compbasemetrics.NewKubeRegistry()
+	var gather compbasemetrics.Gatherer = registry
+
+	registry.MustRegister(metrics.RuntimeOperations)
+	registry.MustRegister(metrics.RuntimeOperationsDuration)
+	registry.MustRegister(metrics.RuntimeOperationsErrors)
+
+	registry.Reset()
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
@@ -40,8 +46,8 @@ func TestRecordOperation(t *testing.T) {
 
 	prometheusURL := "http://" + l.Addr().String() + "/metrics"
 	mux := http.NewServeMux()
-	//lint:ignore SA1019 ignore deprecated warning until we move off of global registries
-	mux.Handle("/metrics", legacyregistry.Handler())
+	handler := compbasemetrics.HandlerFor(gather, compbasemetrics.HandlerOpts{})
+	mux.Handle("/metrics", handler)
 	server := &http.Server{
 		Addr:    l.Addr().String(),
 		Handler: mux,
@@ -80,7 +86,7 @@ func TestStatus(t *testing.T) {
 		},
 	}
 	irs := newInstrumentedRuntimeService(fakeRuntime)
-	actural, err := irs.Status()
+	actural, err := irs.Status(false)
 	assert.NoError(t, err)
 	expected := &runtimeapi.RuntimeStatus{
 		Conditions: []*runtimeapi.RuntimeCondition{
@@ -88,5 +94,5 @@ func TestStatus(t *testing.T) {
 			{Type: runtimeapi.NetworkReady, Status: true},
 		},
 	}
-	assert.Equal(t, expected, actural)
+	assert.Equal(t, expected, actural.Status)
 }

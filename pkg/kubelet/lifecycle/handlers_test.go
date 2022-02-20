@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -99,7 +99,7 @@ func TestRunHandlerExec(t *testing.T) {
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{
+			PostStart: &v1.LifecycleHandler{
 				Exec: &v1.ExecAction{
 					Command: []string{"ls", "-a"},
 				},
@@ -142,7 +142,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{
+			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
 					Port: intstr.FromInt(8080),
@@ -175,7 +175,7 @@ func TestRunHandlerNil(t *testing.T) {
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{},
+			PostStart: &v1.LifecycleHandler{},
 		},
 	}
 	pod := v1.Pod{}
@@ -200,7 +200,7 @@ func TestRunHandlerExecFailure(t *testing.T) {
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{
+			PostStart: &v1.LifecycleHandler{
 				Exec: &v1.ExecAction{
 					Command: command,
 				},
@@ -234,7 +234,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	container := v1.Container{
 		Name: containerName,
 		Lifecycle: &v1.Lifecycle{
-			PostStart: &v1.Handler{
+			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
 					Port: intstr.FromInt(8080),

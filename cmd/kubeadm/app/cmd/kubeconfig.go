@@ -20,16 +20,17 @@ import (
 	"io"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
+	"k8s.io/klog/v2"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-
-	"k8s.io/klog/v2"
-
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -78,6 +79,9 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 		Long:    userKubeconfigLongDesc,
 		Example: userKubeconfigExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(cfgPath) == 0 {
+				return errors.New("the kubeadm configuration path cannot be empty")
+			}
 			// This call returns the ready-to-use configuration based on the defaults populated by flags
 			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 			if err != nil {

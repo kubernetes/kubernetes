@@ -77,3 +77,15 @@ func (c *CommandHeaderRoundTripper) ParseCommandHeaders(cmd *cobra.Command, args
 		c.Headers[kubectlCommandHeader] = strings.Join(cmdStrs, " ")
 	}
 }
+
+// CancelRequest is propagated to the Delegate RoundTripper within
+// if the wrapped RoundTripper implements this function.
+func (c *CommandHeaderRoundTripper) CancelRequest(req *http.Request) {
+	type canceler interface {
+		CancelRequest(*http.Request)
+	}
+	// If possible, call "CancelRequest" on the wrapped Delegate RoundTripper.
+	if cr, ok := c.Delegate.(canceler); ok {
+		cr.CancelRequest(req)
+	}
+}

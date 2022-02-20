@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -141,6 +140,7 @@ func TestServerSidePrint(t *testing.T) {
 			{Group: "node.k8s.io", Version: "v1beta1"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
 			{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"},
 		},
 		[]schema.GroupVersionResource{},
@@ -161,7 +161,7 @@ func TestServerSidePrint(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	cacheDir, err := ioutil.TempDir(os.TempDir(), "test-integration-apiserver-print")
+	cacheDir, err := os.MkdirTemp(os.TempDir(), "test-integration-apiserver-print")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

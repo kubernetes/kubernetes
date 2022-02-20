@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.Controller, *job.Controller, informers.SharedInformerFactory, clientset.Interface, restclient.Config) {
+func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface, restclient.Config) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
@@ -47,7 +47,7 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.Contro
 	}
 	resyncPeriod := 12 * time.Hour
 	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "cronjob-informers")), resyncPeriod)
-	cjc, err := cronjob.NewController(clientSet)
+	cjc, err := cronjob.NewControllerV2(informerSet.Batch().V1().Jobs(), informerSet.Batch().V1().CronJobs(), clientSet)
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}
@@ -159,8 +159,8 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 	defer close(stopCh)
 
 	informerSet.Start(stopCh)
-	go cjc.Run(stopCh)
-	go jc.Run(1, stopCh)
+	go cjc.Run(context.TODO(), 1)
+	go jc.Run(context.TODO(), 1)
 
 	_, err := cjClient.Create(context.TODO(), newCronJob(cronJobName, ns.Name, "* * * * ?"), metav1.CreateOptions{})
 	if err != nil {

@@ -22,7 +22,6 @@ import (
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -47,9 +46,9 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	}
 
-	// */x
-	resourcesWithWildcardSubresoures := sets.String{}
 	// x/*
+	resourcesWithWildcardSubresoures := sets.String{}
+	// */x
 	subResourcesWithWildcardResource := sets.String{}
 	// */*
 	hasDoubleWildcard := false
@@ -201,11 +200,11 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedAdmissi
 }
 
 // ValidateValidatingWebhookConfiguration validates a webhook before creation.
-func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	return validateValidatingWebhookConfiguration(e, validationOptions{
-		requireNoSideEffects:                    requireNoSideEffects(requestGV),
+		requireNoSideEffects:                    true,
 		requireRecognizedAdmissionReviewVersion: true,
-		requireUniqueWebhookNames:               requireUniqueWebhookNames(requestGV),
+		requireUniqueWebhookNames:               true,
 	})
 }
 
@@ -218,19 +217,20 @@ func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 		if opts.requireUniqueWebhookNames && len(hook.Name) > 0 {
 			if hookNames.Has(hook.Name) {
 				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			} else {
+				hookNames.Insert(hook.Name)
 			}
-			hookNames.Insert(hook.Name)
 		}
 	}
 	return allErrors
 }
 
 // ValidateMutatingWebhookConfiguration validates a webhook before creation.
-func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
 	return validateMutatingWebhookConfiguration(e, validationOptions{
-		requireNoSideEffects:                    requireNoSideEffects(requestGV),
+		requireNoSideEffects:                    true,
 		requireRecognizedAdmissionReviewVersion: true,
-		requireUniqueWebhookNames:               requireUniqueWebhookNames(requestGV),
+		requireUniqueWebhookNames:               true,
 	})
 }
 
@@ -249,8 +249,9 @@ func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 		if opts.requireUniqueWebhookNames && len(hook.Name) > 0 {
 			if hookNames.Has(hook.Name) {
 				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			} else {
+				hookNames.Insert(hook.Name)
 			}
-			hookNames.Insert(hook.Name)
 		}
 	}
 	return allErrors
@@ -497,29 +498,19 @@ func validatingHasNoSideEffects(webhooks []admissionregistration.ValidatingWebho
 }
 
 // ValidateValidatingWebhookConfigurationUpdate validates update of validating webhook configuration
-func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	return validateValidatingWebhookConfiguration(newC, validationOptions{
-		requireNoSideEffects:                    requireNoSideEffects(requestGV) && validatingHasNoSideEffects(oldC.Webhooks),
+		requireNoSideEffects:                    validatingHasNoSideEffects(oldC.Webhooks),
 		requireRecognizedAdmissionReviewVersion: validatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
-		requireUniqueWebhookNames:               requireUniqueWebhookNames(requestGV) && validatingHasUniqueWebhookNames(oldC.Webhooks),
+		requireUniqueWebhookNames:               validatingHasUniqueWebhookNames(oldC.Webhooks),
 	})
 }
 
 // ValidateMutatingWebhookConfigurationUpdate validates update of mutating webhook configuration
-func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
+func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
 	return validateMutatingWebhookConfiguration(newC, validationOptions{
-		requireNoSideEffects:                    requireNoSideEffects(requestGV) && mutatingHasNoSideEffects(oldC.Webhooks),
+		requireNoSideEffects:                    mutatingHasNoSideEffects(oldC.Webhooks),
 		requireRecognizedAdmissionReviewVersion: mutatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
-		requireUniqueWebhookNames:               requireUniqueWebhookNames(requestGV) && mutatingHasUniqueWebhookNames(oldC.Webhooks),
+		requireUniqueWebhookNames:               mutatingHasUniqueWebhookNames(oldC.Webhooks),
 	})
-}
-
-// requireUniqueWebhookNames returns true for all requests except v1beta1 (for backwards compatibility)
-func requireUniqueWebhookNames(requestGV schema.GroupVersion) bool {
-	return requestGV != (schema.GroupVersion{Group: admissionregistration.GroupName, Version: "v1beta1"})
-}
-
-// requireNoSideEffects returns true for all requests except v1beta1 (for backwards compatibility)
-func requireNoSideEffects(requestGV schema.GroupVersion) bool {
-	return requestGV != (schema.GroupVersion{Group: admissionregistration.GroupName, Version: "v1beta1"})
 }

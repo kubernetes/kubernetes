@@ -19,7 +19,7 @@ package scale
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -32,6 +32,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
@@ -315,7 +316,7 @@ func (f *IngressScaleFramework) dumpLatencies() {
 	formattedData := f.GetFormattedLatencies()
 	if f.OutputFile != "" {
 		f.Logger.Infof("Dumping scale test latencies to file %s...", f.OutputFile)
-		ioutil.WriteFile(f.OutputFile, []byte(formattedData), 0644)
+		os.WriteFile(f.OutputFile, []byte(formattedData), 0644)
 		return
 	}
 	f.Logger.Infof("\n%v", formattedData)
@@ -445,39 +446,21 @@ func generateScaleTestServiceSpec(suffix string) *v1.Service {
 }
 
 func generateScaleTestBackendDeploymentSpec(numReplicas int32) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: scaleTestBackendName,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &numReplicas,
-			Selector: &metav1.LabelSelector{MatchLabels: scaleTestLabels},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: scaleTestLabels,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  scaleTestBackendName,
-							Image: imageutils.GetE2EImage(imageutils.EchoServer),
-							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
-							ReadinessProbe: &v1.Probe{
-								Handler: v1.Handler{
-									HTTPGet: &v1.HTTPGetAction{
-										Port: intstr.FromInt(8080),
-										Path: "/healthz",
-									},
-								},
-								FailureThreshold: 10,
-								PeriodSeconds:    1,
-								SuccessThreshold: 1,
-								TimeoutSeconds:   1,
-							},
-						},
-					},
-				},
+	d := e2edeployment.NewDeployment(
+		scaleTestBackendName, numReplicas, scaleTestLabels, scaleTestBackendName,
+		imageutils.GetE2EImage(imageutils.EchoServer), appsv1.RollingUpdateDeploymentStrategyType)
+	d.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 8080}}
+	d.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Port: intstr.FromInt(8080),
+				Path: "/healthz",
 			},
 		},
+		FailureThreshold: 10,
+		PeriodSeconds:    1,
+		SuccessThreshold: 1,
+		TimeoutSeconds:   1,
 	}
+	return d
 }

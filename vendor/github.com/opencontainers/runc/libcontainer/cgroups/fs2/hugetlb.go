@@ -21,7 +21,7 @@ func setHugeTlb(dirPath string, r *configs.Resources) error {
 		return nil
 	}
 	for _, hugetlb := range r.HugetlbLimit {
-		if err := fscommon.WriteFile(dirPath, "hugetlb."+hugetlb.Pagesize+".max", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
+		if err := cgroups.WriteFile(dirPath, "hugetlb."+hugetlb.Pagesize+".max", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
 			return err
 		}
 	}
@@ -30,10 +30,7 @@ func setHugeTlb(dirPath string, r *configs.Resources) error {
 }
 
 func statHugeTlb(dirPath string, stats *cgroups.Stats) error {
-	hugePageSizes, err := cgroups.GetHugePageSize()
-	if err != nil {
-		return errors.Wrap(err, "failed to fetch hugetlb info")
-	}
+	hugePageSizes, _ := cgroups.GetHugePageSize()
 	hugetlbStats := cgroups.HugetlbStats{}
 
 	for _, pagesize := range hugePageSizes {

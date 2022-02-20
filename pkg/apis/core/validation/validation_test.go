@@ -18,17 +18,23 @@ package validation
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	asserttestify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -520,7 +526,7 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 			},
 		},
-		"inline-pvspec-with-sc": {
+		"inline-pvspec-with-podSec": {
 			isExpectedFailure: true,
 			isInlineSpec:      true,
 			pvSpec: &core.PersistentVolumeSpec{
@@ -1858,12 +1864,97 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
+	validClaimShrinkInitial := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("15G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	unboundShrink := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("12G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	validClaimShrink := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("13G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	invalidShrinkToStatus := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	invalidClaimShrink := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("3G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
 
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		oldClaim          *core.PersistentVolumeClaim
-		newClaim          *core.PersistentVolumeClaim
-		enableResize      bool
+		isExpectedFailure          bool
+		oldClaim                   *core.PersistentVolumeClaim
+		newClaim                   *core.PersistentVolumeClaim
+		enableResize               bool
+		enableRecoverFromExpansion bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
@@ -2033,12 +2124,53 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          validClaimRWOPAccessModeAddAnnotation,
 			enableResize:      false,
 		},
+		"valid-expand-shrink-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validClaimShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"invalid-expand-shrink-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   invalidClaimShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-to-status-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   invalidShrinkToStatus,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-recover-disabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validClaimShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: false,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-resize-disabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validClaimShrink,
+			enableResize:               false,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
+		"unbound-size-shrink-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   unboundShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			// ensure we have a resource version specified for updates
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			opts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
@@ -2063,35 +2195,45 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                 nil,
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
+				AllowReadWriteOncePod:             true,
+				EnableExpansion:                   true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
+				AllowReadWriteOncePod:             true,
+				EnableExpansion:                   true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop not allowed because not used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: false,
+				AllowReadWriteOncePod:             false,
+				EnableExpansion:                   true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because used and feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
+				AllowReadWriteOncePod:             true,
+				EnableExpansion:                   true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod: true,
+				AllowReadWriteOncePod:             true,
+				EnableExpansion:                   true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 	}
@@ -4791,7 +4933,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 		Spec: spec,
 	}
 
-	if errs := ValidateResourceQuota(resourceQuota, ResourceQuotaValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -5530,6 +5672,18 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+		{Name: "ephemeral", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+			Spec: core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			},
+		}}}},
 	}
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
@@ -5552,6 +5706,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "G:\\mount", SubPath: ""},
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
+		{Name: "ephemeral", MountPath: "/foobar"},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -5586,71 +5741,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 }
 
-func TestValidateDisabledSubpath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
-
-	volumes := []core.Volume{
-		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
-		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
-		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
-	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
-	if len(v1err) > 0 {
-		t.Errorf("Invalid test volume - expected success %v", v1err)
-		return
-	}
-
-	container := core.Container{
-		SecurityContext: nil,
-	}
-
-	goodVolumeDevices := []core.VolumeDevice{
-		{Name: "xyz", DevicePath: "/foofoo"},
-		{Name: "uvw", DevicePath: "/foofoo/share/test"},
-	}
-
-	cases := map[string]struct {
-		mounts      []core.VolumeMount
-		expectError bool
-	}{
-		"subpath not specified": {
-			[]core.VolumeMount{
-				{
-					Name:      "abc-123",
-					MountPath: "/bab",
-				},
-			},
-			false,
-		},
-		"subpath specified": {
-			[]core.VolumeMount{
-				{
-					Name:      "abc-123",
-					MountPath: "/bab",
-					SubPath:   "baz",
-				},
-			},
-			false, // validation should not fail, dropping the field is handled in PrepareForCreate/PrepareForUpdate
-		},
-	}
-
-	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
-
-		if len(errs) != 0 && !test.expectError {
-			t.Errorf("test %v failed: %+v", name, errs)
-		}
-
-		if len(errs) == 0 && test.expectError {
-			t.Errorf("test %v failed, expected error", name)
-		}
-	}
-}
-
 func TestValidateSubpathMutuallyExclusive(t *testing.T) {
-	// Enable feature VolumeSubpath
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, true)()
-
 	volumes := []core.Volume{
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
@@ -5774,45 +5865,6 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 				},
 			},
 			false,
-		},
-	}
-
-	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
-
-		if len(errs) != 0 && !test.expectError {
-			t.Errorf("test %v failed: %+v", name, errs)
-		}
-
-		if len(errs) == 0 && test.expectError {
-			t.Errorf("test %v failed, expected error", name)
-		}
-	}
-
-	// Repeat with subpath feature gate off
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
-	cases = map[string]struct {
-		mounts      []core.VolumeMount
-		expectError bool
-	}{
-		"subpath expr not specified": {
-			[]core.VolumeMount{
-				{
-					Name:      "abc-123",
-					MountPath: "/bab",
-				},
-			},
-			false,
-		},
-		"subpath expr specified": {
-			[]core.VolumeMount{
-				{
-					Name:        "abc-123",
-					MountPath:   "/bab",
-					SubPathExpr: "$(POD_NAME)",
-				},
-			},
-			false, // validation should not fail, dropping the field is handled in PrepareForCreate/PrepareForUpdate
 		},
 	}
 
@@ -5952,6 +6004,18 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "def", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+		{Name: "ephemeral", VolumeSource: core.VolumeSource{Ephemeral: &core.EphemeralVolumeSource{VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+			Spec: core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+			},
+		}}}},
 	}
 
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
@@ -5963,6 +6027,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 	successCase := []core.VolumeDevice{
 		{Name: "abc", DevicePath: "/foo"},
 		{Name: "abc-123", DevicePath: "/usr/share/test"},
+		{Name: "ephemeral", DevicePath: "/disk"},
 	}
 	goodVolumeMounts := []core.VolumeMount{
 		{Name: "xyz", MountPath: "/foofoo"},
@@ -5988,7 +6053,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 	}
 
 	// Success Cases:
-	// Validate normal success cases - only PVC volumeSource
+	// Validate normal success cases - only PVC volumeSource or generic ephemeral volume
 	if errs := ValidateVolumeDevices(successCase, GetVolumeMountMap(goodVolumeMounts), vols, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
@@ -6003,12 +6068,12 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 }
 
 func TestValidateProbe(t *testing.T) {
-	handler := core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}}
+	handler := core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}}
 	// These fields must be positive.
 	positiveFields := [...]string{"InitialDelaySeconds", "TimeoutSeconds", "PeriodSeconds", "SuccessThreshold", "FailureThreshold"}
 	successCases := []*core.Probe{nil}
 	for _, field := range positiveFields {
-		probe := &core.Probe{Handler: handler}
+		probe := &core.Probe{ProbeHandler: handler}
 		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(10)
 		successCases = append(successCases, probe)
 	}
@@ -6021,7 +6086,7 @@ func TestValidateProbe(t *testing.T) {
 
 	errorCases := []*core.Probe{{TimeoutSeconds: 10, InitialDelaySeconds: 10}}
 	for _, field := range positiveFields {
-		probe := &core.Probe{Handler: handler}
+		probe := &core.Probe{ProbeHandler: handler}
 		reflect.ValueOf(probe).Elem().FieldByName(field).SetInt(-10)
 		errorCases = append(errorCases, probe)
 	}
@@ -6055,7 +6120,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler: core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler: core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 				},
 				fldPath: fldPath,
 			},
@@ -6064,7 +6129,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:             core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:        core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					InitialDelaySeconds: -1,
 				},
 				fldPath: fldPath,
@@ -6074,7 +6139,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:        core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:   core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TimeoutSeconds: -1,
 				},
 				fldPath: fldPath,
@@ -6084,7 +6149,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					PeriodSeconds: -1,
 				},
 				fldPath: fldPath,
@@ -6094,7 +6159,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:          core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:     core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					SuccessThreshold: -1,
 				},
 				fldPath: fldPath,
@@ -6104,7 +6169,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:          core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:     core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					FailureThreshold: -1,
 				},
 				fldPath: fldPath,
@@ -6114,7 +6179,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
 				},
 				fldPath: fldPath,
@@ -6124,7 +6189,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TerminationGracePeriodSeconds: utilpointer.Int64(0),
 				},
 				fldPath: fldPath,
@@ -6134,7 +6199,7 @@ func Test_validateProbe(t *testing.T) {
 		{
 			args: args{
 				probe: &core.Probe{
-					Handler:                       core.Handler{Exec: &core.ExecAction{Command: []string{"echo"}}},
+					ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
 					TerminationGracePeriodSeconds: utilpointer.Int64(1),
 				},
 				fldPath: fldPath,
@@ -6160,7 +6225,7 @@ func Test_validateProbe(t *testing.T) {
 }
 
 func TestValidateHandler(t *testing.T) {
-	successCases := []core.Handler{
+	successCases := []core.ProbeHandler{
 		{Exec: &core.ExecAction{Command: []string{"echo"}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP"}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65535), Host: "host", Scheme: "HTTP"}},
@@ -6169,12 +6234,12 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
 	}
 	for _, h := range successCases {
-		if errs := validateHandler(&h, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateHandler(handlerFromProbe(&h), field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := []core.Handler{
+	errorCases := []core.ProbeHandler{
 		{},
 		{Exec: &core.ExecAction{Command: []string{}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "", Port: intstr.FromInt(0), Host: ""}},
@@ -6184,7 +6249,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "foo.example.com"}}}},
 	}
 	for _, h := range errorCases {
-		if errs := validateHandler(&h, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateHandler(handlerFromProbe(&h), field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %#v", h)
 		}
 	}
@@ -6243,7 +6308,10 @@ func getResourceLimits(cpu, memory string) core.ResourceList {
 func TestValidateEphemeralContainers(t *testing.T) {
 	containers := []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
 	initContainers := []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
-	vols := map[string]core.VolumeSource{"vol": {EmptyDir: &core.EmptyDirVolumeSource{}}}
+	vols := map[string]core.VolumeSource{
+		"blk": {PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "pvc"}},
+		"vol": {EmptyDir: &core.EmptyDirVolumeSource{}},
+	}
 
 	// Success Cases
 	for title, ephemeralContainers := range map[string][]core.EphemeralContainer{
@@ -6261,7 +6329,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				TargetContainerName:      "ctr",
 			},
 		},
-		"All allowed Fields": {
+		"All allowed fields": {
 			{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 
@@ -6283,6 +6351,9 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 					VolumeMounts: []core.VolumeMount{
 						{Name: "vol", MountPath: "/vol"},
+					},
+					VolumeDevices: []core.VolumeDevice{
+						{Name: "blk", DevicePath: "/dev/block"},
 					},
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: "File",
@@ -6376,7 +6447,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						ImagePullPolicy:          "IfNotPresent",
 						TerminationMessagePolicy: "File",
 						Lifecycle: &core.Lifecycle{
-							PreStop: &core.Handler{
+							PreStop: &core.LifecycleHandler{
 								Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
 							},
 						},
@@ -6395,7 +6466,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						ImagePullPolicy:          "IfNotPresent",
 						TerminationMessagePolicy: "File",
 						LivenessProbe: &core.Probe{
-							Handler: core.Handler{
+							ProbeHandler: core.ProbeHandler{
 								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
 							},
 							SuccessThreshold: 1,
@@ -6432,7 +6503,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						ImagePullPolicy:          "IfNotPresent",
 						TerminationMessagePolicy: "File",
 						ReadinessProbe: &core.Probe{
-							Handler: core.Handler{
+							ProbeHandler: core.ProbeHandler{
 								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
 							},
 						},
@@ -6460,6 +6531,42 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resources"},
 		},
+		{
+			"Container uses disallowed field: VolumeMount.SubPath",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol", MountPath: "/vol"},
+							{Name: "vol", MountPath: "/volsub", SubPath: "foo"},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPath"},
+		},
+		{
+			"Container uses disallowed field: VolumeMount.SubPathExpr",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol", MountPath: "/vol"},
+							{Name: "vol", MountPath: "/volsub", SubPathExpr: "$(POD_NAME)"},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPathExpr"},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -6480,6 +6587,124 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	}
 }
 
+func TestValidateWindowsPodSecurityContext(t *testing.T) {
+	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}
+	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
+	cases := map[string]struct {
+		podSec         *core.PodSpec
+		expectErr      bool
+		errorType      field.ErrorType
+		errorDetail    string
+		featureEnabled bool
+	}{
+		"valid SC, windows, no error": {
+			podSec:         &core.PodSpec{SecurityContext: validWindowsSC},
+			expectErr:      false,
+			featureEnabled: true,
+		},
+		"invalid SC, windows, error": {
+			podSec:         &core.PodSpec{SecurityContext: invalidWindowsSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "cannot be set for a windows pod",
+			expectErr:      true,
+			featureEnabled: true,
+		},
+		"valid SC, windows, no error, no IdentifyPodOS featuregate": {
+			podSec:         &core.PodSpec{SecurityContext: validWindowsSC},
+			expectErr:      false,
+			featureEnabled: false,
+		},
+		"invalid SC, windows, error, no IdentifyPodOS featuregate": {
+			podSec:         &core.PodSpec{SecurityContext: invalidWindowsSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "cannot be set for a windows pod",
+			expectErr:      true,
+			featureEnabled: false,
+		},
+	}
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
+			errs := validateWindows(v.podSec, field.NewPath("field"))
+			if v.expectErr && len(errs) > 0 {
+				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+				}
+			} else if v.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !v.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateLinuxPodSecurityContext(t *testing.T) {
+	runAsUser := int64(1)
+	validLinuxSC := &core.PodSecurityContext{
+		SELinuxOptions: &core.SELinuxOptions{
+			User:  "user",
+			Role:  "role",
+			Type:  "type",
+			Level: "level",
+		},
+		RunAsUser: &runAsUser,
+	}
+	invalidLinuxSC := &core.PodSecurityContext{
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+	}
+
+	cases := map[string]struct {
+		podSpec        *core.PodSpec
+		expectErr      bool
+		errorType      field.ErrorType
+		errorDetail    string
+		featureEnabled bool
+	}{
+		"valid SC, linux, no error": {
+			podSpec:        &core.PodSpec{SecurityContext: validLinuxSC},
+			expectErr:      false,
+			featureEnabled: true,
+		},
+		"invalid SC, linux, error": {
+			podSpec:        &core.PodSpec{SecurityContext: invalidLinuxSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: true,
+		},
+		"valid SC, linux, no error, no IdentifyPodOS featuregate": {
+			podSpec:        &core.PodSpec{SecurityContext: validLinuxSC},
+			expectErr:      false,
+			featureEnabled: false,
+		},
+		"invalid SC, linux, error, no IdentifyPodOS featuregate": {
+			podSpec:        &core.PodSpec{SecurityContext: invalidLinuxSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: false,
+		},
+	}
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
+			errs := validateLinux(v.podSpec, field.NewPath("field"))
+			if v.expectErr && len(errs) > 0 {
+				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+				}
+			} else if v.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !v.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -6497,7 +6722,7 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "life-123",
 			Image: "image",
 			Lifecycle: &core.Lifecycle{
-				PreStop: &core.Handler{
+				PreStop: &core.LifecycleHandler{
 					Exec: &core.ExecAction{Command: []string{"ls", "-l"}},
 				},
 			},
@@ -6667,7 +6892,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						Exec: &core.ExecAction{},
 					},
 				},
@@ -6680,7 +6905,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						HTTPGet: &core.HTTPGetAction{},
 					},
 				},
@@ -6693,7 +6918,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						TCPSocket: &core.TCPSocketAction{},
 					},
 				},
@@ -6706,7 +6931,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{
+					PreStop: &core.LifecycleHandler{
 						TCPSocket: &core.TCPSocketAction{
 							Port: intstr.FromInt(0),
 						},
@@ -6721,7 +6946,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				Lifecycle: &core.Lifecycle{
-					PreStop: &core.Handler{},
+					PreStop: &core.LifecycleHandler{},
 				},
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
@@ -6732,7 +6957,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				ReadinessProbe: &core.Probe{
-					Handler: core.Handler{
+					ProbeHandler: core.ProbeHandler{
 						TCPSocket: &core.TCPSocketAction{},
 					},
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(10),
@@ -6746,7 +6971,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				LivenessProbe: &core.Probe{
-					Handler: core.Handler{
+					ProbeHandler: core.ProbeHandler{
 						TCPSocket: &core.TCPSocketAction{},
 					},
 				},
@@ -6759,7 +6984,7 @@ func TestValidateContainers(t *testing.T) {
 				Name:  "life-123",
 				Image: "image",
 				LivenessProbe: &core.Probe{
-					Handler: core.Handler{},
+					ProbeHandler: core.ProbeHandler{},
 				},
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
@@ -9479,24 +9704,25 @@ func TestValidatePodUpdate(t *testing.T) {
 	)
 
 	tests := []struct {
-		new  core.Pod
-		old  core.Pod
-		err  string
-		test string
+		new         core.Pod
+		old         core.Pod
+		err         string
+		test        string
+		enablePodOS bool
 	}{
-		{core.Pod{}, core.Pod{}, "", "nothing"},
+		{new: core.Pod{}, old: core.Pod{}, err: "", test: "nothing"},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			},
-			"metadata.name",
-			"ids",
+			err:  "metadata.name",
+			test: "ids",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -9504,7 +9730,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -9512,11 +9738,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"labels",
+			err:  "",
+			test: "labels",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Annotations: map[string]string{
@@ -9524,7 +9750,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Annotations: map[string]string{
@@ -9532,11 +9758,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"annotations",
+			err:  "",
+			test: "annotations",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -9548,7 +9774,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9561,11 +9787,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"may not add or remove containers",
-			"less containers",
+			err:  "may not add or remove containers",
+			test: "less containers",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -9580,7 +9806,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9590,11 +9816,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"may not add or remove containers",
-			"more containers",
+			err:  "may not add or remove containers",
+			test: "more containers",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -9606,7 +9832,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9619,47 +9845,47 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"may not add or remove containers",
-			"more init containers",
+			err:  "may not add or remove containers",
+			test: "more init containers",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"metadata.deletionTimestamp",
-			"deletion timestamp removed",
+			err:  "metadata.deletionTimestamp",
+			test: "deletion timestamp removed",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"metadata.deletionTimestamp",
-			"deletion timestamp added",
+			err:  "metadata.deletionTimestamp",
+			test: "deletion timestamp added",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"metadata.deletionGracePeriodSeconds",
-			"deletion grace period seconds changed",
+			err:  "metadata.deletionGracePeriodSeconds",
+			test: "deletion grace period seconds changed",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9672,7 +9898,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9685,11 +9911,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"image change",
+			err:  "",
+			test: "image change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9702,7 +9928,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9715,11 +9941,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"init container image change",
+			err:  "",
+			test: "init container image change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9731,7 +9957,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9744,11 +9970,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec.containers[0].image",
-			"image change to empty",
+			err:  "spec.containers[0].image",
+			test: "image change to empty",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9760,7 +9986,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9773,11 +9999,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec.initContainers[0].image",
-			"init container image change to empty",
+			err:  "spec.initContainers[0].image",
+			test: "init container image change to empty",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					EphemeralContainers: []core.EphemeralContainer{
@@ -9790,136 +10016,136 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       core.PodSpec{},
 			},
-			"Forbidden: pod updates may not change fields other than",
-			"ephemeralContainer changes are not allowed via normal pod update",
+			err:  "Forbidden: pod updates may not change fields other than",
+			test: "ephemeralContainer changes are not allowed via normal pod update",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{},
 			},
-			"",
-			"activeDeadlineSeconds no change, nil",
+			err:  "",
+			test: "activeDeadlineSeconds no change, nil",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"",
-			"activeDeadlineSeconds no change, set",
+			err:  "",
+			test: "activeDeadlineSeconds no change, set",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			core.Pod{},
-			"",
-			"activeDeadlineSeconds change to positive from nil",
+			old:  core.Pod{},
+			err:  "",
+			test: "activeDeadlineSeconds change to positive from nil",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
 				},
 			},
-			"",
-			"activeDeadlineSeconds change to smaller positive",
+			err:  "",
+			test: "activeDeadlineSeconds change to smaller positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to larger positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to larger positive",
 		},
 
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
 				},
 			},
-			core.Pod{},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to negative from nil",
+			old:  core.Pod{},
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to negative from nil",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to negative from positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to negative from positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to zero from positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to zero from positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
 				},
 			},
-			core.Pod{},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to zero from nil",
+			old:  core.Pod{},
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to zero from nil",
 		},
 		{
-			core.Pod{},
-			core.Pod{
+			new: core.Pod{},
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to nil from positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to nil from positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9932,7 +10158,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9945,11 +10171,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec: Forbidden: pod updates may not change fields",
-			"cpu change",
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "cpu change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9962,7 +10188,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9975,11 +10201,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec: Forbidden: pod updates may not change fields",
-			"fsGroupChangePolicy change",
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "fsGroupChangePolicy change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9992,7 +10218,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -10005,11 +10231,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec: Forbidden: pod updates may not change fields",
-			"port change",
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "port change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -10017,7 +10243,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -10025,11 +10251,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"bad label change",
+			err:  "",
+			test: "bad label change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10038,7 +10264,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value2"}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10047,11 +10273,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			"spec.tolerations: Forbidden",
-			"existing toleration value modified in pod spec updates",
+			err:  "spec.tolerations: Forbidden",
+			test: "existing toleration value modified in pod spec updates",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10060,7 +10286,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: nil}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10069,11 +10295,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			"spec.tolerations: Forbidden",
-			"existing toleration value modified in pod spec updates with modified tolerationSeconds",
+			err:  "spec.tolerations: Forbidden",
+			test: "existing toleration value modified in pod spec updates with modified tolerationSeconds",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10082,7 +10308,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10090,11 +10316,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					NodeName:    "node1",
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
 				}},
-			"",
-			"modified tolerationSeconds in existing toleration value in pod spec updates",
+			err:  "",
+			test: "modified tolerationSeconds in existing toleration value in pod spec updates",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10102,7 +10328,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value2"}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10111,11 +10337,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			"spec.tolerations: Forbidden",
-			"toleration modified in updates to an unscheduled pod",
+			err:  "spec.tolerations: Forbidden",
+			test: "toleration modified in updates to an unscheduled pod",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10124,7 +10350,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10133,11 +10359,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			"",
-			"tolerations unmodified in updates to a scheduled pod",
+			err:  "",
+			test: "tolerations unmodified in updates to a scheduled pod",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10148,7 +10374,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]},
 					},
 				}},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10157,11 +10383,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			"",
-			"added valid new toleration to existing tolerations in pod spec updates",
+			err:  "",
+			test: "added valid new toleration to existing tolerations in pod spec updates",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{
 					NodeName: "node1",
 					Tolerations: []core.Toleration{
@@ -10169,42 +10395,42 @@ func TestValidatePodUpdate(t *testing.T) {
 						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
 					},
 				}},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: core.PodSpec{
 					NodeName: "node1", Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				}},
-			"spec.tolerations[1].effect",
-			"added invalid new toleration to existing tolerations in pod spec updates",
+			err:  "spec.tolerations[1].effect",
+			test: "added invalid new toleration to existing tolerations in pod spec updates",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			"spec: Forbidden: pod updates may not change fields",
-			"removed nodeName from pod spec",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "removed nodeName from pod spec",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			"metadata.annotations[kubernetes.io/config.mirror]",
-			"added mirror pod annotation",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
+			err:  "metadata.annotations[kubernetes.io/config.mirror]",
+			test: "added mirror pod annotation",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
-			"metadata.annotations[kubernetes.io/config.mirror]",
-			"removed mirror pod annotation",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
+			err:  "metadata.annotations[kubernetes.io/config.mirror]",
+			test: "removed mirror pod annotation",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "foo"}}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "bar"}}, Spec: core.PodSpec{NodeName: "foo"}},
-			"metadata.annotations[kubernetes.io/config.mirror]",
-			"changed mirror pod annotation",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "foo"}}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "bar"}}, Spec: core.PodSpec{NodeName: "foo"}},
+			err:  "metadata.annotations[kubernetes.io/config.mirror]",
+			test: "changed mirror pod annotation",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10213,7 +10439,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "bar-priority",
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10222,11 +10448,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "foo-priority",
 				},
 			},
-			"spec: Forbidden: pod updates",
-			"changed priority class name",
+			err:  "spec: Forbidden: pod updates",
+			test: "changed priority class name",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10235,7 +10461,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "",
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10244,11 +10470,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "foo-priority",
 				},
 			},
-			"spec: Forbidden: pod updates",
-			"removed priority class name",
+			err:  "spec: Forbidden: pod updates",
+			test: "removed priority class name",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10256,7 +10482,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(1),
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10264,11 +10490,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
 				},
 			},
-			"",
-			"update termination grace period seconds",
+			err:  "",
+			test: "update termination grace period seconds",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10276,7 +10502,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(0),
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10284,11 +10510,137 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
 				},
 			},
-			"spec: Forbidden: pod updates",
-			"update termination grace period seconds not 1",
+			err:  "spec: Forbidden: pod updates",
+			test: "update termination grace period seconds not 1",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Windows},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Linux},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image`,",
+			test:        "pod OS changing from Linux to Windows, no IdentifyPodOS featuregate set, no validation done",
+			enablePodOS: false,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Windows},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Linux},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test:        "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
+			enablePodOS: true,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Windows},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Linux},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			err:         "spec.securityContext.seLinuxOptions: Forbidden",
+			test:        "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
+			enablePodOS: true,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: "dummy"},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test:        "invalid PodOS update, IdentifyPodOS featuregate set",
+			enablePodOS: true,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: core.Windows},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test:        "no pod spec OS to a valid value, no featuregate",
+			enablePodOS: false,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: core.Linux},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: core.Windows},
+				},
+			},
+			err:  "Forbidden: pod updates may not change fields other than ",
+			test: "update pod spec OS to a valid value, featuregate disabled",
 		},
 	}
-
 	for _, test := range tests {
 		test.new.ObjectMeta.ResourceVersion = "1"
 		test.old.ObjectMeta.ResourceVersion = "1"
@@ -10315,7 +10667,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			test.old.Spec.RestartPolicy = "Always"
 		}
 
-		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{})
+		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{AllowOSField: test.enablePodOS})
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -10433,6 +10785,406 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			"",
 			"Update nominatedNodeName",
 		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						Name:        "init",
+						Ready:       false,
+						Started:     proto.Bool(false),
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						Name:        "main",
+						Ready:       false,
+						Started:     proto.Bool(false),
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			"",
+			"Container statuses pending",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "init",
+						Ready:       true,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						Name:        "init",
+						Ready:       false,
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						Name:        "main",
+						Ready:       false,
+						Started:     proto.Bool(false),
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses running",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses add ephemeral container",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses ephemeral container running",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+								StartedAt:   metav1.NewTime(time.Now()),
+								FinishedAt:  metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses ephemeral container exited",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "init",
+						Ready:       true,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+								StartedAt:   metav1.NewTime(time.Now()),
+								FinishedAt:  metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+								StartedAt:   metav1.NewTime(time.Now()),
+								FinishedAt:  metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "init",
+						Ready:       true,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses all containers terminated",
+		},
 	}
 
 	for _, test := range tests {
@@ -10474,96 +11226,166 @@ func makeValidService() core.Service {
 }
 
 func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
+	makePod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
+		return &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations:     map[string]string{},
+				Labels:          map[string]string{},
+				Name:            "pod",
+				Namespace:       "ns",
+				ResourceVersion: "1",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{
+					Name:                     "cnt",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				}},
+				DNSPolicy:           core.DNSClusterFirst,
+				EphemeralContainers: ephemeralContainers,
+				RestartPolicy:       core.RestartPolicyOnFailure,
+			},
+		}
+	}
+
+	// Some tests use Windows host pods as an example of fields that might
+	// conflict between an ephemeral container and the rest of the pod.
+	opts := PodValidationOptions{AllowWindowsHostProcessField: true}
+	capabilities.SetForTests(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
+	makeWindowsHostPod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
+		return &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations:     map[string]string{},
+				Labels:          map[string]string{},
+				Name:            "pod",
+				Namespace:       "ns",
+				ResourceVersion: "1",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{
+					Name:            "cnt",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: proto.Bool(true),
+						},
+					},
+					TerminationMessagePolicy: "File",
+				}},
+				DNSPolicy:           core.DNSClusterFirst,
+				EphemeralContainers: ephemeralContainers,
+				RestartPolicy:       core.RestartPolicyOnFailure,
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: proto.Bool(true),
+					},
+				},
+			},
+		}
+	}
+
 	tests := []struct {
-		new  []core.EphemeralContainer
-		old  []core.EphemeralContainer
-		err  string
-		test string
+		name     string
+		new, old *core.Pod
+		err      string
 	}{
-		{[]core.EphemeralContainer{}, []core.EphemeralContainer{}, "", "nothing"},
 		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
+			"no ephemeral containers",
+			makePod([]core.EphemeralContainer{}),
+			makePod([]core.EphemeralContainer{}),
 			"",
+		},
+		{
 			"No change in Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"",
 		},
 		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"",
 			"Ephemeral Container list order changes",
-		},
-		{
-			[]core.EphemeralContainer{{
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger",
 					Image:                    "busybox",
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
-			[]core.EphemeralContainer{},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
 			"",
-			"Add an Ephemeral Container",
 		},
 		{
-			[]core.EphemeralContainer{{
+			"Add an Ephemeral Container",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{}),
+			"",
+		},
+		{
+			"Add two Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger1",
 					Image:                    "busybox",
@@ -10577,13 +11399,13 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
-			[]core.EphemeralContainer{},
+			}}),
+			makePod([]core.EphemeralContainer{}),
 			"",
-			"Add two Ephemeral Containers",
 		},
 		{
-			[]core.EphemeralContainer{{
+			"Add to an existing Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger",
 					Image:                    "busybox",
@@ -10597,20 +11419,20 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
-			[]core.EphemeralContainer{{
+			}}),
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger",
 					Image:                    "busybox",
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
+			}}),
 			"",
-			"Add to an existing Ephemeral Containers",
 		},
 		{
-			[]core.EphemeralContainer{{
+			"Add to an existing Ephemeral Containers, list order changes",
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger3",
 					Image:                    "busybox",
@@ -10631,8 +11453,8 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
-			[]core.EphemeralContainer{{
+			}}),
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger",
 					Image:                    "busybox",
@@ -10646,45 +11468,45 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
+			}}),
 			"",
-			"Add to an existing Ephemeral Containers, list order changes",
 		},
 		{
-			[]core.EphemeralContainer{},
-			[]core.EphemeralContainer{{
+			"Remove an Ephemeral Container",
+			makePod([]core.EphemeralContainer{}),
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger",
 					Image:                    "busybox",
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
+			}}),
 			"may not be removed",
-			"Remove an Ephemeral Container",
 		},
 		{
-			[]core.EphemeralContainer{{
+			"Replace an Ephemeral Container",
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "firstone",
 					Image:                    "busybox",
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
-			[]core.EphemeralContainer{{
+			}}),
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "thentheother",
 					Image:                    "busybox",
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
+			}}),
 			"may not be removed",
-			"Replace an Ephemeral Container",
 		},
 		{
-			[]core.EphemeralContainer{{
+			"Change an Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger1",
 					Image:                    "busybox",
@@ -10698,8 +11520,8 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
-			[]core.EphemeralContainer{{
+			}}),
+			makePod([]core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name:                     "debugger1",
 					Image:                    "debian",
@@ -10713,25 +11535,58 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					ImagePullPolicy:          "IfNotPresent",
 					TerminationMessagePolicy: "File",
 				},
-			}},
+			}}),
 			"may not be changed",
-			"Change an Ephemeral Containers",
+		},
+		{
+			"Ephemeral container with potential conflict with regular containers, but conflict not present",
+			makeWindowsHostPod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:            "debugger1",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: proto.Bool(true),
+						},
+					},
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makeWindowsHostPod(nil),
+			"",
+		},
+		{
+			"Ephemeral container with potential conflict with regular containers, and conflict is present",
+			makeWindowsHostPod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:            "debugger1",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: proto.Bool(false),
+						},
+					},
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makeWindowsHostPod(nil),
+			"spec.ephemeralContainers[0].securityContext.windowsOptions.hostProcess: Invalid value: false: pod hostProcess value must be identical",
 		},
 	}
 
-	for _, test := range tests {
-		new := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.new}}
-		old := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.old}}
-		errs := ValidatePodEphemeralContainersUpdate(&new, &old, PodValidationOptions{})
-		if test.err == "" {
+	for _, tc := range tests {
+		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, opts)
+		if tc.err == "" {
 			if len(errs) != 0 {
-				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+				t.Errorf("unexpected invalid for test: %s\nErrors returned: %+v\nLocal diff of test objects (-old +new):\n%s", tc.name, errs, cmp.Diff(tc.old, tc.new))
 			}
 		} else {
 			if len(errs) == 0 {
-				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
-			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
-				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
+				t.Errorf("unexpected valid for test: %s\nLocal diff of test objects (-old +new):\n%s", tc.name, cmp.Diff(tc.old, tc.new))
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, tc.err) {
+				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", tc.name, tc.err, actualErr)
 			}
 		}
 	}
@@ -11003,6 +11858,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid load balancer protocol UDP 1",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports[0].Protocol = "UDP"
 			},
@@ -11012,6 +11868,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid load balancer protocol UDP 2",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports[0] = core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)}
 			},
@@ -11021,6 +11878,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "load balancer with mix protocol",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -11075,6 +11933,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - loadbalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -11083,6 +11942,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - loadbalancer with allocateLoadBalancerNodePorts=false",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 			},
 			numErrs: 0,
@@ -11091,6 +11951,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid type - missing AllocateLoadBalancerNodePorts for loadbalancer type",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 			},
 			numErrs: 1,
 		},
@@ -11098,6 +11959,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type loadbalancer 2 ports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -11107,6 +11969,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid external load balancer 2 ports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -11116,6 +11979,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "duplicate nodeports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(2)})
 			},
@@ -11125,6 +11989,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "duplicate nodeports (different protocols)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1, TargetPort: intstr.FromInt(2)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 3, Protocol: "SCTP", NodePort: 1, TargetPort: intstr.FromInt(3)})
@@ -11161,6 +12026,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - nodeport",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 			},
 			numErrs: 0,
 		},
@@ -11168,6 +12034,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - loadbalancer with allocateLoadBalancerNodePorts=true",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -11176,6 +12043,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type loadbalancer 2 ports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -11185,6 +12053,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type loadbalancer with NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt(12345)})
 			},
@@ -11194,6 +12063,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type=NodePort service with NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt(12345)})
 			},
 			numErrs: 0,
@@ -11202,6 +12072,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type=NodePort service without NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
 			numErrs: 0,
@@ -11226,6 +12097,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid public service with duplicate NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(2)})
 			},
@@ -11235,6 +12107,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type=LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -11246,6 +12119,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid port type=LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -11255,6 +12129,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid LoadBalancer source range annotation",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
 			},
@@ -11264,6 +12139,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "empty LoadBalancer source range annotation",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = ""
 			},
@@ -11280,6 +12156,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid LoadBalancer source range annotation (invalid CIDR)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
 			},
@@ -11296,6 +12173,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid LoadBalancer source range",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/8", "5.6.7.8/16"}
 			},
@@ -11305,6 +12183,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "empty LoadBalancer source range",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerSourceRanges = []string{"   "}
 			},
@@ -11314,6 +12193,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid LoadBalancer source range",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerSourceRanges = []string{"foo.bar"}
 			},
@@ -11369,6 +12249,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.ClusterIP = "None"
 				s.Spec.ClusterIPs = []string{"None"}
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 1,
@@ -11377,6 +12258,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid node port with clusterIP None",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.ClusterIP = "None"
 				s.Spec.ClusterIPs = []string{"None"}
@@ -11400,6 +12282,31 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
 			numErrs:      1,
+		},
+		{
+			name: "internalTrafficPolicy field nil when type is ExternalName",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.InternalTrafficPolicy = nil
+				s.Spec.Type = core.ServiceTypeExternalName
+				s.Spec.ExternalName = "foo.bar.com"
+			},
+			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
+			numErrs:      0,
+		},
+		{
+			// Typically this should fail validation, but in v1.22 we have existing clusters
+			// that may have allowed internalTrafficPolicy when Type=ExternalName.
+			// This test case ensures we don't break compatibility for internalTrafficPolicy
+			// when Type=ExternalName
+			name: "internalTrafficPolicy field is set when type is ExternalName",
+			tweakSvc: func(s *core.Service) {
+				cluster := core.ServiceInternalTrafficPolicyCluster
+				s.Spec.InternalTrafficPolicy = &cluster
+				s.Spec.Type = core.ServiceTypeExternalName
+				s.Spec.ExternalName = "foo.bar.com"
+			},
+			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
+			numErrs:      0,
 		},
 		{
 			name: "invalid internalTraffic field",
@@ -11463,6 +12370,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "sessionAffinityConfig can't be set when session affinity is None",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.SessionAffinity = core.ServiceAffinityNone
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
@@ -11916,6 +12824,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid LoadBalancerClass when type is LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
@@ -11925,6 +12834,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid LoadBalancerClass",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerClass = utilpointer.StringPtr("Bad/LoadBalancerClass")
 			},
@@ -11955,7 +12865,7 @@ func TestValidateServiceCreate(t *testing.T) {
 	}
 }
 
-func TestValidateServiceExternalTrafficFieldsCombination(t *testing.T) {
+func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 	testCases := []struct {
 		name     string
 		tweakSvc func(svc *core.Service) // Given a basic valid service, each test case can customize it.
@@ -12014,12 +12924,26 @@ func TestValidateServiceExternalTrafficFieldsCombination(t *testing.T) {
 			},
 			numErrs: 2,
 		},
+		{
+			name: "externalTrafficPolicy is required on NodePort service",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeNodePort
+			},
+			numErrs: 1,
+		},
+		{
+			name: "externalTrafficPolicy is required on LoadBalancer service",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeLoadBalancer
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
 		svc := makeValidService()
 		tc.tweakSvc(&svc)
-		errs := ValidateServiceExternalTrafficFieldsCombination(&svc)
+		errs := validateServiceExternalTrafficPolicy(&svc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
 		}
@@ -13510,6 +14434,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "change type",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -13525,6 +14450,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "change type -> nodeport",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 			},
 			numErrs: 0,
 		},
@@ -13534,6 +14460,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 			},
@@ -13546,6 +14473,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				oldSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.100.0.0/16"}
 			},
@@ -13557,6 +14485,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.ClusterIP = "None"
 				newSvc.Spec.ClusterIPs = []string{"None"}
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 1,
@@ -13630,6 +14559,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -13644,6 +14574,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -13658,6 +14589,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -13673,6 +14605,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = ""
@@ -13689,6 +14622,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 			},
 			numErrs: 0,
@@ -13699,6 +14633,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -13708,6 +14643,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -13722,6 +14658,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -13764,6 +14701,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -13779,6 +14717,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = ""
@@ -13795,6 +14734,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -13811,6 +14751,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = ""
@@ -13857,6 +14798,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -13872,6 +14814,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -13914,6 +14857,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 
 				oldSvc.Spec.Ports = append(oldSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				newSvc.Spec.Ports = append(newSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
@@ -14366,6 +15310,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 			},
@@ -14379,6 +15324,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-new")
 			},
@@ -14392,6 +15338,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
@@ -14405,6 +15352,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = nil
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-new")
 			},
@@ -14416,6 +15364,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
@@ -14427,6 +15376,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
@@ -14438,6 +15388,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("Bad/LoadBalancerclass")
 			},
@@ -14469,6 +15420,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
@@ -14505,6 +15457,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
@@ -14981,11 +15934,86 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
 		},
 	})
+	validAllocatedResources := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+		},
+	})
+
+	invalidAllocatedResources := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
+		},
+	})
+
+	noStoraegeClaimStatus := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		AllocatedResources: core.ResourceList{
+			core.ResourceName(core.ResourceCPU): resource.MustParse("10G"),
+		},
+	})
+	progressResizeStatus := core.PersistentVolumeClaimControllerExpansionInProgress
+	invalidResizeStatus := core.PersistentVolumeClaimResizeStatus("foo")
+
+	validResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		ResizeStatus: &progressResizeStatus,
+	})
+
+	invalidResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		ResizeStatus: &invalidResizeStatus,
+	})
+
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		oldClaim          *core.PersistentVolumeClaim
-		newClaim          *core.PersistentVolumeClaim
-		enableResize      bool
+		isExpectedFailure          bool
+		oldClaim                   *core.PersistentVolumeClaim
+		newClaim                   *core.PersistentVolumeClaim
+		enableResize               bool
+		enableRecoverFromExpansion bool
 	}{
 		"condition-update-with-enabled-feature-gate": {
 			isExpectedFailure: false,
@@ -14993,13 +16021,51 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			newClaim:          validConditionUpdate,
 			enableResize:      true,
 		},
+		"status-update-with-valid-allocatedResources-feature-enabled": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validAllocatedResources,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-invalid-allocatedResources-feature-enabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidAllocatedResources,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-no-storage-update": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   noStoraegeClaimStatus,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-valid-pvc-resize-status": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validResizeStatusPVC,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-invalid-pvc-resize-status": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidResizeStatusPVC,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			validateOpts := PersistentVolumeClaimSpecValidationOptions{
+				EnableRecoverFromExpansionFailure: scenario.enableRecoverFromExpansion,
+			}
 			// ensure we have a resource version specified for updates
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
-			errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
+			errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim, validateOpts)
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success for scenario: %s", name)
 			}
@@ -15146,10 +16212,9 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		rq                       core.ResourceQuota
-		errDetail                string
-		errField                 string
-		disableNamespaceSelector bool
+		rq        core.ResourceQuota
+		errDetail string
+		errField  string
 	}{
 		"no-scope": {
 			rq: core.ResourceQuota{
@@ -15267,17 +16332,10 @@ func TestValidateResourceQuota(t *testing.T) {
 			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
 			errDetail: "must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
 		},
-		"cross-namespace-affinity-disabled": {
-			rq:                       core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: crossNamespaceAffinitySpec},
-			errDetail:                "unsupported scope",
-			disableNamespaceSelector: true,
-		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateResourceQuota(&tc.rq, ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: !tc.disableNamespaceSelector,
-			})
+			errs := ValidateResourceQuota(&tc.rq)
 			if len(tc.errDetail) == 0 && len(tc.errField) == 0 && len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			} else if (len(tc.errDetail) != 0 || len(tc.errField) != 0) && len(errs) == 0 {
@@ -16184,6 +17242,281 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateWindowsSecurityContext(t *testing.T) {
+	tests := []struct {
+		name           string
+		sc             *core.PodSpec
+		expectError    bool
+		errorMsg       string
+		errorType      field.ErrorType
+		featureEnabled bool
+	}{
+		{
+			name:           "pod with SELinux Options",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: true,
+		},
+		{
+			name:           "pod with SeccompProfile",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: true,
+		},
+		{
+			name:           "pod with WindowsOptions, no error",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
+			expectError:    false,
+			featureEnabled: true,
+		},
+		{
+			name:           "pod with SELinux Options,  no IdentifyPodOS enabled",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: false,
+		},
+		{
+			name:           "pod with SeccompProfile, no IdentifyPodOS enabled",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: false,
+		},
+		{
+			name:           "pod with WindowsOptions, no error,  no IdentifyPodOS enabled",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
+			expectError:    false,
+			featureEnabled: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, test.featureEnabled)()
+			errs := validateWindows(test.sc, field.NewPath("field"))
+			if test.expectError && len(errs) > 0 {
+				if errs[0].Type != test.errorType {
+					t.Errorf("expected error type %q got %q", test.errorType, errs[0].Type)
+				}
+				if errs[0].Detail != test.errorMsg {
+					t.Errorf("expected error detail %q, got %q", test.errorMsg, errs[0].Detail)
+				}
+			} else if test.expectError && len(errs) == 0 {
+				t.Error("Unexpected success")
+			}
+			if !test.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateOSFields(t *testing.T) {
+	// Contains the list of OS specific fields within pod spec.
+	// All the fields in pod spec should be either osSpecific or osNeutral field
+	// To make a field OS specific:
+	// - Add documentation to the os specific field indicating which os it can/cannot be set for
+	// - Add documentation to the os field in the api
+	// - Add validation logic validateLinux, validateWindows functions to make sure the field is only set for eligible OSes
+	osSpecificFields := sets.NewString(
+		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
+		"Containers[*].SecurityContext.Capabilities",
+		"Containers[*].SecurityContext.Privileged",
+		"Containers[*].SecurityContext.ProcMount",
+		"Containers[*].SecurityContext.ReadOnlyRootFilesystem",
+		"Containers[*].SecurityContext.RunAsGroup",
+		"Containers[*].SecurityContext.RunAsUser",
+		"Containers[*].SecurityContext.SELinuxOptions",
+		"Containers[*].SecurityContext.SeccompProfile",
+		"Containers[*].SecurityContext.WindowsOptions",
+		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
+		"InitContainers[*].SecurityContext.Capabilities",
+		"InitContainers[*].SecurityContext.Privileged",
+		"InitContainers[*].SecurityContext.ProcMount",
+		"InitContainers[*].SecurityContext.ReadOnlyRootFilesystem",
+		"InitContainers[*].SecurityContext.RunAsGroup",
+		"InitContainers[*].SecurityContext.RunAsUser",
+		"InitContainers[*].SecurityContext.SELinuxOptions",
+		"InitContainers[*].SecurityContext.SeccompProfile",
+		"InitContainers[*].SecurityContext.WindowsOptions",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Capabilities",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Privileged",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.ProcMount",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.ReadOnlyRootFilesystem",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsGroup",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsUser",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SELinuxOptions",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SeccompProfile",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.WindowsOptions",
+		"OS",
+		"SecurityContext.FSGroup",
+		"SecurityContext.FSGroupChangePolicy",
+		"SecurityContext.HostIPC",
+		"SecurityContext.HostNetwork",
+		"SecurityContext.HostPID",
+		"SecurityContext.RunAsGroup",
+		"SecurityContext.RunAsUser",
+		"SecurityContext.SELinuxOptions",
+		"SecurityContext.SeccompProfile",
+		"SecurityContext.ShareProcessNamespace",
+		"SecurityContext.SupplementalGroups",
+		"SecurityContext.Sysctls",
+		"SecurityContext.WindowsOptions",
+	)
+	osNeutralFields := sets.NewString(
+		"ActiveDeadlineSeconds",
+		"Affinity",
+		"AutomountServiceAccountToken",
+		"Containers[*].Args",
+		"Containers[*].Command",
+		"Containers[*].Env",
+		"Containers[*].EnvFrom",
+		"Containers[*].Image",
+		"Containers[*].ImagePullPolicy",
+		"Containers[*].Lifecycle",
+		"Containers[*].LivenessProbe",
+		"Containers[*].Name",
+		"Containers[*].Ports",
+		"Containers[*].ReadinessProbe",
+		"Containers[*].Resources",
+		"Containers[*].SecurityContext.RunAsNonRoot",
+		"Containers[*].Stdin",
+		"Containers[*].StdinOnce",
+		"Containers[*].StartupProbe",
+		"Containers[*].VolumeDevices[*]",
+		"Containers[*].VolumeMounts[*]",
+		"Containers[*].TTY",
+		"Containers[*].TerminationMessagePath",
+		"Containers[*].TerminationMessagePolicy",
+		"Containers[*].WorkingDir",
+		"DNSPolicy",
+		"EnableServiceLinks",
+		"EphemeralContainers[*].EphemeralContainerCommon.Args",
+		"EphemeralContainers[*].EphemeralContainerCommon.Command",
+		"EphemeralContainers[*].EphemeralContainerCommon.Env",
+		"EphemeralContainers[*].EphemeralContainerCommon.EnvFrom",
+		"EphemeralContainers[*].EphemeralContainerCommon.Image",
+		"EphemeralContainers[*].EphemeralContainerCommon.ImagePullPolicy",
+		"EphemeralContainers[*].EphemeralContainerCommon.Lifecycle",
+		"EphemeralContainers[*].EphemeralContainerCommon.LivenessProbe",
+		"EphemeralContainers[*].EphemeralContainerCommon.Name",
+		"EphemeralContainers[*].EphemeralContainerCommon.Ports",
+		"EphemeralContainers[*].EphemeralContainerCommon.ReadinessProbe",
+		"EphemeralContainers[*].EphemeralContainerCommon.Resources",
+		"EphemeralContainers[*].EphemeralContainerCommon.Stdin",
+		"EphemeralContainers[*].EphemeralContainerCommon.StdinOnce",
+		"EphemeralContainers[*].EphemeralContainerCommon.TTY",
+		"EphemeralContainers[*].EphemeralContainerCommon.TerminationMessagePath",
+		"EphemeralContainers[*].EphemeralContainerCommon.TerminationMessagePolicy",
+		"EphemeralContainers[*].EphemeralContainerCommon.WorkingDir",
+		"EphemeralContainers[*].TargetContainerName",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsNonRoot",
+		"EphemeralContainers[*].EphemeralContainerCommon.StartupProbe",
+		"EphemeralContainers[*].EphemeralContainerCommon.VolumeDevices[*]",
+		"EphemeralContainers[*].EphemeralContainerCommon.VolumeMounts[*]",
+		"HostAliases",
+		"Hostname",
+		"ImagePullSecrets",
+		"InitContainers[*].Args",
+		"InitContainers[*].Command",
+		"InitContainers[*].Env",
+		"InitContainers[*].EnvFrom",
+		"InitContainers[*].Image",
+		"InitContainers[*].ImagePullPolicy",
+		"InitContainers[*].Lifecycle",
+		"InitContainers[*].LivenessProbe",
+		"InitContainers[*].Name",
+		"InitContainers[*].Ports",
+		"InitContainers[*].ReadinessProbe",
+		"InitContainers[*].Resources",
+		"InitContainers[*].Stdin",
+		"InitContainers[*].StdinOnce",
+		"InitContainers[*].TTY",
+		"InitContainers[*].TerminationMessagePath",
+		"InitContainers[*].TerminationMessagePolicy",
+		"InitContainers[*].WorkingDir",
+		"InitContainers[*].SecurityContext.RunAsNonRoot",
+		"InitContainers[*].StartupProbe",
+		"InitContainers[*].VolumeDevices[*]",
+		"InitContainers[*].VolumeMounts[*]",
+		"NodeName",
+		"NodeSelector",
+		"PreemptionPolicy",
+		"Priority",
+		"PriorityClassName",
+		"ReadinessGates",
+		"RestartPolicy",
+		"RuntimeClassName",
+		"SchedulerName",
+		"SecurityContext.RunAsNonRoot",
+		"ServiceAccountName",
+		"SetHostnameAsFQDN",
+		"Subdomain",
+		"TerminationGracePeriodSeconds",
+		"Volumes",
+		"DNSConfig",
+		"Overhead",
+		"Tolerations",
+		"TopologySpreadConstraints",
+	)
+
+	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
+
+	result := collectResourcePaths(t, expect, reflect.TypeOf(&core.PodSpec{}), nil)
+
+	if !expect.Equal(result) {
+		// expected fields missing from result
+		missing := expect.Difference(result)
+		// unexpected fields in result but not specified in expect
+		unexpected := result.Difference(expect)
+		if len(missing) > 0 {
+			t.Errorf("the following fields were expected, but missing from the result. "+
+				"If the field has been removed, please remove it from the osNeutralFields set "+
+				"or remove it from the osSpecificFields set, as appropriate:\n%s",
+				strings.Join(missing.List(), "\n"))
+		}
+		if len(unexpected) > 0 {
+			t.Errorf("the following fields were in the result, but unexpected. "+
+				"If the field is new, please add it to the osNeutralFields set "+
+				"or add it to the osSpecificFields set, as appropriate:\n%s",
+				strings.Join(unexpected.List(), "\n"))
+		}
+	}
+}
+
+// collectResourcePaths traverses the object, computing all the struct paths.
+func collectResourcePaths(t *testing.T, skipRecurseList sets.String, tp reflect.Type, path *field.Path) sets.String {
+	if pathStr := path.String(); len(pathStr) > 0 && skipRecurseList.Has(pathStr) {
+		return sets.NewString(pathStr)
+	}
+
+	paths := sets.NewString()
+	switch tp.Kind() {
+	case reflect.Ptr:
+		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path).List()...)
+	case reflect.Struct:
+		for i := 0; i < tp.NumField(); i++ {
+			field := tp.Field(i)
+			paths.Insert(collectResourcePaths(t, skipRecurseList, field.Type, path.Child(field.Name)).List()...)
+		}
+	case reflect.Map, reflect.Slice:
+		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path.Key("*")).List()...)
+	case reflect.Interface:
+		t.Fatalf("unexpected interface{} field %s", path.String())
+	default:
+		// if we hit a primitive type, we're at a leaf
+		paths.Insert(path.String())
+	}
+	return paths
+}
+
 func TestValidateTLSSecret(t *testing.T) {
 	successCases := map[string]core.Secret{
 		"empty certificate chain": {
@@ -16227,6 +17560,75 @@ func TestValidateTLSSecret(t *testing.T) {
 		if errs := ValidateSecret(&v.secrets); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %s with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
+	}
+}
+
+func TestValidateLinuxSecurityContext(t *testing.T) {
+	runAsUser := int64(1)
+	validLinuxSC := &core.SecurityContext{
+		Privileged: utilpointer.BoolPtr(false),
+		Capabilities: &core.Capabilities{
+			Add:  []core.Capability{"foo"},
+			Drop: []core.Capability{"bar"},
+		},
+		SELinuxOptions: &core.SELinuxOptions{
+			User:  "user",
+			Role:  "role",
+			Type:  "type",
+			Level: "level",
+		},
+		RunAsUser: &runAsUser,
+	}
+	invalidLinuxSC := &core.SecurityContext{
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+	}
+	cases := map[string]struct {
+		sc             *core.PodSpec
+		expectErr      bool
+		errorType      field.ErrorType
+		errorDetail    string
+		featureEnabled bool
+	}{
+		"valid SC, linux, no error": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: validLinuxSC}}},
+			expectErr:      false,
+			featureEnabled: true,
+		},
+		"invalid SC, linux, error": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: invalidLinuxSC}}},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: true,
+		},
+		"valid SC, linux, no error, no IdentifyPodOS featuregate": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: validLinuxSC}}},
+			expectErr:      false,
+			featureEnabled: false,
+		},
+		"invalid SC, linux, error, no IdentifyPodOS featuregate": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: invalidLinuxSC}}},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: false,
+		},
+	}
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
+			errs := validateLinux(v.sc, field.NewPath("field"))
+			if v.expectErr && len(errs) > 0 {
+				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+				}
+			} else if v.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !v.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
 	}
 }
 
@@ -16631,13 +18033,35 @@ func TestIsValidSysctlName(t *testing.T) {
 			return string(x)
 		}(256),
 	}
+
+	containSlashesValid := []string{
+		"a/b/c/d",
+		"a/b.c",
+	}
+
+	containSlashesInvalid := []string{
+		"/",
+		"/a",
+		"a/abc*",
+		"a/b/*",
+	}
 	for _, s := range valid {
-		if !IsValidSysctlName(s) {
+		if !IsValidSysctlName(s, false) {
 			t.Errorf("%q expected to be a valid sysctl name", s)
 		}
 	}
 	for _, s := range invalid {
-		if IsValidSysctlName(s) {
+		if IsValidSysctlName(s, false) {
+			t.Errorf("%q expected to be an invalid sysctl name", s)
+		}
+	}
+	for _, s := range containSlashesValid {
+		if !IsValidSysctlName(s, true) {
+			t.Errorf("%q expected to be a valid sysctl name", s)
+		}
+	}
+	for _, s := range containSlashesInvalid {
+		if IsValidSysctlName(s, true) {
 			t.Errorf("%q expected to be an invalid sysctl name", s)
 		}
 	}
@@ -16658,11 +18082,16 @@ func TestValidateSysctls(t *testing.T) {
 		"kernel.shmmax",
 	}
 
+	containSlashes := []string{
+		"net.ipv4.conf.enp3s0/200.forwarding",
+		"net/ipv4/conf/enp3s0.200/forwarding",
+	}
+
 	sysctls := make([]core.Sysctl, len(valid))
 	for i, sysctl := range valid {
 		sysctls[i].Name = sysctl
 	}
-	errs := validateSysctls(sysctls, field.NewPath("foo"))
+	errs := validateSysctls(sysctls, field.NewPath("foo"), false)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -16671,7 +18100,7 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range invalid {
 		sysctls[i].Name = sysctl
 	}
-	errs = validateSysctls(sysctls, field.NewPath("foo"))
+	errs = validateSysctls(sysctls, field.NewPath("foo"), false)
 	if len(errs) != 2 {
 		t.Errorf("expected 2 validation errors. Got: %v", errs)
 	} else {
@@ -16687,11 +18116,20 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range duplicates {
 		sysctls[i].Name = sysctl
 	}
-	errs = validateSysctls(sysctls, field.NewPath("foo"))
+	errs = validateSysctls(sysctls, field.NewPath("foo"), false)
 	if len(errs) != 1 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
+	}
+
+	sysctls = make([]core.Sysctl, len(containSlashes))
+	for i, sysctl := range containSlashes {
+		sysctls[i].Name = sysctl
+	}
+	errs = validateSysctls(sysctls, field.NewPath("foo"), true)
+	if len(errs) != 0 {
+		t.Errorf("unexpected validation errors: %v", errs)
 	}
 }
 
@@ -18492,11 +19930,98 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 				}},
 			},
 		},
+		{
+			name:            "Non-HostProcess ephemeral container in HostProcess pod should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "HostProcess ephemeral container in HostProcess pod should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{},
+				}},
+			},
+		},
+		{
+			name:            "Non-HostProcess ephemeral container in Non-HostProcess pod should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "HostProcess ephemeral container in Non-HostProcess pod should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &trueVar,
+							},
+						},
+					},
+				}},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
 			opts := PodValidationOptions{AllowWindowsHostProcessField: testCase.featureEnabled}
 
@@ -18512,5 +20037,117 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
+	}
+}
+
+func TestValidateOS(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		podSpec        *core.PodSpec
+	}{
+		{
+			name:           "no OS field, featuregate",
+			expectError:    false,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: nil},
+		},
+		{
+			name:           "empty OS field, featuregate",
+			expectError:    true,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{}},
+		},
+		{
+			name:           "no OS field, no featuregate",
+			expectError:    false,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: nil},
+		},
+		{
+			name:           "empty OS field, no featuregate",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{}},
+		},
+		{
+			name:           "OS field, featuregate, valid OS",
+			expectError:    false,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Linux}},
+		},
+		{
+			name:           "OS field, featuregate, valid OS",
+			expectError:    false,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Windows}},
+		},
+		{
+			name:           "OS field, featuregate, empty OS",
+			expectError:    true,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: ""}},
+		},
+		{
+			name:           "OS field, no featuregate, empty OS",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: ""}},
+		},
+		{
+			name:           "OS field, featuregate, invalid OS",
+			expectError:    true,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: "dummyOS"}},
+		},
+		{
+			name:           "OS field, no featuregate, valid OS",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Linux}},
+		},
+		{
+			name:           "OS field, no featuregate, invalid OS",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: "dummyOS"}},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, testCase.featureEnabled)()
+
+			errs := validateOS(testCase.podSpec, field.NewPath("spec"), PodValidationOptions{AllowOSField: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateAppArmorProfileFormat(t *testing.T) {
+	tests := []struct {
+		profile     string
+		expectValid bool
+	}{
+		{"", true},
+		{v1.AppArmorBetaProfileRuntimeDefault, true},
+		{v1.AppArmorBetaProfileNameUnconfined, true},
+		{"baz", false}, // Missing local prefix.
+		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
+		{v1.AppArmorBetaProfileNamePrefix + "foo-bar", true},
+	}
+
+	for _, test := range tests {
+		err := ValidateAppArmorProfileFormat(test.profile)
+		if test.expectValid {
+			assert.NoError(t, err, "Profile %s should be valid", test.profile)
+		} else {
+			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
+		}
 	}
 }

@@ -158,14 +158,27 @@ func findDeviceGroup(ruleType devices.Type, ruleMajor int64) (string, error) {
 	return "", nil
 }
 
+// DeviceAllow is the dbus type "a(ss)" which means we need a struct
+// to represent it in Go.
+type deviceAllowEntry struct {
+	Path  string
+	Perms string
+}
+
+func allowAllDevices() []systemdDbus.Property {
+	// Setting mode to auto and removing all DeviceAllow rules
+	// results in allowing access to all devices.
+	return []systemdDbus.Property{
+		newProp("DevicePolicy", "auto"),
+		newProp("DeviceAllow", []deviceAllowEntry{}),
+	}
+}
+
 // generateDeviceProperties takes the configured device rules and generates a
 // corresponding set of systemd properties to configure the devices correctly.
-func generateDeviceProperties(rules []*devices.Rule) ([]systemdDbus.Property, error) {
-	// DeviceAllow is the type "a(ss)" which means we need a temporary struct
-	// to represent it in Go.
-	type deviceAllowEntry struct {
-		Path  string
-		Perms string
+func generateDeviceProperties(r *configs.Resources) ([]systemdDbus.Property, error) {
+	if r.SkipDevices {
+		return nil, nil
 	}
 
 	properties := []systemdDbus.Property{
@@ -177,7 +190,7 @@ func generateDeviceProperties(rules []*devices.Rule) ([]systemdDbus.Property, er
 
 	// Figure out the set of rules.
 	configEmu := &cgroupdevices.Emulator{}
-	for _, rule := range rules {
+	for _, rule := range r.Devices {
 		if err := configEmu.Apply(*rule); err != nil {
 			return nil, errors.Wrap(err, "apply rule for systemd")
 		}
@@ -189,12 +202,7 @@ func generateDeviceProperties(rules []*devices.Rule) ([]systemdDbus.Property, er
 	if configEmu.IsBlacklist() {
 		// However, if we're dealing with an allow-all rule then we can do it.
 		if configEmu.IsAllowAll() {
-			return []systemdDbus.Property{
-				// Run in white-list mode by setting to "auto" and removing all
-				// DeviceAllow rules.
-				newProp("DevicePolicy", "auto"),
-				newProp("DeviceAllow", []deviceAllowEntry{}),
-			}, nil
+			return allowAllDevices(), nil
 		}
 		logrus.Warn("systemd doesn't support blacklist device rules -- applying temporary deny-all rule")
 		return properties, nil
@@ -203,8 +211,7 @@ func generateDeviceProperties(rules []*devices.Rule) ([]systemdDbus.Property, er
 	// Now generate the set of rules we actually need to apply. Unlike the
 	// normal devices cgroup, in "strict" mode systemd defaults to a deny-all
 	// whitelist which is the default for devices.Emulator.
-	baseEmu := &cgroupdevices.Emulator{}
-	finalRules, err := baseEmu.Transition(configEmu)
+	finalRules, err := configEmu.Rules()
 	if err != nil {
 		return nil, errors.Wrap(err, "get simplified rules for systemd")
 	}
@@ -303,10 +310,18 @@ func getUnitName(c *configs.Cgroup) string {
 	return c.Name
 }
 
+// This code should be in sync with getUnitName.
+func getUnitType(unitName string) string {
+	if strings.HasSuffix(unitName, ".slice") {
+		return "Slice"
+	}
+	return "Scope"
+}
+
 // isDbusError returns true if the error is a specific dbus error.
 func isDbusError(err error, name string) bool {
 	if err != nil {
-		var derr *dbus.Error
+		var derr dbus.Error
 		if errors.As(err, &derr) {
 			return strings.Contains(derr.Name, name)
 		}
@@ -355,6 +370,9 @@ func stopUnit(cm *dbusConnManager, unitName string) error {
 		return err
 	})
 	if err == nil {
+		timeout := time.NewTimer(30 * time.Second)
+		defer timeout.Stop()
+
 		select {
 		case s := <-statusChan:
 			close(statusChan)
@@ -362,8 +380,8 @@ func stopUnit(cm *dbusConnManager, unitName string) error {
 			if s != "done" {
 				logrus.Warnf("error removing unit `%s`: got `%s`. Continuing...", unitName, s)
 			}
-		case <-time.After(time.Second):
-			logrus.Warnf("Timed out while waiting for StopUnit(%s) completion signal from dbus. Continuing...", unitName)
+		case <-timeout.C:
+			return errors.New("Timed out while waiting for systemd to remove " + unitName)
 		}
 	}
 	return nil
@@ -376,6 +394,15 @@ func resetFailedUnit(cm *dbusConnManager, name string) {
 	if err != nil {
 		logrus.Warnf("unable to reset failed unit: %v", err)
 	}
+}
+
+func getUnitTypeProperty(cm *dbusConnManager, unitName string, unitType string, propertyName string) (*systemdDbus.Property, error) {
+	var prop *systemdDbus.Property
+	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) (Err error) {
+		prop, Err = c.GetUnitTypePropertyContext(context.TODO(), unitName, unitType, propertyName)
+		return Err
+	})
+	return prop, err
 }
 
 func setUnitProperties(cm *dbusConnManager, name string, properties ...systemdDbus.Property) error {
@@ -476,7 +503,7 @@ func addCpuset(cm *dbusConnManager, props *[]systemdDbus.Property, cpus, mems st
 	}
 
 	if cpus != "" {
-		bits, err := rangeToBits(cpus)
+		bits, err := RangeToBits(cpus)
 		if err != nil {
 			return fmt.Errorf("resources.CPU.Cpus=%q conversion error: %w",
 				cpus, err)
@@ -485,7 +512,7 @@ func addCpuset(cm *dbusConnManager, props *[]systemdDbus.Property, cpus, mems st
 			newProp("AllowedCPUs", bits))
 	}
 	if mems != "" {
-		bits, err := rangeToBits(mems)
+		bits, err := RangeToBits(mems)
 		if err != nil {
 			return fmt.Errorf("resources.CPU.Mems=%q conversion error: %w",
 				mems, err)

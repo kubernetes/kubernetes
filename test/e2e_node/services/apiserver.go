@@ -18,11 +18,10 @@ package services
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net"
 	"os"
 
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	netutils "k8s.io/utils/net"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -60,14 +59,14 @@ func (a *APIServer) Start() error {
 
 	o := options.NewServerRunOptions()
 	o.Etcd.StorageConfig = a.storageConfig
-	_, ipnet, err := net.ParseCIDR(clusterIPRange)
+	_, ipnet, err := netutils.ParseCIDRSloppy(clusterIPRange)
 	if err != nil {
 		return err
 	}
 	if len(framework.TestContext.RuntimeConfig) > 0 {
 		o.APIEnablement.RuntimeConfig = framework.TestContext.RuntimeConfig
 	}
-	o.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+	o.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true
 	if err := generateTokenFile(tokenFilePath); err != nil {
@@ -76,12 +75,12 @@ func (a *APIServer) Start() error {
 	o.Authentication.TokenFile.TokenFile = tokenFilePath
 	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
 
-	saSigningKeyFile, err := ioutil.TempFile("/tmp", "insecure_test_key")
+	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
 		return fmt.Errorf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
-	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		return fmt.Errorf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 	o.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
@@ -143,5 +142,5 @@ func getAPIServerHealthCheckURL() string {
 
 func generateTokenFile(tokenFilePath string) error {
 	tokenFile := fmt.Sprintf("%s,kubelet,uid,system:masters\n", framework.TestContext.BearerToken)
-	return ioutil.WriteFile(tokenFilePath, []byte(tokenFile), 0644)
+	return os.WriteFile(tokenFilePath, []byte(tokenFile), 0644)
 }

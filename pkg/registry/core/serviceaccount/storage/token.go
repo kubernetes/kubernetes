@@ -27,9 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/warning"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -46,6 +49,7 @@ type TokenREST struct {
 	secrets              getter
 	issuer               token.TokenGenerator
 	auds                 authenticator.Audiences
+	audsSet              sets.String
 	maxExpirationSeconds int64
 	extendExpiration     bool
 }
@@ -60,30 +64,67 @@ var gvk = schema.GroupVersionKind{
 }
 
 func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	if createValidation != nil {
-		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
-			return nil, err
-		}
+	req := obj.(*authenticationapi.TokenRequest)
+
+	// Get the namespace from the context (populated from the URL).
+	namespace, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return nil, errors.NewBadRequest("namespace is required")
 	}
 
-	out := obj.(*authenticationapi.TokenRequest)
-
-	if errs := authenticationvalidation.ValidateTokenRequest(out); len(errs) != 0 {
-		return nil, errors.NewInvalid(gvk.GroupKind(), "", errs)
+	// require name/namespace in the body to match URL if specified
+	if len(req.Name) > 0 && req.Name != name {
+		errs := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("name"), req.Name, "must match the service account name if specified")}
+		return nil, errors.NewInvalid(gvk.GroupKind(), name, errs)
+	}
+	if len(req.Namespace) > 0 && req.Namespace != namespace {
+		errs := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("namespace"), req.Namespace, "must match the service account namespace if specified")}
+		return nil, errors.NewInvalid(gvk.GroupKind(), name, errs)
 	}
 
+	// Lookup service account
 	svcacctObj, err := r.svcaccts.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 	svcacct := svcacctObj.(*api.ServiceAccount)
 
+	// Default unset spec audiences to API server audiences based on server config
+	if len(req.Spec.Audiences) == 0 {
+		req.Spec.Audiences = r.auds
+	}
+	// Populate metadata fields if not set
+	if len(req.Name) == 0 {
+		req.Name = svcacct.Name
+	}
+	if len(req.Namespace) == 0 {
+		req.Namespace = svcacct.Namespace
+	}
+
+	// Save current time before building the token, to make sure the expiration
+	// returned in TokenRequestStatus would be <= the exp field in token.
+	nowTime := time.Now()
+	req.CreationTimestamp = metav1.NewTime(nowTime)
+
+	// Clear status
+	req.Status = authenticationapi.TokenRequestStatus{}
+
+	// call static validation, then validating admission
+	if errs := authenticationvalidation.ValidateTokenRequest(req); len(errs) != 0 {
+		return nil, errors.NewInvalid(gvk.GroupKind(), "", errs)
+	}
+	if createValidation != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	var (
 		pod    *api.Pod
 		secret *api.Secret
 	)
 
-	if ref := out.Spec.BoundObjectRef; ref != nil {
+	if ref := req.Spec.BoundObjectRef; ref != nil {
 		var uid types.UID
 
 		gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
@@ -114,13 +155,11 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, ref.Name, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record. The object might have been deleted and then recreated", ref.UID))
 		}
 	}
-	if len(out.Spec.Audiences) == 0 {
-		out.Spec.Audiences = r.auds
-	}
 
-	if r.maxExpirationSeconds > 0 && out.Spec.ExpirationSeconds > r.maxExpirationSeconds {
+	if r.maxExpirationSeconds > 0 && req.Spec.ExpirationSeconds > r.maxExpirationSeconds {
 		//only positive value is valid
-		out.Spec.ExpirationSeconds = r.maxExpirationSeconds
+		warning.AddWarning(ctx, "", fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", req.Spec.ExpirationSeconds, r.maxExpirationSeconds))
+		req.Spec.ExpirationSeconds = r.maxExpirationSeconds
 	}
 
 	// Tweak expiration for safe transition of projected service account token.
@@ -128,21 +167,20 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	// Fail after hard-coded extended expiration time.
 	// Only perform the extension when token is pod-bound.
 	var warnAfter int64
-	exp := out.Spec.ExpirationSeconds
-	if r.extendExpiration && pod != nil && out.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds {
+	exp := req.Spec.ExpirationSeconds
+	if r.extendExpiration && pod != nil && req.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(req.Spec.Audiences) {
 		warnAfter = exp
 		exp = token.ExpirationExtensionSeconds
 	}
 
-	// Save current time before building the token, to make sure the expiration
-	// returned in TokenRequestStatus would be earlier than exp field in token.
-	nowTime := time.Now()
-	sc, pc := token.Claims(*svcacct, pod, secret, exp, warnAfter, out.Spec.Audiences)
+	sc, pc := token.Claims(*svcacct, pod, secret, exp, warnAfter, req.Spec.Audiences)
 	tokdata, err := r.issuer.GenerateToken(sc, pc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %v", err)
 	}
 
+	// populate status
+	out := req.DeepCopy()
 	out.Status = authenticationapi.TokenRequestStatus{
 		Token:               tokdata,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
@@ -175,4 +213,10 @@ func newContext(ctx context.Context, resource, name string, gvk schema.GroupVers
 		APIVersion:        gvk.Version,
 	}
 	return genericapirequest.WithRequestInfo(ctx, &newInfo)
+}
+
+// isKubeAudiences returns true if the tokenaudiences is a strict subset of apiserver audiences.
+func (r *TokenREST) isKubeAudiences(tokenAudience []string) bool {
+	// tokenAudiences must be a strict subset of apiserver audiences
+	return r.audsSet.HasAll(tokenAudience...)
 }

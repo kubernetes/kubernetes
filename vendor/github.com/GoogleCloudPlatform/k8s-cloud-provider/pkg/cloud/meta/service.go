@@ -99,6 +99,16 @@ func (i *ServiceInfo) ObjectAggregatedListType() string {
 	return fmt.Sprintf("%v.%vAggregatedList", i.Version(), i.Object)
 }
 
+// ObjectListUsableType is the compute List type for the object (contains Items field).
+func (i *ServiceInfo) ObjectListUsableType() string {
+	return fmt.Sprintf("%v.Usable%vAggregatedList", i.version, i.Service)
+}
+
+// FQObjectType is fully qualified name of the object (e.g. compute.Instance).
+func (i *ServiceInfo) FQListUsableObjectType() string {
+	return fmt.Sprintf("%v.Usable%v", i.Version(), i.Object)
+}
+
 // MockWrapType is the name of the concrete mock for this type.
 func (i *ServiceInfo) MockWrapType() string {
 	return "Mock" + i.WrapType()
@@ -219,6 +229,10 @@ func (i *ServiceInfo) AggregatedListField() string {
 		return i.Service
 	}
 	return i.aggregatedListField
+}
+
+func (i *ServiceInfo) ListUsable() bool {
+	return i.options&ListUsable != 0
 }
 
 // ServiceGroup is a grouping of the same service but at different API versions.

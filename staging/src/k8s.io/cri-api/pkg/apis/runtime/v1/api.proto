@@ -18,7 +18,7 @@ limitations under the License.
 syntax = "proto3";
 
 package runtime.v1;
-option go_package = "v1";
+option go_package = "k8s.io/cri-api/pkg/apis/runtime/v1";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -102,6 +102,12 @@ service RuntimeService {
     rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
     // ListContainerStats returns stats of all running containers.
     rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
+
+    // PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
+    // exist, the call returns an error.
+    rpc PodSandboxStats(PodSandboxStatsRequest) returns (PodSandboxStatsResponse) {}
+    // ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
+    rpc ListPodSandboxStats(ListPodSandboxStatsRequest) returns (ListPodSandboxStatsResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
@@ -324,6 +330,10 @@ message LinuxPodSandboxConfig {
     LinuxSandboxSecurityContext security_context = 2;
     // Sysctls holds linux sysctls config for the sandbox.
     map<string, string> sysctls = 3;
+    // Optional overhead represents the overheads associated with this sandbox
+    LinuxContainerResources overhead = 4;
+    // Optional resources represents the sum of container resources for this sandbox
+    LinuxContainerResources resources = 5;
 }
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
@@ -399,7 +409,7 @@ message RunPodSandboxRequest {
     // If the runtime handler is unknown, this request should be rejected.  An
     // empty string should select the default handler, equivalent to the
     // behavior before this feature was added.
-    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class/README.md
+    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
     string runtime_handler = 2;
 }
 
@@ -435,6 +445,7 @@ message PodIP{
     string ip = 1;
 }
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
+// Currently ignored for pods sharing the host networking namespace.
 message PodSandboxNetworkStatus {
     // IP address of the PodSandbox.
     string ip = 1;
@@ -545,6 +556,113 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
+message PodSandboxStatsRequest {
+    // ID of the pod sandbox for which to retrieve stats.
+    string pod_sandbox_id = 1;
+}
+
+message PodSandboxStatsResponse {
+    PodSandboxStats stats = 1;
+}
+
+// PodSandboxStatsFilter is used to filter the list of pod sandboxes to retrieve stats for.
+// All those fields are combined with 'AND'.
+message PodSandboxStatsFilter {
+    // ID of the pod sandbox.
+    string id = 1;
+    // LabelSelector to select matches.
+    // Only api.MatchLabels is supported for now and the requirements
+    // are ANDed. MatchExpressions is not supported yet.
+    map<string, string> label_selector = 2;
+}
+
+message ListPodSandboxStatsRequest {
+    // Filter for the list request.
+    PodSandboxStatsFilter filter = 1;
+}
+
+message ListPodSandboxStatsResponse {
+    // Stats of the pod sandbox.
+    repeated PodSandboxStats stats = 1;
+}
+
+// PodSandboxAttributes provides basic information of the pod sandbox.
+message PodSandboxAttributes {
+    // ID of the pod sandbox.
+    string id = 1;
+    // Metadata of the pod sandbox.
+    PodSandboxMetadata metadata = 2;
+    // Key-value pairs that may be used to scope and select individual resources.
+    map<string,string> labels = 3;
+    // Unstructured key-value map holding arbitrary metadata.
+    // Annotations MUST NOT be altered by the runtime; the value of this field
+    // MUST be identical to that of the corresponding PodSandboxStatus used to
+    // instantiate the PodSandbox this status represents.
+    map<string,string> annotations = 4;
+}
+
+// PodSandboxStats provides the resource usage statistics for a pod.
+// The linux or windows field will be populated depending on the platform.
+message PodSandboxStats {
+    // Information of the pod.
+    PodSandboxAttributes attributes = 1;
+    // Stats from linux.
+    LinuxPodSandboxStats linux = 2;
+    // Stats from windows.
+    WindowsPodSandboxStats windows = 3;
+}
+
+// LinuxPodSandboxStats provides the resource usage statistics for a pod sandbox on linux.
+message LinuxPodSandboxStats {
+    // CPU usage gathered for the pod sandbox.
+    CpuUsage cpu = 1;
+    // Memory usage gathered for the pod sandbox.
+    MemoryUsage memory = 2;
+    // Network usage gathered for the pod sandbox
+    NetworkUsage network = 3;
+    // Stats pertaining to processes in the pod sandbox.
+    ProcessUsage process = 4;
+    // Stats of containers in the measured pod sandbox.
+    repeated ContainerStats containers = 5;
+}
+
+// WindowsPodSandboxStats provides the resource usage statistics for a pod sandbox on windows
+message WindowsPodSandboxStats {
+    // TODO: Add stats relevant to windows.
+}
+
+// NetworkUsage contains data about network resources.
+message NetworkUsage {
+    // The time at which these stats were updated.
+    int64 timestamp = 1;
+    // Stats for the default network interface.
+    NetworkInterfaceUsage default_interface = 2;
+    // Stats for all found network interfaces, excluding the default.
+    repeated NetworkInterfaceUsage interfaces = 3;
+}
+
+// NetworkInterfaceUsage contains resource value data about a network interface.
+message NetworkInterfaceUsage {
+    // The name of the network interface.
+    string name = 1;
+    // Cumulative count of bytes received.
+    UInt64Value rx_bytes = 2;
+    // Cumulative count of receive errors encountered.
+    UInt64Value rx_errors = 3;
+    // Cumulative count of bytes transmitted.
+    UInt64Value tx_bytes = 4;
+    // Cumulative count of transmit errors encountered.
+    UInt64Value tx_errors = 5;
+}
+
+// ProcessUsage are stats pertaining to processes.
+message ProcessUsage {
+    // The time at which these stats were updated.
+    int64 timestamp = 1;
+    // Number of processes.
+    UInt64Value process_count = 2;
+}
+
 // ImageSpec is an internal representation of an image.
 message ImageSpec {
     // Container's Image field (e.g. imageID or imageDigest).
@@ -607,11 +725,20 @@ message SELinuxOption {
 }
 
 // Capability contains the container capabilities to add or drop
+// Dropping a capability will drop it from all sets.
+// If a capability is added to only the add_capabilities list then it gets added to permitted, 
+// inheritable, effective and bounding sets, i.e. all sets except the ambient set.
+// If a capability is added to only the add_ambient_capabilities list then it gets added to all sets, i.e permitted
+// inheritable, effective, bounding and ambient sets.
+// If a capability is added to add_capabilities and add_ambient_capabilities lists then it gets added to all sets, i.e.
+// permitted, inheritable, effective, bounding and ambient sets.
 message Capability {
     // List of capabilities to add.
     repeated string add_capabilities = 1;
     // List of capabilities to drop.
     repeated string drop_capabilities = 2;
+    // List of ambient capabilities to add.
+    repeated string add_ambient_capabilities = 3;
 }
 
 // LinuxContainerSecurityContext holds linux security configuration that will be applied to a container.
@@ -695,7 +822,7 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
-// WindowsSandboxSecurityContext holds platform-specific configurations that will be 
+// WindowsSandboxSecurityContext holds platform-specific configurations that will be
 // applied to a sandbox.
 // These settings will only apply to the sandbox container.
 message WindowsSandboxSecurityContext {
@@ -1130,6 +1257,10 @@ message Image {
     string username = 6;
     // ImageSpec for image which includes annotations
     ImageSpec spec = 7;
+    // Recommendation on whether this image should be exempt from garbage collection.
+    // It must only be treated as a recommendation -- the client can still request that the image be deleted,
+    // and the runtime must oblige.
+    bool pinned = 8;
 }
 
 message ListImagesResponse {
@@ -1351,6 +1482,9 @@ message CpuUsage {
     int64 timestamp = 1;
     // Cumulative CPU usage (sum across all cores) since object creation.
     UInt64Value usage_core_nano_seconds = 2;
+    // Total CPU usage (sum of all cores) averaged over the sample window.
+    // The "core" unit can be interpreted as CPU core-nanoseconds per second.
+    UInt64Value usage_nano_cores = 3;
 }
 
 // MemoryUsage provides the memory usage information.
@@ -1359,6 +1493,16 @@ message MemoryUsage {
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
+    // Available memory for use. This is defined as the memory limit - workingSetBytes.
+    UInt64Value available_bytes = 3;
+    // Total memory in use. This includes all memory regardless of when it was accessed.
+    UInt64Value usage_bytes = 4;
+    // The amount of anonymous and swap cache memory (includes transparent hugepages).
+    UInt64Value rss_bytes = 5;
+    // Cumulative number of minor page faults.
+    UInt64Value page_faults = 6;
+    // Cumulative number of major page faults.
+    UInt64Value major_page_faults = 7;
 }
 
 message ReopenContainerLogRequest {

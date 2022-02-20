@@ -44,6 +44,7 @@ import (
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
 	_ "k8s.io/kubernetes/test/e2e/apps"
+	_ "k8s.io/kubernetes/test/e2e/architecture"
 	_ "k8s.io/kubernetes/test/e2e/auth"
 	_ "k8s.io/kubernetes/test/e2e/autoscaling"
 	_ "k8s.io/kubernetes/test/e2e/cloud"
@@ -57,7 +58,6 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/storage"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
-	_ "k8s.io/kubernetes/test/e2e/ui"
 	_ "k8s.io/kubernetes/test/e2e/windows"
 )
 

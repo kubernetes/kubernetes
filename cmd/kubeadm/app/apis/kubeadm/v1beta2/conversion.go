@@ -17,10 +17,13 @@ limitations under the License.
 package v1beta2
 
 import (
-	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"unsafe"
 
 	corev1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func Convert_kubeadm_InitConfiguration_To_v1beta2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
@@ -62,5 +65,21 @@ func Convert_v1beta2_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConf
 		return err
 	}
 	out.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	return nil
+}
+
+// Convert_v1beta2_BootstrapToken_To_v1_BootstrapToken is required so that we can directly
+// cast a v1beta1.BootstrapToken to v1.BootstrapToken using unsafe.Pointer and not
+// field by field.
+func Convert_v1beta2_BootstrapToken_To_v1_BootstrapToken(in *BootstrapToken, out *bootstraptokenv1.BootstrapToken, s conversion.Scope) error {
+	*out = *(*bootstraptokenv1.BootstrapToken)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_BootstrapToken_To_v1beta2_BootstrapToken is required so that we can directly
+// cast a v1.BootstrapToken to v1beta1.BootstrapToken using unsafe.Pointer and not
+// field by field.
+func Convert_v1_BootstrapToken_To_v1beta2_BootstrapToken(in *bootstraptokenv1.BootstrapToken, out *BootstrapToken, s conversion.Scope) error {
+	*out = *(*BootstrapToken)(unsafe.Pointer(in))
 	return nil
 }

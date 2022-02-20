@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -172,7 +173,6 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					UID:         "12345",
 					Namespace:   "mynamespace",
 					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
-					SelfLink:    getSelfLink("test-"+string(hostname), "mynamespace"),
 				},
 				Spec: v1.PodSpec{
 					NodeName:                      string(hostname),

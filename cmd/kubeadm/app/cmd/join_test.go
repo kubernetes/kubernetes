@@ -18,16 +18,15 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var testJoinConfig = fmt.Sprintf(`apiVersion: %s
@@ -47,7 +46,7 @@ nodeRegistration:
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
-	tmpDir, err := ioutil.TempDir("", "kubeadm-join-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-join-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}

@@ -3,13 +3,16 @@
 reviewers:
   - bentheelder
   - cblecker
+  - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
   - dims
   - fejta
-  - hasheddan # Release Manager / SIG Technical Lead
-  - justaugustus # Release Manager / SIG Chair
+  - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+  #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
   - lavalamp
-  - saschagrunert # Release Manager / SIG Chair
+  - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+  - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
   - spiffxp
+  - xmudrii # Release Manager
 approvers:
   - bentheelder
   - cblecker

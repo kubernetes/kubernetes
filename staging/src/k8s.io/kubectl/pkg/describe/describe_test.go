@@ -236,19 +236,88 @@ func TestDescribeSecret(t *testing.T) {
 }
 
 func TestDescribeNamespace(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "myns",
+	exampleNamespaceName := "example"
+
+	testCases := []struct {
+		name      string
+		namespace *corev1.Namespace
+		expect    []string
+	}{
+		{
+			name: "no quotas or limit ranges",
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: exampleNamespaceName,
+				},
+				Status: corev1.NamespaceStatus{
+					Phase: corev1.NamespaceActive,
+				},
+			},
+			expect: []string{
+				"Name",
+				exampleNamespaceName,
+				"Status",
+				string(corev1.NamespaceActive),
+				"No resource quota",
+				"No LimitRange resource.",
+			},
 		},
-	})
-	c := &describeClient{T: t, Namespace: "", Interface: fake}
-	d := NamespaceDescriber{c}
-	out, err := d.Describe("", "myns", DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		{
+			name: "has conditions",
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: exampleNamespaceName,
+				},
+				Status: corev1.NamespaceStatus{
+					Phase: corev1.NamespaceTerminating,
+					Conditions: []corev1.NamespaceCondition{
+						{
+							LastTransitionTime: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+							Message:            "example message",
+							Reason:             "example reason",
+							Status:             corev1.ConditionTrue,
+							Type:               corev1.NamespaceDeletionContentFailure,
+						},
+					},
+				},
+			},
+			expect: []string{
+				"Name",
+				exampleNamespaceName,
+				"Status",
+				string(corev1.NamespaceTerminating),
+				"Conditions",
+				"Type",
+				string(corev1.NamespaceDeletionContentFailure),
+				"Status",
+				string(corev1.ConditionTrue),
+				"Reason",
+				"example reason",
+				"Message",
+				"example message",
+				"No resource quota",
+				"No LimitRange resource.",
+			},
+		},
 	}
-	if !strings.Contains(out, "myns") {
-		t.Errorf("unexpected out: %s", out)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.namespace)
+			c := &describeClient{T: t, Namespace: "", Interface: fake}
+			d := NamespaceDescriber{c}
+
+			out, err := d.Describe("", testCase.namespace.Name, DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
 	}
 }
 
@@ -2006,6 +2075,27 @@ func TestDescribeDeployment(t *testing.T) {
 					},
 				}, &corev1.Event{
 					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-000",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:                corev1.EventTypeNormal,
+					Reason:              "ScalingReplicaSet",
+					Message:             "Scaled up replica set bar-002 to 1",
+					ReportingController: "deployment-controller",
+					EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
+					Series: &corev1.EventSeries{
+						Count:            3,
+						LastObservedTime: metav1.NewMicroTime(time.Now().Add(-12 * time.Minute)),
+					},
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
 					},
@@ -2042,6 +2132,23 @@ func TestDescribeDeployment(t *testing.T) {
 						Component: "deployment-controller",
 					},
 					FirstTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-003",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:                corev1.EventTypeNormal,
+					Reason:              "ScalingReplicaSet",
+					Message:             "Scaled down replica set bar-002 to 1",
+					ReportingController: "deployment-controller",
+					EventTime:           metav1.NewMicroTime(time.Now().Add(-1 * time.Minute)),
 				},
 			},
 			expects: []string{
@@ -2050,8 +2157,10 @@ func TestDescribeDeployment(t *testing.T) {
 				"OldReplicaSets:  bar-001 (2/2 replicas created)",
 				"NewReplicaSet:   bar-002 (1/1 replicas created)",
 				"Events:\n",
-				"Normal  ScalingReplicaSet  10m   deployment-controller  Scaled up replica set bar-001 to 2",
-				"Normal  ScalingReplicaSet  2m    deployment-controller  Scaled up replica set bar-002 to 1",
+				"Normal  ScalingReplicaSet  12m (x3 over 20m)  deployment-controller  Scaled up replica set bar-002 to 1",
+				"Normal  ScalingReplicaSet  10m                deployment-controller  Scaled up replica set bar-001 to 2",
+				"Normal  ScalingReplicaSet  2m                 deployment-controller  Scaled up replica set bar-002 to 1",
+				"Normal  ScalingReplicaSet  60s                deployment-controller  Scaled down replica set bar-002 to 1",
 			},
 		},
 	}
@@ -2148,7 +2257,7 @@ func TestDescribeJob(t *testing.T) {
 				if !strings.Contains(out, fmt.Sprintf("Completed Indexes:  %s\n", tc.wantCompletedIndexes)) {
 					t.Errorf("Output didn't contain wanted Completed Indexes:\n%s", out)
 				}
-			} else if strings.Contains(out, fmt.Sprintf("Completed Indexes:")) {
+			} else if strings.Contains(out, "Completed Indexes:") {
 				t.Errorf("Output contains unexpected completed indexes:\n%s", out)
 			}
 		})
@@ -2156,16 +2265,22 @@ func TestDescribeJob(t *testing.T) {
 }
 
 func TestDescribeIngress(t *testing.T) {
+	ingresClassName := "test"
 	backendV1beta1 := networkingv1beta1.IngressBackend{
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt(80),
 	}
 	v1beta1 := fake.NewSimpleClientset(&networkingv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
+			Name: "bar",
+			Labels: map[string]string{
+				"id1": "app1",
+				"id2": "app2",
+			},
 			Namespace: "foo",
 		},
 		Spec: networkingv1beta1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1beta1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -2198,6 +2313,7 @@ func TestDescribeIngress(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -2237,8 +2353,11 @@ func TestDescribeIngress(t *testing.T) {
 		"IngressRule.HTTP.Paths.Backend.Service v1beta1": {
 			input: v1beta1,
 			output: `Name:             bar
+Labels:           id1=app1
+                  id2=app2
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2251,8 +2370,10 @@ Events:        <none>` + "\n",
 		"IngressRule.HTTP.Paths.Backend.Service v1": {
 			input: netv1,
 			output: `Name:             bar
+Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2269,6 +2390,7 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2287,8 +2409,10 @@ Events:        <none>` + "\n",
 				},
 			}),
 			output: `Name:             bar
+Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2305,6 +2429,7 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2323,8 +2448,10 @@ Events:        <none>` + "\n",
 				},
 			}),
 			output: `Name:             bar
+Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2341,7 +2468,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendV1,
+					DefaultBackend:   &backendV1,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2360,8 +2488,10 @@ Events:        <none>` + "\n",
 				},
 			}),
 			output: `Name:             bar
+Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2378,7 +2508,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendResource,
+					DefaultBackend:   &backendResource,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2397,8 +2528,10 @@ Events:        <none>` + "\n",
 				},
 			}),
 			output: `Name:             bar
+Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  APIGroup: example.com, Kind: foo, Name: bar
 Rules:
   Host         Path  Backends
@@ -2415,7 +2548,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendResource,
+					DefaultBackend:   &backendResource,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2434,8 +2568,10 @@ Events:        <none>` + "\n",
 				},
 			}),
 			output: `Name:             bar
+Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  APIGroup: example.com, Kind: foo, Name: bar
 Rules:
   Host         Path  Backends
@@ -2452,12 +2588,39 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					DefaultBackend:   &backendV1,
+					IngressClassName: &ingresClassName,
+				},
+			}),
+			output: `Name:             bar
+Labels:           <none>
+Namespace:        foo
+Address:          
+Ingress Class:    test
+Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:  <none>
+Events:       <none>
+`,
+		},
+		"EmptyIngressClassName": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
 					DefaultBackend: &backendV1,
 				},
 			}),
 			output: `Name:             bar
+Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    <none>
 Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
 Rules:
   Host        Path  Backends
@@ -2487,6 +2650,7 @@ Events:       <none>
 }
 
 func TestDescribeIngressV1(t *testing.T) {
+	ingresClassName := "test"
 	defaultBackend := networkingv1.IngressBackend{
 		Service: &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
@@ -2498,10 +2662,15 @@ func TestDescribeIngressV1(t *testing.T) {
 
 	fakeClient := fake.NewSimpleClientset(&networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
+			Name: "bar",
+			Labels: map[string]string{
+				"id1": "app1",
+				"id2": "app2",
+			},
 			Namespace: "foo",
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -2524,7 +2693,12 @@ func TestDescribeIngressV1(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "foo.bar.com") || !strings.Contains(out, "/foo") {
+	if !strings.Contains(out, "bar") ||
+		!strings.Contains(out, "foo") ||
+		!strings.Contains(out, "foo.bar.com") ||
+		!strings.Contains(out, "/foo") ||
+		!strings.Contains(out, "app1") ||
+		!strings.Contains(out, "app2") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -3672,6 +3846,7 @@ func TestDescribeEvents(t *testing.T) {
 		Items: []corev1.Event{
 			{
 				ObjectMeta: metav1.ObjectMeta{
+					Name:      "event-1",
 					Namespace: "foo",
 				},
 				Source:         corev1.EventSource{Component: "kubelet"},
@@ -3680,6 +3855,20 @@ func TestDescribeEvents(t *testing.T) {
 				LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
 				Count:          1,
 				Type:           corev1.EventTypeNormal,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "event-2",
+					Namespace: "foo",
+				},
+				Source:    corev1.EventSource{Component: "kubelet"},
+				Message:   "Item 1",
+				EventTime: metav1.NewMicroTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Series: &corev1.EventSeries{
+					Count:            1,
+					LastObservedTime: metav1.NewMicroTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				},
+				Type: corev1.EventTypeNormal,
 			},
 		},
 	}
@@ -3740,16 +3929,14 @@ func TestDescribeEvents(t *testing.T) {
 		"NodeDescriber": &NodeDescriber{
 			fake.NewSimpleClientset(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:     "bar",
-					SelfLink: "/api/v1/nodes/bar",
+					Name: "bar",
 				},
 			}, events),
 		},
 		"PersistentVolumeDescriber": &PersistentVolumeDescriber{
 			fake.NewSimpleClientset(&corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:     "bar",
-					SelfLink: "/api/v1/persistentvolumes/bar",
+					Name: "bar",
 				},
 			}, events),
 		},
@@ -3758,7 +3945,6 @@ func TestDescribeEvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
-					SelfLink:  "/api/v1/namespaces/foo/pods/bar",
 				},
 			}, events),
 		},

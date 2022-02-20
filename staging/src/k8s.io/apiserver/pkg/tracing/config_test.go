@@ -30,6 +30,7 @@ import (
 
 var (
 	localhost    = "localhost:4317"
+	ipAddress    = "127.0.0.1:4317"
 	samplingRate = int32(12345)
 )
 
@@ -75,6 +76,23 @@ samplingRatePerMillion: 12345
 				},
 				Endpoint:               &localhost,
 				SamplingRatePerMillion: &samplingRate,
+			},
+			expectedError: nil,
+		},
+		{
+			name:       "ip address",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: TracingConfiguration
+endpoint: 127.0.0.1:4317
+`,
+			expectedResult: &apiserver.TracingConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				Endpoint: &ipAddress,
 			},
 			expectedError: nil,
 		},

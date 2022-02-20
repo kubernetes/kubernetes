@@ -78,7 +78,7 @@ func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 }
 
 const (
-	// NamespaceIndex is the lookup name for the most comment index function, which is to index by the namespace field.
+	// NamespaceIndex is the lookup name for the most common index function, which is to index by the namespace field.
 	NamespaceIndex string = "namespace"
 )
 
@@ -94,7 +94,7 @@ func MetaNamespaceIndexFunc(obj interface{}) ([]string, error) {
 // Index maps the indexed value to a set of keys in the store that match on that value
 type Index map[string]sets.String
 
-// Indexers maps a name to a IndexFunc
+// Indexers maps a name to an IndexFunc
 type Indexers map[string]IndexFunc
 
 // Indices maps a name to an Index

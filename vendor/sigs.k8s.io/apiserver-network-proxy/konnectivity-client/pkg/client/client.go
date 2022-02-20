@@ -114,13 +114,14 @@ func (t *grpcTunnel) serve(c clientConn) {
 			t.pendingDialLock.RUnlock()
 
 			if !ok {
-				klog.V(1).Infoln("DialResp not recognized; dropped")
+				klog.V(1).InfoS("DialResp not recognized; dropped", "connectionID", resp.ConnectID, "dialID", resp.Random)
+				return
 			} else {
 				result := dialResult{
 					err:    resp.Error,
 					connid: resp.ConnectID,
 				}
-				select  {
+				select {
 				case ch <- result:
 				default:
 					klog.ErrorS(fmt.Errorf("blocked pending channel"), "Received second dial response for connection request", "connectionID", resp.ConnectID, "dialID", resp.Random)
@@ -210,7 +211,7 @@ func (t *grpcTunnel) DialContext(ctx context.Context, protocol, address string) 
 
 	klog.V(5).Infoln("DIAL_REQ sent to proxy server")
 
-	c := &conn{stream: t.stream}
+	c := &conn{stream: t.stream, random: random}
 
 	select {
 	case res := <-resCh:

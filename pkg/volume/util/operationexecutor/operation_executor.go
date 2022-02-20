@@ -21,8 +21,11 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/go-logr/logr"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -141,6 +144,9 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName
 	// and one of podName or nodeName is pending, otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName) bool
+	// IsOperationSafeToRetry returns false if an operation for the given volumeName
+	// and one of podName or nodeName is pending or in exponential backoff, otherwise it returns true
+	IsOperationSafeToRetry(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName, operationName string) bool
 	// ExpandInUseVolume will resize volume's file system to expected size without unmounting the volume.
 	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
@@ -338,6 +344,33 @@ func (volume *VolumeToAttach) GenerateError(prefixMsg string, err error) (simple
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
 }
 
+// String combines key fields of the volume for logging in text format.
+func (volume *VolumeToAttach) String() string {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return fmt.Sprintf("%s (UniqueName: %s) from node %s", volumeSpecName, volume.VolumeName, volume.NodeName)
+}
+
+// MarshalLog combines key fields of the volume for logging in a structured format.
+func (volume *VolumeToAttach) MarshalLog() interface{} {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return struct {
+		VolumeName, UniqueName, NodeName string
+	}{
+		VolumeName: volumeSpecName,
+		UniqueName: string(volume.VolumeName),
+		NodeName:   string(volume.NodeName),
+	}
+}
+
+var _ fmt.Stringer = &VolumeToAttach{}
+var _ logr.Marshaler = &VolumeToAttach{}
+
 // VolumeToMount represents a volume that should be attached to this node and
 // mounted to the PodName.
 type VolumeToMount struct {
@@ -384,6 +417,9 @@ type VolumeToMount struct {
 	// DesiredSizeLimit indicates the desired upper bound on the size of the volume
 	// (if so implemented)
 	DesiredSizeLimit *resource.Quantity
+
+	// time at which volume was requested to be mounted
+	MountRequestTime time.Time
 }
 
 // DeviceMountState represents device mount state in a global path.
@@ -414,6 +450,23 @@ const (
 	// VolumeNotMounted means volume has not be mounted in pod's local path
 	VolumeNotMounted VolumeMountState = "VolumeNotMounted"
 )
+
+type MountPreConditionFailed struct {
+	msg string
+}
+
+func (err *MountPreConditionFailed) Error() string {
+	return err.msg
+}
+
+func NewMountPreConditionFailedError(msg string) *MountPreConditionFailed {
+	return &MountPreConditionFailed{msg: msg}
+}
+
+func IsMountFailedPreconditionError(err error) bool {
+	var failedPreconditionError *MountPreConditionFailed
+	return errors.As(err, &failedPreconditionError)
+}
 
 // GenerateMsgDetailed returns detailed msgs for volumes to mount
 func (volume *VolumeToMount) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
@@ -505,6 +558,33 @@ func (volume *AttachedVolume) GenerateError(prefixMsg string, err error) (simple
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
 }
+
+// String combines key fields of the volume for logging in text format.
+func (volume *AttachedVolume) String() string {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return fmt.Sprintf("%s (UniqueName: %s) from node %s", volumeSpecName, volume.VolumeName, volume.NodeName)
+}
+
+// MarshalLog combines key fields of the volume for logging in a structured format.
+func (volume *AttachedVolume) MarshalLog() interface{} {
+	volumeSpecName := "nil"
+	if volume.VolumeSpec != nil {
+		volumeSpecName = volume.VolumeSpec.Name()
+	}
+	return struct {
+		VolumeName, UniqueName, NodeName string
+	}{
+		VolumeName: volumeSpecName,
+		UniqueName: string(volume.VolumeName),
+		NodeName:   string(volume.NodeName),
+	}
+}
+
+var _ fmt.Stringer = &AttachedVolume{}
+var _ logr.Marshaler = &AttachedVolume{}
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
 type MountedVolume struct {
@@ -662,6 +742,14 @@ func (oe *operationExecutor) IsOperationPending(
 	podName volumetypes.UniquePodName,
 	nodeName types.NodeName) bool {
 	return oe.pendingOperations.IsOperationPending(volumeName, podName, nodeName)
+}
+
+func (oe *operationExecutor) IsOperationSafeToRetry(
+	volumeName v1.UniqueVolumeName,
+	podName volumetypes.UniquePodName,
+	nodeName types.NodeName,
+	operationName string) bool {
+	return oe.pendingOperations.IsOperationSafeToRetry(volumeName, podName, nodeName, operationName)
 }
 
 func (oe *operationExecutor) AttachVolume(

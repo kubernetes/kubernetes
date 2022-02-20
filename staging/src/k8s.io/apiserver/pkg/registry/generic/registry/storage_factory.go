@@ -36,7 +36,7 @@ import (
 // Creates a cacher based given storageConfig.
 func StorageWithCacher() generic.StorageDecorator {
 	return func(
-		storageConfig *storagebackend.Config,
+		storageConfig *storagebackend.ConfigForResource,
 		resourcePrefix string,
 		keyFunc func(obj runtime.Object) (string, error),
 		newFunc func() runtime.Object,
@@ -50,7 +50,7 @@ func StorageWithCacher() generic.StorageDecorator {
 			return s, d, err
 		}
 		if klog.V(5).Enabled() {
-			klog.InfoS("Storage caching is enabled", objectTypeToArgs(newFunc())...)
+			klog.V(5).InfoS("Storage caching is enabled", objectTypeToArgs(newFunc())...)
 		}
 
 		cacherConfig := cacherstorage.Config{

@@ -519,3 +519,11 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 	}
 	return mappings, nil
 }
+
+// MaybeResetRESTMapper calls Reset() on the mapper if it is a ResettableRESTMapper.
+func MaybeResetRESTMapper(mapper RESTMapper) {
+	m, ok := mapper.(ResettableRESTMapper)
+	if ok {
+		m.Reset()
+	}
+}

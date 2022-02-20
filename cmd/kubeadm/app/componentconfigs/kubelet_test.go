@@ -22,10 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"github.com/lithammer/dedent"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,13 +31,17 @@ import (
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	utilpointer "k8s.io/utils/pointer"
 
-	"github.com/lithammer/dedent"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func testKubeletConfigMap(contents string) *v1.ConfigMap {
+// TODO: cleanup after UnversionedKubeletConfigMap goes GA:
+// https://github.com/kubernetes/kubeadm/issues/1582
+func testKubeletConfigMap(contents string, legacyKubeletConfigMap bool) *v1.ConfigMap {
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion),
+			Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion, legacyKubeletConfigMap),
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
@@ -50,10 +51,10 @@ func testKubeletConfigMap(contents string) *v1.ConfigMap {
 }
 
 func TestKubeletDefault(t *testing.T) {
-	var resolverConfig string
+	var resolverConfig *string
 	if isSystemdResolvedActive, _ := isServiceActive("systemd-resolved"); isSystemdResolvedActive {
 		// If systemd-resolved is active, we need to set the default resolver config
-		resolverConfig = kubeletSystemdResolverConfig
+		resolverConfig = utilpointer.String(kubeletSystemdResolverConfig)
 	}
 
 	tests := []struct {
@@ -126,59 +127,15 @@ func TestKubeletDefault(t *testing.T) {
 			},
 		},
 		{
-			name: "Service subnet, explicitly disabled dual stack defaulting works",
-			clusterCfg: kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					features.IPv6DualStack: false,
-				},
-				Networking: kubeadmapi.Networking{
-					ServiceSubnet: "192.168.0.0/16",
-				},
-			},
-			expected: kubeletConfig{
-				config: kubeletconfig.KubeletConfiguration{
-					FeatureGates: map[string]bool{
-						features.IPv6DualStack: false,
-					},
-					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
-					ClusterDNS:    []string{"192.168.0.10"},
-					Authentication: kubeletconfig.KubeletAuthentication{
-						X509: kubeletconfig.KubeletX509Authentication{
-							ClientCAFile: constants.CACertName,
-						},
-						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
-							Enabled: utilpointer.BoolPtr(kubeletAuthenticationAnonymousEnabled),
-						},
-						Webhook: kubeletconfig.KubeletWebhookAuthentication{
-							Enabled: utilpointer.BoolPtr(kubeletAuthenticationWebhookEnabled),
-						},
-					},
-					Authorization: kubeletconfig.KubeletAuthorization{
-						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
-					},
-					HealthzBindAddress: kubeletHealthzBindAddress,
-					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
-					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
-					CgroupDriver:       constants.CgroupDriverSystemd,
-				},
-			},
-		},
-		{
 			name: "Service subnet, enabled dual stack defaulting works",
 			clusterCfg: kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					features.IPv6DualStack: true,
-				},
 				Networking: kubeadmapi.Networking{
 					ServiceSubnet: "192.168.0.0/16",
 				},
 			},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
-					FeatureGates: map[string]bool{
-						features.IPv6DualStack: true,
-					},
+					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
 					ClusterDNS:    []string{"192.168.0.10"},
 					Authentication: kubeletconfig.KubeletAuthentication{
@@ -328,8 +285,16 @@ func TestKubeletFromDocumentMap(t *testing.T) {
 func TestKubeletFromCluster(t *testing.T) {
 	runKubeletFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
 		client := clientsetfake.NewSimpleClientset(
-			testKubeletConfigMap(yaml),
+			testKubeletConfigMap(yaml, true),
 		)
-		return kubeletHandler.FromCluster(client, testClusterCfg())
+		legacyKubeletConfigMap := true
+		return kubeletHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
+	})
+	runKubeletFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
+		client := clientsetfake.NewSimpleClientset(
+			testKubeletConfigMap(yaml, false),
+		)
+		legacyKubeletConfigMap := false
+		return kubeletHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
 	})
 }

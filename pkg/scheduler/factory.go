@@ -22,11 +22,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -34,14 +32,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
@@ -80,6 +72,8 @@ type Configurator struct {
 	podInitialBackoffSeconds int64
 
 	podMaxBackoffSeconds int64
+
+	podMaxUnschedulableQDuration time.Duration
 
 	profiles          []schedulerapi.KubeSchedulerProfile
 	registry          frameworkruntime.Registry
@@ -128,7 +122,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 			prof := &c.profiles[i]
 			var found = false
 			for k := range prof.PluginConfig {
-				if prof.PluginConfig[k].Name == noderesources.FitName {
+				if prof.PluginConfig[k].Name == noderesources.Name {
 					// Update the existing args
 					pc := &prof.PluginConfig[k]
 					args, ok := pc.Args.(*schedulerapi.NodeResourcesFitArgs)
@@ -176,6 +170,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),
 		internalqueue.WithClusterEventMap(c.clusterEventMap),
+		internalqueue.WithPodMaxUnschedulableQDuration(c.podMaxUnschedulableQDuration),
 	)
 
 	// Setup cache debugger.
@@ -203,170 +198,6 @@ func (c *Configurator) create() (*Scheduler, error) {
 		StopEverything:  c.StopEverything,
 		SchedulingQueue: podQueue,
 	}, nil
-}
-
-// createFromPolicy creates a scheduler from the legacy policy file.
-func (c *Configurator) createFromPolicy(policy schedulerapi.Policy) (*Scheduler, error) {
-	lr := frameworkplugins.NewLegacyRegistry()
-	args := &frameworkplugins.ConfigProducerArgs{}
-
-	klog.V(2).InfoS("Creating scheduler from configuration", "policy", policy)
-
-	// validate the policy configuration
-	if err := validation.ValidatePolicy(policy); err != nil {
-		return nil, err
-	}
-
-	// If profiles is already set, it means the user is using both CC and policy config, error out
-	// since these configs are no longer merged and they should not be used simultaneously.
-	if c.profiles != nil {
-		return nil, fmt.Errorf("profiles and policy config both set, this should not happen")
-	}
-
-	predicateKeys := sets.NewString()
-	if policy.Predicates == nil {
-		predicateKeys = lr.DefaultPredicates
-	} else {
-		for _, predicate := range policy.Predicates {
-			klog.V(2).InfoS("Registering predicate", "predicate", predicate.Name)
-			predicateName, err := lr.ProcessPredicatePolicy(predicate, args)
-			if err != nil {
-				return nil, err
-			}
-			predicateKeys.Insert(predicateName)
-		}
-	}
-
-	priorityKeys := make(map[string]int64)
-	if policy.Priorities == nil {
-		klog.V(2).InfoS("Using default priorities")
-		priorityKeys = lr.DefaultPriorities
-	} else {
-		for _, priority := range policy.Priorities {
-			if priority.Name == frameworkplugins.EqualPriority {
-				klog.V(2).InfoS("Skip registering priority", "priority", priority.Name)
-				continue
-			}
-			klog.V(2).InfoS("Registering priority", "priority", priority.Name)
-			priorityName, err := lr.ProcessPriorityPolicy(priority, args)
-			if err != nil {
-				return nil, err
-			}
-			priorityKeys[priorityName] = priority.Weight
-		}
-	}
-
-	// HardPodAffinitySymmetricWeight in the policy config takes precedence over
-	// CLI configuration.
-	if policy.HardPodAffinitySymmetricWeight != 0 {
-		args.InterPodAffinityArgs = &schedulerapi.InterPodAffinityArgs{
-			HardPodAffinityWeight: policy.HardPodAffinitySymmetricWeight,
-		}
-	}
-
-	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
-	// predicates even after one or more of them fails.
-	if policy.AlwaysCheckAllPredicates {
-		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
-	}
-
-	klog.V(2).InfoS("Creating scheduler", "predicates", predicateKeys, "priorities", priorityKeys)
-
-	// Combine all framework configurations. If this results in any duplication, framework
-	// instantiation should fail.
-
-	// "PrioritySort", "DefaultPreemption" and "DefaultBinder" were neither predicates nor priorities
-	// before. We add them by default.
-	plugins := schedulerapi.Plugins{
-		QueueSort: schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}},
-		},
-		PostFilter: schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{{Name: defaultpreemption.Name}},
-		},
-		Bind: schedulerapi.PluginSet{
-			Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}},
-		},
-	}
-	var pluginConfig []schedulerapi.PluginConfig
-	var err error
-	if plugins, pluginConfig, err = lr.AppendPredicateConfigs(predicateKeys, args, plugins, pluginConfig); err != nil {
-		return nil, err
-	}
-	if plugins, pluginConfig, err = lr.AppendPriorityConfigs(priorityKeys, args, plugins, pluginConfig); err != nil {
-		return nil, err
-	}
-	if pluginConfig, err = dedupPluginConfigs(pluginConfig); err != nil {
-		return nil, err
-	}
-
-	c.profiles = []schedulerapi.KubeSchedulerProfile{
-		{
-			SchedulerName: v1.DefaultSchedulerName,
-			Plugins:       &plugins,
-			PluginConfig:  pluginConfig,
-		},
-	}
-
-	if err := defaultPluginConfigArgs(&c.profiles[0]); err != nil {
-		return nil, err
-	}
-
-	return c.create()
-}
-
-func defaultPluginConfigArgs(prof *schedulerapi.KubeSchedulerProfile) error {
-	scheme := v1beta2.GetPluginArgConversionScheme()
-	existingConfigs := sets.NewString()
-	for j := range prof.PluginConfig {
-		existingConfigs.Insert(prof.PluginConfig[j].Name)
-		// For existing plugin configs, we don't apply any defaulting, the assumption
-		// is that the legacy registry does it already.
-	}
-
-	// Append default configs for plugins that didn't have one explicitly set.
-	for _, name := range prof.Plugins.Names() {
-		if existingConfigs.Has(name) {
-			continue
-		}
-		gvk := v1beta2.SchemeGroupVersion.WithKind(name + "Args")
-		args, err := scheme.New(gvk)
-		if err != nil {
-			if runtime.IsNotRegisteredError(err) {
-				// This plugin is out-of-tree or doesn't require configuration.
-				continue
-			}
-			return err
-		}
-		scheme.Default(args)
-		internalArgs, err := scheme.ConvertToVersion(args, schedulerapi.SchemeGroupVersion)
-		if err != nil {
-			return fmt.Errorf("converting %q into internal type: %w", gvk.Kind, err)
-		}
-		prof.PluginConfig = append(prof.PluginConfig, schedulerapi.PluginConfig{
-			Name: name,
-			Args: internalArgs,
-		})
-	}
-
-	return nil
-}
-
-// dedupPluginConfigs removes duplicates from pluginConfig, ensuring that,
-// if a plugin name is repeated, the arguments are the same.
-func dedupPluginConfigs(pc []schedulerapi.PluginConfig) ([]schedulerapi.PluginConfig, error) {
-	args := make(map[string]runtime.Object)
-	result := make([]schedulerapi.PluginConfig, 0, len(pc))
-	for _, c := range pc {
-		if v, found := args[c.Name]; !found {
-			result = append(result, c)
-			args[c.Name] = c.Args
-		} else if !cmp.Equal(v, c.Args) {
-			// This should be unreachable.
-			return nil, fmt.Errorf("inconsistent configuration produced for plugin %s", c.Name)
-		}
-	}
-	return result, nil
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error

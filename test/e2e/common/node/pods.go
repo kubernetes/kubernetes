@@ -22,11 +22,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"k8s.io/client-go/util/retry"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/util/retry"
 
 	"golang.org/x/net/websocket"
 
@@ -43,6 +44,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -244,10 +246,6 @@ var _ = SIGDescribe("Pods", func() {
 		pods, err := podClient.List(context.TODO(), options)
 		framework.ExpectNoError(err, "failed to query for pods")
 		framework.ExpectEqual(len(pods.Items), 0)
-		options = metav1.ListOptions{
-			LabelSelector:   selector.String(),
-			ResourceVersion: pods.ListMeta.ResourceVersion,
-		}
 
 		listCompleted := make(chan bool, 1)
 		lw := &cache.ListWatch{
@@ -774,8 +772,7 @@ var _ = SIGDescribe("Pods", func() {
 		}
 	})
 
-	// TODO(freehan): label the test to be [NodeConformance] after tests are proven to be stable.
-	ginkgo.It("should support pod readiness gates [NodeFeature:PodReadinessGate]", func() {
+	ginkgo.It("should support pod readiness gates [NodeConformance]", func() {
 		podName := "pod-ready"
 		readinessGate1 := "k8s.io/test-condition1"
 		readinessGate2 := "k8s.io/test-condition2"
@@ -801,11 +798,13 @@ var _ = SIGDescribe("Pods", func() {
 		}
 
 		validatePodReadiness := func(expectReady bool) {
-			err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-				podReady := podClient.PodIsReady(podName)
+			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				podReady := podutils.IsPodReady(pod)
 				res := expectReady == podReady
 				if !res {
-					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
+					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v (pod status %#v)", podName, expectReady, podReady, pod.Status)
 				}
 				return res, nil
 			})
@@ -867,6 +866,8 @@ var _ = SIGDescribe("Pods", func() {
 				}}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 			framework.Logf("created %v", podTestName)
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podTestName, f.Namespace.Name))
+			framework.Logf("running and ready %v", podTestName)
 		}
 
 		// wait as required for all 3 pods to be found

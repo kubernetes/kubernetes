@@ -252,3 +252,50 @@ run_client_config_tests() {
   set +o nounset
   set +o errexit
 }
+
+run_kubeconfig_impersonate_tests() {
+  set -o nounset
+  set -o errexit
+
+  kube::log::status "Testing config with impersonation"
+
+  # copy the existing kubeconfig over and add a new user entry for the admin user impersonating a different user.
+  kubectl config view --raw > "${TMPDIR:-/tmp}"/impersonateconfig.yaml
+  cat << EOF >> "${TMPDIR:-/tmp}"/impersonateconfig.yaml
+users:
+- name: admin-as-userb
+  user:
+    # token defined in hack/testdata/auth-tokens.csv
+    token: admin-token
+    # impersonated user
+    as: userb
+    as-uid: abc123
+    as-groups:
+    - group2
+    - group1
+    as-user-extra:
+      foo:
+      - bar
+      - baz
+- name: as-uid-without-as
+  user:
+    # token defined in hack/testdata/auth-tokens.csv
+    token: admin-token
+    # impersonated uid
+    as-uid: abc123
+EOF
+
+  kubectl create -f hack/testdata/csr.yml --kubeconfig "${TMPDIR:-/tmp}"/impersonateconfig.yaml --user admin-as-userb
+  kube::test::get_object_assert 'csr/foo' '{{.spec.username}}' 'userb'
+  kube::test::get_object_assert 'csr/foo' '{{.spec.uid}}' 'abc123'
+  kube::test::get_object_assert 'csr/foo' '{{range .spec.groups}}{{.}} {{end}}' 'group2 group1 system:authenticated '
+  kube::test::get_object_assert 'csr/foo' '{{len .spec.extra}}' '1'
+  kube::test::get_object_assert 'csr/foo' '{{range .spec.extra.foo}}{{.}} {{end}}' 'bar baz '
+  kubectl delete -f hack/testdata/csr.yml
+
+  output_message=$(! kubectl get pods --kubeconfig "${TMPDIR:-/tmp}"/impersonateconfig.yaml --user as-uid-without-as 2>&1)
+  kube::test::if_has_string "${output_message}" 'without impersonating a user'
+
+  set +o nounset
+  set +o errexit
+}

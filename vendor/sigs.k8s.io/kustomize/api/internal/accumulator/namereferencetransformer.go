@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/kustomize/api/internal/plugins/builtinconfig"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 type nameReferenceTransformer struct {
@@ -109,11 +110,18 @@ func debug(fMap filterMap) {
 // 'spec/scaleTargetRef/name' field. Return a filter that can do that.
 func (t *nameReferenceTransformer) determineFilters(
 	resources []*resource.Resource) (fMap filterMap) {
+
+	// We cache the resource OrgId values because they don't change and otherwise are very visible in a memory pprof
+	resourceOrgIds := make([]resid.ResId, len(resources))
+	for i, resource := range resources {
+		resourceOrgIds[i] = resource.OrgId()
+	}
+
 	fMap = make(filterMap)
 	for _, backReference := range t.backRefs {
 		for _, referrerSpec := range backReference.Referrers {
-			for _, res := range resources {
-				if res.OrgId().IsSelected(&referrerSpec.Gvk) {
+			for i, res := range resources {
+				if resourceOrgIds[i].IsSelected(&referrerSpec.Gvk) {
 					// If this is true, the res might be a referrer, and if
 					// so, the name reference it holds might need an update.
 					if resHasField(res, referrerSpec.Path) {

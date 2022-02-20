@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -84,13 +84,13 @@ func testWebhookClientAuth(t *testing.T, enableAggregatorRouting bool) {
 		t.Fatal(err)
 	}
 
-	kubeConfigFile, err := ioutil.TempFile("", "admission-config.yaml")
+	kubeConfigFile, err := os.CreateTemp("", "admission-config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(kubeConfigFile.Name())
 
-	if err := ioutil.WriteFile(kubeConfigFile.Name(), []byte(`
+	if err := os.WriteFile(kubeConfigFile.Name(), []byte(`
 apiVersion: v1
 kind: Config
 users:
@@ -110,13 +110,13 @@ users:
 		t.Fatal(err)
 	}
 
-	admissionConfigFile, err := ioutil.TempFile("", "admission-config.yaml")
+	admissionConfigFile, err := os.CreateTemp("", "admission-config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(admissionConfigFile.Name())
 
-	if err := ioutil.WriteFile(admissionConfigFile.Name(), []byte(`
+	if err := os.WriteFile(admissionConfigFile.Name(), []byte(`
 apiVersion: apiserver.k8s.io/v1alpha1
 kind: AdmissionConfiguration
 plugins:
@@ -247,7 +247,7 @@ func newClientAuthWebhookHandler(t *testing.T, recorder *clientAuthRecorder) htt
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}

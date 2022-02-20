@@ -169,11 +169,11 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	cmd.Flags().StringSliceVarP(&o.Keys, "keys", "", o.Keys, "Comma-separated list of keys to import from specified resource")
 	cmd.Flags().BoolVar(&o.List, "list", o.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&o.Resolve, "resolve", o.Resolve, "If true, show secret or configmap references when listing variables")
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set env will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 
 	o.PrintFlags.AddFlags(cmd)
 
@@ -190,10 +190,6 @@ func validateNoOverwrites(existing []v1.EnvVar, env []v1.EnvVar) error {
 	return nil
 }
 
-func keyToEnvName(key string) string {
-	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
-}
-
 func contains(key string, keyList []string) bool {
 	if len(keyList) == 0 {
 		return true
@@ -205,6 +201,14 @@ func contains(key string, keyList []string) bool {
 		}
 	}
 	return false
+}
+
+func (o *EnvOptions) keyToEnvName(key string) string {
+	envName := strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
+	if envName != key {
+		fmt.Fprintf(o.ErrOut, "warning: key %s transferred to %s\n", key, envName)
+	}
+	return envName
 }
 
 // Complete completes all required options
@@ -306,7 +310,7 @@ func (o *EnvOptions) RunEnv() error {
 				for key := range from.Data {
 					if contains(key, o.Keys) {
 						envVar := v1.EnvVar{
-							Name: keyToEnvName(key),
+							Name: o.keyToEnvName(key),
 							ValueFrom: &v1.EnvVarSource{
 								SecretKeyRef: &v1.SecretKeySelector{
 									LocalObjectReference: v1.LocalObjectReference{
@@ -323,7 +327,7 @@ func (o *EnvOptions) RunEnv() error {
 				for key := range from.Data {
 					if contains(key, o.Keys) {
 						envVar := v1.EnvVar{
-							Name: keyToEnvName(key),
+							Name: o.keyToEnvName(key),
 							ValueFrom: &v1.EnvVarSource{
 								ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 									LocalObjectReference: v1.LocalObjectReference{

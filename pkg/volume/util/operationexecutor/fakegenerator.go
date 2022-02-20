@@ -104,6 +104,10 @@ func (f *fakeOGCounter) GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.
 	return f.recordFuncCall("GenerateExpandVolumeFunc"), nil
 }
 
+func (f *fakeOGCounter) GenerateExpandAndRecoverVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume, string) (volumetypes.GeneratedOperations, error) {
+	return f.recordFuncCall("GenerateExpandVolumeFunc"), nil
+}
+
 func (f *fakeOGCounter) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateExpandInUseVolumeFunc"), nil
 }

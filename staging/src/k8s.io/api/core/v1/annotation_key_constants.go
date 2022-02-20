@@ -121,7 +121,7 @@ const (
 	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
 
 	// EndpointsOverCapacity will be set on an Endpoints resource when it
-	// exceeds the maximum capacity of 1000 addresses. Inititially the Endpoints
+	// exceeds the maximum capacity of 1000 addresses. Initially the Endpoints
 	// controller will set this annotation with a value of "warning". In a
 	// future release, the controller may set this annotation with a value of
 	// "truncated" to indicate that any addresses exceeding the limit of 1000

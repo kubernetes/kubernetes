@@ -33,7 +33,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
-	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
@@ -280,16 +279,16 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// scoped to the set control groups it understands.  this is being discussed
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
-	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
+	allowlistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
 
 	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
-		whitelistControllers.Insert("hugetlb")
+		allowlistControllers.Insert("hugetlb")
 	}
 	var missingPaths []string
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
 	for controller, path := range cgroupPaths {
 		// ignore mounts we don't care about
-		if !whitelistControllers.Has(controller) {
+		if !allowlistControllers.Has(controller) {
 			continue
 		}
 		if !libcontainercgroups.PathExists(path) {
@@ -380,16 +379,8 @@ func getSupportedUnifiedControllers() sets.String {
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
 	resources := &libcontainerconfigs.Resources{
-		Devices: []*libcontainerdevices.Rule{
-			{
-				Type:        'a',
-				Permissions: "rwm",
-				Allow:       true,
-				Minor:       libcontainerdevices.Wildcard,
-				Major:       libcontainerdevices.Wildcard,
-			},
-		},
-		SkipDevices: true,
+		SkipDevices:     true,
+		SkipFreezeOnSet: true,
 	}
 	if resourceConfig == nil {
 		return resources

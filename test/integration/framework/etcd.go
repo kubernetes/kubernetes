@@ -18,8 +18,9 @@ package framework
 
 import (
 	"context"
+	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -103,7 +104,7 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 
 	klog.Infof("starting etcd on %s", customURL)
 
-	etcdDataDir, err := ioutil.TempDir(os.TempDir(), dataDir)
+	etcdDataDir, err := os.MkdirTemp(os.TempDir(), dataDir)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to make temp etcd data dir %s: %v", dataDir, err)
 	}
@@ -138,7 +139,7 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 
 	// Quiet etcd logs for integration tests
 	// Comment out to get verbose logs if desired
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
 
 	if err := cmd.Start(); err != nil {
 		return "", nil, fmt.Errorf("failed to run etcd: %v", err)
@@ -168,6 +169,9 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 
 // EtcdMain starts an etcd instance before running tests.
 func EtcdMain(tests func() int) {
+	// Bail out early when -help was given as parameter.
+	flag.Parse()
+
 	stop, err := startEtcd()
 	if err != nil {
 		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)

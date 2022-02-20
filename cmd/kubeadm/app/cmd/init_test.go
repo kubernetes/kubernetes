@@ -18,15 +18,14 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var testInitConfig = fmt.Sprintf(`---
@@ -50,7 +49,7 @@ controlPlaneEndpoint: "3.4.5.6"
 
 func TestNewInitData(t *testing.T) {
 	// create temp directory
-	tmpDir, err := ioutil.TempDir("", "kubeadm-init-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-init-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}

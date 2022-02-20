@@ -166,7 +166,10 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(certs), 1, "expected a single cert, got %#v", certs)
 		cert := certs[0]
-		framework.ExpectEqual(cert.NotAfter.Sub(cert.NotBefore), time.Hour+5*time.Minute, "unexpected cert duration: %s", dynamiccertificates.GetHumanCertDetail(cert))
+		// make sure the cert is not valid for longer than our requested time (plus allowance for backdating)
+		if e, a := time.Hour+5*time.Minute, cert.NotAfter.Sub(cert.NotBefore); a > e {
+			framework.Failf("expected cert valid for %s or less, got %s: %s", e, a, dynamiccertificates.GetHumanCertDetail(cert))
+		}
 
 		newClient, err := certificatesclient.NewForConfig(rcfg)
 		framework.ExpectNoError(err)

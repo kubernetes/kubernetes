@@ -19,11 +19,12 @@ package kubeadm
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
 	"github.com/lithammer/dedent"
+
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func runKubeadmInit(args ...string) (string, string, int, error) {
@@ -35,6 +36,16 @@ func runKubeadmInit(args ...string) (string, string, int, error) {
 	kubeadmArgs := []string{"init", "--dry-run", "--ignore-preflight-errors=all"}
 	kubeadmArgs = append(kubeadmArgs, args...)
 	return RunCmd(kubeadmPath, kubeadmArgs...)
+}
+
+func getKubeadmVersion() *version.Version {
+	kubeadmPath := getKubeadmPath()
+	kubeadmArgs := []string{"version", "-o=short"}
+	out, _, _, err := RunCmd(kubeadmPath, kubeadmArgs...)
+	if err != nil {
+		panic(fmt.Sprintf("could not run 'kubeadm version -o=short': %v", err))
+	}
+	return version.MustParseSemantic(strings.TrimSpace(out))
 }
 
 func TestCmdInitToken(t *testing.T) {
@@ -94,7 +105,7 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 		},
 		{
 			name:     "valid version is accepted",
-			args:     "--kubernetes-version=" + constants.CurrentKubernetesVersion.String(),
+			args:     "--kubernetes-version=" + getKubeadmVersion().String(),
 			expected: true,
 		},
 	}
@@ -252,10 +263,6 @@ func TestCmdInitFeatureGates(t *testing.T) {
 		{
 			name: "no feature gates passed",
 			args: "",
-		},
-		{
-			name: "feature gate IPv6DualStack=false",
-			args: "--feature-gates=IPv6DualStack=false",
 		},
 		{
 			name: "feature gate PublicKeysECDSA=true",

@@ -256,3 +256,165 @@
 - endpoint: deleteNetworkingV1NamespacedNetworkPolicy
   reason: optional feature
   link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
+- endpoint: createRbacAuthorizationV1ClusterRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: createRbacAuthorizationV1ClusterRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: createRbacAuthorizationV1NamespacedRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1ClusterRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1ClusterRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1NamespacedRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: getRbacAuthorizationV1APIResources
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: getRbacAuthorizationAPIGroup
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: createRbacAuthorizationV1NamespacedRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1CollectionClusterRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1CollectionClusterRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1CollectionNamespacedRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1CollectionNamespacedRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: deleteRbacAuthorizationV1NamespacedRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: listRbacAuthorizationV1ClusterRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: listRbacAuthorizationV1ClusterRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: listRbacAuthorizationV1NamespacedRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: listRbacAuthorizationV1NamespacedRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: listRbacAuthorizationV1RoleBindingForAllNamespaces
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: listRbacAuthorizationV1RoleForAllNamespaces
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: patchRbacAuthorizationV1ClusterRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: patchRbacAuthorizationV1ClusterRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: patchRbacAuthorizationV1NamespacedRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: patchRbacAuthorizationV1NamespacedRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: readRbacAuthorizationV1ClusterRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: readRbacAuthorizationV1ClusterRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: readRbacAuthorizationV1NamespacedRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: readRbacAuthorizationV1NamespacedRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: replaceRbacAuthorizationV1ClusterRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: replaceRbacAuthorizationV1ClusterRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: replaceRbacAuthorizationV1NamespacedRole
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: replaceRbacAuthorizationV1NamespacedRoleBinding
+  reason: optional feature
+  link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- endpoint: createAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV1CollectionNamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV1HorizontalPodAutoscalerForAllNamespaces
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV1NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV1NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV1NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV1NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: createAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV2CollectionNamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: deleteAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV2HorizontalPodAutoscalerForAllNamespaces
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: listAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: patchAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: readAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV2NamespacedHorizontalPodAutoscaler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: replaceAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756

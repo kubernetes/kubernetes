@@ -19,6 +19,13 @@ package upgrade
 import (
 	"os"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -26,13 +33,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
-
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 )
 
 // nodeOptions defines all the options exposed via flags by kubeadm upgrade node.
@@ -61,6 +61,7 @@ type nodeData struct {
 	client                clientset.Interface
 	patchesDir            string
 	ignorePreflightErrors sets.String
+	kubeConfigPath        string
 }
 
 // newCmdNode returns the cobra command for `kubeadm upgrade node`
@@ -159,6 +160,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		isControlPlaneNode:    isControlPlaneNode,
 		patchesDir:            options.patchesDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
+		kubeConfigPath:        options.kubeConfigPath,
 	}, nil
 }
 
@@ -200,4 +202,9 @@ func (d *nodeData) PatchesDir() string {
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
 func (d *nodeData) IgnorePreflightErrors() sets.String {
 	return d.ignorePreflightErrors
+}
+
+// KubeconfigPath returns the path to the user kubeconfig file.
+func (d *nodeData) KubeConfigPath() string {
+	return d.kubeConfigPath
 }

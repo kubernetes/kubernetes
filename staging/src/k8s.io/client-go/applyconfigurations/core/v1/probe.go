@@ -21,13 +21,13 @@ package v1
 // ProbeApplyConfiguration represents an declarative configuration of the Probe type for use
 // with apply.
 type ProbeApplyConfiguration struct {
-	HandlerApplyConfiguration     `json:",inline"`
-	InitialDelaySeconds           *int32 `json:"initialDelaySeconds,omitempty"`
-	TimeoutSeconds                *int32 `json:"timeoutSeconds,omitempty"`
-	PeriodSeconds                 *int32 `json:"periodSeconds,omitempty"`
-	SuccessThreshold              *int32 `json:"successThreshold,omitempty"`
-	FailureThreshold              *int32 `json:"failureThreshold,omitempty"`
-	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+	ProbeHandlerApplyConfiguration `json:",inline"`
+	InitialDelaySeconds            *int32 `json:"initialDelaySeconds,omitempty"`
+	TimeoutSeconds                 *int32 `json:"timeoutSeconds,omitempty"`
+	PeriodSeconds                  *int32 `json:"periodSeconds,omitempty"`
+	SuccessThreshold               *int32 `json:"successThreshold,omitempty"`
+	FailureThreshold               *int32 `json:"failureThreshold,omitempty"`
+	TerminationGracePeriodSeconds  *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
 
 // ProbeApplyConfiguration constructs an declarative configuration of the Probe type for use with
@@ -57,6 +57,14 @@ func (b *ProbeApplyConfiguration) WithHTTPGet(value *HTTPGetActionApplyConfigura
 // If called multiple times, the TCPSocket field is set to the value of the last call.
 func (b *ProbeApplyConfiguration) WithTCPSocket(value *TCPSocketActionApplyConfiguration) *ProbeApplyConfiguration {
 	b.TCPSocket = value
+	return b
+}
+
+// WithGRPC sets the GRPC field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the GRPC field is set to the value of the last call.
+func (b *ProbeApplyConfiguration) WithGRPC(value *GRPCActionApplyConfiguration) *ProbeApplyConfiguration {
+	b.GRPC = value
 	return b
 }
 

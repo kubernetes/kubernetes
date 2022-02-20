@@ -18,7 +18,7 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/scheduler/apis/config
 // +k8s:conversion-gen-external-types=k8s.io/kube-scheduler/config/v1beta2
 // +k8s:defaulter-gen=TypeMeta
-// +k8s:defaulter-gen-input=../../../../../vendor/k8s.io/kube-scheduler/config/v1beta2
+// +k8s:defaulter-gen-input=k8s.io/kube-scheduler/config/v1beta2
 // +groupName=kubescheduler.config.k8s.io
 
 package v1beta2 // import "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"

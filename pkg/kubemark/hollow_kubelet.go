@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -28,12 +29,12 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
@@ -71,7 +72,7 @@ func volumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 	allPlugins = append(allPlugins, emptydir.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(volume.VolumeConfig{})...)
+	allPlugins = append(allPlugins, hostpath.FakeProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
@@ -103,6 +104,7 @@ func NewHollowKubelet(
 	d := &kubelet.Dependencies{
 		KubeClient:           client,
 		HeartbeatClient:      heartbeatClient,
+		ProbeManager:         probetest.FakeManager{},
 		RemoteRuntimeService: runtimeService,
 		RemoteImageService:   imageService,
 		CAdvisorInterface:    cadvisorInterface,
@@ -143,7 +145,7 @@ type HollowKubletOptions struct {
 	MaxPods             int
 	PodsPerCore         int
 	NodeLabels          map[string]string
-	RegisterWithTaints  []core.Taint
+	RegisterWithTaints  []v1.Taint
 }
 
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
@@ -161,11 +163,8 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
-	f.ContainerRuntimeOptions.ContainerRuntime = kubetypes.RemoteContainerRuntime
-	f.RegisterNode = true
 	f.RegisterSchedulable = true
-	f.RegisterWithTaints = opt.RegisterWithTaints
-	f.RemoteImageEndpoint = "/run/containerd/containerd.sock"
+	f.RemoteImageEndpoint = "unix:///run/containerd/containerd.sock"
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -209,6 +208,8 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.SerializeImagePulls = true
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
+	c.RegisterWithTaints = opt.RegisterWithTaints
+	c.RegisterNode = true
 
 	return f, c
 }

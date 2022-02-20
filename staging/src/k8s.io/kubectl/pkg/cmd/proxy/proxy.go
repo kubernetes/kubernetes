@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -49,6 +50,8 @@ type ProxyOptions struct {
 	disableFilter bool
 	unixSocket    string
 	keepalive     time.Duration
+
+	appendServerPath bool
 
 	clientConfig *rest.Config
 	filter       *proxy.FilterServer
@@ -138,6 +141,7 @@ func NewCmdProxy(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.disableFilter, "disable-filter", o.disableFilter, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringVarP(&o.unixSocket, "unix-socket", "u", o.unixSocket, "Unix socket on which to run the proxy.")
 	cmd.Flags().DurationVar(&o.keepalive, "keepalive", o.keepalive, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
+	cmd.Flags().BoolVar(&o.appendServerPath, "append-server-path", o.appendServerPath, "If true, enables automatic path appending of the kube context server path to each request.")
 	return cmd
 }
 
@@ -157,6 +161,15 @@ func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 		o.apiPrefix += "/"
 	}
 
+	if o.appendServerPath == false {
+		target, err := url.Parse(clientConfig.Host)
+		if err != nil {
+			return err
+		}
+		if target.Path != "" && target.Path != "/" {
+			klog.Warning("Your kube context contains a server path " + target.Path + ", use --append-server-path to automatically append the path to each request")
+		}
+	}
 	if o.disableFilter {
 		if o.unixSocket == "" {
 			klog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
@@ -193,7 +206,7 @@ func (o ProxyOptions) Validate() error {
 
 // RunProxy checks given arguments and executes command
 func (o ProxyOptions) RunProxy() error {
-	server, err := proxy.NewServer(o.staticDir, o.apiPrefix, o.staticPrefix, o.filter, o.clientConfig, o.keepalive)
+	server, err := proxy.NewServer(o.staticDir, o.apiPrefix, o.staticPrefix, o.filter, o.clientConfig, o.keepalive, o.appendServerPath)
 
 	if err != nil {
 		return err

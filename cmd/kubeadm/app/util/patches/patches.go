@@ -21,20 +21,19 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 
+	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/yaml"
-
-	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
 )
 
 // PatchTarget defines a target to be patched, such as a control-plane static Pod.
@@ -104,7 +103,7 @@ func GetPatchManagerForPath(path string, knownTargets []string, output io.Writer
 	pathLock.RUnlock()
 
 	if output == nil {
-		output = ioutil.Discard
+		output = io.Discard
 	}
 
 	fmt.Fprintf(output, "[patches] Reading patches from path %q\n", path)
@@ -316,7 +315,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		}
 
 		// Read the patch file.
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return errors.Wrapf(err, "could not read the file %q", path)
 		}

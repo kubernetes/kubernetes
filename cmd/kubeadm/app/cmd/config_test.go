@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -28,6 +27,12 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+
+	"github.com/lithammer/dedent"
+	"github.com/spf13/cobra"
+
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -37,12 +42,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
-
-	"github.com/lithammer/dedent"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -111,14 +110,14 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "kubeadm-images-test")
+			tmpDir, err := os.MkdirTemp("", "kubeadm-images-test")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}
 			defer os.RemoveAll(tmpDir)
 
 			configFilePath := filepath.Join(tmpDir, "test-config-file")
-			if err := ioutil.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
+			if err := os.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
@@ -208,8 +207,8 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestConfigImagesListOutput(t *testing.T) {
 
-	etcdVersion, ok := constants.SupportedEtcdVersion[uint8(dummyKubernetesVersion.Minor())]
-	if !ok {
+	etcdVersion, _, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, dummyKubernetesVersionStr)
+	if err != nil {
 		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)
 	}
 	versionMapping := struct {
@@ -218,7 +217,7 @@ func TestConfigImagesListOutput(t *testing.T) {
 		PauseVersion   string
 		CoreDNSVersion string
 	}{
-		EtcdVersion:    etcdVersion,
+		EtcdVersion:    etcdVersion.String(),
 		KubeVersion:    "v" + dummyKubernetesVersionStr,
 		PauseVersion:   constants.PauseVersion,
 		CoreDNSVersion: constants.CoreDNSVersion,
@@ -253,7 +252,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 			outputFormat: "json",
 			expectedOutput: `{
     "kind": "Images",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
     "images": [
         "k8s.gcr.io/kube-apiserver:{{.KubeVersion}}",
         "k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}",
@@ -272,7 +271,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "yaml",
-			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha2
 images:
 - k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
 - k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
@@ -363,10 +362,10 @@ func TestImagesPull(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultDockerCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}
@@ -413,12 +412,12 @@ func TestMigrate(t *testing.T) {
 // Returns the name of the file created and a cleanup callback
 func tempConfig(t *testing.T, config []byte) (string, func()) {
 	t.Helper()
-	tmpDir, err := ioutil.TempDir("", "kubeadm-migration-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-migration-test")
 	if err != nil {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}
 	configFilePath := filepath.Join(tmpDir, "test-config-file")
-	if err := ioutil.WriteFile(configFilePath, config, 0644); err != nil {
+	if err := os.WriteFile(configFilePath, config, 0644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed writing a config file: %v", err)
 	}

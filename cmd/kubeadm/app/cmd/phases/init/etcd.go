@@ -19,15 +19,15 @@ package phases
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
+	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-
-	"k8s.io/klog/v2"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -93,7 +93,7 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 					return err
 				}
 			} else {
-				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
+				fmt.Printf("[etcd] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
 			}
 			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
 			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun()); err != nil {

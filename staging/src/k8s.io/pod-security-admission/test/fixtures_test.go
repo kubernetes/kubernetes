@@ -46,14 +46,22 @@ func TestFixtures(t *testing.T) {
 
 	defaultChecks := policy.DefaultChecks()
 
+	const newestMinorVersionToTest = 23
+
+	policyVersions := computeVersionsToTest(t, defaultChecks)
+	newestMinorVersionWithPolicyChanges := policyVersions[len(policyVersions)-1].Minor()
+
+	if newestMinorVersionToTest < newestMinorVersionWithPolicyChanges {
+		t.Fatalf("fixtures only tested up to %d, but policy changes exist up to %d", newestMinorVersionToTest, newestMinorVersionWithPolicyChanges)
+	}
+
 	for _, level := range []api.Level{api.LevelBaseline, api.LevelRestricted} {
-		// TODO: derive from registered levels
-		for version := 0; version <= 22; version++ {
+		for version := 0; version <= newestMinorVersionToTest; version++ {
 			passDir := filepath.Join("testdata", string(level), fmt.Sprintf("v1.%d", version), "pass")
 			failDir := filepath.Join("testdata", string(level), fmt.Sprintf("v1.%d", version), "fail")
 
 			// render the minimal valid pod fixture
-			validPod, err := getMinimalValidPod(level, api.MajorMinorVersion(1, version))
+			validPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -74,10 +82,10 @@ func TestFixtures(t *testing.T) {
 				}
 
 				for i, pod := range checkData.pass {
-					expectedFiles.Insert(testFixtureFile(t, passDir, fmt.Sprintf("%s%d", strings.ToLower(checkID), i), pod))
+					expectedFiles.Insert(testFixtureFile(t, passDir, fmt.Sprintf("%s%d", strings.ToLower(string(checkID)), i), pod))
 				}
 				for i, pod := range checkData.fail {
-					expectedFiles.Insert(testFixtureFile(t, failDir, fmt.Sprintf("%s%d", strings.ToLower(checkID), i), pod))
+					expectedFiles.Insert(testFixtureFile(t, failDir, fmt.Sprintf("%s%d", strings.ToLower(string(checkID)), i), pod))
 				}
 			}
 		}

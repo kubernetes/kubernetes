@@ -29,15 +29,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")
-var disableRootCgroupStats = flag.Bool("disable_root_cgroup_stats", false, "Disable collecting root Cgroup stats")
+var (
+	DockerOnly             = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")
+	disableRootCgroupStats = flag.Bool("disable_root_cgroup_stats", false, "Disable collecting root Cgroup stats")
+)
 
 type rawFactory struct {
 	// Factory for machine information.
 	machineInfoFactory info.MachineInfoFactory
 
 	// Information about the cgroup subsystems.
-	cgroupSubsystems *libcontainer.CgroupSubsystems
+	cgroupSubsystems map[string]string
 
 	// Information about mounted filesystems.
 	fsInfo fs.FsInfo
@@ -56,7 +58,7 @@ func (f *rawFactory) String() string {
 	return "raw"
 }
 
-func (f *rawFactory) NewContainerHandler(name string, inHostNamespace bool) (container.ContainerHandler, error) {
+func (f *rawFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (container.ContainerHandler, error) {
 	rootFs := "/"
 	if !inHostNamespace {
 		rootFs = "/rootfs"
@@ -69,7 +71,7 @@ func (f *rawFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	if name == "/" {
 		return true, true, nil
 	}
-	if *dockerOnly && f.rawPrefixWhiteList[0] == "" {
+	if *DockerOnly && f.rawPrefixWhiteList[0] == "" {
 		return true, false, nil
 	}
 	for _, prefix := range f.rawPrefixWhiteList {
@@ -89,7 +91,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, incl
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
-	if len(cgroupSubsystems.Mounts) == 0 {
+	if len(cgroupSubsystems) == 0 {
 		return fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
@@ -102,7 +104,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, incl
 	factory := &rawFactory{
 		machineInfoFactory: machineInfoFactory,
 		fsInfo:             fsInfo,
-		cgroupSubsystems:   &cgroupSubsystems,
+		cgroupSubsystems:   cgroupSubsystems,
 		watcher:            watcher,
 		includedMetrics:    includedMetrics,
 		rawPrefixWhiteList: rawPrefixWhiteList,

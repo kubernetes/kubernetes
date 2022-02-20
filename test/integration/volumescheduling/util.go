@@ -123,6 +123,7 @@ func initTestSchedulerWithOptions(
 	testCtx.scheduler, err = scheduler.New(
 		testCtx.clientSet,
 		testCtx.informerFactory,
+		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
 		testCtx.ctx.Done())
 

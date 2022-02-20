@@ -21,6 +21,12 @@ import (
 	"io"
 	"text/tabwriter"
 
+	"github.com/lithammer/dedent"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/util/duration"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -33,13 +39,6 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	"k8s.io/apimachinery/pkg/util/duration"
-
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 var (
@@ -215,8 +214,6 @@ type renewFlags struct {
 	cfgPath        string
 	kubeconfigPath string
 	cfg            kubeadmapiv1.ClusterConfiguration
-	csrOnly        bool
-	csrPath        string
 }
 
 func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
@@ -255,7 +252,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 					return err
 				}
 
-				return renewCert(flags, kdir, internalcfg, handler)
+				return renewCert(kdir, internalcfg, handler)
 			}
 		}(handler)
 		// install the implementation into the command
@@ -282,7 +279,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 
 			// Renew certificates
 			for _, handler := range rm.Certificates() {
-				if err := renewCert(flags, kdir, internalcfg, handler); err != nil {
+				if err := renewCert(kdir, internalcfg, handler); err != nil {
 					return err
 				}
 			}
@@ -301,17 +298,9 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &flags.cfg.CertificatesDir)
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
-
-	// TODO: remove these flags in a future version:
-	// https://github.com/kubernetes/kubeadm/issues/2163
-	const deprecationMessage = "This flag will be removed in a future version. Please use 'kubeadm certs generate-csr' instead."
-	options.AddCSRFlag(cmd.Flags(), &flags.csrOnly)
-	cmd.Flags().MarkDeprecated(options.CSROnly, deprecationMessage)
-	options.AddCSRDirFlag(cmd.Flags(), &flags.csrPath)
-	cmd.Flags().MarkDeprecated(options.CSRDir, deprecationMessage)
 }
 
-func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
+func renewCert(kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
 	// Get a renewal manager for the given cluster configuration
 	rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
 	if err != nil {
@@ -322,17 +311,6 @@ func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfi
 		fmt.Printf("MISSING! %s\n", handler.LongName)
 		return nil
 	}
-
-	// if the renewal operation is set to generate CSR request only
-	if flags.csrOnly {
-		// checks a path for storing CSR request is given
-		if flags.csrPath == "" {
-			return errors.New("please provide a path where CSR request should be stored")
-		}
-		return rm.CreateRenewCSR(handler.Name, flags.csrPath)
-	}
-
-	// otherwise, the renewal operation has to actually renew a certificate
 
 	// renew using local certificate authorities.
 	// this operation can't complete in case the certificate key is not provided (external CA)

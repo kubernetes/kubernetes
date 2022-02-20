@@ -18,6 +18,7 @@ package netpol
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -62,6 +63,48 @@ func UpdatePolicy(k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespac
 
 	_, err := k8s.updateNetworkPolicy(namespace, policy)
 	framework.ExpectNoError(err, "Unable to update netpol %s/%s", namespace, policy.Name)
+}
+
+// waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
+func waitForHTTPServers(k *kubeManager, model *Model) error {
+	const maxTries = 10
+	framework.Logf("waiting for HTTP servers (ports 80 and/or 81) to become ready")
+
+	testCases := map[string]*TestCase{}
+	for _, port := range model.Ports {
+		// Protocols is provided as input so that we can skip udp polling for windows
+		for _, protocol := range model.Protocols {
+			fromPort := 81
+			desc := fmt.Sprintf("%d->%d,%s", fromPort, port, protocol)
+			testCases[desc] = &TestCase{ToPort: int(port), Protocol: protocol}
+		}
+	}
+	notReady := map[string]bool{}
+	for caseName := range testCases {
+		notReady[caseName] = true
+	}
+
+	for i := 0; i < maxTries; i++ {
+		for caseName, testCase := range testCases {
+			if notReady[caseName] {
+				reachability := NewReachability(model.AllPods(), true)
+				testCase.Reachability = reachability
+				ProbePodToPodConnectivity(k, model, testCase)
+				_, wrong, _, _ := reachability.Summary(ignoreLoopback)
+				if wrong == 0 {
+					framework.Logf("server %s is ready", caseName)
+					delete(notReady, caseName)
+				} else {
+					framework.Logf("server %s is not ready", caseName)
+				}
+			}
+		}
+		if len(notReady) == 0 {
+			return nil
+		}
+		time.Sleep(waitInterval)
+	}
+	return fmt.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
 }
 
 // ValidateOrFail validates connectivity

@@ -42,6 +42,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 )
@@ -125,7 +126,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 
 				nodeIPTypes := make(map[v1.NodeAddressType]bool)
 				for _, nodeAddress := range cloudNodeAddresses {
-					if nodeAddress.Address == nodeIP.String() {
+					if netutils.ParseIPSloppy(nodeAddress.Address).Equal(nodeIP) {
 						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
 						nodeIPTypes[nodeAddress.Type] = true
 					}
@@ -149,13 +150,13 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 				// prefer addresses of the matching family
 				sortedAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
 				for _, nodeAddress := range cloudNodeAddresses {
-					ip := net.ParseIP(nodeAddress.Address)
+					ip := netutils.ParseIPSloppy(nodeAddress.Address)
 					if ip == nil || isPreferredIPFamily(ip) {
 						sortedAddresses = append(sortedAddresses, nodeAddress)
 					}
 				}
 				for _, nodeAddress := range cloudNodeAddresses {
-					ip := net.ParseIP(nodeAddress.Address)
+					ip := netutils.ParseIPSloppy(nodeAddress.Address)
 					if ip != nil && !isPreferredIPFamily(ip) {
 						sortedAddresses = append(sortedAddresses, nodeAddress)
 					}
@@ -219,7 +220,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			// unless nodeIP is "::", in which case it is reversed.
 			if nodeIPSpecified {
 				ipAddr = nodeIP
-			} else if addr := net.ParseIP(hostname); addr != nil {
+			} else if addr := netutils.ParseIPSloppy(hostname); addr != nil {
 				ipAddr = addr
 			} else {
 				var addrs []net.IP

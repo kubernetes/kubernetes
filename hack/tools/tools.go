@@ -20,6 +20,7 @@ package tools
 
 import (
 	// linting tools
+	_ "github.com/aojea/sloppy-netparser"
 	_ "github.com/client9/misspell/cmd/misspell"
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "github.com/google/go-flow-levee/cmd/levee"
@@ -32,4 +33,7 @@ import (
 
 	// dependencies
 	_ "sigs.k8s.io/zeitgeist"
+
+	// mockgen
+	_ "github.com/golang/mock/mockgen"
 )

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -38,12 +39,13 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+	netutils "k8s.io/utils/net"
 )
 
 func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
@@ -120,7 +122,7 @@ type gceInstance struct {
 
 var (
 	autoSubnetIPRange = &net.IPNet{
-		IP:   net.ParseIP("10.128.0.0"),
+		IP:   netutils.ParseIPSloppy("10.128.0.0"),
 		Mask: net.CIDRMask(9, 32),
 	}
 )
@@ -305,7 +307,7 @@ func lastIPInRange(cidr *net.IPNet) net.IP {
 func subnetsInCIDR(subnets []*compute.Subnetwork, cidr *net.IPNet) ([]*compute.Subnetwork, error) {
 	var res []*compute.Subnetwork
 	for _, subnet := range subnets {
-		_, subnetRange, err := net.ParseCIDR(subnet.IpCidrRange)
+		_, subnetRange, err := netutils.ParseCIDRSloppy(subnet.IpCidrRange)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse CIDR %q for subnet %q: %v", subnet.IpCidrRange, subnet.Name, err)
 		}

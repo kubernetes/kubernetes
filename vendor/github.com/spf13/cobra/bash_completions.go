@@ -384,7 +384,7 @@ func writePostscript(buf io.StringWriter, name string) {
 	name = strings.Replace(name, ":", "__", -1)
 	WriteStringAndCheck(buf, fmt.Sprintf("__start_%s()\n", name))
 	WriteStringAndCheck(buf, fmt.Sprintf(`{
-    local cur prev words cword
+    local cur prev words cword split
     declare -A flaghash 2>/dev/null || :
     declare -A aliashash 2>/dev/null || :
     if declare -F _init_completion >/dev/null 2>&1; then
@@ -400,11 +400,13 @@ func writePostscript(buf io.StringWriter, name string) {
     local flags_with_completion=()
     local flags_completion=()
     local commands=("%[1]s")
+    local command_aliases=()
     local must_have_one_flag=()
     local must_have_one_noun=()
     local has_completion_function
     local last_command
     local nouns=()
+    local noun_aliases=()
 
     __%[1]s_handle_word
 }
@@ -510,6 +512,8 @@ func writeLocalNonPersistentFlag(buf io.StringWriter, flag *pflag.Flag) {
 
 // Setup annotations for go completions for registered flags
 func prepareCustomAnnotationsForFlags(cmd *Command) {
+	flagCompletionMutex.RLock()
+	defer flagCompletionMutex.RUnlock()
 	for flag := range flagCompletionFunctions {
 		// Make sure the completion script calls the __*_go_custom_completion function for
 		// every registered flag.  We need to do this here (and not when the flag was registered

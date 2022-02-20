@@ -41,12 +41,14 @@ func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint 
 	var numaAffinities []bitmask.BitMask
 	for _, hint := range permutation {
 		// Only consider hints that have an actual NUMANodeAffinity set.
-		if hint.NUMANodeAffinity == nil {
-			numaAffinities = append(numaAffinities, defaultAffinity)
-		} else {
+		if hint.NUMANodeAffinity != nil {
 			numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
+			// Only mark preferred if all affinities are equal.
+			if !hint.NUMANodeAffinity.IsEqual(numaAffinities[0]) {
+				preferred = false
+			}
 		}
-
+		// Only mark preferred if all affinities are preferred.
 		if !hint.Preferred {
 			preferred = false
 		}
@@ -54,8 +56,8 @@ func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint 
 
 	// Merge the affinities using a bitwise-and operation.
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
-	// Build a mergedHint from the merged affinity mask, indicating if an
-	// preferred allocation was used to generate the affinity mask or not.
+	// Build a mergedHint from the merged affinity mask, setting preferred as
+	// appropriate based on the logic above.
 	return TopologyHint{mergedAffinity, preferred}
 }
 

@@ -30,7 +30,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	utilsnet "k8s.io/utils/net"
+	utiltaints "k8s.io/kubernetes/pkg/util/taints"
+	netutils "k8s.io/utils/net"
 )
 
 // TODO(mikedanese): remove these flag wrapper types when we remove command line flags
@@ -40,6 +41,7 @@ var (
 	_ pflag.Value = &IPPortVar{}
 	_ pflag.Value = &PortRangeVar{}
 	_ pflag.Value = &ReservedMemoryVar{}
+	_ pflag.Value = &RegisterWithTaintsVar{}
 )
 
 // IPVar is used for validating a command line option that represents an IP. It implements the pflag.Value interface
@@ -48,12 +50,12 @@ type IPVar struct {
 }
 
 // Set sets the flag value
-func (v IPVar) Set(s string) error {
+func (v *IPVar) Set(s string) error {
 	if len(s) == 0 {
 		v.Val = nil
 		return nil
 	}
-	if net.ParseIP(s) == nil {
+	if netutils.ParseIPSloppy(s) == nil {
 		return fmt.Errorf("%q is not a valid IP address", s)
 	}
 	if v.Val == nil {
@@ -65,7 +67,7 @@ func (v IPVar) Set(s string) error {
 }
 
 // String returns the flag value
-func (v IPVar) String() string {
+func (v *IPVar) String() string {
 	if v.Val == nil {
 		return ""
 	}
@@ -73,7 +75,7 @@ func (v IPVar) String() string {
 }
 
 // Type gets the flag type
-func (v IPVar) Type() string {
+func (v *IPVar) Type() string {
 	return "ip"
 }
 
@@ -83,7 +85,7 @@ type IPPortVar struct {
 }
 
 // Set sets the flag value
-func (v IPPortVar) Set(s string) error {
+func (v *IPPortVar) Set(s string) error {
 	if len(s) == 0 {
 		v.Val = nil
 		return nil
@@ -96,7 +98,7 @@ func (v IPPortVar) Set(s string) error {
 
 	// Both IP and IP:port are valid.
 	// Attempt to parse into IP first.
-	if net.ParseIP(s) != nil {
+	if netutils.ParseIPSloppy(s) != nil {
 		*v.Val = s
 		return nil
 	}
@@ -106,10 +108,10 @@ func (v IPPortVar) Set(s string) error {
 	if err != nil {
 		return fmt.Errorf("%q is not in a valid format (ip or ip:port): %v", s, err)
 	}
-	if net.ParseIP(host) == nil {
+	if netutils.ParseIPSloppy(host) == nil {
 		return fmt.Errorf("%q is not a valid IP address", host)
 	}
-	if _, err := utilsnet.ParsePort(port, true); err != nil {
+	if _, err := netutils.ParsePort(port, true); err != nil {
 		return fmt.Errorf("%q is not a valid number", port)
 	}
 	*v.Val = s
@@ -117,7 +119,7 @@ func (v IPPortVar) Set(s string) error {
 }
 
 // String returns the flag value
-func (v IPPortVar) String() string {
+func (v *IPPortVar) String() string {
 	if v.Val == nil {
 		return ""
 	}
@@ -125,7 +127,7 @@ func (v IPPortVar) String() string {
 }
 
 // Type gets the flag type
-func (v IPPortVar) Type() string {
+func (v *IPPortVar) Type() string {
 	return "ipport"
 }
 
@@ -186,47 +188,46 @@ func (v *ReservedMemoryVar) Set(s string) error {
 		return nil
 	}
 
-	numaNodeReservation := strings.Split(s, ":")
-	if len(numaNodeReservation) != 2 {
-		return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", s)
-	}
-
-	memoryTypeReservations := strings.Split(numaNodeReservation[1], ",")
-	if len(memoryTypeReservations) < 1 {
-		return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", s)
-	}
-
-	numaNodeID, err := strconv.Atoi(numaNodeReservation[0])
-	if err != nil {
-		return fmt.Errorf("failed to convert the NUMA node ID, exptected integer, got %s", numaNodeReservation[0])
-	}
-
-	memoryReservation := kubeletconfig.MemoryReservation{
-		NumaNode: int32(numaNodeID),
-		Limits:   map[v1.ResourceName]resource.Quantity{},
-	}
-
-	for _, reservation := range memoryTypeReservations {
-		limit := strings.Split(reservation, "=")
-		if len(limit) != 2 {
-			return fmt.Errorf("the reserved limit has incorrect value, expected type=quantatity, got %s", reservation)
+	numaNodeReservations := strings.Split(s, ";")
+	for _, reservation := range numaNodeReservations {
+		numaNodeReservation := strings.Split(reservation, ":")
+		if len(numaNodeReservation) != 2 {
+			return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", reservation)
 		}
-
-		resourceName := v1.ResourceName(limit[0])
-		if resourceName != v1.ResourceMemory && !corev1helper.IsHugePageResourceName(resourceName) {
-			return fmt.Errorf("memory type conversion error, unknown type: %q", resourceName)
+		memoryTypeReservations := strings.Split(numaNodeReservation[1], ",")
+		if len(memoryTypeReservations) < 1 {
+			return fmt.Errorf("the reserved memory has incorrect format, expected numaNodeID:type=quantity[,type=quantity...], got %s", reservation)
 		}
-
-		q, err := resource.ParseQuantity(limit[1])
+		numaNodeID, err := strconv.Atoi(numaNodeReservation[0])
 		if err != nil {
-			return fmt.Errorf("failed to parse the quantatity, expected quantatity, got %s", limit[1])
+			return fmt.Errorf("failed to convert the NUMA node ID, exptected integer, got %s", numaNodeReservation[0])
 		}
 
-		memoryReservation.Limits[v1.ResourceName(limit[0])] = q
+		memoryReservation := kubeletconfig.MemoryReservation{
+			NumaNode: int32(numaNodeID),
+			Limits:   map[v1.ResourceName]resource.Quantity{},
+		}
+
+		for _, memoryTypeReservation := range memoryTypeReservations {
+			limit := strings.Split(memoryTypeReservation, "=")
+			if len(limit) != 2 {
+				return fmt.Errorf("the reserved limit has incorrect value, expected type=quantatity, got %s", memoryTypeReservation)
+			}
+
+			resourceName := v1.ResourceName(limit[0])
+			if resourceName != v1.ResourceMemory && !corev1helper.IsHugePageResourceName(resourceName) {
+				return fmt.Errorf("memory type conversion error, unknown type: %q", resourceName)
+			}
+
+			q, err := resource.ParseQuantity(limit[1])
+			if err != nil {
+				return fmt.Errorf("failed to parse the quantatity, expected quantatity, got %s", limit[1])
+			}
+
+			memoryReservation.Limits[v1.ResourceName(limit[0])] = q
+		}
+		*v.Value = append(*v.Value, memoryReservation)
 	}
-
-	*v.Value = append(*v.Value, memoryReservation)
-
 	return nil
 }
 
@@ -254,4 +255,45 @@ func (v *ReservedMemoryVar) String() string {
 // Type gets the flag type
 func (v *ReservedMemoryVar) Type() string {
 	return "reserved-memory"
+}
+
+// RegisterWithTaintsVar is used for validating a command line option that represents a register with taints. It implements the pflag.Value interface
+type RegisterWithTaintsVar struct {
+	Value *[]v1.Taint
+}
+
+// Set sets the flag value
+func (t RegisterWithTaintsVar) Set(s string) error {
+	if len(s) == 0 {
+		*t.Value = nil
+		return nil
+	}
+	sts := strings.Split(s, ",")
+	corev1Taints, _, err := utiltaints.ParseTaints(sts)
+	if err != nil {
+		return err
+	}
+	var taints []v1.Taint
+	for _, ct := range corev1Taints {
+		taints = append(taints, v1.Taint{Key: ct.Key, Value: ct.Value, Effect: v1.TaintEffect(ct.Effect)})
+	}
+	*t.Value = taints
+	return nil
+}
+
+// String returns the flag value
+func (t RegisterWithTaintsVar) String() string {
+	if len(*t.Value) == 0 {
+		return ""
+	}
+	var taints []string
+	for _, taint := range *t.Value {
+		taints = append(taints, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+	}
+	return strings.Join(taints, ",")
+}
+
+// Type gets the flag type
+func (t RegisterWithTaintsVar) Type() string {
+	return "[]v1.Taint"
 }

@@ -539,10 +539,12 @@ func (c *Controller) checkNodeTopologyDistribution() {
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error listing Nodes: %v", err)
+		return
 	}
 	c.topologyCache.SetNodes(nodes)
 	serviceKeys := c.topologyCache.GetOverloadedServices()
 	for _, serviceKey := range serviceKeys {
+		klog.V(2).Infof("Queuing %s Service after Node change due to overloading", serviceKey)
 		c.queue.Add(serviceKey)
 	}
 }

@@ -52,6 +52,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   darwin/arm64
   windows/amd64
   windows/386
+  windows/arm64
 )
 
 # Which platforms we should compile test targets for.
@@ -65,6 +66,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   darwin/amd64
   darwin/arm64
   windows/amd64
+  windows/arm64
 )
 
 # The set of server targets that we are only building for Linux
@@ -77,6 +79,7 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubeadm
     cmd/kube-scheduler
+    vendor/k8s.io/component-base/logs/kube-log-runner
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
@@ -110,7 +113,7 @@ kube::golang::conformance_image_targets() {
   local targets=(
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
-    cluster/images/conformance/go-runner
+    test/conformance/image/go-runner
     cmd/kubectl
   )
   echo "${targets[@]}"
@@ -126,6 +129,7 @@ kube::golang::node_targets() {
     cmd/kube-proxy
     cmd/kubeadm
     cmd/kubelet
+    vendor/k8s.io/component-base/logs/kube-log-runner
   )
   echo "${targets[@]}"
 }
@@ -209,8 +213,8 @@ kube::golang::setup_platforms() {
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
     host_arch=$(kube::util::host_arch)
-    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" ]]; then
-      # on any platform other than amd64 and arm64, we just default to amd64
+    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" ]]; then
+      # on any platform other than amd64, arm64 and ppc64le, we just default to amd64
       host_arch="amd64"
     fi
     KUBE_SERVER_PLATFORMS=("linux/${host_arch}")
@@ -272,7 +276,7 @@ kube::golang::test_targets() {
     cmd/linkcheck
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
-    cluster/images/conformance/go-runner
+    test/conformance/image/go-runner
   )
   echo "${targets[@]}"
 }
@@ -332,8 +336,10 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-controller-manager
   kube-scheduler
   kube-proxy
+  kube-log-runner
   kubeadm
   kubectl
+  kubemark
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.
@@ -412,10 +418,6 @@ kube::golang::set_platform_envs() {
         export CGO_ENABLED=1
         export CC=${KUBE_LINUX_AMD64_CC:-x86_64-linux-gnu-gcc}
         ;;
-      "linux/386")
-        export CGO_ENABLED=1
-        export CC=${KUBE_LINUX_386_CC:-i686-linux-gnu-gcc}
-        ;;
       "linux/arm")
         export CGO_ENABLED=1
         export CC=${KUBE_LINUX_ARM_CC:-arm-linux-gnueabihf-gcc}
@@ -478,7 +480,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.16.0
+  minimum_go_version=go1.17.0
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -716,6 +718,7 @@ kube::golang::build_binaries_for_platform() {
       -ldflags "${goldflags:-}"
       -tags "${gotags:-}"
     )
+    V=1 kube::log::info "> static build CGO_ENABLED=0: ${statics[*]}"
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
   fi
 
@@ -725,9 +728,9 @@ kube::golang::build_binaries_for_platform() {
       -gcflags "${gogcflags:-}"
       -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
-      -buildmode pie
       -tags "${gotags:-}"
     )
+    V=1 kube::log::info "> non-static build: ${nonstatics[*]}"
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 
@@ -805,7 +808,7 @@ kube::golang::build_binaries() {
 
     # extract tags if any specified in GOFLAGS
     # shellcheck disable=SC2001
-    gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -e 's|.*-tags=\([^-]*\).*|\1|')"
+    gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
     local -a targets=()
     local arg

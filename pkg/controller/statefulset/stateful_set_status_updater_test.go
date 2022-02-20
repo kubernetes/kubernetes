@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -41,7 +42,7 @@ func TestStatefulSetUpdaterUpdatesSetStatus(t *testing.T) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
 	})
-	if err := updater.UpdateStatefulSetStatus(set, &status); err != nil {
+	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
 		t.Errorf("Error returned on successful status update: %s", err)
 	}
 	if set.Status.Replicas != 2 {
@@ -62,7 +63,7 @@ func TestStatefulSetStatusUpdaterUpdatesObservedGeneration(t *testing.T) {
 		}
 		return true, sts, nil
 	})
-	if err := updater.UpdateStatefulSetStatus(set, &status); err != nil {
+	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
 		t.Errorf("Error returned on successful status update: %s", err)
 	}
 }
@@ -78,7 +79,7 @@ func TestStatefulSetStatusUpdaterUpdateReplicasFailure(t *testing.T) {
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := updater.UpdateStatefulSetStatus(set, &status); err == nil {
+	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err == nil {
 		t.Error("Failed update did not return error")
 	}
 }
@@ -101,7 +102,7 @@ func TestStatefulSetStatusUpdaterUpdateReplicasConflict(t *testing.T) {
 		return true, update.GetObject(), nil
 
 	})
-	if err := updater.UpdateStatefulSetStatus(set, &status); err != nil {
+	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
 		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
 	}
 	if set.Status.Replicas != 2 {
@@ -121,7 +122,7 @@ func TestStatefulSetStatusUpdaterUpdateReplicasConflictFailure(t *testing.T) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("object already exists"))
 	})
-	if err := updater.UpdateStatefulSetStatus(set, &status); err == nil {
+	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err == nil {
 		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
 	}
 }
@@ -136,7 +137,7 @@ func TestStatefulSetStatusUpdaterGetAvailableReplicas(t *testing.T) {
 		update := action.(core.UpdateAction)
 		return true, update.GetObject(), nil
 	})
-	if err := updater.UpdateStatefulSetStatus(set, &status); err != nil {
+	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
 		t.Errorf("Error returned on successful status update: %s", err)
 	}
 	if set.Status.AvailableReplicas != 3 {

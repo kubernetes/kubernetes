@@ -22,9 +22,9 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -32,6 +32,17 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
+
+// probeConnectivityArgs is set of arguments for a probeConnectivity
+type probeConnectivityArgs struct {
+	nsFrom         string
+	podFrom        string
+	containerFrom  string
+	addrTo         string
+	protocol       v1.Protocol
+	toPort         int
+	timeoutSeconds int
+}
 
 // kubeManager provides a convenience interface to kube functionality that we leverage for polling NetworkPolicy connections.
 // Its responsibilities are:
@@ -70,10 +81,14 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 			}
 
 			createdPods = append(createdPods, kubePod)
-			_, err = k.createService(pod.Service())
+			svc, err := k.createService(pod.Service())
 			if err != nil {
 				return err
 			}
+			if netutils.ParseIPSloppy(svc.Spec.ClusterIP) == nil {
+				return fmt.Errorf("empty IP address found for service %s/%s", svc.Namespace, svc.Name)
+			}
+			pod.ServiceIP = svc.Spec.ClusterIP
 		}
 	}
 
@@ -110,30 +125,35 @@ func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
 	return kubePod, nil
 }
 
-// probeConnectivity execs into a pod and checks its connectivity to another pod..
-func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int, timeoutSeconds int) (bool, string, error) {
-	port := strconv.Itoa(toPort)
+// probeConnectivity execs into a pod and checks its connectivity to another pod.
+// Implements the Prober interface.
+func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, string, error) {
+	port := strconv.Itoa(args.toPort)
+	if args.addrTo == "" {
+		return false, "no IP provided", fmt.Errorf("empty addrTo field")
+	}
+	framework.Logf("Starting probe from pod %v to %v", args.podFrom, args.addrTo)
 	var cmd []string
-	timeout := fmt.Sprintf("--timeout=%vs", timeoutSeconds)
+	timeout := fmt.Sprintf("--timeout=%vs", args.timeoutSeconds)
 
-	switch protocol {
+	switch args.protocol {
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=sctp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=sctp"}
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=tcp"}
 	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=udp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=udp"}
 		if framework.NodeOSDistroIs("windows") {
 			framework.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
 		}
 	default:
-		framework.Failf("protocol %s not supported", protocol)
+		framework.Failf("protocol %s not supported", args.protocol)
 	}
 
-	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", podFrom, containerFrom, nsFrom, strings.Join(cmd, " "))
-	stdout, stderr, err := k.executeRemoteCommand(nsFrom, podFrom, containerFrom, cmd)
+	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
+	stdout, stderr, err := k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
 	if err != nil {
-		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", nsFrom, podFrom, addrTo, err, stdout, stderr)
+		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", args.nsFrom, args.podFrom, args.addrTo, err, stdout, stderr)
 		return false, commandDebugString, nil
 	}
 	return true, commandDebugString, nil
@@ -259,46 +279,4 @@ func (k *kubeManager) deleteNamespaces(namespaces []string) error {
 		}
 	}
 	return nil
-}
-
-// waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
-func (k *kubeManager) waitForHTTPServers(model *Model) error {
-	const maxTries = 10
-	framework.Logf("waiting for HTTP servers (ports 80 and 81) to become ready")
-
-	testCases := map[string]*TestCase{}
-	for _, port := range model.Ports {
-		// Protocols is provided as input so that we can skip udp polling for windows
-		for _, protocol := range model.Protocols {
-			fromPort := 81
-			desc := fmt.Sprintf("%d->%d,%s", fromPort, port, protocol)
-			testCases[desc] = &TestCase{ToPort: int(port), Protocol: protocol}
-		}
-	}
-	notReady := map[string]bool{}
-	for caseName := range testCases {
-		notReady[caseName] = true
-	}
-
-	for i := 0; i < maxTries; i++ {
-		for caseName, testCase := range testCases {
-			if notReady[caseName] {
-				reachability := NewReachability(model.AllPods(), true)
-				testCase.Reachability = reachability
-				ProbePodToPodConnectivity(k, model, testCase)
-				_, wrong, _, _ := reachability.Summary(ignoreLoopback)
-				if wrong == 0 {
-					framework.Logf("server %s is ready", caseName)
-					delete(notReady, caseName)
-				} else {
-					framework.Logf("server %s is not ready", caseName)
-				}
-			}
-		}
-		if len(notReady) == 0 {
-			return nil
-		}
-		time.Sleep(waitInterval)
-	}
-	return fmt.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
 }

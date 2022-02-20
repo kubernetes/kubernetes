@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -90,6 +91,11 @@ func TestRegisterWatch(t *testing.T) {
 			request:  httpRequest("GET", "/apis/group/v1/namespaces/foo/pods", "watch=true&fieldSelector=metadata.name=mypod"),
 			expected: newWatchIdentifier("group", "pods", "foo", "mypod"),
 		},
+		{
+			name:     "watch indexed object",
+			request:  httpRequest("GET", "/apis/group/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName="),
+			expected: newWatchIdentifier("group", "pods", "foo", ""),
+		},
 	}
 
 	requestInfoFactory := &request.RequestInfoFactory{
@@ -100,6 +106,7 @@ func TestRegisterWatch(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			watchTracker := &watchTracker{
+				indexes:    getBuiltinIndexes(),
 				watchCount: make(map[watchIdentifier]int),
 			}
 
@@ -107,8 +114,10 @@ func TestRegisterWatch(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error from requestInfo creation: %#v", err)
 			}
+			ctx := request.WithRequestInfo(context.Background(), requestInfo)
+			r := testCase.request.WithContext(ctx)
 
-			forget := watchTracker.RegisterWatch(requestInfo)
+			forget := watchTracker.RegisterWatch(r)
 			if testCase.expected == nil {
 				if forget != nil {
 					t.Errorf("unexpected watch registered: %#v", watchTracker.watchCount)
@@ -151,7 +160,8 @@ func TestGetInterestedWatchCount(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error from requestInfo creation: %#v", err)
 		}
-		if forget := watchTracker.RegisterWatch(requestInfo); forget == nil {
+		r := req.WithContext(request.WithRequestInfo(context.Background(), requestInfo))
+		if forget := watchTracker.RegisterWatch(r); forget == nil {
 			t.Errorf("watch wasn't registered: %#v", requestInfo)
 		}
 	}
@@ -235,6 +245,76 @@ func TestGetInterestedWatchCount(t *testing.T) {
 			name:     "otherpod update in bar namespace in group group",
 			request:  httpRequest("PUT", "/apis/group/v1/namespaces/bar/pods/otherpod", ""),
 			expected: 0,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			requestInfo, err := requestInfoFactory.NewRequestInfo(testCase.request)
+			if err != nil {
+				t.Fatalf("unexpected error from requestInfo creation: %#v", err)
+			}
+
+			count := watchTracker.GetInterestedWatchCount(requestInfo)
+			if count != testCase.expected {
+				t.Errorf("unexpected interested watch count: %d, expected %d", count, testCase.expected)
+			}
+		})
+	}
+
+}
+
+func TestGetInterestedWatchCountWithIndex(t *testing.T) {
+	watchTracker := NewWatchTracker()
+
+	registeredWatches := []*http.Request{
+		httpRequest("GET", "api/v1/pods", "watch=true"),
+		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true"),
+		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=metadata.name=mypod"),
+		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName="),
+		// The watches below will be ignored due to index.
+		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName=node1"),
+		httpRequest("GET", "api/v1/namespaces/foo/pods", "watch=true&fieldSelector=spec.nodeName=node2"),
+	}
+	requestInfoFactory := &request.RequestInfoFactory{
+		APIPrefixes:          sets.NewString("api", "apis"),
+		GrouplessAPIPrefixes: sets.NewString("api"),
+	}
+	for _, req := range registeredWatches {
+		requestInfo, err := requestInfoFactory.NewRequestInfo(req)
+		if err != nil {
+			t.Fatalf("unexpected error from requestInfo creation: %#v", err)
+		}
+		r := req.WithContext(request.WithRequestInfo(context.Background(), requestInfo))
+		if forget := watchTracker.RegisterWatch(r); forget == nil {
+			t.Errorf("watch wasn't registered: %#v", requestInfo)
+		}
+	}
+
+	testCases := []struct {
+		name     string
+		request  *http.Request
+		expected int
+	}{
+		{
+			name:     "pod creation in foo namespace",
+			request:  httpRequest("POST", "/api/v1/namespaces/foo/pods", ""),
+			expected: 3,
+		},
+		{
+			name:     "mypod update in foo namespace",
+			request:  httpRequest("PUT", "/api/v1/namespaces/foo/pods/mypod", ""),
+			expected: 4,
+		},
+		{
+			name:     "mypod patch in foo namespace",
+			request:  httpRequest("PATCH", "/api/v1/namespaces/foo/pods/mypod", ""),
+			expected: 4,
+		},
+		{
+			name:     "mypod deletion in foo namespace",
+			request:  httpRequest("DELETE", "/api/v1/namespaces/foo/pods/mypod", ""),
+			expected: 4,
 		},
 	}
 

@@ -23,12 +23,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestAnnotateCRISocket(t *testing.T) {
@@ -41,20 +41,20 @@ func TestAnnotateCRISocket(t *testing.T) {
 		{
 			name:                       "CRI-socket annotation missing",
 			currentCRISocketAnnotation: "",
-			newCRISocketAnnotation:     "/run/containerd/containerd.sock",
-			expectedPatch:              `{"metadata":{"annotations":{"kubeadm.alpha.kubernetes.io/cri-socket":"/run/containerd/containerd.sock"}}}`,
+			newCRISocketAnnotation:     "unix:///run/containerd/containerd.sock",
+			expectedPatch:              `{"metadata":{"annotations":{"kubeadm.alpha.kubernetes.io/cri-socket":"unix:///run/containerd/containerd.sock"}}}`,
 		},
 		{
 			name:                       "CRI-socket annotation already exists",
-			currentCRISocketAnnotation: "/run/containerd/containerd.sock",
-			newCRISocketAnnotation:     "/run/containerd/containerd.sock",
+			currentCRISocketAnnotation: "unix:///run/containerd/containerd.sock",
+			newCRISocketAnnotation:     "unix:///run/containerd/containerd.sock",
 			expectedPatch:              `{}`,
 		},
 		{
 			name:                       "CRI-socket annotation needs to be updated",
-			currentCRISocketAnnotation: "/var/run/dockershim.sock",
-			newCRISocketAnnotation:     "/run/containerd/containerd.sock",
-			expectedPatch:              `{"metadata":{"annotations":{"kubeadm.alpha.kubernetes.io/cri-socket":"/run/containerd/containerd.sock"}}}`,
+			currentCRISocketAnnotation: "unix:///foo/bar",
+			newCRISocketAnnotation:     "unix:///run/containerd/containerd.sock",
+			expectedPatch:              `{"metadata":{"annotations":{"kubeadm.alpha.kubernetes.io/cri-socket":"unix:///run/containerd/containerd.sock"}}}`,
 		},
 	}
 

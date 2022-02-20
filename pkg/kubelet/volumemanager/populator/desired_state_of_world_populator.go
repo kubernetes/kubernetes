@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -306,7 +307,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		}
 
 		// Add volume to desired state of world
-		_, err = dswp.desiredStateOfWorld.AddPodToVolume(
+		uniqueVolumeName, err := dswp.desiredStateOfWorld.AddPodToVolume(
 			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue)
 		if err != nil {
 			klog.ErrorS(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
@@ -315,6 +316,8 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		} else {
 			klog.V(4).InfoS("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 		}
+		// sync reconstructed volume
+		dswp.actualStateOfWorld.SyncReconstructedVolume(uniqueVolumeName, uniquePodName, podVolume.Name)
 
 		if expandInUsePV {
 			dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec,
@@ -460,28 +463,15 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.String) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
 	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
-	ephemeral := false
-	if pvcSource == nil &&
-		podVolume.VolumeSource.Ephemeral != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
-			// Provide an unambiguous error message that
-			// explains why the volume cannot be
-			// processed. If we just ignore the volume
-			// source, the error is just a vague "unknown
-			// volume source".
-			return nil, nil, "", fmt.Errorf(
-				"volume %s is a generic ephemeral volume, but that feature is disabled in kubelet",
-				podVolume.Name,
-			)
-		}
+	isEphemeral := pvcSource == nil && podVolume.VolumeSource.Ephemeral != nil
+	if isEphemeral {
 		// Generic ephemeral inline volumes are handled the
 		// same way as a PVC reference. The only additional
 		// constraint (checked below) is that the PVC must be
 		// owned by the pod.
 		pvcSource = &v1.PersistentVolumeClaimVolumeSource{
-			ClaimName: pod.Name + "-" + podVolume.Name,
+			ClaimName: ephemeral.VolumeClaimName(pod, &podVolume),
 		}
-		ephemeral = true
 	}
 	if pvcSource != nil {
 		klog.V(5).InfoS("Found PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName))
@@ -495,12 +485,10 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 				pvcSource.ClaimName,
 				err)
 		}
-		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
-			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %s/%s: not the ephemeral PVC for the pod",
-				pod.Namespace,
-				pvcSource.ClaimName,
-			)
+		if isEphemeral {
+			if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+				return nil, nil, "", err
+			}
 		}
 		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
 		klog.V(5).InfoS("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName)
@@ -582,18 +570,16 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-		// Pods that uses a PVC that is being deleted must not be started.
-		//
-		// In case an old kubelet is running without this check or some kubelets
-		// have this feature disabled, the worst that can happen is that such
-		// pod is scheduled. This was the default behavior in 1.8 and earlier
-		// and users should not be that surprised.
-		// It should happen only in very rare case when scheduler schedules
-		// a pod and user deletes a PVC that's used by it at the same time.
-		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			return nil, errors.New("PVC is being deleted")
-		}
+	// Pods that uses a PVC that is being deleted must not be started.
+	//
+	// In case an old kubelet is running without this check or some kubelets
+	// have this feature disabled, the worst that can happen is that such
+	// pod is scheduled. This was the default behavior in 1.8 and earlier
+	// and users should not be that surprised.
+	// It should happen only in very rare case when scheduler schedules
+	// a pod and user deletes a PVC that's used by it at the same time.
+	if pvc.ObjectMeta.DeletionTimestamp != nil {
+		return nil, errors.New("PVC is being deleted")
 	}
 
 	if pvc.Status.Phase != v1.ClaimBound {

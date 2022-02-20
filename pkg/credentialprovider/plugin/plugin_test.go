@@ -18,7 +18,9 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"reflect"
 	"sync"
 	"testing"
@@ -26,13 +28,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	"k8s.io/client-go/tools/cache"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type fakeExecPlugin struct {
@@ -303,7 +306,7 @@ func Test_ProvideParallel(t *testing.T) {
 }
 
 func Test_getCachedCredentials(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	p := &pluginProvider{
 		clock:          fakeClock,
 		lastCachePurge: fakeClock.Now(),
@@ -712,4 +715,111 @@ func Test_NoCacheResponse(t *testing.T) {
 		t.Logf("expected cache keys: %v", expectedCacheKeys)
 		t.Error("unexpected cache keys")
 	}
+}
+
+func Test_ExecPluginEnvVars(t *testing.T) {
+	testcases := []struct {
+		name            string
+		systemEnvVars   []string
+		execPlugin      *execPlugin
+		expectedEnvVars []string
+	}{
+		{
+			name:          "positive append system env vars",
+			systemEnvVars: []string{"HOME=/home/foo", "PATH=/usr/bin"},
+			execPlugin: &execPlugin{
+				envVars: []kubeletconfig.ExecEnvVar{
+					{
+						Name:  "SUPER_SECRET_STRONG_ACCESS_KEY",
+						Value: "123456789",
+					},
+				},
+			},
+			expectedEnvVars: []string{
+				"HOME=/home/foo",
+				"PATH=/usr/bin",
+				"SUPER_SECRET_STRONG_ACCESS_KEY=123456789",
+			},
+		},
+		{
+			name:          "positive no env vars provided in plugin",
+			systemEnvVars: []string{"HOME=/home/foo", "PATH=/usr/bin"},
+			execPlugin:    &execPlugin{},
+			expectedEnvVars: []string{
+				"HOME=/home/foo",
+				"PATH=/usr/bin",
+			},
+		},
+		{
+			name: "positive no system env vars but env vars are provided in plugin",
+			execPlugin: &execPlugin{
+				envVars: []kubeletconfig.ExecEnvVar{
+					{
+						Name:  "SUPER_SECRET_STRONG_ACCESS_KEY",
+						Value: "123456789",
+					},
+				},
+			},
+			expectedEnvVars: []string{
+				"SUPER_SECRET_STRONG_ACCESS_KEY=123456789",
+			},
+		},
+		{
+			name:            "positive no system or plugin provided env vars",
+			execPlugin:      &execPlugin{},
+			expectedEnvVars: nil,
+		},
+		{
+			name:          "positive plugin provided vars takes priority",
+			systemEnvVars: []string{"HOME=/home/foo", "PATH=/usr/bin", "SUPER_SECRET_STRONG_ACCESS_KEY=1111"},
+			execPlugin: &execPlugin{
+				envVars: []kubeletconfig.ExecEnvVar{
+					{
+						Name:  "SUPER_SECRET_STRONG_ACCESS_KEY",
+						Value: "123456789",
+					},
+				},
+			},
+			expectedEnvVars: []string{
+				"HOME=/home/foo",
+				"PATH=/usr/bin",
+				"SUPER_SECRET_STRONG_ACCESS_KEY=1111",
+				"SUPER_SECRET_STRONG_ACCESS_KEY=123456789",
+			},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			testcase.execPlugin.environ = func() []string {
+				return testcase.systemEnvVars
+			}
+
+			var configVars []string
+			for _, envVar := range testcase.execPlugin.envVars {
+				configVars = append(configVars, fmt.Sprintf("%s=%s", envVar.Name, envVar.Value))
+			}
+			merged := mergeEnvVars(testcase.systemEnvVars, configVars)
+
+			err := validate(testcase.expectedEnvVars, merged)
+			if err != nil {
+				t.Logf("unexpecged error %v", err)
+			}
+		})
+	}
+}
+
+func validate(expected, actual []string) error {
+	if len(actual) != len(expected) {
+		return errors.New(fmt.Sprintf("actual env var length [%d] and expected env var length [%d] don't match",
+			len(actual), len(expected)))
+	}
+
+	for i := range actual {
+		if actual[i] != expected[i] {
+			return fmt.Errorf("mismatch in expected env var %s and actual env var %s", actual[i], expected[i])
+		}
+	}
+
+	return nil
 }

@@ -20,12 +20,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/cmd/events"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 // NewCmdAlpha creates a command that acts as an alternate root command for features in alpha
-func NewCmdAlpha(streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAlpha(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: i18n.T("Commands for features in alpha"),
@@ -34,6 +36,7 @@ func NewCmdAlpha(streams genericclioptions.IOStreams) *cobra.Command {
 
 	// Alpha commands should be added here. As features graduate from alpha they should move
 	// from here to the CommandGroups defined by NewKubeletCommand() in cmd.go.
+	cmd.AddCommand(events.NewCmdEvents(f, streams))
 
 	// NewKubeletCommand() will hide the alpha command if it has no subcommands. Overriding
 	// the help function ensures a reasonable message if someone types the hidden command anyway.

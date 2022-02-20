@@ -20,9 +20,9 @@ import (
 	"crypto/x509"
 	"testing"
 
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-
 	certutil "k8s.io/client-go/util/cert"
+
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 func TestFileRenewer(t *testing.T) {

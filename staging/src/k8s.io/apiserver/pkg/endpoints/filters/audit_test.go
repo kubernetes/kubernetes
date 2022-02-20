@@ -17,9 +17,7 @@ limitations under the License.
 package filters
 
 import (
-	"bufio"
 	"context"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -33,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 type fakeAuditSink struct {
@@ -74,43 +74,46 @@ func (s *fakeAuditSink) Pop(timeout time.Duration) (*auditinternal.Event, error)
 	return result, err
 }
 
-type simpleResponseWriter struct{}
-
-var _ http.ResponseWriter = &simpleResponseWriter{}
-
-func (*simpleResponseWriter) WriteHeader(code int)         {}
-func (*simpleResponseWriter) Write(bs []byte) (int, error) { return len(bs), nil }
-func (*simpleResponseWriter) Header() http.Header          { return http.Header{} }
-
-type fancyResponseWriter struct {
-	simpleResponseWriter
-}
-
-func (*fancyResponseWriter) CloseNotify() <-chan bool { return nil }
-
-func (*fancyResponseWriter) Flush() {}
-
-func (*fancyResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) { return nil, nil, nil }
-
 func TestConstructResponseWriter(t *testing.T) {
-	actual := decorateResponseWriter(context.Background(), &simpleResponseWriter{}, nil, nil, nil)
+	inner := &responsewriter.FakeResponseWriter{}
+	actual := decorateResponseWriter(context.Background(), inner, nil, nil, nil)
 	switch v := actual.(type) {
 	case *auditResponseWriter:
 	default:
 		t.Errorf("Expected auditResponseWriter, got %v", reflect.TypeOf(v))
 	}
+	if innerGot := actual.(responsewriter.UserProvidedDecorator).Unwrap(); inner != innerGot {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	}
 
-	actual = decorateResponseWriter(context.Background(), &fancyResponseWriter{}, nil, nil, nil)
-	switch v := actual.(type) {
-	case *fancyResponseWriterDelegator:
-	default:
-		t.Errorf("Expected fancyResponseWriterDelegator, got %v", reflect.TypeOf(v))
+	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
+	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
+	if _, ok := actual.(http.CloseNotifier); !ok {
+		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
+	}
+	if _, ok := actual.(http.Flusher); !ok {
+		t.Errorf("Expected the wrapper to implement http.Flusher")
+	}
+	if _, ok := actual.(http.Hijacker); ok {
+		t.Errorf("Expected http.ResponseWriter not to implement http.Hijacker")
+	}
+
+	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}, nil, nil, nil)
+	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
+	if _, ok := actual.(http.CloseNotifier); !ok {
+		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
+	}
+	if _, ok := actual.(http.Flusher); !ok {
+		t.Errorf("Expected the wrapper to implement http.Flusher")
+	}
+	if _, ok := actual.(http.Hijacker); !ok {
+		t.Errorf("Expected http.ResponseWriter to implement http.Hijacker")
 	}
 }
 
 func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &simpleResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.WriteHeader(42)
@@ -124,7 +127,7 @@ func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 
 func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &simpleResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.Write([]byte("foo"))
@@ -139,7 +142,7 @@ func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 func TestDecorateResponseWriterChannel(t *testing.T) {
 	sink := &fakeAuditSink{}
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &simpleResponseWriter{}, ev, sink, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, sink, nil)
 
 	done := make(chan struct{})
 	go func() {
@@ -668,8 +671,8 @@ func TestAudit(t *testing.T) {
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			sink := &fakeAuditSink{}
-			policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, test.omitStages)
-			handler := WithAudit(http.HandlerFunc(test.handler), sink, policyChecker, func(r *http.Request, ri *request.RequestInfo) bool {
+			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, test.omitStages)
+			handler := WithAudit(http.HandlerFunc(test.handler), sink, fakeRuleEvaluator, func(r *http.Request, ri *request.RequestInfo) bool {
 				// simplified long-running check
 				return ri.Verb == "watch"
 			})
@@ -738,8 +741,8 @@ func TestAudit(t *testing.T) {
 }
 
 func TestAuditNoPanicOnNilUser(t *testing.T) {
-	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
-	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, policyChecker, nil)
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, fakeRuleEvaluator, nil)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req = withTestContext(req, nil, nil)
 	req.RemoteAddr = "127.0.0.1"
@@ -752,8 +755,8 @@ func TestAuditLevelNone(t *testing.T) {
 	handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(200)
 	})
-	policyChecker := policy.FakeChecker(auditinternal.LevelNone, nil)
-	handler = WithAudit(handler, sink, policyChecker, nil)
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelNone, nil)
+	handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
@@ -807,9 +810,8 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(200)
 			})
-			policyChecker := policy.FakeChecker(test.level, nil)
-
-			handler = WithAudit(handler, sink, policyChecker, nil)
+			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(test.level, nil)
+			handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 			handler = WithAuditID(handler)
 
 			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
@@ -840,13 +842,15 @@ func TestAuditIDHttpHeader(t *testing.T) {
 	}
 }
 
-func withTestContext(req *http.Request, user user.Info, audit *auditinternal.Event) *http.Request {
+func withTestContext(req *http.Request, user user.Info, ae *auditinternal.Event) *http.Request {
 	ctx := req.Context()
 	if user != nil {
 		ctx = request.WithUser(ctx, user)
 	}
-	if audit != nil {
-		ctx = request.WithAuditEvent(ctx, audit)
+	if ae != nil {
+		ctx = audit.WithAuditContext(ctx, &audit.AuditContext{
+			Event: ae,
+		})
 	}
 	if info, err := newTestRequestInfoResolver().NewRequestInfo(req); err == nil {
 		ctx = request.WithRequestInfo(ctx, info)

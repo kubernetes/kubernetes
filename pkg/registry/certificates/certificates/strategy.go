@@ -20,12 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -120,7 +118,7 @@ func (csrStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new CSR. Validation must check for a correct signature.
 func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csr := obj.(*certificates.CertificateSigningRequest)
-	return validation.ValidateCertificateSigningRequestCreate(csr, requestGroupVersion(ctx))
+	return validation.ValidateCertificateSigningRequestCreate(csr)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -133,7 +131,7 @@ func (csrStrategy) Canonicalize(obj runtime.Object) {}
 func (csrStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 	newCSR := obj.(*certificates.CertificateSigningRequest)
-	return validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR, requestGroupVersion(ctx))
+	return validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -181,20 +179,11 @@ func (csrStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	// Updating /status should not modify spec
 	newCSR.Spec = oldCSR.Spec
 
-	switch requestGroupVersion(ctx) {
-	case certificatesv1beta1.SchemeGroupVersion:
-		// Specifically preserve existing Approved/Denied conditions.
-		// If we cannot (if the status update attempted to add/remove Approved/Denied conditions), revert to old conditions for backwards compatibility.
-		if !preserveConditionInstances(newCSR, oldCSR, certificates.CertificateApproved) || !preserveConditionInstances(newCSR, oldCSR, certificates.CertificateDenied) {
-			newCSR.Status.Conditions = oldCSR.Status.Conditions
-		}
-	default:
-		// Specifically preserve existing Approved/Denied conditions.
-		// Adding/removing Approved/Denied conditions will cause these to fail,
-		// and the change in Approved/Denied conditions will produce a validation error
-		preserveConditionInstances(newCSR, oldCSR, certificates.CertificateApproved)
-		preserveConditionInstances(newCSR, oldCSR, certificates.CertificateDenied)
-	}
+	// Specifically preserve existing Approved/Denied conditions.
+	// Adding/removing Approved/Denied conditions will cause these to fail,
+	// and the change in Approved/Denied conditions will produce a validation error
+	preserveConditionInstances(newCSR, oldCSR, certificates.CertificateApproved)
+	preserveConditionInstances(newCSR, oldCSR, certificates.CertificateDenied)
 
 	populateConditionTimestamps(newCSR, oldCSR)
 }
@@ -255,7 +244,7 @@ func populateConditionTimestamps(newCSR, oldCSR *certificates.CertificateSigning
 }
 
 func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCertificateSigningRequestStatusUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest), requestGroupVersion(ctx))
+	return validation.ValidateCertificateSigningRequestStatusUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -307,7 +296,7 @@ func (csrApprovalStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 }
 
 func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCertificateSigningRequestApprovalUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest), requestGroupVersion(ctx))
+	return validation.ValidateCertificateSigningRequestApprovalUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -331,12 +320,4 @@ func SelectableFields(obj *certificates.CertificateSigningRequest) fields.Set {
 		"spec.signerName": obj.Spec.SignerName,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, csrSpecificFieldsSet)
-}
-
-// requestGroupVersion returns the group/version associated with the given context, or a zero-value group/version
-func requestGroupVersion(ctx context.Context) schema.GroupVersion {
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		return schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-	}
-	return schema.GroupVersion{}
 }

@@ -25,12 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -74,7 +72,12 @@ const (
 	// AnnStorageProvisioner annotation is added to a PVC that is supposed to be dynamically
 	// provisioned. Its value is name of volume plugin that is supposed to provision
 	// a volume for this PVC.
-	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+	// TODO: remove beta anno once deprecation period ends
+	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
+	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+
+	//PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
+	PVDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"
 )
 
 // IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
@@ -194,7 +197,6 @@ func FindMatchingVolume(
 	if claim.Spec.Selector != nil {
 		internalSelector, err := metav1.LabelSelectorAsSelector(claim.Spec.Selector)
 		if err != nil {
-			// should be unreachable code due to validation
 			return nil, fmt.Errorf("error creating internal label selector for claim: %v: %v", claimToClaimKey(claim), err)
 		}
 		selector = internalSelector
@@ -225,10 +227,8 @@ func FindMatchingVolume(
 		}
 
 		// check if PV's DeletionTimeStamp is set, if so, skip this volume.
-		if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-			if volume.ObjectMeta.DeletionTimestamp != nil {
-				continue
-			}
+		if volume.ObjectMeta.DeletionTimestamp != nil {
+			continue
 		}
 
 		nodeAffinityValid := true

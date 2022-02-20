@@ -17,15 +17,15 @@ limitations under the License.
 package https
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
-
-	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 )
 
 // RetrieveValidatedConfigInfo connects to the API Server and makes sure it can talk
@@ -39,7 +39,7 @@ func RetrieveValidatedConfigInfo(httpsURL, clustername string, discoveryTimeout 
 	}
 	defer response.Body.Close()
 
-	kubeconfig, err := ioutil.ReadAll(response.Body)
+	kubeconfig, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -208,7 +208,7 @@ func (ce *CheckedEntry) Write(fields ...Field) {
 			// If the entry is dirty, log an internal error; because the
 			// CheckedEntry is being used after it was returned to the pool,
 			// the message may be an amalgamation from multiple call sites.
-			fmt.Fprintf(ce.ErrorOutput, "%v Unsafe CheckedEntry re-use near Entry %+v.\n", time.Now(), ce.Entry)
+			fmt.Fprintf(ce.ErrorOutput, "%v Unsafe CheckedEntry re-use near Entry %+v.\n", ce.Time, ce.Entry)
 			ce.ErrorOutput.Sync()
 		}
 		return
@@ -219,11 +219,9 @@ func (ce *CheckedEntry) Write(fields ...Field) {
 	for i := range ce.cores {
 		err = multierr.Append(err, ce.cores[i].Write(ce.Entry, fields))
 	}
-	if ce.ErrorOutput != nil {
-		if err != nil {
-			fmt.Fprintf(ce.ErrorOutput, "%v write error: %v\n", time.Now(), err)
-			ce.ErrorOutput.Sync()
-		}
+	if err != nil && ce.ErrorOutput != nil {
+		fmt.Fprintf(ce.ErrorOutput, "%v write error: %v\n", ce.Time, err)
+		ce.ErrorOutput.Sync()
 	}
 
 	should, msg := ce.should, ce.Message

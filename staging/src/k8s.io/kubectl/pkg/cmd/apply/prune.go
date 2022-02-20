@@ -20,16 +20,15 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/prune"
 )
 
 type pruner struct {
@@ -71,7 +70,7 @@ func newPruner(o *ApplyOptions) pruner {
 
 func (p *pruner) pruneAll(o *ApplyOptions) error {
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(o.Mapper, &(o.PruneResources))
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(o.Mapper, o.PruneResources)
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
@@ -157,84 +156,4 @@ func asDeleteOptions(cascadingStrategy metav1.DeletionPropagation, gracePeriod i
 	}
 	options.PropagationPolicy = &cascadingStrategy
 	return options
-}
-
-type pruneResource struct {
-	group      string
-	version    string
-	kind       string
-	namespaced bool
-}
-
-func (pr pruneResource) String() string {
-	return fmt.Sprintf("%v/%v, Kind=%v, Namespaced=%v", pr.group, pr.version, pr.kind, pr.namespaced)
-}
-
-func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
-	if len(*pruneResources) == 0 {
-		// default allowlist
-		*pruneResources = []pruneResource{
-			{"", "v1", "ConfigMap", true},
-			{"", "v1", "Endpoints", true},
-			{"", "v1", "Namespace", false},
-			{"", "v1", "PersistentVolumeClaim", true},
-			{"", "v1", "PersistentVolume", false},
-			{"", "v1", "Pod", true},
-			{"", "v1", "ReplicationController", true},
-			{"", "v1", "Secret", true},
-			{"", "v1", "Service", true},
-			{"batch", "v1", "Job", true},
-			{"batch", "v1", "CronJob", true},
-			{"networking.k8s.io", "v1", "Ingress", true},
-			{"apps", "v1", "DaemonSet", true},
-			{"apps", "v1", "Deployment", true},
-			{"apps", "v1", "ReplicaSet", true},
-			{"apps", "v1", "StatefulSet", true},
-		}
-	}
-
-	for _, resource := range *pruneResources {
-		addedMapping, err := mapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid resource %v: %v", resource, err)
-		}
-		if resource.namespaced {
-			namespaced = append(namespaced, addedMapping)
-		} else {
-			nonNamespaced = append(nonNamespaced, addedMapping)
-		}
-	}
-
-	return namespaced, nonNamespaced, nil
-}
-
-func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource, error) {
-	pruneResources := []pruneResource{}
-	for _, groupVersionKind := range gvks {
-		gvk := strings.Split(groupVersionKind, "/")
-		if len(gvk) != 3 {
-			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>", groupVersionKind)
-		}
-
-		if gvk[0] == "core" {
-			gvk[0] = ""
-		}
-		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk[0], Kind: gvk[2]}, gvk[1])
-		if err != nil {
-			return pruneResources, err
-		}
-		var namespaced bool
-		namespaceScope := mapping.Scope.Name()
-		switch namespaceScope {
-		case meta.RESTScopeNameNamespace:
-			namespaced = true
-		case meta.RESTScopeNameRoot:
-			namespaced = false
-		default:
-			return pruneResources, fmt.Errorf("Unknown namespace scope: %q", namespaceScope)
-		}
-
-		pruneResources = append(pruneResources, pruneResource{gvk[0], gvk[1], gvk[2], namespaced})
-	}
-	return pruneResources, nil
 }

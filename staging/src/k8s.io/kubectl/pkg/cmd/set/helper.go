@@ -131,6 +131,12 @@ func findEnv(env []v1.EnvVar, name string) (v1.EnvVar, bool) {
 	return v1.EnvVar{}, false
 }
 
+// updateEnv adds and deletes specified environment variables from existing environment variables.
+// An added variable replaces all existing variables with the same name.
+// Removing a variable removes all existing variables with the same name.
+// If the existing list contains duplicates that are unrelated to the variables being added and removed,
+// those duplicates are left intact in the result.
+// If a variable is both added and removed, the removal takes precedence.
 func updateEnv(existing []v1.EnvVar, env []v1.EnvVar, remove []string) []v1.EnvVar {
 	out := []v1.EnvVar{}
 	covered := sets.NewString(remove...)

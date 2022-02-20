@@ -53,12 +53,12 @@ type result struct {
 }
 
 // wrap a lifecycleSignal so the test can inject its own callback
-type wrappedTerminationSignal struct {
+type wrappedLifecycleSignal struct {
 	lifecycleSignal
 	callback func(bool, string, lifecycleSignal)
 }
 
-func (w *wrappedTerminationSignal) Signal() {
+func (w *wrappedLifecycleSignal) Signal() {
 	var name string
 	if ncw, ok := w.lifecycleSignal.(*namedChannelWrapper); ok {
 		name = ncw.name
@@ -74,18 +74,18 @@ func (w *wrappedTerminationSignal) Signal() {
 	}
 }
 
-func wrapTerminationSignals(t *testing.T, ts *lifecycleSignals, callback func(bool, string, lifecycleSignal)) {
-	newWrappedTerminationSignal := func(delegated lifecycleSignal) lifecycleSignal {
-		return &wrappedTerminationSignal{
+func wrapLifecycleSignals(t *testing.T, ts *lifecycleSignals, callback func(bool, string, lifecycleSignal)) {
+	newWrappedLifecycleSignal := func(delegated lifecycleSignal) lifecycleSignal {
+		return &wrappedLifecycleSignal{
 			lifecycleSignal: delegated,
 			callback:        callback,
 		}
 	}
 
-	ts.AfterShutdownDelayDuration = newWrappedTerminationSignal(ts.AfterShutdownDelayDuration)
-	ts.HTTPServerStoppedListening = newWrappedTerminationSignal(ts.HTTPServerStoppedListening)
-	ts.InFlightRequestsDrained = newWrappedTerminationSignal(ts.InFlightRequestsDrained)
-	ts.ShutdownInitiated = newWrappedTerminationSignal(ts.ShutdownInitiated)
+	ts.AfterShutdownDelayDuration = newWrappedLifecycleSignal(ts.AfterShutdownDelayDuration)
+	ts.HTTPServerStoppedListening = newWrappedLifecycleSignal(ts.HTTPServerStoppedListening)
+	ts.InFlightRequestsDrained = newWrappedLifecycleSignal(ts.InFlightRequestsDrained)
+	ts.ShutdownInitiated = newWrappedLifecycleSignal(ts.ShutdownInitiated)
 }
 
 type step struct {
@@ -111,7 +111,7 @@ func newStep(fn func()) *step {
 }
 
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t *testing.T) {
-	s := newGenericAPIServer(t)
+	s := newGenericAPIServer(t, false)
 
 	// record the termination events in the order they are signaled
 	var signalOrderLock sync.Mutex
@@ -143,9 +143,9 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 		delayedStopVerificationStepExecuted = true
 		t.Log("Before ShutdownDelayDuration elapses new request(s) should be served")
 		resultGot := doer.Do(connReusingClient, shouldReuseConnection(t), "/echo?message=request-on-an-existing-connection-should-succeed", time.Second)
-		requestMustSucceed(t, resultGot)
+		assertResponse(t, resultGot, http.StatusOK)
 		resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-succeed", time.Second)
-		requestMustSucceed(t, resultGot)
+		assertResponse(t, resultGot, http.StatusOK)
 	})
 	steps := func(before bool, name string, e lifecycleSignal) {
 		// Before AfterShutdownDelayDuration event is signaled, the test
@@ -157,7 +157,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 
 	// wrap the termination signals of the GenericAPIServer so the test can inject its own callback
-	wrapTerminationSignals(t, &s.lifecycleSignals, func(before bool, name string, e lifecycleSignal) {
+	wrapLifecycleSignals(t, &s.lifecycleSignals, func(before bool, name string, e lifecycleSignal) {
 		recordOrderFn(before, name, e)
 		steps(before, name, e)
 	})
@@ -208,7 +208,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	case <-time.After(5 * time.Second):
 		t.Fatal("Expected the server to send a response")
 	}
-	requestMustSucceed(t, inFlightResultGot)
+	assertResponse(t, inFlightResultGot, http.StatusOK)
 
 	t.Log("Waiting for the apiserver Run method to return")
 	select {
@@ -217,7 +217,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 		t.Fatal("Expected the apiserver Run method to return")
 	}
 
-	terminationSignalOrderExpected := []string{
+	lifecycleSignalOrderExpected := []string{
 		string("ShutdownInitiated"),
 		string("AfterShutdownDelayDuration"),
 		string("HTTPServerStoppedListening"),
@@ -226,12 +226,200 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	func() {
 		signalOrderLock.Lock()
 		defer signalOrderLock.Unlock()
-		if !reflect.DeepEqual(terminationSignalOrderExpected, signalOrderGot) {
-			t.Errorf("Expected order of termination event signal to match, diff: %s", cmp.Diff(terminationSignalOrderExpected, signalOrderGot))
+		if !reflect.DeepEqual(lifecycleSignalOrderExpected, signalOrderGot) {
+			t.Errorf("Expected order of termination event signal to match, diff: %s", cmp.Diff(lifecycleSignalOrderExpected, signalOrderGot))
 		}
 	}()
 }
 
+func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t *testing.T) {
+	s := newGenericAPIServer(t, true)
+
+	// record the termination events in the order they are signaled
+	var signalOrderLock sync.Mutex
+	signalOrderGot := make([]string, 0)
+	recordOrderFn := func(before bool, name string, e lifecycleSignal) {
+		if !before {
+			return
+		}
+		signalOrderLock.Lock()
+		defer signalOrderLock.Unlock()
+		signalOrderGot = append(signalOrderGot, name)
+	}
+
+	// handler for a request that we want to keep in flight through to the end
+	inFlightRequestBlockedCh, inFlightStartedCh := make(chan result), make(chan struct{})
+	inFlightRequest := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		close(inFlightStartedCh)
+		// this request handler blocks until we deliberately unblock it.
+		<-inFlightRequestBlockedCh
+		w.WriteHeader(http.StatusOK)
+	})
+	s.Handler.NonGoRestfulMux.Handle("/in-flight-request-as-designed", inFlightRequest)
+
+	connReusingClient := newClient(false)
+	doer := setupDoer(t, s.SecureServingInfo)
+
+	var delayedStopVerificationStepExecuted bool
+	delayedStopVerificationStep := newStep(func() {
+		delayedStopVerificationStepExecuted = true
+		t.Log("Before ShutdownDelayDuration elapses new request(s) should be served")
+		resultGot := doer.Do(connReusingClient, shouldReuseConnection(t), "/echo?message=request-on-an-existing-connection-should-succeed", time.Second)
+		assertResponse(t, resultGot, http.StatusOK)
+		resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-succeed", time.Second)
+		assertResponse(t, resultGot, http.StatusOK)
+	})
+	steps := func(before bool, name string, e lifecycleSignal) {
+		// Before AfterShutdownDelayDuration event is signaled, the test
+		// will send request(s) to assert on expected behavior.
+		if name == "AfterShutdownDelayDuration" && before {
+			// it unblocks the verification step and waits for it to complete
+			<-delayedStopVerificationStep.done()
+		}
+	}
+
+	// wrap the termination signals of the GenericAPIServer so the test can inject its own callback
+	wrapLifecycleSignals(t, &s.lifecycleSignals, func(before bool, name string, e lifecycleSignal) {
+		recordOrderFn(before, name, e)
+		steps(before, name, e)
+	})
+
+	// start the API server
+	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(runCompletedCh)
+		s.PrepareRun().Run(stopCh)
+	}()
+	waitForAPIServerStarted(t, doer)
+
+	// step 1: fire a request that we want to keep in-flight through to the end
+	inFlightResultCh := make(chan result)
+	go func() {
+		resultGot := doer.Do(connReusingClient, func(httptrace.GotConnInfo) {}, "/in-flight-request-as-designed", 0)
+		inFlightResultCh <- resultGot
+	}()
+	select {
+	case <-inFlightStartedCh:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("Waited for 5s for the in-flight request to reach the server")
+	}
+
+	//step 1: /readyz should return OK
+	resultGot := doer.Do(connReusingClient, func(httptrace.GotConnInfo) {}, "/readyz", time.Second)
+	assertResponse(t, resultGot, http.StatusOK)
+
+	// step 2: signal termination event: initiate a shutdown
+	close(stopCh)
+
+	// step 3: /readyz must return an error, but we need to give it some time
+	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+		resultGot := doer.Do(connReusingClient, func(httptrace.GotConnInfo) {}, "/readyz", time.Second)
+		// wait until we have a non 200 response
+		if resultGot.response != nil && resultGot.response.StatusCode == http.StatusOK {
+			return false, nil
+		}
+
+		assertResponse(t, resultGot, http.StatusInternalServerError)
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("Expected /readyz to return 500 status code, but got: %v", err)
+	}
+
+	// step 4: before ShutdownDelayDuration elapses new request(s) should be served successfully.
+	delayedStopVerificationStep.execute()
+	if !delayedStopVerificationStepExecuted {
+		t.Fatal("Expected the AfterShutdownDelayDuration verification step to execute")
+	}
+
+	// step 5: ShutdownDelayDuration has elapsed, all incoming requests should receive 429
+	t.Log("Verify that new incoming request(s) get 429")
+	resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-fail-with-429", time.Second)
+	requestMustFailWithRetryHeader(t, resultGot, http.StatusTooManyRequests)
+	resultGot = doer.Do(connReusingClient, shouldReuseConnection(t), "/echo?message=request-on-an-existing-connection-should-fail-with-429", time.Second)
+	requestMustFailWithRetryHeader(t, resultGot, http.StatusTooManyRequests)
+
+	// step 6: we still have a request in flight, let it unblock and we expect the request to succeed.
+	close(inFlightRequestBlockedCh)
+	var inFlightResultGot result
+	select {
+	case inFlightResultGot = <-inFlightResultCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Expected the server to send a response")
+	}
+	assertResponse(t, inFlightResultGot, http.StatusOK)
+
+	// step 7: wait for the HTTP Server listener to have stopped
+	httpServerStoppedListeningCh := s.lifecycleSignals.HTTPServerStoppedListening
+	select {
+	case <-httpServerStoppedListeningCh.Signaled():
+	case <-time.After(5 * time.Second):
+		t.Fatal("Expected the server to signal HTTPServerStoppedListening event")
+	}
+
+	t.Log("Waiting for the apiserver Run method to return")
+	select {
+	case <-runCompletedCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Expected the apiserver Run method to return")
+	}
+
+	lifecycleSignalOrderExpected := []string{
+		string("ShutdownInitiated"),
+		string("AfterShutdownDelayDuration"),
+		string("InFlightRequestsDrained"),
+		string("HTTPServerStoppedListening"),
+	}
+	func() {
+		signalOrderLock.Lock()
+		defer signalOrderLock.Unlock()
+		if !reflect.DeepEqual(lifecycleSignalOrderExpected, signalOrderGot) {
+			t.Errorf("Expected order of termination event signal to match, diff: %s", cmp.Diff(lifecycleSignalOrderExpected, signalOrderGot))
+		}
+	}()
+}
+
+func TestMuxAndDiscoveryComplete(t *testing.T) {
+	// setup
+	testSignal1 := make(chan struct{})
+	testSignal2 := make(chan struct{})
+	s := newGenericAPIServer(t, true)
+	s.muxAndDiscoveryCompleteSignals["TestSignal1"] = testSignal1
+	s.muxAndDiscoveryCompleteSignals["TestSignal2"] = testSignal2
+	doer := setupDoer(t, s.SecureServingInfo)
+	isChanClosed := func(ch <-chan struct{}, delay time.Duration) bool {
+		time.Sleep(delay)
+		select {
+		case <-ch:
+			return true
+		default:
+			return false
+		}
+	}
+
+	// start the API server
+	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(runCompletedCh)
+		s.PrepareRun().Run(stopCh)
+	}()
+	waitForAPIServerStarted(t, doer)
+
+	// act
+	if isChanClosed(s.lifecycleSignals.MuxAndDiscoveryComplete.Signaled(), 1*time.Second) {
+		t.Fatalf("%s is closed whereas the TestSignal is still open", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+	}
+
+	close(testSignal1)
+	if isChanClosed(s.lifecycleSignals.MuxAndDiscoveryComplete.Signaled(), 1*time.Second) {
+		t.Fatalf("%s is closed whereas the TestSignal2 is still open", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+	}
+
+	close(testSignal2)
+	if !isChanClosed(s.lifecycleSignals.MuxAndDiscoveryComplete.Signaled(), 1*time.Second) {
+		t.Fatalf("%s wasn't closed", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+	}
+}
 func shouldReuseConnection(t *testing.T) func(httptrace.GotConnInfo) {
 	return func(ci httptrace.GotConnInfo) {
 		if !ci.Reused {
@@ -248,13 +436,27 @@ func shouldUseNewConnection(t *testing.T) func(httptrace.GotConnInfo) {
 	}
 }
 
-func requestMustSucceed(t *testing.T, resultGot result) {
+func assertResponse(t *testing.T, resultGot result, statusCodeExpected int) {
 	if resultGot.err != nil {
 		t.Errorf("Expected no error, but got: %v", resultGot.err)
 		return
 	}
-	if resultGot.response.StatusCode != http.StatusOK {
-		t.Errorf("Expected Status Code: %d, but got: %d", http.StatusOK, resultGot.response.StatusCode)
+	if resultGot.response.StatusCode != statusCodeExpected {
+		t.Errorf("Expected Status Code: %d, but got: %d", statusCodeExpected, resultGot.response.StatusCode)
+	}
+}
+
+func requestMustFailWithRetryHeader(t *testing.T, resultGot result, statusCodedExpected int) {
+	if resultGot.err != nil {
+		t.Errorf("Expected no error, but got: %v", resultGot.err)
+		return
+	}
+	if statusCodedExpected != resultGot.response.StatusCode {
+		t.Errorf("Expected Status Code: %d, but got: %d", statusCodedExpected, resultGot.response.StatusCode)
+	}
+	retryAfterGot := resultGot.response.Header.Get("Retry-After")
+	if retryAfterGot != "5" {
+		t.Errorf("Expected Retry-After Response Header, but got: %v", resultGot.response)
 	}
 }
 
@@ -351,11 +553,15 @@ func newClient(useNewConnection bool) *http.Client {
 	}
 }
 
-func newGenericAPIServer(t *testing.T) *GenericAPIServer {
+func newGenericAPIServer(t *testing.T, keepListening bool) *GenericAPIServer {
 	config, _ := setUp(t)
 	config.ShutdownDelayDuration = 100 * time.Millisecond
+	config.ShutdownSendRetryAfter = keepListening
 	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
 		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		if c.ShutdownSendRetryAfter {
+			handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.AfterShutdownDelayDuration.Signaled())
+		}
 		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 		return handler
 	}

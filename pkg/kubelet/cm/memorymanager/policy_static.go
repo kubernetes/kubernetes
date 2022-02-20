@@ -438,28 +438,10 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 		maskBits := mask.GetBits()
 		singleNUMAHint := len(maskBits) == 1
 
-		// the node already in group with another node, it can not be used for the single NUMA node allocation
-		if singleNUMAHint && len(machineState[maskBits[0]].Cells) > 1 {
-			return
-		}
-
 		totalFreeSize := map[v1.ResourceName]uint64{}
 		totalAllocatableSize := map[v1.ResourceName]uint64{}
-		// calculate total free memory for the node mask
+		// calculate total free and allocatable memory for the node mask
 		for _, nodeID := range maskBits {
-			// the node already used for the memory allocation
-			if !singleNUMAHint && machineState[nodeID].NumberOfAssignments > 0 {
-				// the node used for the single NUMA memory allocation, it can not be used for the multi NUMA node allocation
-				if len(machineState[nodeID].Cells) == 1 {
-					return
-				}
-
-				// the node already used with different group of nodes, it can not be use with in the current hint
-				if !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
-					return
-				}
-			}
-
 			for resourceName := range requestedResources {
 				if _, ok := totalFreeSize[resourceName]; !ok {
 					totalFreeSize[resourceName] = 0
@@ -483,6 +465,26 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 		// set the minimum amount of NUMA nodes that can satisfy the container resources requests
 		if mask.Count() < minAffinitySize {
 			minAffinitySize = mask.Count()
+		}
+
+		// the node already in group with another node, it can not be used for the single NUMA node allocation
+		if singleNUMAHint && len(machineState[maskBits[0]].Cells) > 1 {
+			return
+		}
+
+		for _, nodeID := range maskBits {
+			// the node already used for the memory allocation
+			if !singleNUMAHint && machineState[nodeID].NumberOfAssignments > 0 {
+				// the node used for the single NUMA memory allocation, it can not be used for the multi NUMA node allocation
+				if len(machineState[nodeID].Cells) == 1 {
+					return
+				}
+
+				// the node already used with different group of nodes, it can not be use with in the current hint
+				if !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
+					return
+				}
+			}
 		}
 
 		// verify that for all memory types the node mask has enough free resources
@@ -837,7 +839,7 @@ func (p *staticPolicy) updatePodReusableMemory(pod *v1.Pod, container *v1.Contai
 	// If pod entries to m.initContainersReusableMemory other than the current pod exist, delete them.
 	for uid := range p.initContainersReusableMemory {
 		if podUID != uid {
-			delete(p.initContainersReusableMemory, podUID)
+			delete(p.initContainersReusableMemory, uid)
 		}
 	}
 
@@ -936,13 +938,13 @@ func isInitContainer(pod *v1.Pod, container *v1.Container) bool {
 func isNUMAAffinitiesEqual(numaAffinity1, numaAffinity2 []int) bool {
 	bitMask1, err := bitmask.NewBitMask(numaAffinity1...)
 	if err != nil {
-		klog.ErrorS(err, "failed to create bit mask", numaAffinity1)
+		klog.ErrorS(err, "failed to create bit mask", "numaAffinity1", numaAffinity1)
 		return false
 	}
 
 	bitMask2, err := bitmask.NewBitMask(numaAffinity2...)
 	if err != nil {
-		klog.ErrorS(err, "failed to create bit mask", numaAffinity2)
+		klog.ErrorS(err, "failed to create bit mask", "numaAffinity2", numaAffinity2)
 		return false
 	}
 

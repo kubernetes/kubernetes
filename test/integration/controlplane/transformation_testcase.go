@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -53,7 +52,7 @@ const (
 	metricsPrefix            = "apiserver_storage_"
 )
 
-type unSealSecret func(cipherText []byte, ctx value.Context, config apiserverconfigv1.ProviderConfiguration) ([]byte, error)
+type unSealSecret func(ctx context.Context, cipherText []byte, dataCtx value.Context, config apiserverconfigv1.ProviderConfiguration) ([]byte, error)
 
 type transformTest struct {
 	logger            kubeapiservertesting.Logger
@@ -116,14 +115,15 @@ func (e *transformTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefi
 	}
 
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
-	ctx := value.DefaultContext([]byte(e.getETCDPath()))
+	ctx := context.Background()
+	dataCtx := value.DefaultContext([]byte(e.getETCDPath()))
 	// Envelope header precedes the cipherTextPayload
 	sealedData := response.Kvs[0].Value[len(expectedEnvelopePrefix):]
 	transformerConfig, err := e.getEncryptionConfig()
 	if err != nil {
 		e.logger.Errorf("failed to parse transformer config: %v", err)
 	}
-	v, err := unSealSecretFunc(sealedData, ctx, *transformerConfig)
+	v, err := unSealSecretFunc(ctx, sealedData, dataCtx, *transformerConfig)
 	if err != nil {
 		e.logger.Errorf("failed to unseal secret: %v", err)
 		return
@@ -173,14 +173,14 @@ func (e *transformTest) getEncryptionOptions() []string {
 }
 
 func (e *transformTest) createEncryptionConfig() (string, error) {
-	tempDir, err := ioutil.TempDir("", "secrets-encryption-test")
+	tempDir, err := os.MkdirTemp("", "secrets-encryption-test")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}
 
 	encryptionConfig := path.Join(tempDir, encryptionConfigFileName)
 
-	if err := ioutil.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0644); err != nil {
+	if err := os.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0644); err != nil {
 		os.RemoveAll(tempDir)
 		return "", fmt.Errorf("error while writing encryption config: %v", err)
 	}

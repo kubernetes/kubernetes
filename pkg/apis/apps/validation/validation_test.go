@@ -814,7 +814,8 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 					Template:            validPodTemplate.Template,
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 					},
 				},
 			},

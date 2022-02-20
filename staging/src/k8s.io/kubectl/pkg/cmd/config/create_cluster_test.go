@@ -55,6 +55,31 @@ func TestCreateCluster(t *testing.T) {
 	test.run(t)
 }
 
+func TestCreateClusterWithProxy(t *testing.T) {
+	conf := clientcmdapi.Config{}
+	test := createClusterTest{
+		description: "Testing 'kubectl config set-cluster' with a new cluster",
+		config:      conf,
+		args:        []string{"my-cluster"},
+		flags: []string{
+			"--server=http://192.168.0.1",
+			"--tls-server-name=my-cluster-name",
+			"--proxy-url=http://192.168.0.2",
+		},
+		expected: `Cluster "my-cluster" set.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Clusters: map[string]*clientcmdapi.Cluster{
+				"my-cluster": {
+					Server:        "http://192.168.0.1",
+					TLSServerName: "my-cluster-name",
+					ProxyURL:      "http://192.168.0.2",
+				},
+			},
+		},
+	}
+	test.run(t)
+}
+
 func TestModifyCluster(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
@@ -72,6 +97,61 @@ func TestModifyCluster(t *testing.T) {
 		expectedConfig: clientcmdapi.Config{
 			Clusters: map[string]*clientcmdapi.Cluster{
 				"my-cluster": {Server: "https://192.168.0.99"},
+			},
+		},
+	}
+	test.run(t)
+}
+
+// TestModifyClusterWithProxy tests setting proxy-url in kubeconfig
+func TestModifyClusterWithProxy(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"my-cluster": {Server: "https://192.168.0.1", TLSServerName: "to-be-cleared"},
+		},
+	}
+	test := createClusterTest{
+		description: "Testing 'kubectl config set-cluster' with an existing cluster",
+		config:      conf,
+		args:        []string{"my-cluster"},
+		flags: []string{
+			"--server=https://192.168.0.99",
+			"--proxy-url=https://192.168.0.100",
+		},
+		expected: `Cluster "my-cluster" set.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Clusters: map[string]*clientcmdapi.Cluster{
+				"my-cluster": {Server: "https://192.168.0.99", ProxyURL: "https://192.168.0.100"},
+			},
+		},
+	}
+	test.run(t)
+}
+
+// TestModifyClusterWithProxyOverride tests updating proxy-url
+// in kubeconfig which already exists
+func TestModifyClusterWithProxyOverride(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"my-cluster": {
+				Server:        "https://192.168.0.1",
+				TLSServerName: "to-be-cleared",
+				ProxyURL:      "https://192.168.0.2",
+			},
+		},
+	}
+	test := createClusterTest{
+		description: "Testing 'kubectl config set-cluster' with an existing cluster",
+		config:      conf,
+		args:        []string{"my-cluster"},
+		flags: []string{
+			"--server=https://192.168.0.99",
+			"--proxy-url=https://192.168.0.100",
+		},
+		expected: `Cluster "my-cluster" set.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Clusters: map[string]*clientcmdapi.Cluster{
+				"my-cluster": {Server: "https://192.168.0.99", ProxyURL: "https://192.168.0.100"},
 			},
 		},
 	}

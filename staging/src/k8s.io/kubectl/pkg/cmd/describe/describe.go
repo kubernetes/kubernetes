@@ -64,8 +64,8 @@ var (
 		# Describe pods by label name=myLabel
 		kubectl describe po -l name=myLabel
 
-		# Describe all pods managed by the 'frontend' replication controller (rc-created pods
-		# get the name of the rc as a prefix in the pod the name)
+		# Describe all pods managed by the 'frontend' replication controller 
+		# (rc-created pods get the name of the rc as a prefix in the pod name)
 		kubectl describe pods frontend`))
 )
 
@@ -115,7 +115,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 	}
 	usage := "containing the resource to describe"
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.DescriberSettings.ShowEvents, "show-events", o.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.DescriberSettings.ChunkSize)

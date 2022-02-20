@@ -38,6 +38,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -62,6 +63,9 @@ var CmdNetexec = &cobra.Command{
 
 - /: Returns the request's timestamp.
 - /clientip: Returns the request's IP address.
+- /header: Returns the request's header value corresponding to the key provided or the entire 
+  header marshalled as json, if no form value (key) is provided.
+  ("/header?key=X-Forwarded-For" or /header)
 - /dial: Creates a given number of requests to the given host and port using the given protocol,
   and returns a JSON with the fields "responses" (successful request responses) and "errors" (
   failed request responses). Returns "200 OK" status code if the last request succeeded,
@@ -105,11 +109,13 @@ will be upgraded to HTTPS. The image has default, "localhost"-based cert/privkey
 If "--http-override" is set, the HTTP(S) server will always serve the override path & options,
 ignoring the request URL.
 
-It will also start a UDP server on the indicated UDP port that responds to the following commands:
+It will also start a UDP server on the indicated UDP port and addresses that responds to the following commands:
 
 - "hostname": Returns the server's hostname
 - "echo <msg>": Returns the given <msg>
 - "clientip": Returns the request's IP address
+
+The UDP server can be disabled by setting --udp-port to -1.
 
 Additionally, if (and only if) --sctp-port is passed, it will start an SCTP server on that port,
 responding to the same commands as the UDP server.
@@ -167,14 +173,19 @@ func main(cmd *cobra.Command, args []string) {
 		addRoutes(http.DefaultServeMux, exitCh)
 	}
 
-	udpBindTo, err := parseAddresses(udpListenAddresses)
-	if err != nil {
-		log.Fatal(err)
+	// UDP server
+	if udpPort != -1 {
+		udpBindTo, err := parseAddresses(udpListenAddresses)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, address := range udpBindTo {
+			go startUDPServer(address, udpPort)
+		}
 	}
 
-	for _, address := range udpBindTo {
-		go startUDPServer(address, udpPort)
-	}
+	// SCTP server
 	if sctpPort != -1 {
 		go startSCTPServer(sctpPort)
 	}
@@ -190,6 +201,7 @@ func main(cmd *cobra.Command, args []string) {
 func addRoutes(mux *http.ServeMux, exitCh chan shutdownRequest) {
 	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/clientip", clientIPHandler)
+	mux.HandleFunc("/header", headerHandler)
 	mux.HandleFunc("/dial", dialHandler)
 	mux.HandleFunc("/echo", echoHandler)
 	mux.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
@@ -246,6 +258,21 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 func clientIPHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /clientip")
 	fmt.Fprintf(w, r.RemoteAddr)
+}
+func headerHandler(w http.ResponseWriter, r *http.Request) {
+	key := r.FormValue("key")
+	if key != "" {
+		log.Printf("GET /header?key=%s", key)
+		fmt.Fprintf(w, "%s", r.Header.Get(key))
+	} else {
+		log.Printf("GET /header")
+		data, err := json.Marshal(r.Header)
+		if err != nil {
+			fmt.Fprintf(w, "error marshalling header, err: %v", err)
+			return
+		}
+		fmt.Fprintf(w, "%s", string(data))
+	}
 }
 
 type shutdownRequest struct {
@@ -660,7 +687,7 @@ func parseAddresses(addresses string) ([]string, error) {
 	res := make([]string, 0)
 	split := strings.Split(addresses, ",")
 	for _, address := range split {
-		netAddr := net.ParseIP(address)
+		netAddr := netutils.ParseIPSloppy(address)
 		if netAddr == nil {
 			return nil, fmt.Errorf("parseAddress: invalid address %s", address)
 		}

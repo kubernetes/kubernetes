@@ -133,7 +133,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	inputs := sets.NewString(context.Inputs...)
 	packages := generator.Packages{}
-	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
+	header := append([]byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag)), boilerplate...)
 
 	boundingDirs := []string{}
 	if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
@@ -530,7 +530,10 @@ func (g *genDeepCopy) deepCopyableInterfacesInner(c *generator.Context, t *types
 	var ts []*types.Type
 	for _, intf := range intfs {
 		t := types.ParseFullyQualifiedName(intf)
-		c.AddDir(t.Package)
+		err := c.AddDir(t.Package)
+		if err != nil {
+			return nil, err
+		}
 		intfT := c.Universe.Type(t)
 		if intfT == nil {
 			return nil, fmt.Errorf("unknown type %q in %s tag of type %s", intf, interfacesTagName, intfT)
@@ -864,6 +867,8 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("in, out := &in.$.name$, &out.$.name$\n", args)
 			g.generateFor(ft, sw)
 			sw.Do("}\n", nil)
+		case uft.Kind == types.Array:
+			sw.Do("out.$.name$ = in.$.name$\n", args)
 		case uft.Kind == types.Struct:
 			if ft.IsAssignable() {
 				sw.Do("out.$.name$ = in.$.name$\n", args)

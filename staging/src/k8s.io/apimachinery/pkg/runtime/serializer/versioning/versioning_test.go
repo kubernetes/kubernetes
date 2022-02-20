@@ -82,6 +82,23 @@ func TestNestedDecode(t *testing.T) {
 	}
 }
 
+func TestNestedDecodeStrictDecodingError(t *testing.T) {
+	strictErr := runtime.NewStrictDecodingError([]error{fmt.Errorf("duplicate field")})
+	n := &testNestedDecodable{nestedErr: strictErr}
+	decoder := &mockSerializer{obj: n}
+	codec := NewCodec(nil, decoder, nil, nil, nil, nil, nil, nil, "TestNestedDecode")
+	o, _, err := codec.Decode([]byte(`{}`), nil, n)
+	if strictErr, ok := runtime.AsStrictDecodingError(err); !ok || err != strictErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if o != n {
+		t.Errorf("did not successfully decode with strict decoding error: %v", o)
+	}
+	if !n.nestedCalled {
+		t.Errorf("did not invoke nested decoder")
+	}
+}
+
 func TestNestedEncode(t *testing.T) {
 	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
 	n2 := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode 2")}

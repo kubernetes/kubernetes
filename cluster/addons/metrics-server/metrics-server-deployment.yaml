@@ -23,23 +23,23 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: metrics-server-v0.4.4
+  name: metrics-server-v0.5.2
   namespace: kube-system
   labels:
     k8s-app: metrics-server
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v0.4.4
+    version: v0.5.2
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
-      version: v0.4.4
+      version: v0.5.2
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
-        version: v0.4.4
+        version: v0.5.2
     spec:
       securityContext:
         seccompProfile:
@@ -50,21 +50,33 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server/metrics-server:v0.4.4
+        image: k8s.gcr.io/metrics-server/metrics-server:v0.5.2
         command:
         - /metrics-server
         - --metric-resolution=30s
-        # These are needed for GKE, which doesn't support secure communication yet.
-        # Remove these lines for non-GKE clusters, and when GKE supports token-based auth.
-        - --kubelet-port=10255
-        - --deprecated-kubelet-completely-insecure=true
+        - --kubelet-use-node-status-port
+        - --kubelet-insecure-tls
         - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
         - --cert-dir=/tmp
-        - --secure-port=443
+        - --secure-port=10250
         ports:
-        - containerPort: 443
+        - containerPort: 10250
           name: https
           protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          failureThreshold: 3
         volumeMounts:
         - mountPath: /tmp
           name: tmp-dir
@@ -97,7 +109,7 @@ spec:
           - --memory={{ base_metrics_server_memory }}
           - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
-          - --deployment=metrics-server-v0.4.4
+          - --deployment=metrics-server-v0.5.2
           - --container=metrics-server
           - --poll-period=30000
           - --estimator=exponential

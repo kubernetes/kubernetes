@@ -64,12 +64,15 @@ runTests() {
   kube::log::status "Starting etcd instance"
   CLEANUP_REQUIRED=1
   kube::etcd::start
+  # shellcheck disable=SC2034
+  local ETCD_SCRAPE_PID # Set in kube::etcd::start_scraping, used in cleanup
+  kube::etcd::start_scraping
   kube::log::status "Running integration test cases"
 
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="--alsologtostderr=true ${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE}" \
+      KUBE_TEST_ARGS="--alsologtostderr=true ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE=""
 

@@ -966,7 +966,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
 		},
 		{
-			name: "no machine macthes preferred scheduling requirements in NodeAffinity of pod so all machines' priority is zero",
+			name: "no machine matches preferred scheduling requirements in NodeAffinity of pod so all machines' priority is zero",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Affinity: affinity1,

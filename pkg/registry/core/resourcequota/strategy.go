@@ -22,11 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -73,8 +71,7 @@ func (resourcequotaStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new resourcequota.
 func (resourcequotaStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
-	opts := getValidationOptionsFromResourceQuota(resourcequota, nil)
-	return validation.ValidateResourceQuota(resourcequota, opts)
+	return validation.ValidateResourceQuota(resourcequota)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -94,8 +91,7 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (resourcequotaStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj, oldObj := obj.(*api.ResourceQuota), old.(*api.ResourceQuota)
-	opts := getValidationOptionsFromResourceQuota(newObj, oldObj)
-	return validation.ValidateResourceQuotaUpdate(newObj, oldObj, opts)
+	return validation.ValidateResourceQuotaUpdate(newObj, oldObj)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -139,38 +135,4 @@ func (resourcequotaStatusStrategy) ValidateUpdate(ctx context.Context, obj, old 
 // WarningsOnUpdate returns warnings for the given update.
 func (resourcequotaStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-func getValidationOptionsFromResourceQuota(newObj *api.ResourceQuota, oldObj *api.ResourceQuota) validation.ResourceQuotaValidationOptions {
-	opts := validation.ResourceQuotaValidationOptions{
-		AllowPodAffinityNamespaceSelector: utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
-	}
-
-	if oldObj == nil {
-		return opts
-	}
-
-	opts.AllowPodAffinityNamespaceSelector = opts.AllowPodAffinityNamespaceSelector || hasCrossNamespacePodAffinityScope(&oldObj.Spec)
-	return opts
-}
-
-func hasCrossNamespacePodAffinityScope(spec *api.ResourceQuotaSpec) bool {
-	if spec == nil {
-		return false
-	}
-	for _, scope := range spec.Scopes {
-		if scope == api.ResourceQuotaScopeCrossNamespacePodAffinity {
-			return true
-		}
-	}
-
-	if spec.ScopeSelector == nil {
-		return false
-	}
-	for _, req := range spec.ScopeSelector.MatchExpressions {
-		if req.ScopeName == api.ResourceQuotaScopeCrossNamespacePodAffinity {
-			return true
-		}
-	}
-	return false
 }

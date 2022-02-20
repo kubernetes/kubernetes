@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,7 +20,6 @@ limitations under the License.
 package users
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -571,11 +571,11 @@ func TestRemoveUsersAndGroups(t *testing.T) {
 }
 
 func writeTempFile(t *testing.T, contents string) (string, func()) {
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatalf("could not create file: %v", err)
 	}
-	if err := ioutil.WriteFile(file.Name(), []byte(contents), os.ModePerm); err != nil {
+	if err := os.WriteFile(file.Name(), []byte(contents), os.ModePerm); err != nil {
 		t.Fatalf("could not write file: %v", err)
 	}
 	close := func() {
@@ -585,7 +585,7 @@ func writeTempFile(t *testing.T, contents string) (string, func()) {
 }
 
 func readTempFile(t *testing.T, path string) string {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("could not read file: %v", err)
 	}

@@ -23,10 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestAllowEphemeralVolumeType(t *testing.T) {
@@ -83,35 +80,25 @@ func TestAllowEphemeralVolumeType(t *testing.T) {
 		},
 	}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPSPInfo := range pspInfo {
-			for _, newPSPInfo := range pspInfo {
-				oldPSP := oldPSPInfo.psp()
-				newPSP := newPSPInfo.psp()
-				if newPSP == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", enabled, oldPSPInfo.description, newPSPInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, enabled)()
-
-					var errs field.ErrorList
-					var expectErrors bool
-					if oldPSP == nil {
-						errs = Strategy.Validate(context.Background(), newPSP)
-						expectErrors = newPSPInfo.hasGenericVolume && !enabled
-					} else {
-						errs = Strategy.ValidateUpdate(context.Background(), newPSP, oldPSP)
-						expectErrors = !oldPSPInfo.hasGenericVolume && newPSPInfo.hasGenericVolume && !enabled
-					}
-					if expectErrors && len(errs) == 0 {
-						t.Error("expected errors, got none")
-					}
-					if !expectErrors && len(errs) > 0 {
-						t.Errorf("expected no errors, got: %v", errs)
-					}
-				})
+	for _, oldPSPInfo := range pspInfo {
+		for _, newPSPInfo := range pspInfo {
+			oldPSP := oldPSPInfo.psp()
+			newPSP := newPSPInfo.psp()
+			if newPSP == nil {
+				continue
 			}
+
+			t.Run(fmt.Sprintf("old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", oldPSPInfo.description, newPSPInfo.description), func(t *testing.T) {
+				var errs field.ErrorList
+				if oldPSP == nil {
+					errs = Strategy.Validate(context.Background(), newPSP)
+				} else {
+					errs = Strategy.ValidateUpdate(context.Background(), newPSP, oldPSP)
+				}
+				if len(errs) > 0 {
+					t.Errorf("expected no errors, got: %v", errs)
+				}
+			})
 		}
 	}
 }

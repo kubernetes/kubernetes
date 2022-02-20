@@ -15,5 +15,3 @@
 # NOTE(claudiub): Noop. We're just mirroring the image to staging.
 ARG BASEIMAGE
 FROM $BASEIMAGE
-
-LABEL image_version="1.29-1"

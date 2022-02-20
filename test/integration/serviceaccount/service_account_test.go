@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/request/union"
 	serviceaccountapiserver "k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -355,10 +356,10 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		externalInformers.Core().V1().Pods().Lister(),
 	)
 	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
-	authenticator := union.New(
+	authenticator := group.NewAuthenticatedGroupAdder(union.New(
 		bearertoken.New(rootTokenAuth),
 		bearertoken.New(serviceAccountTokenAuth),
-	)
+	))
 
 	// Set up a stub authorizer:
 	// 1. The "root" user is allowed to do anything
@@ -408,9 +409,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	_, _, kubeAPIServerCloseFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	stop := func() {
-		close(stopCh)
+		cancel()
 		kubeAPIServerCloseFn()
 		apiServer.Close()
 	}
@@ -428,7 +429,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}
-	go tokenController.Run(1, stopCh)
+	go tokenController.Run(1, ctx.Done())
 
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
 		informers.Core().V1().ServiceAccounts(),
@@ -439,9 +440,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}
-	informers.Start(stopCh)
-	externalInformers.Start(stopCh)
-	go serviceAccountController.Run(5, stopCh)
+	informers.Start(ctx.Done())
+	externalInformers.Start(ctx.Done())
+	go serviceAccountController.Run(ctx, 5)
 
 	return rootClientset, clientConfig, stop, nil
 }

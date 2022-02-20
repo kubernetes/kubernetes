@@ -20,8 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -53,13 +53,14 @@ import (
 )
 
 const (
-	configFile             = "config/performance-config.yaml"
-	createNodesOpcode      = "createNodes"
-	createNamespacesOpcode = "createNamespaces"
-	createPodsOpcode       = "createPods"
-	createPodSetsOpcode    = "createPodSets"
-	churnOpcode            = "churn"
-	barrierOpcode          = "barrier"
+	configFile               = "config/performance-config.yaml"
+	createNodesOpcode        = "createNodes"
+	createNamespacesOpcode   = "createNamespaces"
+	createPodsOpcode         = "createPods"
+	createPodSetsOpcode      = "createPodSets"
+	churnOpcode              = "churn"
+	barrierOpcode            = "barrier"
+	extensionPointsLabelName = "extension_point"
 
 	// Two modes supported in "churn" operator.
 
@@ -71,11 +72,13 @@ const (
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: []string{
-			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
-			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
-			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_pod_scheduling_duration_seconds",
+		Metrics: map[string]*labelValues{
+			"scheduler_framework_extension_point_duration_seconds": {
+				label:  extensionPointsLabelName,
+				values: []string{"Filter", "Score"},
+			},
+			"scheduler_e2e_scheduling_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds": nil,
 		},
 	}
 )
@@ -131,7 +134,63 @@ type workload struct {
 	// Name of the workload.
 	Name string
 	// Values of parameters used in the workloadTemplate.
-	Params map[string]int
+	Params params
+}
+
+type params struct {
+	params map[string]int
+	// isUsed field records whether params is used or not.
+	isUsed map[string]bool
+}
+
+// UnmarshalJSON is a custom unmarshaler for params.
+//
+// from(json):
+// 	{
+// 		"initNodes": 500,
+// 		"initPods": 50
+// 	}
+//
+// to:
+//	params{
+//		params: map[string]int{
+//			"intNodes": 500,
+//			"initPods": 50,
+//		},
+//		isUsed: map[string]bool{}, // empty map
+//	}
+//
+func (p *params) UnmarshalJSON(b []byte) error {
+	aux := map[string]int{}
+
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+
+	p.params = aux
+	p.isUsed = map[string]bool{}
+	return nil
+}
+
+// get returns param.
+func (p params) get(key string) (int, error) {
+	p.isUsed[key] = true
+	param, ok := p.params[key]
+	if ok {
+		return param, nil
+	}
+	return 0, fmt.Errorf("parameter %s is undefined", key)
+}
+
+// unusedParams returns the names of unusedParams
+func (w workload) unusedParams() []string {
+	var ret []string
+	for name := range w.Params.params {
+		if !w.Params.isUsed[name] {
+			ret = append(ret, name)
+		}
+	}
+	return ret
 }
 
 // op is a dummy struct which stores the real op in itself.
@@ -224,9 +283,10 @@ func (*createNodesOp) collectsMetrics() bool {
 
 func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 	if cno.CountParam != "" {
-		var ok bool
-		if cno.Count, ok = w.Params[cno.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cno.CountParam)
+		var err error
+		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cno, (&cno).isValid(false)
@@ -265,9 +325,10 @@ func (*createNamespacesOp) collectsMetrics() bool {
 
 func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
 	if cmo.CountParam != "" {
-		var ok bool
-		if cmo.Count, ok = w.Params[cmo.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cmo.CountParam)
+		var err error
+		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cmo, (&cmo).isValid(false)
@@ -324,9 +385,10 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 
 func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 	if cpo.CountParam != "" {
-		var ok bool
-		if cpo.Count, ok = w.Params[cpo.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cpo.CountParam)
+		var err error
+		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpo, (&cpo).isValid(false)
@@ -365,9 +427,10 @@ func (cpso *createPodSetsOp) collectsMetrics() bool {
 
 func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
 	if cpso.CountParam != "" {
-		var ok bool
-		if cpso.Count, ok = w.Params[cpso.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cpso.CountParam)
+		var err error
+		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpso, (&cpso).isValid(true)
@@ -474,12 +537,12 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		})
 	}
 	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
-		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
+		klog.Fatalf("%v: unable to write measured data %+v: %v", b.Name(), dataItems, err)
 	}
 }
 
 func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +645,18 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
 			} else {
+				// define Pod's namespace automatically, and create that namespace.
 				namespace = fmt.Sprintf("namespace-%d", opIndex)
+				_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					b.Fatalf("failed to create namespace for Pod: %v", namespace)
+				}
+				b.Cleanup(func() {
+					err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+					if err != nil {
+						b.Errorf("failed to delete namespace %v", namespace)
+					}
+				})
 			}
 			var collectors []testDataCollector
 			var collectorCtx context.Context
@@ -750,6 +824,13 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
 		}
 	}
+
+	// check unused params and inform users
+	unusedParams := w.unusedParams()
+	if len(unusedParams) != 0 {
+		b.Fatalf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
+	}
+
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return dataItems
@@ -859,7 +940,7 @@ func waitUntilPodsScheduled(ctx context.Context, podInformer coreinformers.PodIn
 }
 
 func getSpecFromFile(path *string, spec interface{}) error {
-	bytes, err := ioutil.ReadFile(*path)
+	bytes, err := os.ReadFile(*path)
 	if err != nil {
 		return err
 	}
@@ -867,7 +948,7 @@ func getSpecFromFile(path *string, spec interface{}) error {
 }
 
 func getUnstructuredFromFile(path string) (*unstructured.Unstructured, *schema.GroupVersionKind, error) {
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil, err
 	}

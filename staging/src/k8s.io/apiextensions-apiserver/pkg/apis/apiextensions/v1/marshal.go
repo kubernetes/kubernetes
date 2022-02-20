@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
 	"errors"
 
 	"k8s.io/apimachinery/pkg/util/json"
@@ -128,7 +129,7 @@ func (s JSON) MarshalJSON() ([]byte, error) {
 }
 
 func (s *JSON) UnmarshalJSON(data []byte) error {
-	if len(data) > 0 && string(data) != "null" {
+	if len(data) > 0 && !bytes.Equal(data, nullLiteral) {
 		s.Raw = data
 	}
 	return nil

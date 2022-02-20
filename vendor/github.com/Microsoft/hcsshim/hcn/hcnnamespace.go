@@ -378,7 +378,7 @@ func (namespace *HostComputeNamespace) Sync() error {
 		// The shim is likey gone. Simply ignore the sync as if it didn't exist.
 		if perr, ok := err.(*os.PathError); ok && perr.Err == syscall.ERROR_FILE_NOT_FOUND {
 			// Remove the reg key there is no point to try again
-			cfg.Remove()
+			_ = cfg.Remove()
 			return nil
 		}
 		f := map[string]interface{}{

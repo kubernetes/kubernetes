@@ -19,10 +19,10 @@ package phases
 import (
 	"io"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 // resetData is the interface to use for reset phases.
@@ -32,6 +32,7 @@ type resetData interface {
 	InputReader() io.Reader
 	IgnorePreflightErrors() sets.String
 	Cfg() *kubeadmapi.InitConfiguration
+	DryRun() bool
 	Client() clientset.Interface
 	AddDirsToClean(dirs ...string)
 	CertificatesDir() string

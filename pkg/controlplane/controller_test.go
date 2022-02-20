@@ -17,7 +17,6 @@ limitations under the License.
 package controlplane
 
 import (
-	"net"
 	"reflect"
 	"testing"
 
@@ -25,9 +24,14 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes/fake"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	netutils "k8s.io/utils/net"
 )
 
 func TestReconcileEndpoints(t *testing.T) {
@@ -401,7 +405,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		}
 		epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
+		err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -520,7 +524,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		}
 		epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
+		err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -585,7 +589,7 @@ func TestEmptySubsets(t *testing.T) {
 	endpointPorts := []corev1.EndpointPort{
 		{Name: "foo", Port: 8080, Protocol: "TCP"},
 	}
-	err := reconciler.RemoveEndpoints("foo", net.ParseIP("1.2.3.4"), endpointPorts)
+	err := reconciler.RemoveEndpoints("foo", netutils.ParseIPSloppy("1.2.3.4"), endpointPorts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -631,7 +635,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset()
 		master.ServiceClient = fakeClient.CoreV1()
-		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, false)
+		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		creates := []core.CreateAction{}
 		for _, action := range fakeClient.Actions() {
 			if action.GetVerb() == "create" {
@@ -913,7 +917,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
 		master.ServiceClient = fakeClient.CoreV1()
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, true)
+		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -972,7 +976,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
 		master.ServiceClient = fakeClient.CoreV1()
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, net.ParseIP("1.2.3.4"), test.servicePorts, test.serviceType, false)
+		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -995,5 +999,159 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		if test.expectUpdate == nil && len(updates) > 0 {
 			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
 		}
+	}
+}
+
+func Test_completedConfig_NewBootstrapController(t *testing.T) {
+
+	_, ipv4cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/24")
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	_, ipv6cidr, err := netutils.ParseCIDRSloppy("2001:db8::/112")
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	ipv4address := netutils.ParseIPSloppy("192.168.1.1")
+	ipv6address := netutils.ParseIPSloppy("2001:db8::1")
+
+	type args struct {
+		legacyRESTStorage corerest.LegacyRESTStorage
+		serviceClient     corev1client.ServicesGetter
+		nsClient          corev1client.NamespacesGetter
+		eventClient       corev1client.EventsGetter
+		readyzClient      rest.Interface
+	}
+	tests := []struct {
+		name        string
+		config      genericapiserver.Config
+		extraConfig *ExtraConfig
+		args        args
+		wantErr     bool
+	}{
+		{
+			name: "master endpoint reconciler - IPv4 families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
+				ServiceIPRange:         *ipv4cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv4address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "master endpoint reconciler - IPv6 families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
+				ServiceIPRange:         *ipv6cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv6address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "master endpoint reconciler - wrong IP families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
+				ServiceIPRange:         *ipv4cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv6address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "master endpoint reconciler - wrong IP families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
+				ServiceIPRange:         *ipv6cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv4address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "lease endpoint reconciler - IPv4 families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.LeaseEndpointReconcilerType,
+				ServiceIPRange:         *ipv4cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv4address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "lease endpoint reconciler - IPv6 families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.LeaseEndpointReconcilerType,
+				ServiceIPRange:         *ipv6cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv6address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "lease endpoint reconciler - wrong IP families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.LeaseEndpointReconcilerType,
+				ServiceIPRange:         *ipv4cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv6address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "lease endpoint reconciler - wrong IP families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.LeaseEndpointReconcilerType,
+				ServiceIPRange:         *ipv6cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv4address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "none endpoint reconciler - wrong IP families",
+			extraConfig: &ExtraConfig{
+				EndpointReconcilerType: reconcilers.NoneEndpointReconcilerType,
+				ServiceIPRange:         *ipv4cidr,
+			},
+			config: genericapiserver.Config{
+				PublicAddress: ipv6address,
+				SecureServing: &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &completedConfig{
+				GenericConfig: tt.config.Complete(nil),
+				ExtraConfig:   tt.extraConfig,
+			}
+			_, err := c.NewBootstrapController(tt.args.legacyRESTStorage, tt.args.serviceClient, tt.args.nsClient, tt.args.eventClient, tt.args.readyzClient)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("completedConfig.NewBootstrapController() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+		})
 	}
 }

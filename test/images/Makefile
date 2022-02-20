@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY ?= gcr.io/kubernetes-e2e-test-images
+REGISTRY ?= k8s.gcr.io/e2e-test-images
 GOARM ?= 7
 DOCKER_CERT_BASE_PATH ?=
 QEMUVERSION=v5.1.0-2
-GOLANG_VERSION=1.16.6
+GOLANG_VERSION=1.17.7
 export
 
 ifndef WHAT
@@ -29,7 +29,7 @@ endif
 #   WHAT: Directory names to build.
 #
 # Example:
-#   make all WHAT=clusterapi-tester
+#   make all WHAT=httpd
 all: all-container
 
 all-container:

@@ -102,7 +102,7 @@ func (c *FakeCSINodes) Update(ctx context.Context, cSINode *storagev1.CSINode, o
 // Delete takes name of the cSINode and deletes it. Returns an error if one occurs.
 func (c *FakeCSINodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(csinodesResource, name), &storagev1.CSINode{})
+		Invokes(testing.NewRootDeleteActionWithOptions(csinodesResource, name, opts), &storagev1.CSINode{})
 	return err
 }
 

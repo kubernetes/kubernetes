@@ -32,7 +32,7 @@ var GraphStructures = []string{string(TreeStructureGraph), string(TreeStructureP
 
 // TreeWriter prints the package structured as a tree.
 // TODO(pwittrock): test this package better.  it is lower-risk since it is only
-// used for printing rather than updating or editing.
+//   used for printing rather than updating or editing.
 type TreeWriter struct {
 	Writer          io.Writer
 	Root            string
@@ -49,6 +49,11 @@ type TreeWriterField struct {
 }
 
 func (p TreeWriter) packageStructure(nodes []*yaml.RNode) error {
+	for i := range nodes {
+		if err := kioutil.CopyLegacyAnnotations(nodes[i]); err != nil {
+			return err
+		}
+	}
 	indexByPackage := p.index(nodes)
 
 	// create the new tree

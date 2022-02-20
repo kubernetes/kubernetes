@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -281,7 +281,7 @@ type PVLabeler interface {
 // InstanceMetadata contains metadata about a specific instance.
 // Values returned in InstanceMetadata are translated into specific fields and labels for Node.
 type InstanceMetadata struct {
-	// ProviderID is a unique ID used to idenfitify an instance on the cloud provider.
+	// ProviderID is a unique ID used to identify an instance on the cloud provider.
 	// The ProviderID set here will be set on the node's spec.providerID field.
 	// The provider ID format can be set by the cloud provider but providers should
 	// ensure the format does not change in any incompatible way.

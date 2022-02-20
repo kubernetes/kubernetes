@@ -83,11 +83,13 @@ const (
 	// Interface is any type that could have differing types at run time.
 	Interface Kind = "Interface"
 
+	// Array is just like slice, but has a fixed length.
+	Array Kind = "Array"
+
 	// The remaining types are included for completeness, but are not well
 	// supported.
-	Array Kind = "Array" // Array is just like slice, but has a fixed length.
-	Chan  Kind = "Chan"
-	Func  Kind = "Func"
+	Chan Kind = "Chan"
+	Func Kind = "Func"
 
 	// DeclarationOf is different from other Kinds; it indicates that instead of
 	// representing an actual Type, the type is a declaration of an instance of
@@ -350,7 +352,9 @@ type Type struct {
 
 	// TODO: Add:
 	// * channel direction
-	// * array length
+
+	// If Kind == Array
+	Len int64
 }
 
 // String returns the name of the type.
@@ -419,12 +423,12 @@ func (m Member) String() string {
 
 // Signature is a function's signature.
 type Signature struct {
-	// TODO: store the parameter names, not just types.
-
 	// If a method of some type, this is the type it's a member of.
-	Receiver   *Type
-	Parameters []*Type
-	Results    []*Type
+	Receiver       *Type
+	Parameters     []*Type
+	ParameterNames []string
+	Results        []*Type
+	ResultNames    []string
 
 	// True if the last in parameter is of the form ...T.
 	Variadic bool

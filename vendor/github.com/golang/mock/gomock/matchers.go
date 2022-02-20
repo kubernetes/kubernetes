@@ -102,7 +102,21 @@ type eqMatcher struct {
 }
 
 func (e eqMatcher) Matches(x interface{}) bool {
-	return reflect.DeepEqual(e.x, x)
+	// In case, some value is nil
+	if e.x == nil || x == nil {
+		return reflect.DeepEqual(e.x, x)
+	}
+
+	// Check if types assignable and convert them to common type
+	x1Val := reflect.ValueOf(e.x)
+	x2Val := reflect.ValueOf(x)
+
+	if x1Val.Type().AssignableTo(x2Val.Type()) {
+		x1ValConverted := x1Val.Convert(x2Val.Type())
+		return reflect.DeepEqual(x1ValConverted.Interface(), x2Val.Interface())
+	}
+
+	return false
 }
 
 func (e eqMatcher) String() string {
@@ -245,7 +259,7 @@ func Not(x interface{}) Matcher {
 //   AssignableToTypeOf(s).Matches(time.Second) // returns true
 //   AssignableToTypeOf(s).Matches(99) // returns false
 //
-//   var ctx = reflect.TypeOf((*context.Context)).Elem()
+//   var ctx = reflect.TypeOf((*context.Context)(nil)).Elem()
 //   AssignableToTypeOf(ctx).Matches(context.Background()) // returns true
 func AssignableToTypeOf(x interface{}) Matcher {
 	if xt, ok := x.(reflect.Type); ok {

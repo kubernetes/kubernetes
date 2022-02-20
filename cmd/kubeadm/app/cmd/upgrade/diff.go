@@ -18,8 +18,16 @@ package upgrade
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
+
+	"github.com/pkg/errors"
+	"github.com/pmezard/go-difflib/difflib"
+	"github.com/spf13/cobra"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
+	client "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -29,15 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/version"
-	client "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
-	"github.com/pkg/errors"
-	"github.com/pmezard/go-difflib/difflib"
-	"github.com/spf13/cobra"
 )
 
 type diffFlags struct {
@@ -171,7 +170,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if path == "" {
 			return errors.New("empty manifest path")
 		}
-		existingManifest, err := ioutil.ReadFile(path)
+		existingManifest, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

@@ -24,14 +24,15 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/client-go/tools/clientcmd"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
+	netutils "k8s.io/utils/net"
+
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-
-	"k8s.io/client-go/tools/clientcmd"
-	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/client-go/util/keyutil"
 )
 
 func TestPKICertificateReadWriter(t *testing.T) {
@@ -126,6 +127,11 @@ func TestKubeconfigReadWriter(t *testing.T) {
 		t.Fatalf("couldn't write new embedded certificate: %v", err)
 	}
 
+	// Make sure that CA key is not present during Read() as it is not needed.
+	// This covers testing when the CA is external and not present on the host.
+	_, caKeyPath := pkiutil.PathsForCertAndKey(dirPKI, caName)
+	os.Remove(caKeyPath)
+
 	// Reads back the new certificate embedded in a kubeconfig writer
 	readCert, err = kubeconfigReadWriter.Read()
 	if err != nil {
@@ -161,7 +167,7 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 			Organization: []string{"sig-cluster-lifecycle"},
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			AltNames: certutil.AltNames{
-				IPs:      []net.IP{net.ParseIP("10.100.0.1")},
+				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 				DNSNames: []string{"test-domain.space"},
 			},
 		},

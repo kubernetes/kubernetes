@@ -51,7 +51,7 @@ const (
 	// LoadBalancerCreateTimeoutDefault is the default time to wait for a load balancer to be created/modified.
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
-	loadBalancerCreateTimeoutDefault = 10 * time.Minute
+	loadBalancerCreateTimeoutDefault = 15 * time.Minute
 	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
 	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
 	loadBalancerCreateTimeoutLarge = 45 * time.Minute

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -228,6 +229,10 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 
 	disk, rerr := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
 	if rerr != nil {
+		if rerr.HTTPStatusCode == http.StatusNotFound {
+			klog.V(2).Infof("azureDisk - disk(%s) is already deleted", diskURI)
+			return nil
+		}
 		return rerr.Error()
 	}
 

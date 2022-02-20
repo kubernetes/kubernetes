@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -destination=testing/mock_manager.go -package=testing -build_flags=-mod=mod . Manager
 package pod
 
 import (
@@ -158,10 +159,6 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.updatePodsInternal(pod)
 }
 
-func isPodInTerminatedState(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
-}
-
 // updateMetrics updates the metrics surfaced by the pod manager.
 // oldPod or newPod may be nil to signify creation or deletion.
 func updateMetrics(oldPod, newPod *v1.Pod) {
@@ -186,32 +183,6 @@ func updateMetrics(oldPod, newPod *v1.Pod) {
 // lock.
 func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
-		if pm.secretManager != nil {
-			if isPodInTerminatedState(pod) {
-				// Pods that are in terminated state and no longer running can be
-				// ignored as they no longer require access to secrets.
-				// It is especially important in watch-based manager, to avoid
-				// unnecessary watches for terminated pods waiting for GC.
-				pm.secretManager.UnregisterPod(pod)
-			} else {
-				// TODO: Consider detecting only status update and in such case do
-				// not register pod, as it doesn't really matter.
-				pm.secretManager.RegisterPod(pod)
-			}
-		}
-		if pm.configMapManager != nil {
-			if isPodInTerminatedState(pod) {
-				// Pods that are in terminated state and no longer running can be
-				// ignored as they no longer require access to configmaps.
-				// It is especially important in watch-based manager, to avoid
-				// unnecessary watches for terminated pods waiting for GC.
-				pm.configMapManager.UnregisterPod(pod)
-			} else {
-				// TODO: Consider detecting only status update and in such case do
-				// not register pod, as it doesn't really matter.
-				pm.configMapManager.RegisterPod(pod)
-			}
-		}
 		podFullName := kubecontainer.GetPodFullName(pod)
 		// This logic relies on a static pod and its mirror to have the same name.
 		// It is safe to type convert here due to the IsMirrorPod guard.
@@ -238,12 +209,6 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	updateMetrics(pod, nil)
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	if pm.secretManager != nil {
-		pm.secretManager.UnregisterPod(pod)
-	}
-	if pm.configMapManager != nil {
-		pm.configMapManager.UnregisterPod(pod)
-	}
 	podFullName := kubecontainer.GetPodFullName(pod)
 	// It is safe to type convert here due to the IsMirrorPod guard.
 	if kubetypes.IsMirrorPod(pod) {

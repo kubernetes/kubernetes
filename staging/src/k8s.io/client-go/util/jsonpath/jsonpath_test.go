@@ -280,6 +280,7 @@ func TestStructInput(t *testing.T) {
 
 	missingKeyTests := []jsonpathTest{
 		{"nonexistent field", "{.hello}", storeData, "", false},
+		{"nonexistent field 2", "before-{.hello}after", storeData, "before-after", false},
 	}
 	testJSONPath(missingKeyTests, true, t)
 
@@ -792,8 +793,7 @@ func TestRunningPodsJSONPathOutput(t *testing.T) {
 				}
 			},
            		{
-				"resourceVersion": "",
-				"selfLink": ""
+				"resourceVersion": ""
 			}
 		]
 	}`)
@@ -806,8 +806,8 @@ func TestRunningPodsJSONPathOutput(t *testing.T) {
 	testJSONPath(
 		[]jsonpathTest{
 			{
-				"when range is used in a certain way in script, additional line is printed",
-				`{range .items[?(.status.phase=="Running")]}{.metadata.name}{" is Running\n"}`,
+				"range over pods without selecting the last one",
+				`{range .items[?(.status.phase=="Running")]}{.metadata.name}{" is Running\n"}{end}`,
 				data,
 				"pod1 is Running\npod2 is Running\npod3 is Running\n",
 				false, // expect no error

@@ -51,6 +51,7 @@ var statusData = map[schema.GroupVersionResource]string{
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 5}}`,
+	gvr("autoscaling", "v2", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 5}}`,
 	gvr("batch", "v1", "cronjobs"):                                  `{"status": {"lastScheduleTime": null}}`,
 	gvr("batch", "v1beta1", "cronjobs"):                             `{"status": {"lastScheduleTime": null}}`,
 	gvr("storage.k8s.io", "v1", "volumeattachments"):                `{"status": {"attached": true}}`,

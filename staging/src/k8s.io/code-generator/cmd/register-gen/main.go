@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -26,13 +25,12 @@ import (
 	generatorargs "k8s.io/code-generator/cmd/register-gen/args"
 	"k8s.io/code-generator/cmd/register-gen/generators"
 	"k8s.io/code-generator/pkg/util"
-	"k8s.io/gengo/args"
 )
 
 func main() {
 	klog.InitFlags(nil)
 	genericArgs := generatorargs.NewDefaults()
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
+	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 	genericArgs.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)

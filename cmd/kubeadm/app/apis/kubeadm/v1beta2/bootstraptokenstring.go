@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
-
-	"github.com/pkg/errors"
 )
 
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used

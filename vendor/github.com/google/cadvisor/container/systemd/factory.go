@@ -32,7 +32,7 @@ func (f *systemdFactory) String() string {
 	return "systemd"
 }
 
-func (f *systemdFactory) NewContainerHandler(name string, inHostNamespace bool) (container.ContainerHandler, error) {
+func (f *systemdFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (container.ContainerHandler, error) {
 	return nil, fmt.Errorf("Not yet supported")
 }
 

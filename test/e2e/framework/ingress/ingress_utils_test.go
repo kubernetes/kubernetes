@@ -17,7 +17,6 @@ limitations under the License.
 package ingress
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +27,7 @@ import (
 func TestIngressToManifest(t *testing.T) {
 	ing := &networkingv1.Ingress{}
 	// Create a temp dir.
-	tmpDir, err := ioutil.TempDir("", "kubemci")
+	tmpDir, err := os.MkdirTemp("", "kubemci")
 	if err != nil {
 		t.Fatalf("unexpected error in creating temp dir: %s", err)
 	}

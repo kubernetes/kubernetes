@@ -22,14 +22,16 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 func TestCleanVerb(t *testing.T) {
 	testCases := []struct {
-		desc         string
-		initialVerb  string
-		request      *http.Request
-		expectedVerb string
+		desc          string
+		initialVerb   string
+		suggestedVerb string
+		request       *http.Request
+		expectedVerb  string
 	}{
 		{
 			desc:         "An empty string should be designated as unknown",
@@ -47,6 +49,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST should be transformed to WATCH if we have the right query param on the request",
 			initialVerb: "LIST",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "watch=true",
 				},
@@ -57,11 +60,50 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST isn't transformed to WATCH if we have query params that do not include watch",
 			initialVerb: "LIST",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "blah=asdf&something=else",
 				},
 			},
 			expectedVerb: "LIST",
+		},
+		{
+			// The above may seem counter-intuitive, but it actually is needed for cases like
+			// watching a single item, e.g.:
+			//  /api/v1/namespaces/foo/pods/bar?fieldSelector=metadata.name=baz&watch=true
+			desc:        "GET is transformed to WATCH if we have the right query param on the request",
+			initialVerb: "GET",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "watch=true",
+				},
+			},
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:          "LIST is transformed to WATCH for the old pattern watch",
+			initialVerb:   "LIST",
+			suggestedVerb: "WATCH",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "/api/v1/watch/pods",
+				},
+			},
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:          "LIST is transformed to WATCH for the old pattern watchlist",
+			initialVerb:   "LIST",
+			suggestedVerb: "WATCHLIST",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "/api/v1/watch/pods",
+				},
+			},
+			expectedVerb: "WATCH",
 		},
 		{
 			desc:         "WATCHLIST should be transformed to WATCH",
@@ -104,7 +146,7 @@ func TestCleanVerb(t *testing.T) {
 			if tt.request != nil {
 				req = tt.request
 			}
-			cleansedVerb := cleanVerb(tt.initialVerb, req)
+			cleansedVerb := cleanVerb(tt.initialVerb, tt.suggestedVerb, req)
 			if cleansedVerb != tt.expectedVerb {
 				t.Errorf("Got %s, but expected %s", cleansedVerb, tt.expectedVerb)
 			}
@@ -156,5 +198,16 @@ func TestCleanScope(t *testing.T) {
 				t.Errorf("failed to clean scope: %v", test.requestInfo)
 			}
 		})
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &ResponseWriterDelegator{
+		ResponseWriter: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.ResponseWriter {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }

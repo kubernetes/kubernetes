@@ -92,7 +92,7 @@ func (pl *SelectorSpread) Score(ctx context.Context, state *framework.CycleState
 
 	s, ok := c.(*preScoreState)
 	if !ok {
-		return 0, framework.AsStatus(fmt.Errorf("cannot convert saved state to tainttoleration.preScoreState"))
+		return 0, framework.AsStatus(fmt.Errorf("cannot convert saved state to selectorspread.preScoreState"))
 	}
 
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)

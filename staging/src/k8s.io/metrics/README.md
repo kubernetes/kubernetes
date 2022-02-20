@@ -14,9 +14,7 @@ library when implementing their API servers.
 
 ## APIs
 
-This repository contains types and clients for several APIs.  For more
-details on implementations of these apis, see
-[IMPLEMENTATIONS.md](IMPLEMENTATIONS.md).
+This repository contains types and clients for several APIs.
 
 ### Custom Metrics API
 
@@ -27,7 +25,7 @@ The API is intended to be implemented by monitoring pipeline vendors, on
 top of their metrics storage solutions.
 
 If you want to implement this as an API server for this API, please see the
-[kubernetes-incubator/custom-metrics-apiserver](https://github.com/kubernetes-incubator/custom-metrics-apiserver)
+[kubernetes-sigs/custom-metrics-apiserver](https://github.com/kubernetes-sigs/custom-metrics-apiserver)
 library, which contains the basic infrastructure required to set up such
 an API server.
 
@@ -38,7 +36,7 @@ Import Path: `k8s.io/metrics/pkg/apis/custom_metrics`.
 This API allows consumers to access resource metrics (CPU and memory) for
 pods and nodes.
 
-The API is implemented by [metrics-server](https://github.com/kubernetes-sigs/metrics-server).
+The API is implemented by [metrics-server](https://github.com/kubernetes-sigs/metrics-server) and [prometheus-adapter](https://github.com/kubernetes-sigs/prometheus-adapter).
 
 Import Path: `k8s.io/metrics/pkg/apis/metrics`.
 
@@ -66,3 +64,4 @@ Code of Conduct](code-of-conduct.md).
 ### Contibution Guidelines
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
+

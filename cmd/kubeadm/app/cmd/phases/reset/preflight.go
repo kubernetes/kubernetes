@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -50,7 +52,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	if !r.ForceReset() {
-		fmt.Println("[reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
+		klog.Warning("[reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
 		fmt.Print("[reset] Are you sure you want to proceed? [y/N]: ")
 		s := bufio.NewScanner(r.InputReader())
 		s.Scan()

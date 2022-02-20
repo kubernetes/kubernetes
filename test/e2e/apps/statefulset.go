@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -71,7 +73,7 @@ const (
 )
 
 var httpProbe = &v1.Probe{
-	Handler: v1.Handler{
+	ProbeHandler: v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: "/index.html",
 			Port: intstr.IntOrString{IntVal: 80},
@@ -1113,6 +1115,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working zookeeper cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &zookeeperTester{client: c}
 			appTester.run()
 		})
@@ -1120,6 +1123,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working redis cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &redisTester{client: c}
 			appTester.run()
 		})
@@ -1127,6 +1131,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working mysql cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &mysqlGaleraTester{client: c}
 			appTester.run()
 		})
@@ -1134,13 +1139,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working CockroachDB cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &cockroachDBTester{client: c}
 			appTester.run()
 		})
 	})
+
 	// Make sure minReadySeconds is honored
 	// Don't mark it as conformance yet
-	ginkgo.It("MinReadySeconds should be honored when enabled [Feature:StatefulSetMinReadySeconds] [alpha]", func() {
+	ginkgo.It("MinReadySeconds should be honored when enabled", func() {
 		ssName := "test-ss"
 		headlessSvcName := "test"
 		// Define StatefulSet Labels
@@ -1153,6 +1160,188 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 1)
+	})
+
+	ginkgo.It("AvailableReplicas should get updated accordingly when MinReadySeconds is enabled", func() {
+		ssName := "test-ss"
+		headlessSvcName := "test"
+		// Define StatefulSet Labels
+		ssPodLabels := map[string]string{
+			"name": "sample-pod",
+			"pod":  WebserverImageName,
+		}
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels)
+		ss.Spec.MinReadySeconds = 30
+		setHTTPProbe(ss)
+		ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 0)
+		// let's check that the availableReplicas have still not updated
+		time.Sleep(5 * time.Second)
+		ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ss.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		if ss.Status.AvailableReplicas != 0 {
+			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 0, ss.Status.AvailableReplicas)
+		}
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 2)
+
+		ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+			update.Spec.MinReadySeconds = 3600
+		})
+		framework.ExpectNoError(err)
+		// We don't expect replicas to be updated till 1 hour, so the availableReplicas should be 0
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 0)
+
+		ss, err = updateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+			update.Spec.MinReadySeconds = 0
+		})
+		framework.ExpectNoError(err)
+		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 2)
+
+		ginkgo.By("check availableReplicas are shown in status")
+		out, err := framework.RunKubectl(ns, "get", "statefulset", ss.Name, "-o=yaml")
+		framework.ExpectNoError(err)
+		if !strings.Contains(out, "availableReplicas: 2") {
+			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 2, out)
+		}
+	})
+
+	ginkgo.Describe("Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC]", func() {
+		ssName := "ss"
+		labels := map[string]string{
+			"foo": "bar",
+			"baz": "blah",
+		}
+		headlessSvcName := "test"
+		var statefulPodMounts, podMounts []v1.VolumeMount
+		var ss *appsv1.StatefulSet
+
+		ginkgo.BeforeEach(func() {
+			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			podMounts = []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+
+			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
+			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
+			_, err := c.CoreV1().Services(ns).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all statefulset in ns %v", ns)
+			e2estatefulset.DeleteAllStatefulSets(c, ns)
+		})
+
+		ginkgo.It("should delete PVCs with a WhenDeleted policy", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist with their owner refs")
+			err = verifyStatefulSetPVCsExistWithOwnerRefs(c, ss, []int{0, 1, 2}, true, false)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Deleting stateful set " + ss.Name)
+			err = c.AppsV1().StatefulSets(ns).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying PVCs deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should delete PVCs with a OnScaledown policy", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0, 1, 2})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
+			ss, err = e2estatefulset.Scale(c, ss, 1)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying all but one PVC deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should delete PVCs after adopting pod (WhenDeleted)", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist with their owner refs")
+			err = verifyStatefulSetPVCsExistWithOwnerRefs(c, ss, []int{0, 1, 2}, true, false)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Orphaning the 3rd pod")
+			patch, err := json.Marshal(metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{},
+			})
+			framework.ExpectNoError(err, "Could not Marshal JSON for patch payload")
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), fmt.Sprintf("%s-2", ss.Name), types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "")
+			framework.ExpectNoError(err, "Could not patch payload")
+
+			ginkgo.By("Deleting stateful set " + ss.Name)
+			err = c.AppsV1().StatefulSets(ns).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying PVCs deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0, 1, 2})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Orphaning the 3rd pod")
+			patch, err := json.Marshal(metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{},
+			})
+			framework.ExpectNoError(err, "Could not Marshal JSON for patch payload")
+			_, err = c.CoreV1().Pods(ns).Patch(context.TODO(), fmt.Sprintf("%s-2", ss.Name), types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "")
+			framework.ExpectNoError(err, "Could not patch payload")
+
+			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
+			ss, err = e2estatefulset.Scale(c, ss, 1)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying all but one PVC deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{0})
+			framework.ExpectNoError(err)
+		})
 	})
 })
 
@@ -1596,4 +1785,112 @@ func getStatefulSet(c clientset.Interface, namespace, name string) *appsv1.State
 		framework.Failf("Failed to get StatefulSet %s/%s: %v", namespace, name, err)
 	}
 	return ss
+}
+
+// verifyStatefulSetPVCsExist confirms that exactly the PVCs for ss with the specified ids exist. This polls until the situation occurs, an error happens, or until timeout (in the latter case an error is also returned). Beware that this cannot tell if a PVC will be deleted at some point in the future, so if used to confirm that no PVCs are deleted, the caller should wait for some event giving the PVCs a reasonable chance to be deleted, before calling this function.
+func verifyStatefulSetPVCsExist(c clientset.Interface, ss *appsv1.StatefulSet, claimIds []int) error {
+	idSet := map[int]struct{}{}
+	for _, id := range claimIds {
+		idSet[id] = struct{}{}
+	}
+	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
+		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
+			return false, nil
+		}
+		for _, claim := range ss.Spec.VolumeClaimTemplates {
+			pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
+			seenPVCs := map[int]struct{}{}
+			for _, pvc := range pvcList.Items {
+				matches := pvcNameRE.FindStringSubmatch(pvc.Name)
+				if len(matches) != 2 {
+					continue
+				}
+				ordinal, err := strconv.ParseInt(matches[1], 10, 32)
+				if err != nil {
+					framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
+					return false, err
+				}
+				if _, found := idSet[int(ordinal)]; !found {
+					return false, nil // Retry until the PVCs are consistent.
+				} else {
+					seenPVCs[int(ordinal)] = struct{}{}
+				}
+			}
+			if len(seenPVCs) != len(idSet) {
+				framework.Logf("Found %d of %d PVCs", len(seenPVCs), len(idSet))
+				return false, nil // Retry until the PVCs are consistent.
+			}
+		}
+		return true, nil
+	})
+}
+
+// verifyStatefulSetPVCsExistWithOwnerRefs works as verifyStatefulSetPVCsExist, but also waits for the ownerRefs to match.
+func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, ss *appsv1.StatefulSet, claimIndicies []int, wantSetRef, wantPodRef bool) error {
+	indexSet := map[int]struct{}{}
+	for _, id := range claimIndicies {
+		indexSet[id] = struct{}{}
+	}
+	set := getStatefulSet(c, ss.Namespace, ss.Name)
+	setUID := set.GetUID()
+	if setUID == "" {
+		framework.Failf("Statefulset %s mising UID", ss.Name)
+	}
+	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
+		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
+			return false, nil
+		}
+		for _, claim := range ss.Spec.VolumeClaimTemplates {
+			pvcNameRE := regexp.MustCompile(fmt.Sprintf("^%s-%s-([0-9]+)$", claim.Name, ss.Name))
+			seenPVCs := map[int]struct{}{}
+			for _, pvc := range pvcList.Items {
+				matches := pvcNameRE.FindStringSubmatch(pvc.Name)
+				if len(matches) != 2 {
+					continue
+				}
+				ordinal, err := strconv.ParseInt(matches[1], 10, 32)
+				if err != nil {
+					framework.Logf("ERROR: bad pvc name %s (%v)", pvc.Name, err)
+					return false, err
+				}
+				if _, found := indexSet[int(ordinal)]; !found {
+					framework.Logf("Unexpected, retrying")
+					return false, nil // Retry until the PVCs are consistent.
+				}
+				var foundSetRef, foundPodRef bool
+				for _, ref := range pvc.GetOwnerReferences() {
+					if ref.Kind == "StatefulSet" && ref.UID == setUID {
+						foundSetRef = true
+					}
+					if ref.Kind == "Pod" {
+						podName := fmt.Sprintf("%s-%d", ss.Name, ordinal)
+						pod, err := c.CoreV1().Pods(ss.Namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+						if err != nil {
+							framework.Logf("Pod %s not found, retrying (%v)", podName, err)
+							return false, nil
+						}
+						podUID := pod.GetUID()
+						if podUID == "" {
+							framework.Failf("Pod %s is missing UID", pod.Name)
+						}
+						if ref.UID == podUID {
+							foundPodRef = true
+						}
+					}
+				}
+				if foundSetRef == wantSetRef && foundPodRef == wantPodRef {
+					seenPVCs[int(ordinal)] = struct{}{}
+				}
+			}
+			if len(seenPVCs) != len(indexSet) {
+				framework.Logf("Only %d PVCs, retrying", len(seenPVCs))
+				return false, nil // Retry until the PVCs are consistent.
+			}
+		}
+		return true, nil
+	})
 }

@@ -17,7 +17,10 @@ limitations under the License.
 package config
 
 import (
+	"time"
+
 	apiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -31,26 +34,29 @@ type Config struct {
 	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
-	LegacyPolicySource *kubeschedulerconfig.SchedulerPolicySource
-
 	// LoopbackClientConfig is a config for a privileged loopback connection
 	LoopbackClientConfig *restclient.Config
 
-	InsecureServing        *apiserver.DeprecatedInsecureServingInfo // nil will disable serving on an insecure port
-	InsecureMetricsServing *apiserver.DeprecatedInsecureServingInfo // non-nil if metrics should be served independently
-	Authentication         apiserver.AuthenticationInfo
-	Authorization          apiserver.AuthorizationInfo
-	SecureServing          *apiserver.SecureServingInfo
+	Authentication apiserver.AuthenticationInfo
+	Authorization  apiserver.AuthorizationInfo
+	SecureServing  *apiserver.SecureServingInfo
 
-	Client          clientset.Interface
-	KubeConfig      *restclient.Config
-	InformerFactory informers.SharedInformerFactory
+	Client             clientset.Interface
+	KubeConfig         *restclient.Config
+	InformerFactory    informers.SharedInformerFactory
+	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
 
-	//lint:ignore SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.
+	//nolint:staticcheck // SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.
 	EventBroadcaster events.EventBroadcasterAdapter
 
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig
+
+	// PodMaxUnschedulableQDuration is the maximum time a pod can stay in
+	// unschedulableQ. If a pod stays in unschedulableQ for longer than this
+	// value, the pod will be moved from unschedulableQ to backoffQ or activeQ.
+	// If this value is empty, the default value (60s) will be used.
+	PodMaxUnschedulableQDuration time.Duration
 }
 
 type completedConfig struct {
@@ -66,13 +72,6 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
 	cc := completedConfig{c}
-
-	if c.InsecureServing != nil {
-		c.InsecureServing.Name = "healthz"
-	}
-	if c.InsecureMetricsServing != nil {
-		c.InsecureMetricsServing.Name = "metrics"
-	}
 
 	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 

@@ -26,12 +26,13 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v0.9.1'
 DEFAULT_CNI_HASH='b5a59660053a5f1a33b5dd5624d9ed61864482d9dc8e5b79c9b3afc3d6f62c9830e1c30f9ccba6ee76f5fb1ff0504e58984420cc0680b26cb643f1cb07afbd1c'
-DEFAULT_NPD_VERSION='v0.8.8'
-DEFAULT_NPD_HASH_AMD64='ba8315a29368bfc33bdc602eb02d325b0b80e295c8739da35616de5b562c372bd297a2553f3ccd4daaecd67698b659b2c7068a2d2a0b9418ad29233fb75ff3f2'
+DEFAULT_NPD_VERSION='v0.8.9'
+DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
 # TODO (SergeyKanzhelev): fill up for npd 0.8.9+
-DEFAULT_NPD_HASH_ARM64='N/A'
-DEFAULT_CRICTL_VERSION='v1.21.0'
-DEFAULT_CRICTL_HASH='e4fb9822cb5f71ab8f85021c66170613aae972f4b32030e42868fb36a3bc3ea8642613df8542bf716fad903ed4d7528021ecb28b20c6330448cd2bd2b76bd776'
+DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
+DEFAULT_CRICTL_VERSION='v1.23.0'
+DEFAULT_CRICTL_AMD64_SHA512='f8c40c66c8d9a85e857399506f4977564890815b02658eec591114e04bd8bc6b8ea08bcc159af0088b5eda7bf0dfd16096bf0c174819c204193fb7343ae7d9d5'
+DEFAULT_CRICTL_ARM64_SHA512='261ac360b0ac3fc88c81f1cc348f84b0df0b07ca4db61b0e647c142882d129ba11d21d0de373a27ecfd984436a08a11b19cde2ad5e3412e5d03203caedd62d92'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
@@ -187,7 +188,7 @@ function download-or-bust {
 
         echo "Getting the scope of service account configured for VM."
         if ! valid-storage-scope ; then
-          canUseCredentials=$?
+          canUseCredentials=1
           # this behavior is preserved for backward compatibility. We want to fail fast if SA is not available
           # and try to download without SA if scope does not exist on SA
           echo "No service account or service account without storage scope. Attempt to download without service account token."
@@ -199,9 +200,8 @@ function download-or-bust {
           if access_token=$(get-credentials); then
             echo "Service account access token is received. Downloading ${url} using this token."
           else
-            local exit_code=$?
             echo "Cannot get a service account token. Exiting."
-            exit ${exit_code}
+            exit 1
           fi
 
           curl_headers=${access_token:+Authorization: Bearer "${access_token}"}
@@ -263,24 +263,29 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  if [[ "${HOST_ARCH}" == "amd64" ]]; then
-    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_AMD64}
-  elif [[ "${HOST_ARCH}" == "arm64" ]]; then
-    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_ARM64}
-  else
-    # no other architectures are supported currently.
-    # Assumption is that this script only runs on linux,
-    # see cluster/gce/windows/k8s-node-setup.psm1 for windows
-    # https://github.com/kubernetes/node-problem-detector/releases/
-    DEFAULT_NPD_HASH='N/A'
-  fi
-
   if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
   else
       local -r npd_version="${DEFAULT_NPD_VERSION}"
-      local -r npd_hash="${DEFAULT_NPD_HASH}"
+      case "${HOST_PLATFORM}/${HOST_ARCH}" in
+        linux/amd64)
+          local -r npd_hash="${DEFAULT_NPD_HASH_AMD64}"
+          ;;
+        linux/arm64)
+          local -r npd_hash="${DEFAULT_NPD_HASH_ARM64}"
+          ;;
+        # no other architectures are supported currently.
+        # Assumption is that this script only runs on linux,
+        # see cluster/gce/windows/k8s-node-setup.psm1 for windows
+        # https://github.com/kubernetes/node-problem-detector/releases/
+        *)
+          echo "Unrecognized version and platform/arch combination:"
+          echo "$DEFAULT_NPD_VERSION $HOST_PLATFORM/$HOST_ARCH"
+          echo "Set NODE_PROBLEM_DETECTOR_VERSION and NODE_PROBLEM_DETECTOR_TAR_HASH to overwrite"
+          exit 1
+          ;;
+      esac
   fi
   local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
 
@@ -335,13 +340,25 @@ function install-crictl {
     local -r crictl_hash="${CRICTL_TAR_HASH}"
   else
     local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
-    local -r crictl_hash="${DEFAULT_CRICTL_HASH}"
+    case "${HOST_PLATFORM}/${HOST_ARCH}" in
+      linux/amd64)
+        local -r crictl_hash="${DEFAULT_CRICTL_AMD64_SHA512}"
+        ;;
+      linux/arm64)
+        local -r crictl_hash="${DEFAULT_CRICTL_ARM64_SHA512}"
+        ;;
+      *)
+        echo "Unrecognized version and platform/arch combination:"
+        echo "$DEFAULT_CRICTL_VERSION $HOST_PLATFORM/$HOST_ARCH"
+        echo "Set CRICTL_VERSION and CRICTL_TAR_HASH to overwrite"
+        exit 1
+    esac
   fi
   local -r crictl="crictl-${crictl_version}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"
 
   # Create crictl config file.
   cat > /etc/crictl.yaml <<EOF
-runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
 EOF
 
   if is-preloaded "${crictl}" "${crictl_hash}"; then
@@ -354,6 +371,7 @@ EOF
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
+  rm -f "${crictl}"
 }
 
 function install-exec-auth-plugin {
@@ -437,9 +455,7 @@ function try-load-docker-image {
   local -r max_attempts=5
   local -i attempt_num=1
 
-  if [[ "${CONTAINER_RUNTIME_NAME:-}" == "docker" ]]; then
-    load_image_command=${LOAD_IMAGE_COMMAND:-docker load -i}
-  elif [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
+  if [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
     load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
   else
     load_image_command="${LOAD_IMAGE_COMMAND:-}"
@@ -472,44 +488,6 @@ function load-docker-images {
   else
     try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
-}
-
-# If we are on ubuntu we can try to install docker
-function install-docker {
-  # bailout if we are not on ubuntu
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo "Unable to automatically install docker. Bailing out..."
-    return
-  fi
-  # Install Docker deps, some of these are already installed in the image but
-  # that's fine since they won't re-install and we can reuse the code below
-  # for another image someday.
-  apt-get update
-  apt-get install -y --no-install-recommends \
-    apt-transport-https \
-    ca-certificates \
-    socat \
-    curl \
-    gnupg2 \
-    software-properties-common \
-    lsb-release
-
-  release=$(lsb_release -cs)
-
-  # Add the Docker apt-repository
-  # shellcheck disable=SC2086
-  curl ${CURL_FLAGS} \
-    --location \
-    "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
-  | apt-key add -
-  add-apt-repository \
-    "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
-    $release stable"
-
-  # Install Docker
-  apt-get update && \
-    apt-get install -y --no-install-recommends "${GCI_DOCKER_VERSION:-"docker-ce=5:19.03.*"}"
-  rm -rf /var/lib/apt/lists/*
 }
 
 # If we are on ubuntu we can try to install containerd
@@ -584,40 +562,32 @@ function install-containerd-ubuntu {
 }
 
 function ensure-container-runtime {
-  container_runtime="${CONTAINER_RUNTIME:-docker}"
-  if [[ "${container_runtime}" == "docker" ]]; then
-    if ! command -v docker >/dev/null 2>&1; then
-      install-docker
-      if ! command -v docker >/dev/null 2>&1; then
-        echo "ERROR docker not found. Aborting."
-        exit 2
-      fi
-    fi
-    docker version
-  elif [[ "${container_runtime}" == "containerd" ]]; then
-    # Install containerd/runc if requested
-    if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-      install-containerd-ubuntu
-    fi
-    # Verify presence and print versions of ctr, containerd, runc
-    if ! command -v ctr >/dev/null 2>&1; then
-      echo "ERROR ctr not found. Aborting."
-      exit 2
-    fi
-    ctr --version
-
-    if ! command -v containerd >/dev/null 2>&1; then
-      echo "ERROR containerd not found. Aborting."
-      exit 2
-    fi
-    containerd --version
-
-    if ! command -v runc >/dev/null 2>&1; then
-      echo "ERROR runc not found. Aborting."
-      exit 2
-    fi
-    runc --version
+  # Install containerd/runc if requested
+  if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
+    log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
+
+  # when custom containerd version is installed sourcing containerd_env.sh will add all tools like ctr to the PATH
+  if [[ -e "/etc/profile.d/containerd_env.sh" ]]; then
+   log-wrap 'SourceContainerdEnv' source "/etc/profile.d/containerd_env.sh"
+  fi
+
+  # Verify presence and print versions of ctr, containerd, runc
+  if ! command -v ctr >/dev/null 2>&1; then
+    echo "ERROR ctr not found. Aborting."
+    exit 2
+  fi
+  ctr --version
+  if ! command -v containerd >/dev/null 2>&1; then
+    echo "ERROR containerd not found. Aborting."
+    exit 2
+  fi
+  containerd --version
+  if ! command -v runc >/dev/null 2>&1; then
+    echo "ERROR runc not found. Aborting."
+    exit 2
+  fi
+  runc --version
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
@@ -633,7 +603,7 @@ function install-kube-binary-config {
     local -r server_binary_tar_hash="${SERVER_BINARY_TAR_HASH}"
   else
     echo "Downloading binary release sha512 (not found in env)"
-    download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha512}"
+    log-wrap "DownloadServerBinarySHA" download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha512}"
     local -r server_binary_tar_hash=$(cat "${server_binary_tar}.sha512")
   fi
 
@@ -641,8 +611,8 @@ function install-kube-binary-config {
     echo "${server_binary_tar} is preloaded."
   else
     echo "Downloading binary release tar"
-    download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
-    tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
+    log-wrap "DownloadServerBinary" download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
+    log-wrap "UntarServerBinary" tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
     # Copy docker_tag and image files to ${KUBE_HOME}/kube-docker-files.
     local -r src_dir="${KUBE_HOME}/kubernetes/server/bin"
     local dst_dir="${KUBE_HOME}/kube-docker-files"
@@ -656,7 +626,7 @@ function install-kube-binary-config {
       cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
       cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
     fi
-    load-docker-images
+    log-wrap "LoadDockerImages" load-docker-images
     mv "${src_dir}/kubelet" "${KUBE_BIN}"
     mv "${src_dir}/kubectl" "${KUBE_BIN}"
 
@@ -669,31 +639,31 @@ function install-kube-binary-config {
 
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
      [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    install-node-problem-detector
+    log-wrap "InstallNodeProblemDetector" install-node-problem-detector
   fi
 
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-    install-cni-binaries
+    log-wrap "InstallCNIBinaries" install-cni-binaries
   fi
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
-  install-kube-manifests
+  log-wrap "InstallKubeManifests" install-kube-manifests
   chmod -R 755 "${KUBE_BIN}"
 
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
-  install-gci-mounter-tools
+  log-wrap "InstallGCIMounterTools" install-gci-mounter-tools
 
   # Remount the Flexvolume directory with the "exec" option, if needed.
   if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
-    remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
+    log-wrap "RemountFlexVolume" remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
   fi
 
   # Install crictl on each node.
-  install-crictl
+  log-wrap "InstallCrictl" install-crictl
 
   # TODO(awly): include the binary and license in the OS image.
-  install-exec-auth-plugin
+  log-wrap "InstallExecAuthPlugin" install-exec-auth-plugin
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

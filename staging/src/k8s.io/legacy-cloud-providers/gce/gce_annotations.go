@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -73,6 +74,13 @@ const (
 
 	// NetworkTierAnnotationPremium is an annotation to indicate the Service is on the Premium network tier
 	NetworkTierAnnotationPremium = cloud.NetworkTierPremium
+
+	// RBSAnnotationKey is annotated on a Service object to indicate
+	// opt-in mode for RBS NetLB
+	RBSAnnotationKey = "cloud.google.com/l4-rbs"
+
+	// RBSEnabled is an annotation to indicate the Service is opt-in for RBS
+	RBSEnabled = "enabled"
 )
 
 // GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.

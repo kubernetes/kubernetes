@@ -22,6 +22,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"k8s.io/klog/v2"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -30,9 +33,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
-
-	"k8s.io/klog/v2"
-	utilsexec "k8s.io/utils/exec"
 )
 
 // NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
@@ -63,40 +63,57 @@ func runCleanupNode(c workflow.RunData) error {
 		klog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
 		klog.Warningln("[reset] Please ensure kubelet is stopped manually")
 	} else {
-		fmt.Println("[reset] Stopping the kubelet service")
-		if err := initSystem.ServiceStop("kubelet"); err != nil {
-			klog.Warningf("[reset] The kubelet service could not be stopped by kubeadm: [%v]\n", err)
-			klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+		if !r.DryRun() {
+			fmt.Println("[reset] Stopping the kubelet service")
+			if err := initSystem.ServiceStop("kubelet"); err != nil {
+				klog.Warningf("[reset] The kubelet service could not be stopped by kubeadm: [%v]\n", err)
+				klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+			}
+		} else {
+			fmt.Println("[reset] Would stop the kubelet service")
 		}
 	}
 
-	// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
-	fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
-	// In case KubeletRunDirectory holds a symbolic link, evaluate it
-	kubeletRunDir, err := absoluteKubeletRunDirectory()
-	if err == nil {
-		// Only clean absoluteKubeletRunDirectory if umountDirsCmd passed without error
-		r.AddDirsToClean(kubeletRunDir)
+	if !r.DryRun() {
+		// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
+		fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+		// In case KubeletRunDirectory holds a symbolic link, evaluate it
+		kubeletRunDir, err := absoluteKubeletRunDirectory()
+		if err == nil {
+			// Only clean absoluteKubeletRunDirectory if umountDirsCmd passed without error
+			r.AddDirsToClean(kubeletRunDir)
+		}
+	} else {
+		fmt.Printf("[reset] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
 	}
 
-	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
-	if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
-		klog.Warningf("[reset] Failed to remove containers: %v\n", err)
+	if !r.DryRun() {
+		klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
+		if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
+			klog.Warningf("[reset] Failed to remove containers: %v\n", err)
+		}
+	} else {
+		fmt.Println("[reset] Would remove Kubernetes-managed containers")
 	}
 
+	// TODO: remove the dockershim directory cleanup in 1.25
+	// https://github.com/kubernetes/kubeadm/issues/2626
 	r.AddDirsToClean("/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories
-	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
 	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
-	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir)
+	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir, r.DryRun())
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
-		klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
-		if err := users.RemoveUsersAndGroups(); err != nil {
-			klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
+		if !r.DryRun() {
+			klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
+			if err := users.RemoveUsersAndGroups(); err != nil {
+				klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
+			}
+		} else {
+			fmt.Println("[reset] Would remove users and groups created for rootless control-plane")
 		}
 	}
 
@@ -130,16 +147,20 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 }
 
 // resetConfigDir is used to cleanup the files kubeadm writes in /etc/kubernetes/.
-func resetConfigDir(configPathDir, pkiPathDir string) {
+func resetConfigDir(configPathDir, pkiPathDir string, isDryRun bool) {
 	dirsToClean := []string{
 		filepath.Join(configPathDir, kubeadmconstants.ManifestsSubDirName),
 		pkiPathDir,
 	}
-	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
-	for _, dir := range dirsToClean {
-		if err := CleanDir(dir); err != nil {
-			klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
+	if !isDryRun {
+		fmt.Printf("[reset] Deleting contents of directories: %v\n", dirsToClean)
+		for _, dir := range dirsToClean {
+			if err := CleanDir(dir); err != nil {
+				klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
+			}
 		}
+	} else {
+		fmt.Printf("[reset] Would delete contents of directories: %v\n", dirsToClean)
 	}
 
 	filesToClean := []string{
@@ -149,11 +170,16 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
-	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
-	for _, path := range filesToClean {
-		if err := os.RemoveAll(path); err != nil {
-			klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
+
+	if !isDryRun {
+		fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
+		for _, path := range filesToClean {
+			if err := os.RemoveAll(path); err != nil {
+				klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
+			}
 		}
+	} else {
+		fmt.Printf("[reset] Would delete files: %v\n", filesToClean)
 	}
 }
 

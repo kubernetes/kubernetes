@@ -211,12 +211,19 @@ kube::util::find-binary-for-platform() {
     "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
     "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
+
   # if we're looking for the host platform, add local non-platform-qualified search paths
   if [[ "${platform}" = "$(kube::util::host_platform)" ]]; then
     locations+=(
       "${KUBE_ROOT}/_output/local/go/bin/${lookfor}"
       "${KUBE_ROOT}/_output/dockerized/go/bin/${lookfor}"
     );
+  fi
+
+  # looks for $1 in the $PATH
+  if which "${lookfor}" >/dev/null; then
+    local -r local_bin="$(which "${lookfor}")"
+    locations+=( "${local_bin}"  );
   fi
 
   # List most recently-updated location.
@@ -707,14 +714,14 @@ function kube::util::ensure-cfssl {
   popd > /dev/null || return 1
 }
 
-# kube::util::ensure_dockerized
-# Confirms that the script is being run inside a kube-build image
+# kube::util::ensure-docker-buildx
+# Check if we have "docker buildx" commands available
 #
-function kube::util::ensure_dockerized {
-  if [[ -f /kube-build-image ]]; then
+function kube::util::ensure-docker-buildx {
+  if docker buildx --help >/dev/null 2>&1; then
     return 0
   else
-    echo "ERROR: This script is designed to be run inside a kube-build container"
+    echo "ERROR: docker buildx not available. Docker 19.03 or higher is required with experimental features enabled"
     exit 1
   fi
 }

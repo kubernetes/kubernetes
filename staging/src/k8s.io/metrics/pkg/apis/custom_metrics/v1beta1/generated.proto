@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1";
 
 // MetricListOptions is used to select metrics by their label selectors
 message MetricListOptions {

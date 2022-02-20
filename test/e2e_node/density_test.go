@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -446,7 +447,8 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 // between creations there is an interval for throughput control
 func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, interval time.Duration) map[string]metav1.Time {
 	createTimes := make(map[string]metav1.Time)
-	for _, pod := range pods {
+	for i := range pods {
+		pod := pods[i]
 		createTimes[pod.ObjectMeta.Name] = metav1.Now()
 		go f.PodClient().Create(pod)
 		time.Sleep(interval)

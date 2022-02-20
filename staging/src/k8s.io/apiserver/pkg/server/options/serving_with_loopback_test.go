@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
+	netutils "k8s.io/utils/net"
 )
 
 func TestEmptyMainCert(t *testing.T) {
@@ -29,7 +30,7 @@ func TestEmptyMainCert(t *testing.T) {
 	var loopbackClientConfig *rest.Config
 
 	s := (&SecureServingOptions{
-		BindAddress: net.ParseIP("127.0.0.1"),
+		BindAddress: netutils.ParseIPSloppy("127.0.0.1"),
 	}).WithLoopback()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

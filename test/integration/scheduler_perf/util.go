@@ -17,11 +17,11 @@ limitations under the License.
 package benchmark
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -40,9 +40,10 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -57,7 +58,7 @@ const (
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
 
 func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
-	gvk := v1beta1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
+	gvk := v1beta2.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
 	cfg := config.KubeSchedulerConfiguration{}
 	_, _, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(nil, &gvk, &cfg)
 	if err != nil {
@@ -74,6 +75,8 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
 func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+	// Run API server with minimimal logging by default. Can be raised with -v.
+	framework.MinVerbosity = 0
 	apiURL, apiShutdown := util.StartApiserver()
 	var err error
 
@@ -173,17 +176,26 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 		}
 		destFile = path.Join(*dataItemsDir, destFile)
 	}
+	formatted := &bytes.Buffer{}
+	if err := json.Indent(formatted, b, "", "  "); err != nil {
+		return fmt.Errorf("indenting error: %v", err)
+	}
+	return os.WriteFile(destFile, formatted.Bytes(), 0644)
+}
 
-	return ioutil.WriteFile(destFile, b, 0644)
+type labelValues struct {
+	label  string
+	values []string
 }
 
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
+// NOTE: The mapping here means only one filter is supported, either value in the list of `values` is able to be collected.
 type metricsCollectorConfig struct {
-	Metrics []string
+	Metrics map[string]*labelValues
 }
 
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
-// Currently only Histrogram metrics are supported.
+// Currently only Histogram metrics are supported.
 type metricsCollector struct {
 	*metricsCollectorConfig
 	labels map[string]string
@@ -202,41 +214,53 @@ func (*metricsCollector) run(ctx context.Context) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for _, metric := range pc.Metrics {
-		dataItem := collectHistogram(metric, pc.labels)
-		if dataItem != nil {
-			dataItems = append(dataItems, *dataItem)
+	for metric, labelVals := range pc.Metrics {
+		// no filter is specified, aggregate all the metrics within the same metricFamily.
+		if labelVals == nil {
+			dataItem := collectHistogramVec(metric, pc.labels, nil)
+			if dataItem != nil {
+				dataItems = append(dataItems, *dataItem)
+			}
+		} else {
+			// fetch the metric from metricFamily which match each of the lvMap.
+			for _, value := range labelVals.values {
+				lvMap := map[string]string{labelVals.label: value}
+				dataItem := collectHistogramVec(metric, pc.labels, lvMap)
+				if dataItem != nil {
+					dataItems = append(dataItems, *dataItem)
+				}
+			}
 		}
 	}
 	return dataItems
 }
 
-func collectHistogram(metric string, labels map[string]string) *DataItem {
-	hist, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric)
+func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
+	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
 	if err != nil {
 		klog.Error(err)
 		return nil
 	}
-	if hist.Histogram == nil {
-		klog.Errorf("metric %q is not a Histogram metric", metric)
-		return nil
-	}
-	if err := hist.Validate(); err != nil {
+
+	if err := vec.Validate(); err != nil {
 		klog.Error(err)
 		return nil
 	}
 
-	q50 := hist.Quantile(0.50)
-	q90 := hist.Quantile(0.90)
-	q95 := hist.Quantile(0.95)
-	q99 := hist.Quantile(0.99)
-	avg := hist.Average()
+	q50 := vec.Quantile(0.50)
+	q90 := vec.Quantile(0.90)
+	q95 := vec.Quantile(0.95)
+	q99 := vec.Quantile(0.99)
+	avg := vec.Average()
 
 	msFactor := float64(time.Second) / float64(time.Millisecond)
 
 	// Copy labels and add "Metric" label for this metric.
 	labelMap := map[string]string{"Metric": metric}
 	for k, v := range labels {
+		labelMap[k] = v
+	}
+	for k, v := range lvMap {
 		labelMap[k] = v
 	}
 	return &DataItem{

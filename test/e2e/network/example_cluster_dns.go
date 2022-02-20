@@ -19,7 +19,7 @@ package network
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -175,7 +175,7 @@ func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	f, err := os.Open(inputFile)
 	framework.ExpectNoError(err, "failed to open file: %s", inputFile)
 	defer f.Close()
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	framework.ExpectNoError(err, "failed to read from file: %s", inputFile)
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml

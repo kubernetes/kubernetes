@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package logs contains support for logging options, flags and setup.
+// Commands must explicitly enable command line flags. They no longer
+// get added automatically when importing this package.
 package logs
 
 import (
@@ -28,17 +31,131 @@ import (
 )
 
 const logFlushFreqFlagName = "log-flush-frequency"
+const deprecated = "will be removed in a future release, see https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components"
 
-var logFlushFreq = pflag.Duration(logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
+// TODO (https://github.com/kubernetes/kubernetes/issues/105310): once klog
+// flags are removed, stop warning about "Non-default formats don't honor these
+// flags" in config.go and instead add this remark here.
+//
+// const vmoduleUsage = " (only works for the default text log format)"
+
+var (
+	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
+	logrFlush    func()
+
+	// Periodic flushing gets configured either via the global flag
+	// in this file or via LoggingConfiguration.
+	logFlushFreq      time.Duration
+	logFlushFreqAdded bool
+)
 
 func init() {
-	klog.InitFlags(flag.CommandLine)
+	klog.InitFlags(packageFlags)
+	packageFlags.DurationVar(&logFlushFreq, logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
 }
 
-// AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
-// same value as the global flags.
-func AddFlags(fs *pflag.FlagSet) {
-	fs.AddFlag(pflag.Lookup(logFlushFreqFlagName))
+type addFlagsOptions struct {
+	skipLoggingConfigurationFlags bool
+}
+
+type Option func(*addFlagsOptions)
+
+// SkipLoggingConfigurationFlags must be used as option for AddFlags when
+// the program also uses a LoggingConfiguration struct for configuring
+// logging. Then only flags not covered by that get added.
+func SkipLoggingConfigurationFlags() Option {
+	return func(o *addFlagsOptions) {
+		o.skipLoggingConfigurationFlags = true
+	}
+}
+
+// AddFlags registers this package's flags on arbitrary FlagSets. This includes
+// the klog flags, with the original underscore as separator between. If
+// commands want hyphens as separators, they can set
+// k8s.io/component-base/cli/flag/WordSepNormalizeFunc as normalization
+// function on the flag set before calling AddFlags.
+//
+// May be called more than once.
+func AddFlags(fs *pflag.FlagSet, opts ...Option) {
+	// Determine whether the flags are already present by looking up one
+	// which always should exist.
+	if fs.Lookup("logtostderr") != nil {
+		return
+	}
+
+	o := addFlagsOptions{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	// Add flags with pflag deprecation remark for some klog flags.
+	packageFlags.VisitAll(func(f *flag.Flag) {
+		pf := pflag.PFlagFromGoFlag(f)
+		switch f.Name {
+		case "v":
+			// unchanged, potentially skip it
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+		case logFlushFreqFlagName:
+			// unchanged, potentially skip it
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+			logFlushFreqAdded = true
+		case "vmodule":
+			// TODO: see above
+			// pf.Usage += vmoduleUsage
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+		default:
+			// deprecated, but not hidden
+			pf.Deprecated = deprecated
+		}
+		fs.AddFlag(pf)
+	})
+}
+
+// AddGoFlags is a variant of AddFlags for traditional Go flag.FlagSet.
+// Commands should use pflag whenever possible for the sake of consistency.
+// Cases where this function is needed include tests (they have to set up flags
+// in flag.CommandLine) and commands that for historic reasons use Go
+// flag.Parse and cannot change to pflag because it would break their command
+// line interface.
+func AddGoFlags(fs *flag.FlagSet, opts ...Option) {
+	o := addFlagsOptions{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	// Add flags with deprecation remark added to the usage text of
+	// some klog flags.
+	packageFlags.VisitAll(func(f *flag.Flag) {
+		usage := f.Usage
+		switch f.Name {
+		case "v":
+			// unchanged
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+		case logFlushFreqFlagName:
+			// unchanged
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+			logFlushFreqAdded = true
+		case "vmodule":
+			// TODO: see above
+			// usage += vmoduleUsage
+			if o.skipLoggingConfigurationFlags {
+				return
+			}
+		default:
+			usage += " (DEPRECATED: " + deprecated + ")"
+		}
+		fs.Var(f.Value, f.Name, usage)
+	})
 }
 
 // KlogWriter serves as a bridge between the standard log package and the glog package.
@@ -50,17 +167,27 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 	return len(data), nil
 }
 
-// InitLogs initializes logs the way we want for kubernetes.
+// InitLogs initializes logs the way we want for Kubernetes.
+// It should be called after parsing flags. If called before that,
+// it will use the default log settings.
 func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
-	// The default glog flush interval is 5 seconds.
-	go wait.Forever(klog.Flush, *logFlushFreq)
+	if logFlushFreqAdded {
+		// The flag from this file was activated, so use it now.
+		// Otherwise LoggingConfiguration.Apply will do this.
+		go wait.Forever(FlushLogs, logFlushFreq)
+	}
 }
 
-// FlushLogs flushes logs immediately.
+// FlushLogs flushes logs immediately. This should be called at the end of
+// the main function via defer to ensure that all pending log messages
+// are printed before exiting the program.
 func FlushLogs() {
 	klog.Flush()
+	if logrFlush != nil {
+		logrFlush()
+	}
 }
 
 // NewLogger creates a new log.Logger which sends logs to klog.Info.

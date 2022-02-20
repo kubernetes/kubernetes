@@ -75,11 +75,11 @@ type ResponseMeta struct {
 }
 
 // IndexerFunc is a function that for a given object computes
-// <value of an index> for a particular <index>.
+// `<value of an index>` for a particular `<index>`.
 type IndexerFunc func(obj runtime.Object) string
 
-// IndexerFuncs is a mapping from <index name> to function that
-// for a given object computes <value for that index>.
+// IndexerFuncs is a mapping from `<index name>` to function that
+// for a given object computes `<value for that index>`.
 type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
@@ -88,7 +88,7 @@ var Everything = SelectionPredicate{
 	Field: fields.Everything(),
 }
 
-// MatchValue defines a pair (<index name>, <value for that index>).
+// MatchValue defines a pair (`<index name>`, `<value for that index>`).
 type MatchValue struct {
 	IndexName string
 	Value     string
@@ -183,15 +183,6 @@ type Interface interface {
 	// and send it in an "ADDED" event, before watch starts.
 	Watch(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
-	// WatchList begins watching the specified key's items. Items are decoded into API
-	// objects and any item selected by 'p' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching,
-	// which should be the current resourceVersion, and no longer rv+1
-	// (e.g. reconnecting without missing any updates).
-	// If resource version is "0", this interface will list current objects directory defined by key
-	// and send them in "ADDED" events, before watch starts.
-	WatchList(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
-
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on 'opts.ignoreNotFound'.
 	// Treats empty responses and nil response nodes exactly like a not found error.
@@ -274,6 +265,9 @@ type ListOptions struct {
 	ResourceVersionMatch metav1.ResourceVersionMatch
 	// Predicate provides the selection rules for the list operation.
 	Predicate SelectionPredicate
+	// Recursive determines whether the watch is defined for a single object or for the whole set
+	// of objects. The option is ignored for non-watch requests.
+	Recursive bool
 	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
 	// be delivered to the users. The option is ignored for non-watch requests.
 	ProgressNotify bool

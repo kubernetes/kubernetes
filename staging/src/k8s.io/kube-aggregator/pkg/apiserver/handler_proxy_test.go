@@ -17,10 +17,12 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -38,10 +40,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/egressselector"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -296,6 +301,7 @@ func TestProxyHandler(t *testing.T) {
 	target := &targetHTTPHandler{}
 	for name, tc := range tests {
 		target.Reset()
+		legacyregistry.Reset()
 
 		func() {
 			targetServer := httptest.NewUnstartedServer(target)
@@ -379,11 +385,43 @@ func TestProxyHandler(t *testing.T) {
 	}
 }
 
+type mockEgressDialer struct {
+	called int
+}
+
+func (m *mockEgressDialer) dial(ctx context.Context, net, addr string) (net.Conn, error) {
+	m.called++
+	return http.DefaultTransport.(*http.Transport).DialContext(ctx, net, addr)
+}
+
+func (m *mockEgressDialer) dialBroken(ctx context.Context, net, addr string) (net.Conn, error) {
+	m.called++
+	return nil, fmt.Errorf("Broken dialer")
+}
+
+func newDialerAndSelector() (*mockEgressDialer, *egressselector.EgressSelector) {
+	dialer := &mockEgressDialer{}
+	m := make(map[egressselector.EgressType]utilnet.DialFunc)
+	m[egressselector.Cluster] = dialer.dial
+	es := egressselector.NewEgressSelectorWithMap(m)
+	return dialer, es
+}
+
+func newBrokenDialerAndSelector() (*mockEgressDialer, *egressselector.EgressSelector) {
+	dialer := &mockEgressDialer{}
+	m := make(map[egressselector.EgressType]utilnet.DialFunc)
+	m[egressselector.Cluster] = dialer.dialBroken
+	es := egressselector.NewEgressSelectorWithMap(m)
+	return dialer, es
+}
+
 func TestProxyUpgrade(t *testing.T) {
+	upgradeUser := "upgradeUser"
 	testcases := map[string]struct {
-		APIService   *apiregistration.APIService
-		ExpectError  bool
-		ExpectCalled bool
+		APIService        *apiregistration.APIService
+		NewEgressSelector func() (*mockEgressDialer, *egressselector.EgressSelector)
+		ExpectError       bool
+		ExpectCalled      bool
 	}{
 		"valid hostname + CABundle": {
 			APIService: &apiregistration.APIService{
@@ -436,18 +474,58 @@ func TestProxyUpgrade(t *testing.T) {
 			ExpectError:  true,
 			ExpectCalled: false,
 		},
+		"valid hostname + CABundle + egress selector": {
+			APIService: &apiregistration.APIService{
+				Spec: apiregistration.APIServiceSpec{
+					CABundle: testCACrt,
+					Group:    "mygroup",
+					Version:  "v1",
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			NewEgressSelector: newDialerAndSelector,
+			ExpectError:       false,
+			ExpectCalled:      true,
+		},
+		"valid hostname + CABundle + egress selector non working": {
+			APIService: &apiregistration.APIService{
+				Spec: apiregistration.APIServiceSpec{
+					CABundle: testCACrt,
+					Group:    "mygroup",
+					Version:  "v1",
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			NewEgressSelector: newBrokenDialerAndSelector,
+			ExpectError:       true,
+			ExpectCalled:      false,
+		},
 	}
 
 	for k, tc := range testcases {
 		tcName := k
-		path := "/apis/" + tc.APIService.Spec.Group + "/" + tc.APIService.Spec.Version + "/foo"
-		timesCalled := int32(0)
-
-		func() { // Cleanup after each test case.
+		t.Run(tcName, func(t *testing.T) {
+			path := "/apis/" + tc.APIService.Spec.Group + "/" + tc.APIService.Spec.Version + "/foo"
+			timesCalled := int32(0)
 			backendHandler := http.NewServeMux()
 			backendHandler.Handle(path, websocket.Handler(func(ws *websocket.Conn) {
 				atomic.AddInt32(&timesCalled, 1)
 				defer ws.Close()
+				req := ws.Request()
+				user := req.Header.Get("X-Remote-User")
+				if user != upgradeUser {
+					t.Errorf("expected user %q, got %q", upgradeUser, user)
+				}
 				body := make([]byte, 5)
 				ws.Read(body)
 				ws.Write([]byte("hello " + string(body)))
@@ -475,8 +553,16 @@ func TestProxyUpgrade(t *testing.T) {
 				proxyTransport:             &http.Transport{},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
+
+			var dialer *mockEgressDialer
+			var selector *egressselector.EgressSelector
+			if tc.NewEgressSelector != nil {
+				dialer, selector = tc.NewEgressSelector()
+				proxyHandler.egressSelector = selector
+			}
+
 			proxyHandler.updateAPIService(tc.APIService)
-			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
+			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: upgradeUser}))
 			defer aggregator.Close()
 
 			ws, err := websocket.Dial("ws://"+aggregator.Listener.Addr().String()+path, "", "http://127.0.0.1/")
@@ -487,6 +573,12 @@ func TestProxyUpgrade(t *testing.T) {
 				return
 			}
 			defer ws.Close()
+
+			// if the egressselector is configured assume it has to be called
+			if dialer != nil && dialer.called != 1 {
+				t.Errorf("expect egress dialer gets called %d times, got %d", 1, dialer.called)
+			}
+
 			if tc.ExpectError {
 				t.Errorf("%s: expected websocket error, got none", tcName)
 				return
@@ -507,7 +599,7 @@ func TestProxyUpgrade(t *testing.T) {
 				t.Errorf("%s: expected '%#v', got '%#v'", tcName, e, a)
 				return
 			}
-		}()
+		})
 	}
 }
 
@@ -806,6 +898,141 @@ func TestProxyCertReload(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("Expected status code 200 but got %d", resp.StatusCode)
+	}
+}
+
+type fcInitSignal struct {
+	nSignals int32
+}
+
+func (s *fcInitSignal) SignalCount() int {
+	return int(atomic.SwapInt32(&s.nSignals, 0))
+}
+
+func (s *fcInitSignal) Signal() {
+	atomic.AddInt32(&s.nSignals, 1)
+}
+
+func (s *fcInitSignal) Wait() {
+}
+
+type hookedListener struct {
+	l        net.Listener
+	onAccept func()
+}
+
+func (wl *hookedListener) Accept() (net.Conn, error) {
+	conn, err := wl.l.Accept()
+	if err == nil {
+		wl.onAccept()
+	}
+	return conn, err
+}
+
+func (wl *hookedListener) Close() error {
+	return wl.l.Close()
+}
+
+func (wl *hookedListener) Addr() net.Addr {
+	return wl.l.Addr()
+}
+
+func TestFlowControlSignal(t *testing.T) {
+	for _, tc := range []struct {
+		Name           string
+		Local          bool
+		Available      bool
+		Request        http.Request
+		SignalExpected bool
+	}{
+		{
+			Name:           "local",
+			Local:          true,
+			SignalExpected: false,
+		},
+		{
+			Name:           "unavailable",
+			Local:          false,
+			Available:      false,
+			SignalExpected: false,
+		},
+		{
+			Name:           "request performed",
+			Local:          false,
+			Available:      true,
+			SignalExpected: true,
+		},
+		{
+			Name:      "upgrade request performed",
+			Local:     false,
+			Available: true,
+			Request: http.Request{
+				Header: http.Header{"Connection": []string{"Upgrade"}},
+			},
+			SignalExpected: true,
+		},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			okh := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			var sig fcInitSignal
+
+			var signalCountOnAccept int32
+			backend := httptest.NewUnstartedServer(okh)
+			backend.Listener = &hookedListener{
+				l: backend.Listener,
+				onAccept: func() {
+					atomic.StoreInt32(&signalCountOnAccept, int32(sig.SignalCount()))
+				},
+			}
+			backend.Start()
+			defer backend.Close()
+
+			p := proxyHandler{
+				localDelegate:   okh,
+				serviceResolver: &mockedRouter{destinationHost: backend.Listener.Addr().String()},
+			}
+
+			server := httptest.NewServer(contextHandler(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					p.ServeHTTP(w, r.WithContext(utilflowcontrol.WithInitializationSignal(r.Context(), &sig)))
+				}),
+				&user.DefaultInfo{
+					Name:   "username",
+					Groups: []string{"one", "two"},
+				},
+			))
+			defer server.Close()
+
+			p.handlingInfo.Store(proxyHandlingInfo{
+				local:             tc.Local,
+				serviceAvailable:  tc.Available,
+				proxyRoundTripper: backend.Client().Transport,
+			})
+
+			surl, err := url.Parse(server.URL)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			req := tc.Request
+			req.URL = surl
+			res, err := server.Client().Do(&req)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := res.Body.Close(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if fired := (atomic.LoadInt32(&signalCountOnAccept) > 0); tc.SignalExpected && !fired {
+				t.Errorf("flow control signal expected but not fired")
+			} else if fired && !tc.SignalExpected {
+				t.Errorf("flow control signal fired but not expected")
+			}
+		})
 	}
 }
 

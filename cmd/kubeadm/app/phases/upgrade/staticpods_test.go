@@ -20,13 +20,18 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+
+	"k8s.io/client-go/tools/clientcmd"
+	certutil "k8s.io/client-go/util/cert"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -43,12 +48,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-
-	"k8s.io/client-go/tools/clientcmd"
-	certutil "k8s.io/client-go/util/cert"
-
-	"github.com/pkg/errors"
-	"go.etcd.io/etcd/client/pkg/v3/transport"
 )
 
 const (
@@ -154,7 +153,7 @@ type fakeStaticPodPathManager struct {
 }
 
 func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (StaticPodPathManager, error) {
-	kubernetesDir, err := ioutil.TempDir("", "kubeadm-pathmanager-")
+	kubernetesDir, err := os.MkdirTemp("", "kubeadm-pathmanager-")
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a temporary directory for the upgrade")
 	}
@@ -453,18 +452,18 @@ func TestStaticPodControlPlane(t *testing.T) {
 			defer os.RemoveAll(pathMgr.(*fakeStaticPodPathManager).KubernetesDir())
 			tmpKubernetesDir := pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
 
-			tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
+			tempCertsDir, err := os.MkdirTemp("", "kubeadm-certs")
 			if err != nil {
 				t.Fatalf("couldn't create temporary certificates directory: %v", err)
 			}
 			defer os.RemoveAll(tempCertsDir)
-			tmpEtcdDataDir, err := ioutil.TempDir("", "kubeadm-etcd-data")
+			tmpEtcdDataDir, err := os.MkdirTemp("", "kubeadm-etcd-data")
 			if err != nil {
 				t.Fatalf("couldn't create temporary etcd data directory: %v", err)
 			}
 			defer os.RemoveAll(tmpEtcdDataDir)
 
-			oldcfg, err := getConfig(constants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			oldcfg, err := getConfig("v1.3.0", tempCertsDir, tmpEtcdDataDir)
 			if err != nil {
 				t.Fatalf("couldn't create config: %v", err)
 			}
@@ -573,7 +572,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 func getAPIServerHash(dir string) (string, error) {
 	manifestPath := constants.GetStaticPodFilepath(constants.KubeAPIServer, dir)
 
-	fileBytes, err := ioutil.ReadFile(manifestPath)
+	fileBytes, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return "", err
 	}
@@ -589,7 +588,7 @@ func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.InitConfigura
 }
 
 func getTempDir(t *testing.T, name string) (string, func()) {
-	dir, err := ioutil.TempDir(os.TempDir(), name)
+	dir, err := os.MkdirTemp(os.TempDir(), name)
 	if err != nil {
 		t.Fatalf("couldn't make temporary directory: %v", err)
 	}
@@ -942,7 +941,7 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Use a temporary directory
-			tmpdir, err := ioutil.TempDir("", "TestGetPathManagerForUpgrade")
+			tmpdir, err := os.MkdirTemp("", "TestGetPathManagerForUpgrade")
 			if err != nil {
 				t.Fatalf("unexpected error making temporary directory: %v", err)
 			}
@@ -1000,13 +999,13 @@ spec:
   - name: etcd
     image: k8s.gcr.io/etcd:` + expectedEtcdVersion
 
-	manifestsDir, err := ioutil.TempDir("", "GetEtcdImageTagFromStaticPod-test-manifests")
+	manifestsDir, err := os.MkdirTemp("", "GetEtcdImageTagFromStaticPod-test-manifests")
 	if err != nil {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(manifestsDir)
 
-	if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+	if err = os.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
 		t.Fatalf("Unable to create test static pod manifest: %v", err)
 	}
 

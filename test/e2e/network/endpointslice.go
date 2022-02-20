@@ -57,26 +57,33 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
 		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
 		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		API Server should create self referential Endpoints and EndpointSlices named "kubernetes" in the default namespace.
+		The cluster MUST have a service named "kubernetes" on the default namespace referencing the API servers.
+		The "kubernetes.default" service MUST have Endpoints and EndpointSlices pointing to each API server instance.
 	*/
 	framework.ConformanceIt("should have Endpoints and EndpointSlices pointing to API Server", func() {
 		namespace := "default"
 		name := "kubernetes"
+		// verify "kubernetes.default" service exist
+		_, err := cs.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" Service resource on \"default\" namespace")
+
+		// verify Endpoints for the API servers exist
 		endpoints, err := cs.CoreV1().Endpoints(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "error creating Endpoints resource")
-		if len(endpoints.Subsets) != 1 {
-			framework.Failf("Expected 1 subset in endpoints, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
+		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" Endpoint resource on \"default\" namespace")
+		if len(endpoints.Subsets) == 0 {
+			framework.Failf("Expected at least 1 subset in endpoints, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
+		}
+		// verify EndpointSlices for the API servers exist
+		endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "kubernetes.io/service-name=" + name,
+		})
+		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" EndpointSlice resource on \"default\" namespace")
+		if len(endpointSliceList.Items) == 0 {
+			framework.Failf("Expected at least 1 EndpointSlice, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
 		}
 
-		endpointSubset := endpoints.Subsets[0]
-		endpointSlice, err := cs.DiscoveryV1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "error creating EndpointSlice resource")
-		if len(endpointSlice.Ports) != len(endpointSubset.Ports) {
-			framework.Failf("Expected EndpointSlice to have %d ports, got %d: %#v", len(endpointSubset.Ports), len(endpointSlice.Ports), endpointSlice.Ports)
-		}
-		numExpectedEndpoints := len(endpointSubset.Addresses) + len(endpointSubset.NotReadyAddresses)
-		if len(endpointSlice.Endpoints) != numExpectedEndpoints {
-			framework.Failf("Expected EndpointSlice to have %d endpoints, got %d: %#v", numExpectedEndpoints, len(endpointSlice.Endpoints), endpointSlice.Endpoints)
+		if !endpointSlicesEqual(endpoints, endpointSliceList) {
+			framework.Failf("Expected EndpointSlice to have same addresses and port as Endpoints, got %#v: %#v", endpoints, endpointSliceList)
 		}
 
 	})
@@ -373,7 +380,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected discovery API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected discovery API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 
 		ginkgo.By("getting /apis/discovery.k8s.io")
@@ -388,7 +397,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected discovery API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected discovery API version, got %#v", group.Versions)
+			}
 		}
 
 		ginkgo.By("getting /apis/discovery.k8s.io" + epsVersion)
@@ -402,7 +413,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					foundEPS = true
 				}
 			}
-			framework.ExpectEqual(foundEPS, true, fmt.Sprintf("expected endpointslices, got %#v", resources.APIResources))
+			if !foundEPS {
+				framework.Failf("expected endpointslices, got %#v", resources.APIResources)
+			}
 		}
 
 		// EndpointSlice resource create/read/update/watch verbs
@@ -464,10 +477,14 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-epsWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedEPS, isEPS := evt.Object.(*discoveryv1.EndpointSlice)
-				framework.ExpectEqual(isEPS, true, fmt.Sprintf("expected EndpointSlice, got %T", evt.Object))
+				if !isEPS {
+					framework.Failf("expected EndpointSlice, got %T", evt.Object)
+				}
 				if watchedEPS.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -485,7 +502,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		err = epsClient.Delete(context.TODO(), createdEPS.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 		_, err = epsClient.Get(context.TODO(), createdEPS.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %v", err))
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %v", err)
+		}
 		epsList, err = epsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(epsList.Items), 2, "filtered list should have 2 items")
@@ -784,4 +803,58 @@ func createServiceReportErr(cs clientset.Interface, ns string, service *v1.Servi
 	svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "error deleting Service")
 	return svc
+}
+
+// endpointSlicesEqual compare if the Endpoint and the EndpointSliceList contains the same endpoints values
+// as in addresses and ports, considering Ready and Unready addresses
+func endpointSlicesEqual(endpoints *v1.Endpoints, endpointSliceList *discoveryv1.EndpointSliceList) bool {
+	// get the apiserver endpoint addresses
+	epAddresses := sets.NewString()
+	epPorts := sets.NewInt32()
+	for _, subset := range endpoints.Subsets {
+		for _, addr := range subset.Addresses {
+			epAddresses.Insert(addr.IP)
+		}
+		for _, addr := range subset.NotReadyAddresses {
+			epAddresses.Insert(addr.IP)
+		}
+		for _, port := range subset.Ports {
+			epPorts.Insert(port.Port)
+		}
+	}
+	framework.Logf("Endpoints addresses: %v , ports: %v", epAddresses.List(), epPorts.List())
+
+	// Endpoints are single stack, and must match the primary IP family of the Service kubernetes.default
+	// However, EndpointSlices can be IPv4 or IPv6, we can only compare the Slices that match the same IP family
+	// framework.TestContext.ClusterIsIPv6() reports the IP family of the kubernetes.default service
+	var addrType discoveryv1.AddressType
+	if framework.TestContext.ClusterIsIPv6() {
+		addrType = discoveryv1.AddressTypeIPv6
+	} else {
+		addrType = discoveryv1.AddressTypeIPv4
+	}
+
+	// get the apiserver addresses from the endpoint slice list
+	sliceAddresses := sets.NewString()
+	slicePorts := sets.NewInt32()
+	for _, slice := range endpointSliceList.Items {
+		if slice.AddressType != addrType {
+			framework.Logf("Skipping slice %s: wanted %s family, got %s", slice.Name, addrType, slice.AddressType)
+			continue
+		}
+		for _, s := range slice.Endpoints {
+			sliceAddresses.Insert(s.Addresses...)
+		}
+		for _, ports := range slice.Ports {
+			if ports.Port != nil {
+				slicePorts.Insert(*ports.Port)
+			}
+		}
+	}
+
+	framework.Logf("EndpointSlices addresses: %v , ports: %v", sliceAddresses.List(), slicePorts.List())
+	if sliceAddresses.Equal(epAddresses) && slicePorts.Equal(epPorts) {
+		return true
+	}
+	return false
 }

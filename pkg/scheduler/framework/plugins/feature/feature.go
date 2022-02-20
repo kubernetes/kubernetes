@@ -24,4 +24,6 @@ type Features struct {
 	EnablePodDisruptionBudget          bool
 	EnablePodOverhead                  bool
 	EnableReadWriteOncePod             bool
+	EnableVolumeCapacityPriority       bool
+	EnableCSIStorageCapacity           bool
 }

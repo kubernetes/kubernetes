@@ -19,7 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -27,23 +27,22 @@ import (
 	"sync"
 	"time"
 
-	testutils "k8s.io/kubernetes/test/utils"
-
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/apimachinery/pkg/runtime"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -88,20 +87,6 @@ func detectCoresPerSocket() int {
 	framework.ExpectNoError(err)
 
 	return coreCount
-}
-
-func countSRIOVDevices() (int, error) {
-	outData, err := exec.Command("/bin/sh", "-c", "ls /sys/bus/pci/devices/*/physfn | wc -w").Output()
-	if err != nil {
-		return -1, err
-	}
-	return strconv.Atoi(strings.TrimSpace(string(outData)))
-}
-
-func detectSRIOVDevices() int {
-	devCount, err := countSRIOVDevices()
-	framework.ExpectNoError(err)
-	return devCount
 }
 
 func makeContainers(ctnCmd string, ctnAttributes []tmCtnAttribute) (ctns []v1.Container) {
@@ -208,7 +193,7 @@ func findNUMANodeWithoutSRIOVDevices(configMap *v1.ConfigMap, numaNodes int) (in
 	return findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes)
 }
 
-func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, policy, scope string, configMap *v1.ConfigMap, numaNodes int) string {
+func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, policy, scope string, configMap *v1.ConfigMap, numaNodes int) (*kubeletconfig.KubeletConfiguration, string) {
 	// Configure Topology Manager in Kubelet with policy.
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
@@ -217,8 +202,6 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 
 	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["TopologyManager"] = true
-
-	deleteStateFile()
 
 	// Set the Topology Manager policy
 	newCfg.TopologyManagerPolicy = policy
@@ -251,17 +234,7 @@ func configureTopologyManagerInKubelet(f *framework.Framework, oldCfg *kubeletco
 	// Dump the config -- debug
 	framework.Logf("New kubelet config is %s", *newCfg)
 
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
-
-	return newCfg.ReservedSystemCPUs
+	return newCfg, newCfg.ReservedSystemCPUs
 }
 
 // getSRIOVDevicePluginPod returns the Device Plugin pod for sriov resources in e2e tests.
@@ -367,6 +340,13 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	var cpuCap, cpuAlloc int64
 
 	cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
+	ginkgo.By(fmt.Sprintf("checking node CPU capacity (%d) and allocatable CPUs (%d)", cpuCap, cpuAlloc))
+
+	// Albeit even the weakest CI machines usually have 2 cpus, let's be extra careful and
+	// check explicitly. We prefer to skip than a false negative (and a failed test).
+	if cpuAlloc < 1 {
+		e2eskipper.Skipf("Skipping basic CPU Manager tests since CPU capacity < 2")
+	}
 
 	ginkgo.By("running a non-Gu pod")
 	runNonGuPodTest(f, cpuCap)
@@ -374,13 +354,13 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	ginkgo.By("running a Gu pod")
 	runGuPodTest(f, 1)
 
-	ginkgo.By("running multiple Gu and non-Gu pods")
-	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
-
-	// Skip rest of the tests if CPU capacity < 3.
-	if cpuCap < 3 {
+	// Skip rest of the tests if CPU allocatable < 3.
+	if cpuAlloc < 3 {
 		e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 	}
+
+	ginkgo.By("running multiple Gu and non-Gu pods")
+	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
 
 	ginkgo.By("running a Gu pod requesting multiple CPUs")
 	runMultipleCPUGuPod(f)
@@ -498,7 +478,7 @@ func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 	// the SRIOVDP configuration is hw-dependent, so we allow per-test-host customization.
 	framework.Logf("host-local SRIOV Device Plugin Config Map %q", cmFile)
 	if cmFile != "" {
-		data, err = ioutil.ReadFile(cmFile)
+		data, err = os.ReadFile(cmFile)
 		if err != nil {
 			framework.Failf("unable to load the SRIOV Device Plugin ConfigMap: %v", err)
 		}
@@ -519,6 +499,15 @@ type sriovData struct {
 }
 
 func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sriovData {
+	sd := createSRIOVConfigOrFail(f, configMap)
+
+	e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+
+	sd.pod = createSRIOVPodOrFail(f)
+	return sd
+}
+
+func createSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sriovData {
 	var err error
 
 	ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", metav1.NamespaceSystem, configMap.Name))
@@ -536,8 +525,13 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sr
 		framework.Failf("unable to create test serviceAccount %s: %v", serviceAccount.Name, err)
 	}
 
-	e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+	return &sriovData{
+		configMap:      configMap,
+		serviceAccount: serviceAccount,
+	}
+}
 
+func createSRIOVPodOrFail(f *framework.Framework) *v1.Pod {
 	dp := getSRIOVDevicePluginPod()
 	dp.Spec.NodeName = framework.TestContext.NodeName
 
@@ -550,11 +544,7 @@ func setupSRIOVConfigOrFail(f *framework.Framework, configMap *v1.ConfigMap) *sr
 	}
 	framework.ExpectNoError(err)
 
-	return &sriovData{
-		configMap:      configMap,
-		serviceAccount: serviceAccount,
-		pod:            dpPod,
-	}
+	return dpPod
 }
 
 // waitForSRIOVResources waits until enough SRIOV resources are avaailable, expecting to complete within the timeout.
@@ -574,7 +564,7 @@ func waitForSRIOVResources(f *framework.Framework, sd *sriovData) {
 	framework.Logf("Detected SRIOV allocatable devices name=%q amount=%d", sd.resourceName, sd.resourceAmount)
 }
 
-func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
+func deleteSRIOVPodOrFail(f *framework.Framework, sd *sriovData) {
 	var err error
 	gp := int64(0)
 	deleteOptions := metav1.DeleteOptions{
@@ -585,6 +575,14 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
 	waitForAllContainerRemoval(sd.pod.Name, sd.pod.Namespace)
+}
+
+func removeSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
+	var err error
+	gp := int64(0)
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
 
 	ginkgo.By(fmt.Sprintf("Deleting configMap %v/%v", metav1.NamespaceSystem, sd.configMap.Name))
 	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, deleteOptions)
@@ -593,6 +591,11 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	ginkgo.By(fmt.Sprintf("Deleting serviceAccount %v/%v", metav1.NamespaceSystem, sd.serviceAccount.Name))
 	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, deleteOptions)
 	framework.ExpectNoError(err)
+}
+
+func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
+	deleteSRIOVPodOrFail(f, sd)
+	removeSRIOVConfigOrFail(f, sd)
 }
 
 func runTMScopeResourceAlignmentTestSuite(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
@@ -891,28 +894,15 @@ func runTopologyManagerTests(f *framework.Framework) {
 			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
 			framework.Logf("Configuring topology Manager policy to %s", policy)
 
-			configureTopologyManagerInKubelet(f, oldCfg, policy, scope, nil, 0)
+			newCfg, _ := configureTopologyManagerInKubelet(oldCfg, policy, scope, nil, 0)
+			updateKubeletConfig(f, newCfg, true)
 			// Run the tests
 			runTopologyManagerPolicySuiteTests(f)
 		}
 	})
 
 	ginkgo.It("run Topology Manager node alignment test suite", func() {
-		// this is a very rough check. We just want to rule out system that does NOT have
-		// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
-		sriovdevCount := detectSRIOVDevices()
-		numaNodes := detectNUMANodes()
-		coreCount := detectCoresPerSocket()
-
-		if numaNodes < minNumaNodes {
-			e2eskipper.Skipf("this test is meant to run on a multi-node NUMA system")
-		}
-		if coreCount < minCoreCount {
-			e2eskipper.Skipf("this test is meant to run on a system with at least 4 cores per socket")
-		}
-		if sriovdevCount == 0 {
-			e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
-		}
+		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
@@ -928,44 +918,55 @@ func runTopologyManagerTests(f *framework.Framework) {
 			ginkgo.By(fmt.Sprintf("by configuring Topology Manager policy to %s", policy))
 			framework.Logf("Configuring topology Manager policy to %s", policy)
 
-			reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, scope, configMap, numaNodes)
+			newCfg, reservedSystemCPUs := configureTopologyManagerInKubelet(oldCfg, policy, scope, configMap, numaNodes)
+			updateKubeletConfig(f, newCfg, true)
 
 			runTopologyManagerNodeAlignmentSuiteTests(f, sd, reservedSystemCPUs, policy, numaNodes, coreCount)
 		}
 	})
 
 	ginkgo.It("run the Topology Manager pod scope alignment test suite", func() {
-		sriovdevCount := detectSRIOVDevices()
-		numaNodes := detectNUMANodes()
-		coreCount := detectCoresPerSocket()
-
-		if numaNodes < minNumaNodes {
-			e2eskipper.Skipf("this test is intended to be run on a multi-node NUMA system")
-		}
-		if coreCount < minCoreCount {
-			e2eskipper.Skipf("this test is intended to be run on a system with at least %d cores per socket", minCoreCount)
-		}
-		if sriovdevCount == 0 {
-			e2eskipper.Skipf("this test is intended to be run on a system with at least one SR-IOV VF enabled")
-		}
+		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
-		oldCfg, err := getCurrentKubeletConfig()
+		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
 		policy := topologymanager.PolicySingleNumaNode
 		scope := podScopeTopology
 
-		reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, scope, configMap, numaNodes)
+		newCfg, reservedSystemCPUs := configureTopologyManagerInKubelet(oldCfg, policy, scope, configMap, numaNodes)
+		updateKubeletConfig(f, newCfg, true)
 
 		runTMScopeResourceAlignmentTestSuite(f, configMap, reservedSystemCPUs, policy, numaNodes, coreCount)
 	})
 
 	ginkgo.AfterEach(func() {
-		// restore kubelet config
-		setOldKubeletConfig(f, oldCfg)
+		if oldCfg != nil {
+			// restore kubelet config
+			updateKubeletConfig(f, oldCfg, true)
+		}
 	})
+}
+
+func hostPrecheck() (int, int) {
+	// this is a very rough check. We just want to rule out system that does NOT have
+	// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
+
+	numaNodes := detectNUMANodes()
+	if numaNodes < minNumaNodes {
+		e2eskipper.Skipf("this test is intended to be run on a multi-node NUMA system")
+	}
+
+	coreCount := detectCoresPerSocket()
+	if coreCount < minCoreCount {
+		e2eskipper.Skipf("this test is intended to be run on a system with at least %d cores per socket", minCoreCount)
+	}
+
+	requireSRIOVDevices()
+
+	return numaNodes, coreCount
 }
 
 // Serial because the test updates kubelet configuration.

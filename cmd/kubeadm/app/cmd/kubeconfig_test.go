@@ -19,20 +19,19 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/yaml"
 
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/yaml"
 )
 
 func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, error) {
@@ -70,7 +69,7 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 	}
 	buf.Write(data)
 
-	err = ioutil.WriteFile(cfgPath, buf.Bytes(), 0644)
+	err = os.WriteFile(cfgPath, buf.Bytes(), 0644)
 	return cfgPath, err
 }
 

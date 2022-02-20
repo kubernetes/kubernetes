@@ -132,7 +132,7 @@ type NodeResizeOptions struct {
 type DynamicPluginProber interface {
 	Init() error
 
-	// If an error occurs, events are undefined.
+	// aggregates events for successful drivers and errors for failed drivers
 	Probe() (events []ProbeEvent, err error)
 }
 
@@ -449,6 +449,8 @@ type VolumeHost interface {
 	// Returns the name of the node
 	GetNodeName() types.NodeName
 
+	GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error)
+
 	// Returns the event recorder of kubelet.
 	GetEventRecorder() record.EventRecorder
 
@@ -706,30 +708,26 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	defer pm.mutex.RUnlock()
 
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
-	matches := []VolumePlugin{}
+	var match VolumePlugin
 	if v, found := pm.plugins[name]; found {
-		matches = append(matches, v)
+		match = v
 	}
 
 	pm.refreshProbedPlugins()
 	if plugin, found := pm.probedPlugins[name]; found {
-		matches = append(matches, plugin)
+		if match != nil {
+			return nil, fmt.Errorf("multiple volume plugins matched: %s and %s", match.GetPluginName(), plugin.GetPluginName())
+		}
+		match = plugin
 	}
 
-	if len(matches) == 0 {
+	if match == nil {
 		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
-	}
-	if len(matches) > 1 {
-		matchedPluginNames := []string{}
-		for _, plugin := range matches {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
-		}
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 
 	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(matches[0].GetPluginName())
-	return matches[0], nil
+	pm.logDeprecation(match.GetPluginName())
+	return match, nil
 }
 
 // logDeprecation logs warning when a deprecated plugin is used.
@@ -746,11 +744,14 @@ func (pm *VolumePluginMgr) logDeprecation(plugin string) {
 // If it is, initialize all probed plugins and replace the cache with them.
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
 	events, err := pm.prober.Probe()
+
 	if err != nil {
 		klog.ErrorS(err, "Error dynamically probing plugins")
-		return // Use cached plugins upon failure.
 	}
 
+	// because the probe function can return a list of valid plugins
+	// even when an error is present we still must add the plugins
+	// or they will be skipped because each event only fires once
 	for _, event := range events {
 		if event.Op == ProbeAddOrUpdate {
 			if err := pm.initProbedPlugin(event.Plugin); err != nil {

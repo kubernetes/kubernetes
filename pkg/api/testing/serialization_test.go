@@ -20,13 +20,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	gojson "encoding/json"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	jsoniter "github.com/json-iterator/go"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -365,7 +363,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
 			t.Fatal(err)
 		}
-		sr := streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
+		sr := streaming.NewDecoder(framer.NewFrameReader(io.NopCloser(out)), s)
 		resultSecret := &v1.Secret{}
 		res, _, err := sr.Decode(nil, resultSecret)
 		if err != nil {
@@ -394,7 +392,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
 			t.Fatal(err)
 		}
-		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
+		sr = streaming.NewDecoder(framer.NewFrameReader(io.NopCloser(out)), s)
 		outEvent := &metav1.WatchEvent{}
 		_, _, err = sr.Decode(nil, outEvent)
 		if err != nil || outEvent.Type != string(watch.Added) {
@@ -583,59 +581,6 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := gojson.Unmarshal(encoded[i%width], &obj); err != nil {
-			b.Fatal(err)
-		}
-	}
-	b.StopTimer()
-}
-
-// BenchmarkDecodeIntoJSONCodecGenConfigFast provides a baseline
-// for JSON decode performance with jsoniter.ConfigFast
-func BenchmarkDecodeIntoJSONCodecGenConfigFast(b *testing.B) {
-	kcodec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
-	items := benchmarkItems(b)
-	width := len(items)
-	encoded := make([][]byte, width)
-	for i := range items {
-		data, err := runtime.Encode(kcodec, &items[i])
-		if err != nil {
-			b.Fatal(err)
-		}
-		encoded[i] = data
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		obj := v1.Pod{}
-		if err := jsoniter.ConfigFastest.Unmarshal(encoded[i%width], &obj); err != nil {
-			b.Fatal(err)
-		}
-	}
-	b.StopTimer()
-}
-
-// BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary provides a
-// baseline for JSON decode performance with
-// jsoniter.ConfigCompatibleWithStandardLibrary, but with case sensitivity set
-// to true
-func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testing.B) {
-	kcodec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
-	items := benchmarkItems(b)
-	width := len(items)
-	encoded := make([][]byte, width)
-	for i := range items {
-		data, err := runtime.Encode(kcodec, &items[i])
-		if err != nil {
-			b.Fatal(err)
-		}
-		encoded[i] = data
-	}
-
-	b.ResetTimer()
-	iter := json.CaseSensitiveJSONIterator()
-	for i := 0; i < b.N; i++ {
-		obj := v1.Pod{}
-		if err := iter.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}

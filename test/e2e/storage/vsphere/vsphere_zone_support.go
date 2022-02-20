@@ -107,6 +107,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
+		e2eskipper.SkipUnlessMultizone(client)
 		namespace = f.Namespace.Name
 		vsanDatastore1 = GetAndExpectStringEnvVar(VCPZoneVsanDatastore1)
 		vsanDatastore2 = GetAndExpectStringEnvVar(VCPZoneVsanDatastore2)

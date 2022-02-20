@@ -19,15 +19,13 @@ package cmd
 import (
 	"io"
 
+	"github.com/lithammer/dedent"
+	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/alpha"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	// Register the kubeadm configuration types because CLI flag generation
-	// depends on the generated defaults.
-
-	"github.com/lithammer/dedent"
-	"github.com/spf13/cobra"
 )
 
 // NewKubeadmCommand returns cobra.Command to run kubeadm command

@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 )
 
 func fakeCreatePod(name, namespace string, uid types.UID) *v1.Pod {
@@ -111,35 +110,5 @@ func TestPodWithDeletionTimestamp(t *testing.T) {
 
 		realPodWithDeletionTimestamp := PodWithDeletionTimestamp(fakePod)
 		assert.Equalf(t, testCase.expectedValue, realPodWithDeletionTimestamp, "Failed to test: %s", testCase.caseName)
-	}
-}
-
-func TestPods(t *testing.T) {
-	pod1 := fakeCreatePod("pod1", metav1.NamespaceDefault, "551f5a43-9f2f-11e7-a589-fa163e148d75")
-	pod2 := fakeCreatePod("pod2", metav1.NamespaceDefault, "e84a99bf-d1f9-43c2-9fa5-044ac85f794b")
-
-	pod1Obj := klog.ObjectRef{
-		Name:      "pod1",
-		Namespace: metav1.NamespaceDefault,
-	}
-	pod2Obj := klog.ObjectRef{
-		Name:      "pod2",
-		Namespace: metav1.NamespaceDefault,
-	}
-	testCases := []struct {
-		caseName      string
-		pods          []*v1.Pod
-		expectedValue []klog.ObjectRef
-	}{
-		{"input_nil_case", nil, []klog.ObjectRef{}},
-		{"input_empty_case", []*v1.Pod{}, []klog.ObjectRef{}},
-		{"input_length_one_case", []*v1.Pod{pod1, nil}, []klog.ObjectRef{pod1Obj}},
-		{"input_length_more_than_one_case", []*v1.Pod{pod1, pod2}, []klog.ObjectRef{pod1Obj, pod2Obj}},
-		{"input_include_nil_case", []*v1.Pod{pod1, nil}, []klog.ObjectRef{pod1Obj}},
-	}
-
-	for _, testCase := range testCases {
-		realPods := Pods(testCase.pods)
-		assert.Equalf(t, testCase.expectedValue, realPods, "Failed to test: %s", testCase.caseName)
 	}
 }

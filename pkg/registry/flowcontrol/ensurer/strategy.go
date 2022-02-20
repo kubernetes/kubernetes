@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -176,7 +176,7 @@ func (s *strategy) ShouldUpdate(current, bootstrap configurationObject) (runtime
 // shouldUpdateSpec inspects the auto-update annotation key and generation field to determine
 // whether the configurationWrapper object should be auto-updated.
 func shouldUpdateSpec(accessor metav1.Object) bool {
-	value, _ := accessor.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]
+	value, _ := accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]
 	if autoUpdate, err := strconv.ParseBool(value); err == nil {
 		return autoUpdate
 	}
@@ -196,7 +196,7 @@ func shouldUpdateSpec(accessor metav1.Object) bool {
 // shouldUpdateAnnotation determines whether the current value of the auto-update annotation
 // key matches the desired value.
 func shouldUpdateAnnotation(accessor metav1.Object, desired bool) bool {
-	if value, ok := accessor.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]; ok {
+	if value, ok := accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]; ok {
 		if current, err := strconv.ParseBool(value); err == nil && current == desired {
 			return false
 		}
@@ -211,7 +211,7 @@ func setAutoUpdateAnnotation(accessor metav1.Object, autoUpdate bool) {
 		accessor.SetAnnotations(map[string]string{})
 	}
 
-	accessor.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
+	accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
 }
 
 // ensureConfiguration ensures the boostrap configurationWrapper on the cluster based on the specified strategy.
@@ -219,19 +219,27 @@ func ensureConfiguration(wrapper configurationWrapper, strategy ensureStrategy, 
 	name := bootstrap.GetName()
 	configurationType := strategy.Name()
 
-	current, err := wrapper.Get(bootstrap.GetName())
-	if err != nil {
+	var current configurationObject
+	var err error
+	for {
+		current, err = wrapper.Get(bootstrap.GetName())
+		if err == nil {
+			break
+		}
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 		}
 
 		// we always re-create a missing configuration object
-		if _, err := wrapper.Create(bootstrap); err != nil {
-			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+		if _, err = wrapper.Create(bootstrap); err == nil {
+			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", wrapper.TypeName()), "type", configurationType, "name", name)
+			return nil
 		}
 
-		klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", wrapper.TypeName()), "type", configurationType, "name", name)
-		return nil
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+		}
+		klog.V(5).InfoS(fmt.Sprintf("Something created the %s concurrently", wrapper.TypeName()), "type", configurationType, "name", name)
 	}
 
 	klog.V(5).InfoS(fmt.Sprintf("The %s already exists, checking whether it is up to date", wrapper.TypeName()), "type", configurationType, "name", name)
@@ -240,22 +248,29 @@ func ensureConfiguration(wrapper configurationWrapper, strategy ensureStrategy, 
 		return fmt.Errorf("failed to determine whether auto-update is required for %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 	}
 	if !update {
-		if klog.V(5).Enabled() {
-			// TODO: if we use structured logging here the diff gets escaped and very awkward to read in the log
-			klog.Infof("No update required for the %s type=%s name=%q diff: %s", wrapper.TypeName(), configurationType, name, cmp.Diff(current, bootstrap))
+		if klogV := klog.V(5); klogV.Enabled() {
+			klogV.InfoS("No update required", "wrapper", wrapper.TypeName(), "type", configurationType, "name", name,
+				"diff", cmp.Diff(current, bootstrap))
 		}
 		return nil
 	}
 
-	if _, err := wrapper.Update(newObject); err != nil {
-		return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
+	if _, err = wrapper.Update(newObject); err == nil {
+		klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", wrapper.TypeName(), configurationType, name, cmp.Diff(current, newObject))
+		return nil
 	}
 
-	klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", wrapper.TypeName(), configurationType, name, cmp.Diff(current, newObject))
-	return nil
+	if apierrors.IsConflict(err) {
+		klog.V(2).InfoS(fmt.Sprintf("Something updated the %s concurrently, I will check its spec later", wrapper.TypeName()), "type", configurationType, "name", name)
+		return nil
+	}
+
+	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 }
 
-func removeConfiguration(wrapper configurationWrapper, name string) error {
+// removeAutoUpdateEnabledConfiguration makes an attempt to remove the given
+// configuration object if automatic update of the spec is enabled for this object.
+func removeAutoUpdateEnabledConfiguration(wrapper configurationWrapper, name string) error {
 	current, err := wrapper.Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -265,7 +280,7 @@ func removeConfiguration(wrapper configurationWrapper, name string) error {
 		return fmt.Errorf("failed to retrieve the %s, will retry later name=%q error=%w", wrapper.TypeName(), name, err)
 	}
 
-	value := current.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]
+	value := current.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]
 	autoUpdate, err := strconv.ParseBool(value)
 	if err != nil {
 		klog.ErrorS(err, fmt.Sprintf("Skipping deletion of the %s", wrapper.TypeName()), "name", name)
@@ -281,6 +296,7 @@ func removeConfiguration(wrapper configurationWrapper, name string) error {
 
 	if err := wrapper.Delete(name); err != nil {
 		if apierrors.IsNotFound(err) {
+			klog.V(5).InfoS(fmt.Sprintf("Something concurrently deleted the %s", wrapper.TypeName()), "name", name)
 			return nil
 		}
 
@@ -291,16 +307,17 @@ func removeConfiguration(wrapper configurationWrapper, name string) error {
 	return nil
 }
 
-// getRemoveCandidate returns a list of configuration objects we should delete
-// from the cluster given a set of bootstrap and current configuration.
-// bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
-// current: a set of configuration objects that exist on the cluster
-// Any object present in current is a candidate for removal if both a and b are true:
+// getDanglingBootstrapObjectNames returns a list of names of bootstrap
+// configuration objects that are potentially candidates for deletion from
+// the cluster, given a set of bootstrap and current configuration.
+//  - bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
+//  - current: a set of configuration objects that exist on the cluster
+// Any object present in current is added to the list if both a and b are true:
 //  a. the object in current is missing from the bootstrap configuration
 //  b. the object has the designated auto-update annotation key
-// This function shares the common logic for both FlowSchema and PriorityLevelConfiguration
-// type and hence it accepts metav1.Object only.
-func getRemoveCandidate(bootstrap sets.String, current []metav1.Object) []string {
+// This function shares the common logic for both FlowSchema and
+// PriorityLevelConfiguration type and hence it accepts metav1.Object only.
+func getDanglingBootstrapObjectNames(bootstrap sets.String, current []metav1.Object) []string {
 	if len(current) == 0 {
 		return nil
 	}
@@ -308,8 +325,10 @@ func getRemoveCandidate(bootstrap sets.String, current []metav1.Object) []string
 	candidates := make([]string, 0)
 	for i := range current {
 		object := current[i]
-		if _, ok := object.GetAnnotations()[flowcontrolv1beta1.AutoUpdateAnnotationKey]; !ok {
-			// the configuration object does not have the annotation key
+		if _, ok := object.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]; !ok {
+			// the configuration object does not have the annotation key,
+			// it's probably a user defined configuration object,
+			// so we can skip it.
 			continue
 		}
 

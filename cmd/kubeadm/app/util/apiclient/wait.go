@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"time"
 
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
-	"github.com/pkg/errors"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
@@ -166,11 +166,11 @@ func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
 		}
 	}(errorChan, w)
 
-	go func(errC chan error, waiter Waiter) {
+	go func(errC chan error) {
 		// This main goroutine sends whatever the f function returns (error or not) to the channel
 		// This in order to continue on success (nil error), or just fail if the function returns an error
 		errC <- f()
-	}(errorChan, w)
+	}(errorChan)
 
 	// This call is blocking until one of the goroutines sends to errorChan
 	return <-errorChan

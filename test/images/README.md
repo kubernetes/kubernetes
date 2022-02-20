@@ -94,8 +94,8 @@ the regular image building process. This helper image can be found in at `e2etea
 It can be used by anyone, but if you need to build your own, you can read more about it [here](windows/README.md).
 
 For Windows, in order to spawn process-isolated containers, the container OS version should closely match
-the host OS version. For this reason, we build test images for different Windows OS Versions: 1809, 1903,
-1909, 2004, 20H2. In order add support for a new Windows OS version, a new entry for that OS version will have
+the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019),
+2004, 20H2, ltsc2022. In order add support for a new Windows OS version, a new entry for that OS version will have
 to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
 These images are then used by the rest of the E2E test images as a cache / base image.
 
@@ -104,8 +104,7 @@ These images are then used by the rest of the E2E test images as a cache / base 
 Make updates to the functionality of the images required for your test case and update the version number.
 
 The version can easily be bumped by modifying the file `test/images/${IMAGE_NAME}/VERSION`, which will
-be used when building the image. Additionally, for the `agnhost` image, also bump the `Version` in
-`test/images/agnhost/agnhost.go`.
+be used when building the image.
 
 Some test images (`agnhost`) are used as bases for other images (`kitten`, `nautilus`). If the parent
 image's `VERSION` has been bumped, also bump the version in the children's `BASEIMAGE` files in order
@@ -131,7 +130,7 @@ To build AND push an image, the following command can be used:
 make all-push WHAT=agnhost
 ```
 
-By default, the images will be tagged and pushed under the `gcr.io/kubernetes-e2e-test-images`
+By default, the images will be tagged and pushed under the `k8s.gcr.io/e2e-test-images`
 registry. That can changed by running this command instead:
 
 ```bash
@@ -142,7 +141,7 @@ REGISTRY=foo_registry make all-push WHAT=agnhost
 require the `agnhost` image to be published in an authenticated repo as well:
 
 ```bash
-REGISTRY=gcr.io/kubernetes-e2e-test-images make all-push WHAT=agnhost
+REGISTRY=k8s.gcr.io/e2e-test-images make all-push WHAT=agnhost
 REGISTRY=gcr.io/k8s-authenticated-test make all-push WHAT=agnhost
 ```
 
@@ -164,7 +163,6 @@ export KUBE_TEST_REPO_LIST=/path/to/repo_list.yaml
 to pull the images from. Sample file:
 
 ```yaml
-e2eRegistry: your-awesome-registry
 promoterE2eRegistry: your-awesome-registry
 gcRegistry: your-awesome-registry
 sampleRegistry: your-awesome-registry

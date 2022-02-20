@@ -51,6 +51,8 @@ const (
 	// The node is marked as uncertain. The attach operation will fail and return timeout error
 	// for the first attach call. The following call will return sucesssfully.
 	UncertainAttachNode = "uncertain-attach-node"
+	// The detach operation will keep failing on the node.
+	FailDetachNode = "fail-detach-node"
 	// The node is marked as timeout. The attach operation will always fail and return timeout error
 	// but the operation is actually succeeded.
 	TimeoutAttachNode = "timeout-attach-node"
@@ -80,6 +82,10 @@ const (
 
 	// FailWithInUseVolumeName will cause NodeExpandVolume to result in FailedPrecondition error
 	FailWithInUseVolumeName = "fail-expansion-in-use"
+
+	FailVolumeExpansion = "fail-expansion-test"
+
+	AlwaysFailNodeExpansion = "always-fail-node-expansion"
 
 	deviceNotMounted     = "deviceNotMounted"
 	deviceMountUncertain = "deviceMountUncertain"
@@ -174,6 +180,7 @@ type FakeVolumePlugin struct {
 	LimitKey               string
 	ProvisionDelaySeconds  int
 	SupportsRemount        bool
+	DisableNodeExpansion   bool
 
 	// default to false which means it is attachable by default
 	NonAttachable bool
@@ -460,12 +467,24 @@ func (plugin *FakeVolumePlugin) ExpandVolumeDevice(spec *Spec, newSize resource.
 }
 
 func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
-	return true
+	return !plugin.DisableNodeExpansion
 }
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
+	}
+	if resizeOptions.VolumeSpec.Name() == AlwaysFailNodeExpansion {
+		return false, fmt.Errorf("Test failure: NodeExpand")
+	}
+
+	// Set up fakeVolumePlugin not support STAGE_UNSTAGE for testing the behavior
+	// so as volume can be node published before we can resize
+	if resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
+		return false, nil
+	}
+	if resizeOptions.CSIVolumePhase == volume.CSIVolumePublished && resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
+		return false, fmt.Errorf("fail volume expansion for volume: %s", FailVolumeExpansion)
 	}
 	return true, nil
 }
@@ -1065,12 +1084,16 @@ func (fv *FakeVolume) GetUnmountDeviceCallCount() int {
 func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
-	fv.DetachCallCount++
 
 	node := string(nodeName)
 	volumeNodes, exist := fv.VolumesAttached[volumeName]
 	if !exist || !volumeNodes.Has(node) {
 		return fmt.Errorf("trying to detach volume %q that is not attached to the node %q", volumeName, node)
+	}
+
+	fv.DetachCallCount++
+	if nodeName == FailDetachNode {
+		return fmt.Errorf("fail to detach volume %q to node %q", volumeName, nodeName)
 	}
 
 	volumeNodes.Delete(node)
@@ -1629,6 +1652,19 @@ func GetTestKubeletVolumePluginMgr(t *testing.T) (*VolumePluginMgr, *FakeVolumeP
 		nil,     /* kubeClient */
 		plugins, /* plugins */
 	)
+	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
+}
+
+func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*VolumePluginMgr, *FakeVolumePlugin) {
+	plugins := ProbeVolumePlugins(VolumeConfig{})
+	v := NewFakeKubeletVolumeHost(
+		t,
+		"",      /* rootDir */
+		nil,     /* kubeClient */
+		plugins, /* plugins */
+	)
+	v.WithNode(node)
+
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
 

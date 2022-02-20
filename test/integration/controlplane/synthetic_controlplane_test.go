@@ -21,8 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -39,8 +38,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -124,7 +126,7 @@ func TestEmptyList(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
+	data, _ := io.ReadAll(resp.Body)
 	decodedData := map[string]interface{}{}
 	if err := json.Unmarshal(data, &decodedData); err != nil {
 		t.Logf("body: %s", string(data))
@@ -141,6 +143,15 @@ func TestEmptyList(t *testing.T) {
 
 func initStatusForbiddenControlPlaneConfig() *controlplane.Config {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(
+		authauthenticator.RequestFunc(func(req *http.Request) (*authauthenticator.Response, bool, error) {
+			return &authauthenticator.Response{
+				User: &user.DefaultInfo{
+					Name:   "unprivileged",
+					Groups: []string{user.AllAuthenticated},
+				},
+			}, true, nil
+		}))
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	return controlPlaneConfig
 }
@@ -178,7 +189,7 @@ func TestStatus(t *testing.T) {
 			statusCode:         http.StatusForbidden,
 			reqPath:            "/apis",
 			reason:             "Forbidden",
-			message:            `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
+			message:            `forbidden: User "unprivileged" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
 			name:               "401",
@@ -203,7 +214,7 @@ func TestStatus(t *testing.T) {
 			t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
 		}
 		defer resp.Body.Close()
-		data, _ := ioutil.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body)
 		decodedData := map[string]interface{}{}
 		if err := json.Unmarshal(data, &decodedData); err != nil {
 			t.Logf("body: %s", string(data))
@@ -459,7 +470,7 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -507,7 +518,7 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -534,7 +545,7 @@ func TestAccept(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
 	}
@@ -551,7 +562,7 @@ func TestAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/yaml" {
 		t.Errorf("unexpected content: %s", body)
 	}
@@ -569,7 +580,7 @@ func TestAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
 	}
@@ -638,7 +649,7 @@ func TestAPIServerService(t *testing.T) {
 
 func TestServiceAlloc(t *testing.T) {
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := net.ParseCIDR("192.168.0.0/29")
+	_, cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/29")
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}

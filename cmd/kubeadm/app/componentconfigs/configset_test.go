@@ -19,31 +19,41 @@ package componentconfigs
 import (
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"github.com/lithammer/dedent"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/lithammer/dedent"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func testClusterCfg() *kubeadmapi.ClusterConfiguration {
+// TODO: cleanup after UnversionedKubeletConfigMap goes GA:
+// https://github.com/kubernetes/kubeadm/issues/1582
+func testClusterCfg(legacyKubeletConfigMap bool) *kubeadmapi.ClusterConfiguration {
+	if legacyKubeletConfigMap {
+		return &kubeadmapi.ClusterConfiguration{
+			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+		}
+	}
 	return &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+		FeatureGates:      map[string]bool{features.UnversionedKubeletConfigMap: true},
 	}
 }
 
 func TestDefault(t *testing.T) {
-	clusterCfg := testClusterCfg()
+	legacyKubeletConfigMap := false
+	clusterCfg := testClusterCfg(legacyKubeletConfigMap)
 	localAPIEndpoint := &kubeadmapi.APIEndpoint{}
 	nodeRegOps := &kubeadmapi.NodeRegistrationOptions{}
 
 	Default(clusterCfg, localAPIEndpoint, nodeRegOps)
 
 	if len(clusterCfg.ComponentConfigs) != len(known) {
-		t.Errorf("missmatch between supported and defaulted type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(known))
+		t.Errorf("mismatch between supported and defaulted type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(known))
 	}
 }
 
@@ -56,17 +66,42 @@ func TestFromCluster(t *testing.T) {
 		testKubeletConfigMap(`
 			apiVersion: kubelet.config.k8s.io/v1beta1
 			kind: KubeletConfiguration
-		`),
+		`, false),
 	}
 	client := clientsetfake.NewSimpleClientset(objects...)
-	clusterCfg := testClusterCfg()
+	legacyKubeletConfigMap := false
+	clusterCfg := testClusterCfg(legacyKubeletConfigMap)
 
 	if err := FetchFromCluster(clusterCfg, client); err != nil {
 		t.Fatalf("FetchFromCluster failed: %v", err)
 	}
 
 	if len(clusterCfg.ComponentConfigs) != len(objects) {
-		t.Fatalf("missmatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(objects))
+		t.Fatalf("mismatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(objects))
+	}
+
+	// TODO: cleanup the legacy case below after UnversionedKubeletConfigMap goes GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
+	objectsLegacyKubelet := []runtime.Object{
+		testKubeProxyConfigMap(`
+			apiVersion: kubeproxy.config.k8s.io/v1alpha1
+			kind: KubeProxyConfiguration
+		`),
+		testKubeletConfigMap(`
+			apiVersion: kubelet.config.k8s.io/v1beta1
+			kind: KubeletConfiguration
+		`, true),
+	}
+	clientLegacyKubelet := clientsetfake.NewSimpleClientset(objectsLegacyKubelet...)
+	legacyKubeletConfigMap = true
+	clusterCfgLegacyKubelet := testClusterCfg(legacyKubeletConfigMap)
+
+	if err := FetchFromCluster(clusterCfgLegacyKubelet, clientLegacyKubelet); err != nil {
+		t.Fatalf("FetchFromCluster failed: %v", err)
+	}
+
+	if len(clusterCfgLegacyKubelet.ComponentConfigs) != len(objectsLegacyKubelet) {
+		t.Fatalf("mismatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(objects))
 	}
 }
 
@@ -83,12 +118,13 @@ func TestFetchFromDocumentMap(t *testing.T) {
 		t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 	}
 
-	clusterCfg := testClusterCfg()
+	legacyKubeletConfigMap := false
+	clusterCfg := testClusterCfg(legacyKubeletConfigMap)
 	if err = FetchFromDocumentMap(clusterCfg, gvkmap); err != nil {
 		t.Fatalf("FetchFromDocumentMap failed: %v", err)
 	}
 
 	if len(clusterCfg.ComponentConfigs) != len(gvkmap) {
-		t.Fatalf("missmatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(gvkmap))
+		t.Fatalf("mismatch between supplied and loaded type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(gvkmap))
 	}
 }

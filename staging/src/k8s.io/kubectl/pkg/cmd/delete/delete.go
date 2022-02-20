@@ -69,7 +69,11 @@ var (
 
 		Note that the delete command does NOT do resource version checks, so if someone submits an
 		update to a resource right when you submit a delete, their update will be lost along with the
-		rest of the resource.`))
+		rest of the resource.
+
+		After a CustomResourceDefinition is deleted, invalidation of discovery cache may take up
+		to 10 minutes. If you don't want to wait, you might want to run "kubectl api-resources"
+		to refresh the discovery cache.`))
 
 	deleteExample = templates.Examples(i18n.T(`
 		# Delete a pod using the type and name specified in pod.json

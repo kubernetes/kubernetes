@@ -46,7 +46,6 @@ func getArbitraryResource(s schema.GroupVersionResource, name, namespace string)
 				"generateName":    "test_generateName",
 				"uid":             "test_uid",
 				"resourceVersion": "test_resourceVersion",
-				"selfLink":        "test_selfLink",
 			},
 			"data": strconv.Itoa(rand.Int()),
 		},

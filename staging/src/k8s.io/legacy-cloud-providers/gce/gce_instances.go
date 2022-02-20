@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -79,7 +80,7 @@ func makeHostURL(projectsAPIEndpoint, projectID, zone, host string) string {
 // ToInstanceReferences returns instance references by links
 func (g *Cloud) ToInstanceReferences(zone string, instanceNames []string) (refs []*compute.InstanceReference) {
 	for _, ins := range instanceNames {
-		instanceLink := makeHostURL(g.service.BasePath, g.projectID, zone, ins)
+		instanceLink := makeHostURL(g.projectsBasePath, g.projectID, zone, ins)
 		refs = append(refs, &compute.InstanceReference{Instance: instanceLink})
 	}
 	return refs

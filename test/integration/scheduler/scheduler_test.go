@@ -29,21 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/pointer"
 )
@@ -53,304 +47,6 @@ type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.Node
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
 	makeUnSchedulable nodeMutationFunc
-}
-
-// TestSchedulerCreationFromConfigMap verifies that scheduler can be created
-// from configurations provided by a ConfigMap object and then verifies that the
-// configuration is applied correctly.
-func TestSchedulerCreationFromConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("configmap", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	defer clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
-
-	for i, test := range []struct {
-		policy          string
-		expectedPlugins config.Plugins
-	}{
-		{
-			policy: `{
-				"kind" : "Policy",
-				"apiVersion" : "v1",
-				"predicates" : [
-					{"name" : "PodFitsResources"}
-				],
-				"priorities" : [
-					{"name" : "ImageLocalityPriority", "weight" : 1}
-				]
-			}`,
-			expectedPlugins: config.Plugins{
-				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-				PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "NodeResourcesFit"}}},
-				Filter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "TaintToleration"},
-				}},
-				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-				Score:      config.PluginSet{Enabled: []config.Plugin{{Name: "ImageLocality", Weight: 1}}},
-				Bind:       config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-			},
-		},
-		{
-			policy: `{
-				"kind" : "Policy",
-				"apiVersion" : "v1"
-			}`,
-			expectedPlugins: config.Plugins{
-				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-				PreFilter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeResourcesFit"},
-					{Name: "NodePorts"},
-					{Name: "NodeAffinity"},
-					{Name: "VolumeBinding"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				}},
-				Filter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "NodeName"},
-					{Name: "NodePorts"},
-					{Name: "NodeAffinity"},
-					{Name: "VolumeRestrictions"},
-					{Name: "TaintToleration"},
-					{Name: "EBSLimits"},
-					{Name: "GCEPDLimits"},
-					{Name: "NodeVolumeLimits"},
-					{Name: "AzureDiskLimits"},
-					{Name: "VolumeBinding"},
-					{Name: "VolumeZone"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				}},
-				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-					{Name: "NodeAffinity"},
-					{Name: "TaintToleration"},
-				}},
-				Score: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "PodTopologySpread", Weight: 2},
-					{Name: "ImageLocality", Weight: 1},
-					{Name: "InterPodAffinity", Weight: 1},
-					{Name: "NodeResourcesLeastAllocated", Weight: 1},
-					{Name: "NodeAffinity", Weight: 1},
-					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "TaintToleration", Weight: 1},
-				}},
-				Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				Bind:    config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-			},
-		},
-		{
-			policy: `{
-				"kind" : "Policy",
-				"apiVersion" : "v1",
-				"predicates" : [],
-				"priorities" : []
-			}`,
-			expectedPlugins: config.Plugins{
-				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-				Filter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-				}},
-				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-				Bind:       config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-			},
-		},
-		{
-			policy: `apiVersion: v1
-kind: Policy
-predicates:
-- name: PodFitsResources
-priorities:
-- name: ImageLocalityPriority
-  weight: 1
-`,
-			expectedPlugins: config.Plugins{
-				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-				PreFilter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeResourcesFit"},
-				}},
-				Filter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "TaintToleration"},
-				}},
-				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-				Score: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "ImageLocality", Weight: 1},
-				}},
-				Bind: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-			},
-		},
-		{
-			policy: `apiVersion: v1
-kind: Policy
-`,
-			expectedPlugins: config.Plugins{
-				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-				PreFilter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeResourcesFit"},
-					{Name: "NodePorts"},
-					{Name: "NodeAffinity"},
-					{Name: "VolumeBinding"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				}},
-				Filter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "NodeName"},
-					{Name: "NodePorts"},
-					{Name: "NodeAffinity"},
-					{Name: "VolumeRestrictions"},
-					{Name: "TaintToleration"},
-					{Name: "EBSLimits"},
-					{Name: "GCEPDLimits"},
-					{Name: "NodeVolumeLimits"},
-					{Name: "AzureDiskLimits"},
-					{Name: "VolumeBinding"},
-					{Name: "VolumeZone"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				}},
-				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-					{Name: "NodeAffinity"},
-					{Name: "TaintToleration"},
-				}},
-				Score: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "PodTopologySpread", Weight: 2},
-					{Name: "ImageLocality", Weight: 1},
-					{Name: "InterPodAffinity", Weight: 1},
-					{Name: "NodeResourcesLeastAllocated", Weight: 1},
-					{Name: "NodeAffinity", Weight: 1},
-					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "TaintToleration", Weight: 1},
-				}},
-				Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				Bind:    config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-			},
-		},
-		{
-			policy: `apiVersion: v1
-kind: Policy
-predicates: []
-priorities: []
-`,
-			expectedPlugins: config.Plugins{
-				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-				Filter: config.PluginSet{Enabled: []config.Plugin{
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-				}},
-				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-				Bind:       config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-			},
-		},
-	} {
-		// Add a ConfigMap object.
-		configPolicyName := fmt.Sprintf("scheduler-custom-policy-config-%d", i)
-		policyConfigMap := v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-			Data:       map[string]string{config.SchedulerPolicyConfigMapKey: test.policy},
-		}
-
-		policyConfigMap.APIVersion = "v1"
-		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
-
-		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1()})
-		stopCh := make(chan struct{})
-		eventBroadcaster.StartRecordingToSink(stopCh)
-
-		sched, err := scheduler.New(clientSet,
-			informerFactory,
-			profile.NewRecorderFactory(eventBroadcaster),
-			nil,
-			scheduler.WithProfiles([]config.KubeSchedulerProfile(nil)...),
-			scheduler.WithLegacyPolicySource(&config.SchedulerPolicySource{
-				ConfigMap: &config.SchedulerPolicyConfigMapSource{
-					Namespace: policyConfigMap.Namespace,
-					Name:      policyConfigMap.Name,
-				},
-			}),
-		)
-		if err != nil {
-			t.Fatalf("couldn't make scheduler config for test %d: %v", i, err)
-		}
-
-		schedPlugins := sched.Profiles[v1.DefaultSchedulerName].ListPlugins()
-		if diff := cmp.Diff(&test.expectedPlugins, schedPlugins); diff != "" {
-			t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
-		}
-	}
-}
-
-// TestSchedulerCreationFromNonExistentConfigMap ensures that creation of the
-// scheduler from a non-existent ConfigMap fails.
-func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("configmap", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	defer clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-
-	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
-
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1()})
-	stopCh := make(chan struct{})
-	eventBroadcaster.StartRecordingToSink(stopCh)
-
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			PluginConfig: []v1beta2.PluginConfig{
-				{
-					Name: "VolumeBinding",
-					Args: runtime.RawExtension{
-						Object: &v1beta2.VolumeBindingArgs{
-							BindTimeoutSeconds: pointer.Int64Ptr(30),
-						},
-					},
-				},
-			}},
-		},
-	})
-
-	_, err := scheduler.New(clientSet,
-		informerFactory,
-		profile.NewRecorderFactory(eventBroadcaster),
-		nil,
-		scheduler.WithLegacyPolicySource(&config.SchedulerPolicySource{
-			ConfigMap: &config.SchedulerPolicyConfigMapSource{
-				Namespace: "non-existent-config",
-				Name:      "non-existent-config",
-			},
-		}),
-		scheduler.WithProfiles(cfg.Profiles...),
-	)
-
-	if err == nil {
-		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
-	}
 }
 
 func TestUnschedulableNodes(t *testing.T) {
@@ -556,14 +252,14 @@ func TestMultipleSchedulers(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(fooScheduler),
-			PluginConfig: []v1beta2.PluginConfig{
+			PluginConfig: []v1beta3.PluginConfig{
 				{
 					Name: "VolumeBinding",
 					Args: runtime.RawExtension{
-						Object: &v1beta2.VolumeBindingArgs{
+						Object: &v1beta3.VolumeBindingArgs{
 							BindTimeoutSeconds: pointer.Int64Ptr(30),
 						},
 					},
@@ -571,7 +267,7 @@ func TestMultipleSchedulers(t *testing.T) {
 			}},
 		},
 	})
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, nil, scheduler.WithProfiles(cfg.Profiles...))
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, scheduler.WithProfiles(cfg.Profiles...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
@@ -632,8 +328,8 @@ func TestMultipleSchedulers(t *testing.T) {
 }
 
 func TestMultipleSchedulingProfiles(t *testing.T) {
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{
 			{SchedulerName: pointer.StringPtr("default-scheduler")},
 			{SchedulerName: pointer.StringPtr("custom-scheduler")},
 		},

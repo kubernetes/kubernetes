@@ -129,6 +129,18 @@ Add-Type -AssemblyName System.Web
 
 $poll_interval = 10
 
+# New for v7.9.0.0: administrators_authorized_keys file. For permission
+# information see
+# https://github.com/PowerShell/Win32-OpenSSH/wiki/Security-protection-of-various-files-in-Win32-OpenSSH#administrators_authorized_keys.
+# this file is created only once, each valid user will be added here
+$administrator_keys_file = ${env:ProgramData} + `
+    "\ssh\administrators_authorized_keys"
+New-Item -ItemType file -Force $administrator_keys_file | Out-Null
+icacls $administrator_keys_file /inheritance:r | Out-Null
+icacls $administrator_keys_file /grant SYSTEM:`(F`) | Out-Null
+icacls $administrator_keys_file /grant BUILTIN\Administrators:`(F`) | `
+    Out-Null
+
 while($true) {
   $r1 = ""
   $r2 = ""
@@ -191,10 +203,18 @@ while($true) {
 
     $pw = [System.Web.Security.Membership]::GeneratePassword(16,2)
     try {
-      # Create-NewProfile will throw this when the user profile already exists:
+      # Create-NewProfile will throw these errors:
+      #
+      # - if the username already exists:
+      #
       #   Create-NewProfile : Exception calling "SetInfo" with "0" argument(s):
       #   "The account already exists."
-      # Just catch it and ignore it.
+      #
+      # - if the username is invalid (e.g. gke-29bd5e8d9ea0446f829d)
+      #
+      #   Create-NewProfile : Exception calling "SetInfo" with "0" argument(s): "The specified username is invalid.
+      #
+      # Just catch them and ignore them.
       Create-NewProfile $username $pw -ErrorAction Stop
 
       # Add the user to the Administrators group, otherwise we will not have
@@ -209,29 +229,26 @@ while($true) {
       return
     }
 
-    # NOTE: there is a race condition here where someone could try to ssh to
-    # this node in-between when we clear out the authorized_keys file and when
-    # we write keys to it. Oh well.
+    # the authorized_keys file is created only once per user
     $user_keys_file = -join($user_dir, "\.ssh\authorized_keys")
-    New-Item -ItemType file -Force $user_keys_file | Out-Null
-
-    # New for v7.9.0.0: administrators_authorized_keys file. For permission
-    # information see
-    # https://github.com/PowerShell/Win32-OpenSSH/wiki/Security-protection-of-various-files-in-Win32-OpenSSH#administrators_authorized_keys.
-    $administrator_keys_file = ${env:ProgramData} + `
-        "\ssh\administrators_authorized_keys"
-    New-Item -ItemType file -Force $administrator_keys_file | Out-Null
-    icacls $administrator_keys_file /inheritance:r | Out-Null
-    icacls $administrator_keys_file /grant SYSTEM:`(F`) | Out-Null
-    icacls $administrator_keys_file /grant BUILTIN\Administrators:`(F`) | `
-        Out-Null
+    if (-not (Test-Path $user_keys_file)) {
+      New-Item -ItemType file -Force $user_keys_file | Out-Null
+    }
 
     ForEach ($ssh_key in $_.value) {
       # authorized_keys and other ssh config files must be UTF-8 encoded:
       # https://github.com/PowerShell/Win32-OpenSSH/issues/862
       # https://github.com/PowerShell/Win32-OpenSSH/wiki/Various-Considerations
-      Add-Content -Encoding UTF8 $user_keys_file $ssh_key
-      Add-Content -Encoding UTF8 $administrator_keys_file $ssh_key
+      #
+      # these files will be append only, only new keys will be added
+      $found = Select-String -Path $user_keys_file -Pattern $ssh_key -SimpleMatch
+      if ($found -eq $null) {
+        Add-Content -Encoding UTF8 $user_keys_file $ssh_key
+      }
+      $found = Select-String -Path $administrator_keys_file -Pattern $ssh_key -SimpleMatch
+      if ($found -eq $null) {
+        Add-Content -Encoding UTF8 $administrator_keys_file $ssh_key
+      }
     }
   }
   Start-Sleep -sec $poll_interval

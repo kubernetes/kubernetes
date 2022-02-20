@@ -31,6 +31,18 @@ import (
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
 )
 
+const (
+	// When a token is matched with 'BootstrapTokenPattern', the size of validated substrings returned by
+	// regexp functions which contains 'Submatch' in their names will be 3.
+	// Submatch 0 is the match of the entire expression, submatch 1 is
+	// the match of the first parenthesized subexpression, and so on.
+	// e.g.:
+	// result := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch("abcdef.1234567890123456")
+	// result == []string{"abcdef.1234567890123456","abcdef","1234567890123456"}
+	// len(result) == 3
+	validatedSubstringsSize = 3
+)
+
 // MarshalJSON implements the json.Marshaler interface.
 func (bts BootstrapTokenString) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, bts.String())), nil
@@ -69,8 +81,7 @@ func (bts BootstrapTokenString) String() string {
 // is of the right format
 func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
 	substrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(token)
-	// TODO: Add a constant for the 3 value here, and explain better why it's needed (other than because how the regexp parsin works)
-	if len(substrs) != 3 {
+	if len(substrs) != validatedSubstringsSize {
 		return nil, errors.Errorf("the bootstrap token %q was not of the form %q", token, bootstrapapi.BootstrapTokenPattern)
 	}
 

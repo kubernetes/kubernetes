@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -48,7 +46,6 @@ import (
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	"k8s.io/kubernetes/pkg/features"
 	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	utilnet "k8s.io/utils/net"
 )
@@ -65,20 +62,6 @@ const (
 	// stored in an Endpoints resource. In a future release, this controller
 	// may truncate endpoints exceeding this length.
 	maxCapacity = 1000
-
-	// TolerateUnreadyEndpointsAnnotation is an annotation on the Service denoting if the endpoints
-	// controller should go ahead and create endpoints for unready pods. This annotation is
-	// currently only used by StatefulSets, where we need the pod to be DNS
-	// resolvable during initialization and termination. In this situation we
-	// create a headless Service just for the StatefulSet, and clients shouldn't
-	// be using this Service for anything so unready endpoints don't matter.
-	// Endpoints of these Services retain their DNS records and continue
-	// receiving traffic for the Service from the moment the kubelet starts all
-	// containers in the pod and marks it "Running", till the kubelet stops all
-	// containers and deletes the pod from the apiserver.
-	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
-	// subsequent releases.  It will be removed no sooner than 1.13.
-	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 
 	// truncated is a possible value for `endpoints.kubernetes.io/over-capacity` annotation on an
 	// endpoint resource and indicates that the number of endpoints have been truncated to
@@ -188,19 +171,19 @@ type Controller struct {
 
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
-func (e *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (e *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer e.queue.ShutDown()
 
 	klog.Infof("Starting endpoint controller")
 	defer klog.Infof("Shutting down endpoint controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
+	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(e.worker, e.workerLoopPeriod, stopCh)
+		go wait.UntilWithContext(ctx, e.worker, e.workerLoopPeriod)
 	}
 
 	go func() {
@@ -208,7 +191,7 @@ func (e *Controller) Run(workers int, stopCh <-chan struct{}) {
 		e.checkLeftoverEndpoints()
 	}()
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // When a pod is added, figure out what services it will be a member of and
@@ -229,42 +212,38 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 	var endpointIP string
 	ipFamily := v1.IPv4Protocol
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		// In a legacy cluster, the pod IP is guaranteed to be usable
-		endpointIP = pod.Status.PodIP
+	if len(svc.Spec.IPFamilies) > 0 {
+		// controller is connected to an api-server that correctly sets IPFamilies
+		ipFamily = svc.Spec.IPFamilies[0] // this works for headful and headless
 	} else {
-		//feature flag enabled and pods may have multiple IPs
-		if len(svc.Spec.IPFamilies) > 0 {
-			// controller is connected to an api-server that correctly sets IPFamilies
-			ipFamily = svc.Spec.IPFamilies[0] // this works for headful and headless
+		// controller is connected to an api server that does not correctly
+		// set IPFamilies (e.g. old api-server during an upgrade)
+		// TODO (khenidak): remove by when the possibility of upgrading
+		// from a cluster that does not support dual stack is nil
+		if len(svc.Spec.ClusterIP) > 0 && svc.Spec.ClusterIP != v1.ClusterIPNone {
+			// headful service. detect via service clusterIP
+			if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
+				ipFamily = v1.IPv6Protocol
+			}
 		} else {
-			// controller is connected to an api server that does not correctly
-			// set IPFamilies (e.g. old api-server during an upgrade)
-			if len(svc.Spec.ClusterIP) > 0 && svc.Spec.ClusterIP != v1.ClusterIPNone {
-				// headful service. detect via service clusterIP
-				if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
-					ipFamily = v1.IPv6Protocol
-				}
-			} else {
-				// Since this is a headless service we use podIP to identify the family.
-				// This assumes that status.PodIP is assigned correctly (follows pod cidr and
-				// pod cidr list order is same as service cidr list order). The expectation is
-				// this is *most probably* the case.
+			// Since this is a headless service we use podIP to identify the family.
+			// This assumes that status.PodIP is assigned correctly (follows pod cidr and
+			// pod cidr list order is same as service cidr list order). The expectation is
+			// this is *most probably* the case.
 
-				// if the family was incorrectly indentified then this will be corrected once the
-				// the upgrade is completed (controller connects to api-server that correctly defaults services)
-				if utilnet.IsIPv6String(pod.Status.PodIP) {
-					ipFamily = v1.IPv6Protocol
-				}
+			// if the family was incorrectly identified then this will be corrected once the
+			// the upgrade is completed (controller connects to api-server that correctly defaults services)
+			if utilnet.IsIPv6String(pod.Status.PodIP) {
+				ipFamily = v1.IPv6Protocol
 			}
 		}
+	}
 
-		// find an ip that matches the family
-		for _, podIP := range pod.Status.PodIPs {
-			if (ipFamily == v1.IPv6Protocol) == utilnet.IsIPv6String(podIP.IP) {
-				endpointIP = podIP.IP
-				break
-			}
+	// find an ip that matches the family
+	for _, podIP := range pod.Status.PodIPs {
+		if (ipFamily == v1.IPv6Protocol) == utilnet.IsIPv6String(podIP.IP) {
+			endpointIP = podIP.IP
+			break
 		}
 	}
 
@@ -341,19 +320,19 @@ func (e *Controller) onEndpointsDelete(obj interface{}) {
 // marks them done. You may run as many of these in parallel as you wish; the
 // workqueue guarantees that they will not end up processing the same service
 // at the same time.
-func (e *Controller) worker() {
-	for e.processNextWorkItem() {
+func (e *Controller) worker(ctx context.Context) {
+	for e.processNextWorkItem(ctx) {
 	}
 }
 
-func (e *Controller) processNextWorkItem() bool {
+func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	eKey, quit := e.queue.Get()
 	if quit {
 		return false
 	}
 	defer e.queue.Done(eKey)
 
-	err := e.syncService(eKey.(string))
+	err := e.syncService(ctx, eKey.(string))
 	e.handleErr(err, eKey)
 
 	return true
@@ -381,7 +360,7 @@ func (e *Controller) handleErr(err error, key interface{}) {
 	utilruntime.HandleError(err)
 }
 
-func (e *Controller) syncService(key string) error {
+func (e *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
@@ -402,7 +381,7 @@ func (e *Controller) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		err = e.client.CoreV1().Endpoints(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+		err = e.client.CoreV1().Endpoints(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -426,14 +405,6 @@ func (e *Controller) syncService(key string) error {
 
 	// If the user specified the older (deprecated) annotation, we have to respect it.
 	tolerateUnreadyEndpoints := service.Spec.PublishNotReadyAddresses
-	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
-		b, err := strconv.ParseBool(v)
-		if err == nil {
-			tolerateUnreadyEndpoints = b
-		} else {
-			utilruntime.HandleError(fmt.Errorf("Failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err))
-		}
-	}
 
 	// We call ComputeEndpointLastChangeTriggerTime here to make sure that the
 	// state of the trigger time tracker gets updated even if the sync turns out
@@ -559,10 +530,10 @@ func (e *Controller) syncService(key string) error {
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{})
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(ctx, newEndpoints, metav1.CreateOptions{})
 	} else {
 		// Pre-existing
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(context.TODO(), newEndpoints, metav1.UpdateOptions{})
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(ctx, newEndpoints, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {

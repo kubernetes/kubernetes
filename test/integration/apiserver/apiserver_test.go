@@ -22,13 +22,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -71,19 +72,19 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResources(t, groupVersions, nil)
 }
 
-func setupWithOptions(t *testing.T, opts *framework.ControlPlaneConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResourcesWithOptions(t, opts, groupVersions, nil)
 }
 
-func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithResources(t testing.TB, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResourcesWithOptions(t, &framework.ControlPlaneConfigOptions{}, groupVersions, resources)
 }
 
-func setupWithResourcesWithOptions(t *testing.T, opts *framework.ControlPlaneConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithResourcesWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(opts)
 	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
@@ -115,7 +116,7 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 		t.Fatalf("unexpected error: %v in req: %v", err, req)
 	}
 	defer resp.Body.Close()
-	b, _ := ioutil.ReadAll(resp.Body)
+	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != expectedStatusCode {
 		t.Errorf("Expected status %v, but got %v", expectedStatusCode, resp.StatusCode)
 		t.Errorf("Body: %v", string(b))
@@ -264,6 +265,54 @@ func TestCacheControl(t *testing.T) {
 			cc := resp.Header.Get("Cache-Control")
 			if !strings.Contains(cc, "private") {
 				t.Errorf("expected private cache-control, got %q", cc)
+			}
+		})
+	}
+}
+
+// Tests that the apiserver returns HSTS headers as expected.
+func TestHSTS(t *testing.T) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	controlPlaneConfig.GenericConfig.HSTSDirectives = []string{"max-age=31536000", "includeSubDomains"}
+	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths := []string{
+		// untyped
+		"/",
+		// health
+		"/healthz",
+		// openapi
+		"/openapi/v2",
+		// discovery
+		"/api",
+		"/api/v1",
+		"/apis",
+		"/apis/apps",
+		"/apis/apps/v1",
+		// apis
+		"/api/v1/namespaces",
+		"/apis/apps/v1/deployments",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cc := resp.Header.Get("Strict-Transport-Security")
+			if !strings.Contains(cc, "max-age=31536000; includeSubDomains") {
+				t.Errorf("expected max-age=31536000; includeSubDomains, got %q", cc)
 			}
 		})
 	}
@@ -2020,7 +2069,7 @@ func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	rs := protobuf.NewRawSerializer(scheme, scheme)
 	d := streaming.NewDecoder(
-		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
+		protobuf.LengthDelimitedFramer.NewFrameReader(io.NopCloser(r)),
 		rs,
 	)
 	ds := metainternalversionscheme.Codecs.UniversalDeserializer()
@@ -2129,7 +2178,7 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	rs := protobuf.NewRawSerializer(scheme, scheme)
 	d := streaming.NewDecoder(
-		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
+		protobuf.LengthDelimitedFramer.NewFrameReader(io.NopCloser(r)),
 		rs,
 	)
 	ds := metainternalversionscheme.Codecs.UniversalDeserializer()
@@ -2154,6 +2203,65 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 		if meta.Annotations["test"] != value {
 			t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
 		}
+	}
+}
+
+func TestClientsetShareTransport(t *testing.T) {
+	var counter int
+	var mu sync.Mutex
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	dialFn := func(ctx context.Context, network, address string) (net.Conn, error) {
+		mu.Lock()
+		counter++
+		mu.Unlock()
+		return (&net.Dialer{}).DialContext(ctx, network, address)
+	}
+	server.ClientConfig.Dial = dialFn
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	// create test namespace
+	_, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-creation",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create test ns: %v", err)
+	}
+	// List different objects
+	result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
+	_, err = result.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = client.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d namespaces on the cluster", len(n.Items))
+	p, err := client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d pods on the cluster", len(p.Items))
+	e, err := client.DiscoveryV1().EndpointSlices("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d endpoint slices on the cluster", len(e.Items))
+	d, err := client.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d deployments on the cluster", len(d.Items))
+
+	if counter != 1 {
+		t.Fatalf("expected only one connection, created %d connections", counter)
 	}
 }
 

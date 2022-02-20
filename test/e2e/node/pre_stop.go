@@ -77,7 +77,7 @@ func testPreStop(c clientset.Interface, ns string) {
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sleep", "600"},
 					Lifecycle: &v1.Lifecycle{
-						PreStop: &v1.Handler{
+						PreStop: &v1.LifecycleHandler{
 							Exec: &v1.ExecAction{
 								Command: []string{
 									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s/write", podURL),
@@ -225,7 +225,7 @@ func getPodWithpreStopLifeCycle(name string) *v1.Pod {
 					Name:  "nginx",
 					Image: imageutils.GetE2EImage(imageutils.Nginx),
 					Lifecycle: &v1.Lifecycle{
-						PreStop: &v1.Handler{
+						PreStop: &v1.LifecycleHandler{
 							Exec: &v1.ExecAction{
 								Command: []string{"sh", "-c", "while true; do echo preStop; sleep 1; done"},
 							},

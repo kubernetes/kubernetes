@@ -193,7 +193,6 @@ func (d *Digest) UnmarshalBinary(b []byte) error {
 	b, d.v4 = consumeUint64(b)
 	b, d.total = consumeUint64(b)
 	copy(d.mem[:], b)
-	b = b[len(d.mem):]
 	d.n = int(d.total % uint64(len(d.mem)))
 	return nil
 }

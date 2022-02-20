@@ -22,6 +22,7 @@ import (
 	"log"
 	"reflect"
 	rt "runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -29,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,13 +42,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -462,6 +461,224 @@ func TestAPIVersions(t *testing.T) {
 	t.Errorf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", versions, clientVersion)
 }
 
+func TestEventValidation(t *testing.T) {
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
+
+	createNamespace := func(namespace string) string {
+		if namespace == "" {
+			namespace = metav1.NamespaceDefault
+		}
+		return namespace
+	}
+
+	mkCoreEvent := func(ver string, ns string) *v1.Event {
+		name := fmt.Sprintf("%v-%v-event", ver, ns)
+		namespace := createNamespace(ns)
+		return &v1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			InvolvedObject: v1.ObjectReference{
+				Namespace: ns,
+				Name:      name,
+			},
+			Count:               2,
+			Type:                "Normal",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-1",
+			Reason:              fmt.Sprintf("event %v test", name),
+			Action:              "Testing",
+		}
+	}
+	mkV1Event := func(ver string, ns string) *eventsv1.Event {
+		name := fmt.Sprintf("%v-%v-event", ver, ns)
+		namespace := createNamespace(ns)
+		return &eventsv1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			Regarding: v1.ObjectReference{
+				Namespace: ns,
+				Name:      name,
+			},
+			Series: &eventsv1.EventSeries{
+				Count:            2,
+				LastObservedTime: metav1.MicroTime{Time: time.Now()},
+			},
+			Type:                "Normal",
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-2",
+			Reason:              fmt.Sprintf("event %v test", name),
+			Action:              "Testing",
+		}
+	}
+
+	testcases := []struct {
+		name      string
+		namespace string
+		hasError  bool
+	}{
+		{
+			name:      "Involved object is namespaced",
+			namespace: "kube-system",
+			hasError:  false,
+		},
+		{
+			name:      "Involved object is cluster-scoped",
+			namespace: "",
+			hasError:  false,
+		},
+	}
+
+	for _, test := range testcases {
+		// create test
+		oldEventObj := mkCoreEvent("corev1", test.namespace)
+		corev1Event, err := client.CoreV1().Events(oldEventObj.Namespace).Create(context.TODO(), oldEventObj, metav1.CreateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Create failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		newEventObj := mkV1Event("eventsv1", test.namespace)
+		eventsv1Event, err := client.EventsV1().Events(newEventObj.Namespace).Create(context.TODO(), newEventObj, metav1.CreateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Create failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		if corev1Event.Namespace != eventsv1Event.Namespace {
+			t.Errorf("%v, events created by different api client have different namespaces that isn't expected", test.name)
+		}
+		// update test
+		corev1Event.Count++
+		corev1Event, err = client.CoreV1().Events(corev1Event.Namespace).Update(context.TODO(), corev1Event, metav1.UpdateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Update failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		eventsv1Event.Series.Count++
+		eventsv1Event.Series.LastObservedTime = metav1.MicroTime{Time: time.Now()}
+		eventsv1Event, err = client.EventsV1().Events(eventsv1Event.Namespace).Update(context.TODO(), eventsv1Event, metav1.UpdateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Update failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		if corev1Event.Namespace != eventsv1Event.Namespace {
+			t.Errorf("%v, events updated by different api client have different namespaces that isn't expected", test.name)
+		}
+	}
+}
+
+func TestEventCompatibility(t *testing.T) {
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
+
+	coreevents := []*v1.Event{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pass-core-default-cluster-scoped",
+				Namespace: "default",
+			},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fail-core-kube-system-cluster-scoped",
+				Namespace: "kube-system",
+			},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fail-core-other-ns-cluster-scoped",
+				Namespace: "test-ns",
+			},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+	}
+	for _, e := range coreevents {
+		t.Run(e.Name, func(t *testing.T) {
+			_, err := client.CoreV1().Events(e.Namespace).Create(context.TODO(), e, metav1.CreateOptions{})
+			if err == nil && !strings.HasPrefix(e.Name, "pass-") {
+				t.Fatalf("unexpected pass")
+			}
+			if err != nil && !strings.HasPrefix(e.Name, "fail-") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+
+	v1events := []*eventsv1.Event{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pass-events-default-cluster-scoped",
+				Namespace: "default",
+			},
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pass-events-kube-system-cluster-scoped",
+				Namespace: "kube-system",
+			},
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fail-events-other-ns-cluster-scoped",
+				Namespace: "test-ns",
+			},
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+	}
+	for _, e := range v1events {
+		t.Run(e.Name, func(t *testing.T) {
+			_, err := client.EventsV1().Events(e.Namespace).Create(context.TODO(), e, metav1.CreateOptions{})
+			if err == nil && !strings.HasPrefix(e.Name, "pass-") {
+				t.Fatalf("unexpected pass")
+			}
+			if err != nil && !strings.HasPrefix(e.Name, "fail-") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestSingleWatch(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
@@ -747,67 +964,6 @@ func TestMultiWatch(t *testing.T) {
 	}
 	log.Printf("all watches ended")
 	t.Errorf("durations: %v", dur)
-}
-
-func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace string) {
-	podBody := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "selflinktest",
-			Namespace: namespace,
-			Labels: map[string]string{
-				"name": "selflinktest",
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{Name: "name", Image: "image"},
-			},
-		},
-	}
-	pod, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &podBody, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Failed creating selflinktest pod: %v", err)
-	}
-	if err = c.CoreV1().RESTClient().Get().RequestURI(pod.SelfLink).Do(context.TODO()).Into(pod); err != nil {
-		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
-	}
-
-	podList, err := c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		t.Errorf("Failed listing pods: %v", err)
-	}
-
-	if err = c.CoreV1().RESTClient().Get().RequestURI(podList.SelfLink).Do(context.TODO()).Into(podList); err != nil {
-		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
-	}
-
-	found := false
-	for i := range podList.Items {
-		item := &podList.Items[i]
-		if item.Name != "selflinktest" {
-			continue
-		}
-		found = true
-		err = c.CoreV1().RESTClient().Get().RequestURI(item.SelfLink).Do(context.TODO()).Into(pod)
-		if err != nil {
-			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
-		}
-		break
-	}
-	if !found {
-		t.Errorf("never found selflinktest pod in namespace %s", namespace)
-	}
-}
-
-func TestSelfLinkOnNamespace(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoveSelfLink, false)()
-
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
-	defer result.TearDownFn()
-
-	c := clientset.NewForConfigOrDie(result.ClientConfig)
-
-	runSelfLinkTestOnNamespace(t, c, "default")
 }
 
 func TestApplyWithApplyConfiguration(t *testing.T) {
@@ -1147,11 +1303,11 @@ func TestExtractModifyApply_ForceOwnership(t *testing.T) {
 				WithSpec(corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().
-							WithName("nginx").
-							WithWorkingDir("/tmp/v2"),
-						corev1ac.Container().
 							WithName("sidecar").
 							WithImage("nginx:1.14.3"),
+						corev1ac.Container().
+							WithName("nginx").
+							WithWorkingDir("/tmp/v2"),
 					),
 				),
 			),

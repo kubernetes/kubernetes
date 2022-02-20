@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	apiservicestorage "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd"
 )
@@ -33,14 +32,6 @@ import (
 // NewRESTStorage returns an APIGroupInfo object that will work against apiservice.
 func NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, shouldServeBeta bool) genericapiserver.APIGroupInfo {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, aggregatorscheme.Scheme, metav1.ParameterCodec, aggregatorscheme.Codecs)
-
-	if shouldServeBeta && apiResourceConfigSource.VersionEnabled(v1beta1.SchemeGroupVersion) {
-		storage := map[string]rest.Storage{}
-		apiServiceREST := apiservicestorage.NewREST(aggregatorscheme.Scheme, restOptionsGetter)
-		storage["apiservices"] = apiServiceREST
-		storage["apiservices/status"] = apiservicestorage.NewStatusREST(aggregatorscheme.Scheme, apiServiceREST)
-		apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = storage
-	}
 
 	if apiResourceConfigSource.VersionEnabled(v1.SchemeGroupVersion) {
 		storage := map[string]rest.Storage{}

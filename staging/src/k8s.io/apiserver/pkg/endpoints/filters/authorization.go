@@ -49,7 +49,7 @@ func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 
 		attributes, err := GetAuthorizerAttributes(ctx)
 		if err != nil {

@@ -17,17 +17,14 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -69,17 +66,6 @@ const (
 	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list"
 	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable"
 
-	// Metric keys for node config
-	AssignedConfigKey             = "node_config_assigned"
-	ActiveConfigKey               = "node_config_active"
-	LastKnownGoodConfigKey        = "node_config_last_known_good"
-	ConfigErrorKey                = "node_config_error"
-	ConfigSourceLabelKey          = "node_config_source"
-	ConfigSourceLabelValueLocal   = "local"
-	ConfigUIDLabelKey             = "node_config_uid"
-	ConfigResourceVersionLabelKey = "node_config_resource_version"
-	KubeletConfigKeyLabelKey      = "node_config_kubelet_key"
-
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
 	RunPodSandboxErrorsKey   = "run_podsandbox_errors_total"
@@ -89,6 +75,10 @@ const (
 	StartedPodsErrorsTotalKey       = "started_pods_errors_total"
 	StartedContainersTotalKey       = "started_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
+
+	// Metrics to track HostProcess container usage by this kubelet
+	StartedHostProcessContainersTotalKey       = "started_host_process_containers_total"
+	StartedHostProcessContainersErrorsTotalKey = "started_host_process_containers_errors_total"
 
 	// Metrics to track ephemeral container usage by this kubelet
 	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
@@ -132,12 +122,13 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to go from pending to running.
+	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run since it's
+	// first time seen by kubelet.
 	PodStartDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
-			Help:           "Duration in seconds for a single pod to go from pending to running.",
+			Help:           "Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -154,12 +145,12 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	// PodWorkerStartDuration is a Histogram that tracks the duration (in seconds) it takes from seeing a pod to starting a worker.
+	// PodWorkerStartDuration is a Histogram that tracks the duration (in seconds) it takes from kubelet seeing a pod to starting a worker.
 	PodWorkerStartDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodWorkerStartDurationKey,
-			Help:           "Duration in seconds from seeing a pod to starting a worker.",
+			Help:           "Duration in seconds from kubelet seeing a pod to starting a worker.",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -359,52 +350,6 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// Metrics for node config
-
-	// AssignedConfig is a Gauge that is set 1 if the Kubelet has a NodeConfig assigned.
-	AssignedConfig = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              AssignedConfigKey,
-			Help:              "The node's understanding of intended config. The count is always 1.",
-			DeprecatedVersion: "1.22.0",
-			StabilityLevel:    metrics.ALPHA,
-		},
-		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
-	)
-	// ActiveConfig is a Gauge that is set to 1 if the Kubelet has an active NodeConfig.
-	ActiveConfig = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              ActiveConfigKey,
-			Help:              "The config source the node is actively using. The count is always 1.",
-			DeprecatedVersion: "1.22.0",
-			StabilityLevel:    metrics.ALPHA,
-		},
-		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
-	)
-	// LastKnownGoodConfig is a Gauge that is set to 1 if the Kubelet has a NodeConfig it can fall back to if there
-	// are certain errors.
-	LastKnownGoodConfig = metrics.NewGaugeVec(
-		&metrics.GaugeOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              LastKnownGoodConfigKey,
-			Help:              "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
-			DeprecatedVersion: "1.22.0",
-			StabilityLevel:    metrics.ALPHA,
-		},
-		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
-	)
-	// ConfigError is a Gauge that is set to 1 if the node is experiencing a configuration-related error.
-	ConfigError = metrics.NewGauge(
-		&metrics.GaugeOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              ConfigErrorKey,
-			Help:              "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
-			DeprecatedVersion: "1.22.0",
-			StabilityLevel:    metrics.ALPHA,
-		},
-	)
 	// RunPodSandboxDuration is a Histogram that tracks the duration (in seconds) it takes to run Pod Sandbox operations.
 	// Broken down by RuntimeClass.Handler.
 	RunPodSandboxDuration = metrics.NewHistogramVec(
@@ -460,14 +405,13 @@ var (
 		},
 	)
 	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pod sandboxes
-	StartedPodsErrorsTotal = metrics.NewCounterVec(
+	StartedPodsErrorsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedPodsErrorsTotalKey,
 			Help:           "Cumulative number of errors when starting pods",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"message"},
 	)
 	// StartedContainersTotal is a counter that tracks the number of container creation operations
 	StartedContainersTotal = metrics.NewCounterVec(
@@ -485,6 +429,26 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedContainersErrorsTotalKey,
 			Help:           "Cumulative number of errors when starting containers",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "code"},
+	)
+	// StartedHostProcessContainersTotal is a counter that tracks the number of hostprocess container creation operations
+	StartedHostProcessContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedHostProcessContainersTotalKey,
+			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type"},
+	)
+	// StartedHostProcessContainersErrorsTotal is a counter that tracks the number of errors creating hostprocess containers
+	StartedHostProcessContainersErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedHostProcessContainersErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type", "code"},
@@ -531,14 +495,12 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			legacyregistry.MustRegister(StartedHostProcessContainersTotal)
+			legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
+		}
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-			legacyregistry.MustRegister(AssignedConfig)
-			legacyregistry.MustRegister(ActiveConfig)
-			legacyregistry.MustRegister(LastKnownGoodConfig)
-			legacyregistry.MustRegister(ConfigError)
-		}
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
 		}
@@ -553,104 +515,6 @@ func GetGather() metrics.Gatherer {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
-}
-
-const configMapAPIPathFmt = "/api/v1/namespaces/%s/configmaps/%s"
-
-func configLabels(source *corev1.NodeConfigSource) (map[string]string, error) {
-	if source == nil {
-		return map[string]string{
-			// prometheus requires all of the labels that can be set on the metric
-			ConfigSourceLabelKey:          "local",
-			ConfigUIDLabelKey:             "",
-			ConfigResourceVersionLabelKey: "",
-			KubeletConfigKeyLabelKey:      "",
-		}, nil
-	}
-	if source.ConfigMap != nil {
-		return map[string]string{
-			ConfigSourceLabelKey:          fmt.Sprintf(configMapAPIPathFmt, source.ConfigMap.Namespace, source.ConfigMap.Name),
-			ConfigUIDLabelKey:             string(source.ConfigMap.UID),
-			ConfigResourceVersionLabelKey: source.ConfigMap.ResourceVersion,
-			KubeletConfigKeyLabelKey:      source.ConfigMap.KubeletConfigKey,
-		}, nil
-	}
-	return nil, fmt.Errorf("unrecognized config source type, all source subfields were nil")
-}
-
-// track labels across metric updates, so we can delete old label sets and prevent leaks
-var assignedConfigLabels map[string]string
-
-// SetAssignedConfig tracks labels according to the assigned NodeConfig. It also tracks labels
-// across metric updates so old labels can be safely deleted.
-func SetAssignedConfig(source *corev1.NodeConfigSource) error {
-	// compute the timeseries labels from the source
-	labels, err := configLabels(source)
-	if err != nil {
-		return err
-	}
-	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	if !AssignedConfig.Delete(assignedConfigLabels) {
-		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different assigned configs.", "labels", assignedConfigLabels)
-	}
-	// record the new timeseries
-	assignedConfigLabels = labels
-	// expose the new timeseries with a constant count of 1
-	AssignedConfig.With(assignedConfigLabels).Set(1)
-	return nil
-}
-
-// track labels across metric updates, so we can delete old label sets and prevent leaks
-var activeConfigLabels map[string]string
-
-// SetActiveConfig tracks labels according to the NodeConfig that is currently used by the Kubelet.
-// It also tracks labels across metric updates so old labels can be safely deleted.
-func SetActiveConfig(source *corev1.NodeConfigSource) error {
-	// compute the timeseries labels from the source
-	labels, err := configLabels(source)
-	if err != nil {
-		return err
-	}
-	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	if !ActiveConfig.Delete(activeConfigLabels) {
-		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different active configs.", "labels", activeConfigLabels)
-	}
-	// record the new timeseries
-	activeConfigLabels = labels
-	// expose the new timeseries with a constant count of 1
-	ActiveConfig.With(activeConfigLabels).Set(1)
-	return nil
-}
-
-// track labels across metric updates, so we can delete old label sets and prevent leaks
-var lastKnownGoodConfigLabels map[string]string
-
-// SetLastKnownGoodConfig tracks labels according to the NodeConfig that was successfully applied last.
-// It also tracks labels across metric updates so old labels can be safely deleted.
-func SetLastKnownGoodConfig(source *corev1.NodeConfigSource) error {
-	// compute the timeseries labels from the source
-	labels, err := configLabels(source)
-	if err != nil {
-		return err
-	}
-	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	if !LastKnownGoodConfig.Delete(lastKnownGoodConfigLabels) {
-		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different last known good configs.", "labels", lastKnownGoodConfigLabels)
-	}
-	// record the new timeseries
-	lastKnownGoodConfigLabels = labels
-	// expose the new timeseries with a constant count of 1
-	LastKnownGoodConfig.With(lastKnownGoodConfigLabels).Set(1)
-	return nil
-}
-
-// SetConfigError sets a the ConfigError metric to 1 in case any errors were encountered.
-func SetConfigError(err bool) {
-	if err {
-		ConfigError.Set(1)
-	} else {
-		ConfigError.Set(0)
-	}
 }
 
 // SetNodeName sets the NodeName Gauge to 1.

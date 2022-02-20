@@ -23,11 +23,13 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestDetermineNeededServiceUpdates(t *testing.T) {
@@ -659,6 +661,127 @@ func Test_podChanged(t *testing.T) {
 			}
 			if labelsChanged != tc.labelsChanged {
 				t.Errorf("Expected labelsChanged to be %t, got %t", tc.labelsChanged, labelsChanged)
+			}
+		})
+	}
+}
+
+func TestEndpointsEqualBeyondHash(t *testing.T) {
+	tests := []struct {
+		name     string
+		ep1      *discovery.Endpoint
+		ep2      *discovery.Endpoint
+		expected bool
+	}{
+		{
+			name: "No change",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			expected: true,
+		},
+		{
+			name: "NodeName changed",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				NodeName:  utilpointer.StringPtr("node-2"),
+			},
+			expected: false,
+		},
+		{
+			name: "Zone changed",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-2"),
+			},
+			expected: false,
+		},
+		{
+			name: "Ready condition changed",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(false),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			expected: false,
+		},
+		{
+			name: "Pod name changed",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := EndpointsEqualBeyondHash(tt.ep1, tt.ep2); got != tt.expected {
+				t.Errorf("EndpointsEqualBeyondHash() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

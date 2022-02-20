@@ -1,15 +1,14 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- jsafrane
-- anguslees
-- dims
-- FengyunPan2
+  - jsafrane
+  - anguslees
+  - dims
 reviewers:
-- anguslees
-- rootfs
-- saad-ali
-- jsafrane
-- jingxu97
-- msau42
-- FengyunPan2
+  - anguslees
+  - saad-ali
+  - jsafrane
+  - jingxu97
+  - msau42
+emeritus_approvers:
+  - FengyunPan2

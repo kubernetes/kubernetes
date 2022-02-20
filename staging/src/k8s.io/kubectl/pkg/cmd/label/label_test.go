@@ -24,10 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -563,5 +564,180 @@ func TestLabelResourceVersion(t *testing.T) {
 	}
 	if err := options.RunLabel(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLabelMsg(t *testing.T) {
+	tests := []struct {
+		obj             runtime.Object
+		overwrite       bool
+		resourceVersion string
+		labels          map[string]string
+		remove          []string
+		expectObj       runtime.Object
+		expectMsg       string
+		expectErr       bool
+	}{
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:    map[string]string{"a": "b"},
+			expectMsg: MsgNotLabeled,
+			expectErr: true,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			labels: map[string]string{"a": "b"},
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			expectMsg: MsgLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:    map[string]string{"a": "c"},
+			overwrite: true,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "c"},
+				},
+			},
+			expectMsg: MsgLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels: map[string]string{"c": "d"},
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			expectMsg: MsgLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:          map[string]string{"c": "d"},
+			resourceVersion: "2",
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:          map[string]string{"a": "b", "c": "d"},
+					ResourceVersion: "2",
+				},
+			},
+			expectMsg: MsgLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels: map[string]string{},
+			remove: []string{"a"},
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			expectMsg: MsgUnLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			labels: map[string]string{"e": "f"},
+			remove: []string{"a"},
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"c": "d",
+						"e": "f",
+					},
+				},
+			},
+			expectMsg: MsgLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"status": "unhealthy"},
+				},
+			},
+			labels:    map[string]string{"status": "healthy"},
+			overwrite: true,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"status": "healthy",
+					},
+				},
+			},
+			expectMsg: MsgLabeled,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"status": "unhealthy"},
+				},
+			},
+			labels:    map[string]string{"status": "healthy"},
+			overwrite: false,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"status": "unhealthy",
+					},
+				},
+			},
+			expectMsg: MsgNotLabeled,
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		oldData, err := json.Marshal(test.obj)
+		if err != nil {
+			t.Errorf("unexpected error: %v %v", err, test)
+		}
+
+		err = labelFunc(test.obj, test.overwrite, test.resourceVersion, test.labels, test.remove)
+		if test.expectErr && err == nil {
+			t.Errorf("unexpected non-error: %v", test)
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v %v", err, test)
+		}
+
+		newObj, err := json.Marshal(test.obj)
+		if err != nil {
+			t.Errorf("unexpected error: %v %v", err, test)
+		}
+
+		dataChangeMsg := updateDataChangeMsg(oldData, newObj, test.overwrite)
+		if dataChangeMsg != test.expectMsg {
+			t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, test)
+		}
 	}
 }

@@ -1757,6 +1757,17 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 			},
 		}...)
 	}
+	if includedMetrics.Has(container.OOMMetrics) {
+		c.containerMetrics = append(c.containerMetrics, containerMetric{
+			name:      "container_oom_events_total",
+			help:      "Count of out of memory events observed for the container",
+			valueType: prometheus.CounterValue,
+			getValues: func(s *info.ContainerStats) metricValues {
+				return metricValues{{value: float64(s.OOMEvents), timestamp: s.Timestamp}}
+			},
+		})
+	}
+
 	return c
 }
 
@@ -1825,7 +1836,7 @@ func DefaultContainerLabels(container *info.ContainerInfo) map[string]string {
 }
 
 // BaseContainerLabels returns a ContainerLabelsFunc that exports the container
-// name, first alias, image name as well as white listed label values.
+// name, first alias, image name as well as all its white listed env and label values.
 func BaseContainerLabels(whiteList []string) func(container *info.ContainerInfo) map[string]string {
 	whiteListMap := make(map[string]struct{}, len(whiteList))
 	for _, k := range whiteList {
@@ -1844,6 +1855,9 @@ func BaseContainerLabels(whiteList []string) func(container *info.ContainerInfo)
 			if _, ok := whiteListMap[k]; ok {
 				set[ContainerLabelPrefix+k] = v
 			}
+		}
+		for k, v := range container.Spec.Envs {
+			set[ContainerEnvPrefix+k] = v
 		}
 		return set
 	}

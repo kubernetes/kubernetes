@@ -104,7 +104,7 @@ func InitNFSDriver() storageframework.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
+			SupportedMountOption: sets.NewString("relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence: true,
@@ -1372,7 +1372,7 @@ func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone: zone,
 			},
 		}
 	}
@@ -1491,10 +1491,19 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *storageframework
 
 func (v *vSphereDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
 	return &storageframework.PerTestConfig{
-		Driver:    v,
-		Prefix:    "vsphere",
-		Framework: f,
-	}, func() {}
+			Driver:    v,
+			Prefix:    "vsphere",
+			Framework: f,
+		}, func() {
+			// Driver Cleanup function
+			// Logout each vSphere client connection to prevent session leakage
+			nodes := vspheretest.GetReadySchedulableNodeInfos()
+			for _, node := range nodes {
+				if node.VSphere.Client != nil {
+					node.VSphere.Client.Logout(context.TODO())
+				}
+			}
+		}
 }
 
 func (v *vSphereDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {

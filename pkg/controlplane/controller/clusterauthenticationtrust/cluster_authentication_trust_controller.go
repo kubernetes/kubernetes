@@ -432,7 +432,7 @@ func (c *Controller) Enqueue() {
 }
 
 // Run the controller until stopped.
-func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()

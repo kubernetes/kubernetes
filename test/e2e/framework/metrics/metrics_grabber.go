@@ -201,20 +201,26 @@ func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
 	}
 
 	var err error
-	var output string
+
 	g.waitForSchedulerReadyOnce.Do(func() {
-		var lastMetricsFetchErr error
-		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			output, lastMetricsFetchErr = g.getSecureMetricsFromPod(g.kubeScheduler, metav1.NamespaceSystem, kubeSchedulerPort)
-			return lastMetricsFetchErr == nil, nil
-		}); metricsWaitErr != nil {
-			err = fmt.Errorf("error waiting for scheduler pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
-			return
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(g.client, g.kubeScheduler, metav1.NamespaceSystem, 5*time.Minute); readyErr != nil {
+			err = fmt.Errorf("error waiting for kube-scheduler pod to be ready: %w", readyErr)
 		}
 	})
 	if err != nil {
 		return SchedulerMetrics{}, err
 	}
+
+	var lastMetricsFetchErr error
+	var output string
+	if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		output, lastMetricsFetchErr = g.getSecureMetricsFromPod(g.kubeScheduler, metav1.NamespaceSystem, kubeSchedulerPort)
+		return lastMetricsFetchErr == nil, nil
+	}); metricsWaitErr != nil {
+		err := fmt.Errorf("error waiting for kube-scheduler pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
+		return SchedulerMetrics{}, err
+	}
+
 	return parseSchedulerMetrics(output)
 }
 
@@ -246,37 +252,37 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 	}
 
 	var err error
-	var output string
-	podName := g.kubeControllerManager
-	g.waitForControllerManagerReadyOnce.Do(func() {
-		if readyErr := e2epod.WaitForPodsReady(g.client, metav1.NamespaceSystem, podName, 0); readyErr != nil {
-			err = fmt.Errorf("error waiting for controller manager pod to be ready: %w", readyErr)
-			return
-		}
 
-		var lastMetricsFetchErr error
-		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			output, lastMetricsFetchErr = g.getSecureMetricsFromPod(g.kubeControllerManager, metav1.NamespaceSystem, kubeControllerManagerPort)
-			return lastMetricsFetchErr == nil, nil
-		}); metricsWaitErr != nil {
-			err = fmt.Errorf("error waiting for controller manager pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
-			return
+	g.waitForControllerManagerReadyOnce.Do(func() {
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(g.client, g.kubeControllerManager, metav1.NamespaceSystem, 5*time.Minute); readyErr != nil {
+			err = fmt.Errorf("error waiting for kube-controller-manager pod to be ready: %w", readyErr)
 		}
 	})
 	if err != nil {
 		return ControllerManagerMetrics{}, err
 	}
+
+	var output string
+	var lastMetricsFetchErr error
+	if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		output, lastMetricsFetchErr = g.getSecureMetricsFromPod(g.kubeControllerManager, metav1.NamespaceSystem, kubeControllerManagerPort)
+		return lastMetricsFetchErr == nil, nil
+	}); metricsWaitErr != nil {
+		err := fmt.Errorf("error waiting for kube-controller-manager to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
+		return ControllerManagerMetrics{}, err
+	}
+
 	return parseControllerManagerMetrics(output)
 }
 
 // GrabFromSnapshotController returns metrics from controller manager
 func (g *Grabber) GrabFromSnapshotController(podName string, port int) (SnapshotControllerMetrics, error) {
 	if !g.grabFromSnapshotController {
-		return SnapshotControllerMetrics{}, fmt.Errorf("snapshot controller: %w", MetricsGrabbingDisabledError)
+		return SnapshotControllerMetrics{}, fmt.Errorf("volume-snapshot-controller: %w", MetricsGrabbingDisabledError)
 	}
 
 	// Use overrides if provided via test config flags.
-	// Otherwise, use the default snapshot controller pod name and port.
+	// Otherwise, use the default volume-snapshot-controller pod name and port.
 	if podName == "" {
 		podName = g.snapshotController
 	}
@@ -285,29 +291,26 @@ func (g *Grabber) GrabFromSnapshotController(podName string, port int) (Snapshot
 	}
 
 	var err error
-	g.waitForSnapshotControllerReadyOnce.Do(func() {
-		if readyErr := e2epod.WaitForPodsReady(g.client, metav1.NamespaceSystem, podName, 0); readyErr != nil {
-			err = fmt.Errorf("error waiting for snapshot controller pod to be ready: %w", readyErr)
-			return
-		}
 
-		var lastMetricsFetchErr error
-		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			_, lastMetricsFetchErr = g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, port)
-			return lastMetricsFetchErr == nil, nil
-		}); metricsWaitErr != nil {
-			err = fmt.Errorf("error waiting for snapshot controller pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
-			return
+	g.waitForSnapshotControllerReadyOnce.Do(func() {
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(g.client, podName, metav1.NamespaceSystem, 5*time.Minute); readyErr != nil {
+			err = fmt.Errorf("error waiting for volume-snapshot-controller pod to be ready: %w", readyErr)
 		}
 	})
 	if err != nil {
 		return SnapshotControllerMetrics{}, err
 	}
 
-	output, err := g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, port)
-	if err != nil {
+	var output string
+	var lastMetricsFetchErr error
+	if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		output, lastMetricsFetchErr = g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, port)
+		return lastMetricsFetchErr == nil, nil
+	}); metricsWaitErr != nil {
+		err = fmt.Errorf("error waiting for volume-snapshot-controller pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
 		return SnapshotControllerMetrics{}, err
 	}
+
 	return parseSnapshotControllerMetrics(output)
 }
 
@@ -315,7 +318,7 @@ func (g *Grabber) GrabFromSnapshotController(podName string, port int) (Snapshot
 func (g *Grabber) GrabFromAPIServer() (APIServerMetrics, error) {
 	output, err := g.getMetricsFromAPIServer()
 	if err != nil {
-		return APIServerMetrics{}, nil
+		return APIServerMetrics{}, err
 	}
 	return parseAPIServerMetrics(output)
 }

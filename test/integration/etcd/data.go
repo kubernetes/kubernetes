@@ -131,6 +131,14 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/autoscaling/v2
+		gvr("autoscaling", "v2", "horizontalpodautoscalers"): {
+			Stub:             `{"metadata": {"name": "hpa4"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
+			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa4",
+			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1
 		gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
@@ -166,14 +174,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/certificates/v1beta1
-		gvr("certificates.k8s.io", "v1beta1", "certificatesigningrequests"): {
-			Stub:             `{"metadata": {"name": "csr1"}, "spec": {"request": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQnlqQ0NBVE1DQVFBd2dZa3hDekFKQmdOVkJBWVRBbFZUTVJNd0VRWURWUVFJRXdwRFlXeHBabTl5Ym1saApNUll3RkFZRFZRUUhFdzFOYjNWdWRHRnBiaUJXYVdWM01STXdFUVlEVlFRS0V3cEhiMjluYkdVZ1NXNWpNUjh3CkhRWURWUVFMRXhaSmJtWnZjbTFoZEdsdmJpQlVaV05vYm05c2IyZDVNUmN3RlFZRFZRUURFdzUzZDNjdVoyOXYKWjJ4bExtTnZiVENCbnpBTkJna3Foa2lHOXcwQkFRRUZBQU9CalFBd2dZa0NnWUVBcFp0WUpDSEo0VnBWWEhmVgpJbHN0UVRsTzRxQzAzaGpYK1prUHl2ZFlkMVE0K3FiQWVUd1htQ1VLWUhUaFZSZDVhWFNxbFB6eUlCd2llTVpyCldGbFJRZGRaMUl6WEFsVlJEV3dBbzYwS2VjcWVBWG5uVUsrNWZYb1RJL1VnV3NocmU4dEoreC9UTUhhUUtSL0oKY0lXUGhxYVFoc0p1elpidkFkR0E4MEJMeGRNQ0F3RUFBYUFBTUEwR0NTcUdTSWIzRFFFQkJRVUFBNEdCQUlobAo0UHZGcStlN2lwQVJnSTVaTStHWng2bXBDejQ0RFRvMEprd2ZSRGYrQnRyc2FDMHE2OGVUZjJYaFlPc3E0ZmtIClEwdUEwYVZvZzNmNWlKeENhM0hwNWd4YkpRNnpWNmtKMFRFc3VhYU9oRWtvOXNkcENvUE9uUkJtMmkvWFJEMkQKNmlOaDhmOHowU2hHc0ZxakRnRkh5RjNvK2xVeWorVUM2SDFRVzdibgotLS0tLUVORCBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0="}}`,
-			ExpectedEtcdPath: "/registry/certificatesigningrequests/csr1",
-			ExpectedGVK:      gvkP("certificates.k8s.io", "v1", "CertificateSigningRequest"),
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/certificates/v1
 		gvr("certificates.k8s.io", "v1", "certificatesigningrequests"): {
 			Stub:             `{"metadata": {"name": "csr2"}, "spec": {"signerName":"example.com/signer", "usages":["any"], "request": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQnlqQ0NBVE1DQVFBd2dZa3hDekFKQmdOVkJBWVRBbFZUTVJNd0VRWURWUVFJRXdwRFlXeHBabTl5Ym1saApNUll3RkFZRFZRUUhFdzFOYjNWdWRHRnBiaUJXYVdWM01STXdFUVlEVlFRS0V3cEhiMjluYkdVZ1NXNWpNUjh3CkhRWURWUVFMRXhaSmJtWnZjbTFoZEdsdmJpQlVaV05vYm05c2IyZDVNUmN3RlFZRFZRUURFdzUzZDNjdVoyOXYKWjJ4bExtTnZiVENCbnpBTkJna3Foa2lHOXcwQkFRRUZBQU9CalFBd2dZa0NnWUVBcFp0WUpDSEo0VnBWWEhmVgpJbHN0UVRsTzRxQzAzaGpYK1prUHl2ZFlkMVE0K3FiQWVUd1htQ1VLWUhUaFZSZDVhWFNxbFB6eUlCd2llTVpyCldGbFJRZGRaMUl6WEFsVlJEV3dBbzYwS2VjcWVBWG5uVUsrNWZYb1RJL1VnV3NocmU4dEoreC9UTUhhUUtSL0oKY0lXUGhxYVFoc0p1elpidkFkR0E4MEJMeGRNQ0F3RUFBYUFBTUEwR0NTcUdTSWIzRFFFQkJRVUFBNEdCQUlobAo0UHZGcStlN2lwQVJnSTVaTStHWng2bXBDejQ0RFRvMEprd2ZSRGYrQnRyc2FDMHE2OGVUZjJYaFlPc3E0ZmtIClEwdUEwYVZvZzNmNWlKeENhM0hwNWd4YkpRNnpWNmtKMFRFc3VhYU9oRWtvOXNkcENvUE9uUkJtMmkvWFJEMkQKNmlOaDhmOHowU2hHc0ZxakRnRkh5RjNvK2xVeWorVUM2SDFRVzdibgotLS0tLUVORCBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0="}}`,
@@ -185,14 +185,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("coordination.k8s.io", "v1", "leases"): {
 			Stub:             `{"metadata": {"name": "leasev1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
 			ExpectedEtcdPath: "/registry/leases/" + namespace + "/leasev1",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/coordination/v1beta1
-		gvr("coordination.k8s.io", "v1beta1", "leases"): {
-			Stub:             `{"metadata": {"name": "leasev1beta1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
-			ExpectedEtcdPath: "/registry/leases/" + namespace + "/leasev1beta1",
-			ExpectedGVK:      gvkP("coordination.k8s.io", "v1", "Lease"),
 		},
 		// --
 
@@ -227,27 +219,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/extensions/v1beta1
-		gvr("extensions", "v1beta1", "ingresses"): {
-			Stub:             `{"metadata": {"name": "ingress1"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
-			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress1",
-			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "Ingress"),
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/networking/v1beta1
-		gvr("networking.k8s.io", "v1beta1", "ingresses"): {
-			Stub:             `{"metadata": {"name": "ingress2"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
-			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress2",
-			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "Ingress"),
-		},
-		gvr("networking.k8s.io", "v1beta1", "ingressclasses"): {
-			Stub:             `{"metadata": {"name": "ingressclass2"}, "spec": {"controller": "example.com/controller"}}`,
-			ExpectedEtcdPath: "/registry/ingressclasses/ingressclass2",
-			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "IngressClass"),
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/networking/v1
 		gvr("networking.k8s.io", "v1", "ingresses"): {
 			Stub:             `{"metadata": {"name": "ingress3"}, "spec": {"defaultBackend": {"service":{"name":"service", "port":{"number": 5000}}}}}`,
@@ -279,14 +250,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("policy", "v1beta1", "podsecuritypolicies"): {
 			Stub:             `{"metadata": {"name": "psp2"}, "spec": {"fsGroup": {"rule": "RunAsAny"}, "privileged": true, "runAsUser": {"rule": "RunAsAny"}, "seLinux": {"rule": "MustRunAs"}, "supplementalGroups": {"rule": "RunAsAny"}}}`,
 			ExpectedEtcdPath: "/registry/podsecuritypolicy/psp2",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/storage/v1alpha1
-		gvr("storage.k8s.io", "v1alpha1", "volumeattachments"): {
-			Stub:             `{"metadata": {"name": "va1"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv1"}}}`,
-			ExpectedEtcdPath: "/registry/volumeattachments/va1",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
 		},
 		// --
 
@@ -328,11 +291,19 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-		gvr("storage.k8s.io", "v1beta1", "volumeattachments"): {
-			Stub:             `{"metadata": {"name": "va2"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv2"}}}`,
-			ExpectedEtcdPath: "/registry/volumeattachments/va2",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
+		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2
+		gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas"): {
+			Stub:             `{"metadata": {"name": "fs-1"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
+			ExpectedEtcdPath: "/registry/flowschemas/fs-1",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta1", "FlowSchema"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2
+		gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "prioritylevelconfigurations"): {
+			Stub:             `{"metadata": {"name": "conf3"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
+			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf3",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1beta1", "PriorityLevelConfiguration"),
 		},
 		// --
 
@@ -344,13 +315,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-		gvr("storage.k8s.io", "v1beta1", "storageclasses"): {
-			Stub:             `{"metadata": {"name": "sc1"}, "provisioner": "aws"}`,
-			ExpectedEtcdPath: "/registry/storageclasses/sc1",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "StorageClass"),
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 		gvr("storage.k8s.io", "v1beta1", "csistoragecapacities"): {
 			Stub:             `{"metadata": {"name": "csc-12345-2"}, "storageClassName": "sc1"}`,
@@ -362,52 +326,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("storage.k8s.io", "v1", "storageclasses"): {
 			Stub:             `{"metadata": {"name": "sc2"}, "provisioner": "aws"}`,
 			ExpectedEtcdPath: "/registry/storageclasses/sc2",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/rbac/v1alpha1
-		gvr("rbac.authorization.k8s.io", "v1alpha1", "roles"): {
-			Stub:             `{"metadata": {"name": "role1"}, "rules": [{"apiGroups": ["v1"], "resources": ["events"], "verbs": ["watch"]}]}`,
-			ExpectedEtcdPath: "/registry/roles/" + namespace + "/role1",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "Role"),
-		},
-		gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterroles"): {
-			Stub:             `{"metadata": {"name": "crole1"}, "rules": [{"nonResourceURLs": ["/version"], "verbs": ["get"]}]}`,
-			ExpectedEtcdPath: "/registry/clusterroles/crole1",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRole"),
-		},
-		gvr("rbac.authorization.k8s.io", "v1alpha1", "rolebindings"): {
-			Stub:             `{"metadata": {"name": "roleb1"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
-			ExpectedEtcdPath: "/registry/rolebindings/" + namespace + "/roleb1",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "RoleBinding"),
-		},
-		gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterrolebindings"): {
-			Stub:             `{"metadata": {"name": "croleb1"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
-			ExpectedEtcdPath: "/registry/clusterrolebindings/croleb1",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRoleBinding"),
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/rbac/v1beta1
-		gvr("rbac.authorization.k8s.io", "v1beta1", "roles"): {
-			Stub:             `{"metadata": {"name": "role2"}, "rules": [{"apiGroups": ["v1"], "resources": ["events"], "verbs": ["watch"]}]}`,
-			ExpectedEtcdPath: "/registry/roles/" + namespace + "/role2",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "Role"),
-		},
-		gvr("rbac.authorization.k8s.io", "v1beta1", "clusterroles"): {
-			Stub:             `{"metadata": {"name": "crole2"}, "rules": [{"nonResourceURLs": ["/version"], "verbs": ["get"]}]}`,
-			ExpectedEtcdPath: "/registry/clusterroles/crole2",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRole"),
-		},
-		gvr("rbac.authorization.k8s.io", "v1beta1", "rolebindings"): {
-			Stub:             `{"metadata": {"name": "roleb2"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
-			ExpectedEtcdPath: "/registry/rolebindings/" + namespace + "/roleb2",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "RoleBinding"),
-		},
-		gvr("rbac.authorization.k8s.io", "v1beta1", "clusterrolebindings"): {
-			Stub:             `{"metadata": {"name": "croleb2"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
-			ExpectedEtcdPath: "/registry/clusterrolebindings/croleb2",
-			ExpectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRoleBinding"),
 		},
 		// --
 
@@ -441,48 +359,10 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): {
-			Stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
-			ExpectedEtcdPath: "/registry/validatingwebhookconfigurations/hook1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingWebhookConfiguration"),
-		},
-		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"): {
-			Stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
-			ExpectedEtcdPath: "/registry/mutatingwebhookconfigurations/hook1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "MutatingWebhookConfiguration"),
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1
-		gvr("scheduling.k8s.io", "v1alpha1", "priorityclasses"): {
-			Stub:             `{"metadata":{"name":"pc1"},"Value":1000}`,
-			ExpectedEtcdPath: "/registry/priorityclasses/pc1",
-			ExpectedGVK:      gvkP("scheduling.k8s.io", "v1", "PriorityClass"),
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/scheduling/v1beta1
-		gvr("scheduling.k8s.io", "v1beta1", "priorityclasses"): {
-			Stub:             `{"metadata":{"name":"pc2"},"Value":1000}`,
-			ExpectedEtcdPath: "/registry/priorityclasses/pc2",
-			ExpectedGVK:      gvkP("scheduling.k8s.io", "v1", "PriorityClass"),
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/scheduling/v1
 		gvr("scheduling.k8s.io", "v1", "priorityclasses"): {
 			Stub:             `{"metadata":{"name":"pc3"},"Value":1000}`,
 			ExpectedEtcdPath: "/registry/priorityclasses/pc3",
-		},
-		// --
-
-		// k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
-		// depends on aggregator using the same ungrouped RESTOptionsGetter as the kube apiserver, not SimpleRestOptionsFactory in aggregator.go
-		gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {
-			Stub:             `{"metadata": {"name": "as1.foo.com"}, "spec": {"group": "foo.com", "version": "as1", "groupPriorityMinimum":100, "versionPriority":10}}`,
-			ExpectedEtcdPath: "/registry/apiregistration.k8s.io/apiservices/as1.foo.com",
-			ExpectedGVK:      gvkP("apiregistration.k8s.io", "v1", "APIService"),
 		},
 		// --
 
@@ -502,11 +382,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 				`"names": {"kind": "OpenShiftWebConsoleConfig","plural": "openshiftwebconsoleconfigs","singular": "openshiftwebconsoleconfig"}}}`,
 			ExpectedEtcdPath: "/registry/apiextensions.k8s.io/customresourcedefinitions/openshiftwebconsoleconfigs.webconsole2.operator.openshift.io",
 			ExpectedGVK:      gvkP("apiextensions.k8s.io", "v1beta1", "CustomResourceDefinition"),
-		},
-		// k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
-		gvr("apiextensions.k8s.io", "v1beta1", "customresourcedefinitions"): {
-			Stub:             `{"metadata": {"name": "openshiftwebconsoleconfigs.webconsole.operator.openshift.io"},"spec": {"scope": "Cluster","group": "webconsole.operator.openshift.io","version": "v1alpha1","names": {"kind": "OpenShiftWebConsoleConfig","plural": "openshiftwebconsoleconfigs","singular": "openshiftwebconsoleconfig"}}}`,
-			ExpectedEtcdPath: "/registry/apiextensions.k8s.io/customresourcedefinitions/openshiftwebconsoleconfigs.webconsole.operator.openshift.io",
 		},
 		gvr("cr.bar.com", "v1", "foos"): {
 			Stub:             `{"kind": "Foo", "apiVersion": "cr.bar.com/v1", "metadata": {"name": "cr1foo"}, "color": "blue"}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
@@ -563,13 +438,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 	}
 
 	// add csinodes
-	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-	etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csinodes")] = StorageData{
-		Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
-		ExpectedEtcdPath: "/registry/csinodes/csini1",
-		ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSINode"),
-	}
-
 	// k8s.io/kubernetes/pkg/apis/storage/v1
 	etcdStorageData[gvr("storage.k8s.io", "v1", "csinodes")] = StorageData{
 		Stub:             `{"metadata": {"name": "csini2"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
@@ -577,13 +445,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 	}
 
 	// add csidrivers
-	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-	etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csidrivers")] = StorageData{
-		Stub:             `{"metadata": {"name": "csid1"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
-		ExpectedEtcdPath: "/registry/csidrivers/csid1",
-		ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSIDriver"),
-	}
-
 	// k8s.io/kubernetes/pkg/apis/storage/v1
 	etcdStorageData[gvr("storage.k8s.io", "v1", "csidrivers")] = StorageData{
 		Stub:             `{"metadata": {"name": "csid2"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,

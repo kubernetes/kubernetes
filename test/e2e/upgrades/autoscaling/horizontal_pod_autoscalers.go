@@ -50,7 +50,9 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 		500, /* cpuLimit */
 		200, /* memLimit */
 		f.ClientSet,
-		f.ScalesGetter)
+		f.ScalesGetter,
+		e2eautoscaling.Disable,
+		e2eautoscaling.Idle)
 	t.hpa = e2eautoscaling.CreateCPUHorizontalPodAutoscaler(
 		t.rc,
 		20, /* targetCPUUtilizationPercent */

@@ -1,27 +1,18 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
+  - release-engineering-approvers
+  - release-managers
+  - AuraSinis # 1.24 Release Notes Lead
+  - cici37 # 1.23 Release Notes Lead
   - pmmalinov01 # 1.22 Release Notes Lead
   - wilsonehusin # 1.21 Release Notes Lead
-  - cpanato # Release Manager
-  - feiskyer # Release Manager
-  - hasheddan # Release Manager / SIG Technical Lead
-  - idealhack # Release Manager
-  - justaugustus # Release Manager / SIG Chair
-  - puerco # Release Manager
-  - saschagrunert # Release Manager / SIG Chair
-  - xmudrii # Release Manager
 reviewers:
-  - pmmalinov01 # 1.22 Release Notes Lead
-  - cici37 # 1.22 Release Notes shadow
-  - Damans227 # 1.22 Release Notes shadow
-  - simcard0000 # 1.22 Release Notes shadow
-  - sladyn98 # 1.22 Release Notes shadow
-  - wilsonehusin # 1.21 Release Notes Lead
-  - ashnehete # 1.21 Release Notes shadow
-  - melodychn # 1.21 Release Notes shadow
-  - soniasingla # 1.21 Release Notes shadow
-
+  - AuraSinis # 1.24 Release Notes Lead
+  - csantanapr # 1.24 Release Notes Shadow
+  - parul5sahoo # 1.24 Release Notes Shadow
+  - Lp-Francois # 1.24 Release Notes Shadow
+  - RinkiyaKeDad # 1.24 Release Notes Shadow
 labels:
   - sig/release
   - area/release-eng

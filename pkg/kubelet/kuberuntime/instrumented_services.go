@@ -20,7 +20,7 @@ import (
 	"time"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -68,11 +68,11 @@ func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeapi.Ver
 	return out, err
 }
 
-func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
+func (in instrumentedRuntimeService) Status(verbose bool) (*runtimeapi.StatusResponse, error) {
 	const operation = "status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.Status()
+	out, err := in.service.Status(verbose)
 	recordError(operation, err)
 	return out, err
 }
@@ -122,11 +122,11 @@ func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.Container
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error) {
+func (in instrumentedRuntimeService) ContainerStatus(containerID string, verbose bool) (*runtimeapi.ContainerStatusResponse, error) {
 	const operation = "container_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ContainerStatus(containerID)
+	out, err := in.service.ContainerStatus(containerID, verbose)
 	recordError(operation, err)
 	return out, err
 }
@@ -208,11 +208,11 @@ func (in instrumentedRuntimeService) RemovePodSandbox(podSandboxID string) error
 	return err
 }
 
-func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error) {
+func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error) {
 	const operation = "podsandbox_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.PodSandboxStatus(podSandboxID)
+	out, err := in.service.PodSandboxStatus(podSandboxID, verbose)
 	recordError(operation, err)
 	return out, err
 }
@@ -244,6 +244,24 @@ func (in instrumentedRuntimeService) ListContainerStats(filter *runtimeapi.Conta
 	return out, err
 }
 
+func (in instrumentedRuntimeService) PodSandboxStats(podSandboxID string) (*runtimeapi.PodSandboxStats, error) {
+	const operation = "podsandbox_stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.PodSandboxStats(podSandboxID)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+	const operation = "list_podsandbox_stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListPodSandboxStats(filter)
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	const operation = "port_forward"
 	defer recordOperation(operation, time.Now())
@@ -271,11 +289,11 @@ func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFil
 	return out, err
 }
 
-func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
 	const operation = "image_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ImageStatus(image)
+	out, err := in.service.ImageStatus(image, verbose)
 	recordError(operation, err)
 	return out, err
 }

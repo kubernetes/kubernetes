@@ -64,7 +64,7 @@ func TestErrorNew(t *testing.T) {
 	}
 
 	if !IsConflict(NewConflict(resource("tests"), "2", errors.New("message"))) {
-		t.Errorf("expected to be conflict")
+		t.Errorf("expected to be %s", metav1.StatusReasonAlreadyExists)
 	}
 	if !IsNotFound(NewNotFound(resource("tests"), "3")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonNotFound)
@@ -86,6 +86,13 @@ func TestErrorNew(t *testing.T) {
 	}
 	if !IsMethodNotSupported(NewMethodNotSupported(resource("foos"), "delete")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonMethodNotAllowed)
+	}
+
+	if !IsAlreadyExists(NewGenerateNameConflict(resource("tests"), "3", 1)) {
+		t.Errorf("expected to be %s", metav1.StatusReasonAlreadyExists)
+	}
+	if time, ok := SuggestsClientDelay(NewGenerateNameConflict(resource("tests"), "3", 1)); time != 1 || !ok {
+		t.Errorf("unexpected %d", time)
 	}
 
 	if time, ok := SuggestsClientDelay(NewServerTimeout(resource("tests"), "doing something", 10)); time != 10 || !ok {
@@ -118,6 +125,7 @@ func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
 		Err     *field.Error
 		Details *metav1.StatusDetails
+		Msg     string
 	}{
 		{
 			field.Duplicate(field.NewPath("field[0].name"), "bar"),
@@ -129,6 +137,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Duplicate value: "bar"`,
 		},
 		{
 			field.Invalid(field.NewPath("field[0].name"), "bar", "detail"),
@@ -140,6 +149,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Invalid value: "bar": detail`,
 		},
 		{
 			field.NotFound(field.NewPath("field[0].name"), "bar"),
@@ -151,6 +161,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Not found: "bar"`,
 		},
 		{
 			field.NotSupported(field.NewPath("field[0].name"), "bar", nil),
@@ -162,6 +173,7 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Unsupported value: "bar"`,
 		},
 		{
 			field.Required(field.NewPath("field[0].name"), ""),
@@ -173,18 +185,37 @@ func TestNewInvalid(t *testing.T) {
 					Field: "field[0].name",
 				}},
 			},
+			`Kind "name" is invalid: field[0].name: Required value`,
+		},
+		{
+			nil,
+			&metav1.StatusDetails{
+				Kind:   "Kind",
+				Name:   "name",
+				Causes: []metav1.StatusCause{},
+			},
+			`Kind "name" is invalid`,
 		},
 	}
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
-		expected.Causes[0].Message = vErr.ErrorBody()
-		err := NewInvalid(kind("Kind"), "name", field.ErrorList{vErr})
+		if vErr != nil && expected != nil {
+			expected.Causes[0].Message = vErr.ErrorBody()
+		}
+		var errList field.ErrorList
+		if vErr != nil {
+			errList = append(errList, vErr)
+		}
+		err := NewInvalid(kind("Kind"), "name", errList)
 		status := err.ErrStatus
 		if status.Code != 422 || status.Reason != metav1.StatusReasonInvalid {
 			t.Errorf("%d: unexpected status: %#v", i, status)
 		}
 		if !reflect.DeepEqual(expected, status.Details) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected, status.Details)
+		}
+		if testCase.Msg != status.Message {
+			t.Errorf("%d: expected\n%s\ngot\n%s", i, testCase.Msg, status.Message)
 		}
 	}
 }
@@ -248,6 +279,10 @@ func TestReasonForErrorSupportsWrappedErrors(t *testing.T) {
 			err:            fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
 			expectedReason: metav1.StatusReasonUnknown,
 		},
+		{
+			name:           "Nil",
+			expectedReason: metav1.StatusReasonUnknown,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -295,6 +330,10 @@ func TestIsTooManyRequestsSupportsWrappedErrors(t *testing.T) {
 			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
 			expectMatch: false,
 		},
+		{
+			name:        "Nil",
+			expectMatch: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -337,6 +376,10 @@ func TestIsRequestEntityTooLargeErrorSupportsWrappedErrors(t *testing.T) {
 		{
 			name:        "Nested,no match",
 			err:         fmt.Errorf("Wrapping: %w", &StatusError{ErrStatus: metav1.Status{Code: http.StatusNotFound}}),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}
@@ -383,6 +426,10 @@ func TestIsUnexpectedServerError(t *testing.T) {
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
 			expectMatch: false,
 		},
+		{
+			name:        "Nil",
+			expectMatch: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -421,6 +468,10 @@ func TestIsUnexpectedObjectError(t *testing.T) {
 		{
 			name:        "Nested, no match",
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
+			expectMatch: false,
+		},
+		{
+			name:        "Nil",
 			expectMatch: false,
 		},
 	}
@@ -468,6 +519,10 @@ func TestSuggestsClientDelaySupportsWrapping(t *testing.T) {
 			err:         fmt.Errorf("wrapping: %w", fmt.Errorf("some more: %w", errors.New("hello"))),
 			expectMatch: false,
 		},
+		{
+			name:        "Nil",
+			expectMatch: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -476,5 +531,97 @@ func TestSuggestsClientDelaySupportsWrapping(t *testing.T) {
 				t.Errorf("expected match: %t, but got match: %t", tc.expectMatch, result)
 			}
 		})
+	}
+}
+
+func TestIsErrorTypesByReasonAndCode(t *testing.T) {
+	testCases := []struct {
+		name                  string
+		knownReason           metav1.StatusReason
+		otherReason           metav1.StatusReason
+		otherReasonConsidered bool
+		code                  int32
+		fn                    func(error) bool
+	}{
+		{
+			name:                  "IsRequestEntityTooLarge",
+			knownReason:           metav1.StatusReasonRequestEntityTooLarge,
+			otherReason:           metav1.StatusReasonForbidden,
+			otherReasonConsidered: false,
+			code:                  http.StatusRequestEntityTooLarge,
+			fn:                    IsRequestEntityTooLargeError,
+		}, {
+			name:                  "TooManyRequests",
+			knownReason:           metav1.StatusReasonTooManyRequests,
+			otherReason:           metav1.StatusReasonForbidden,
+			otherReasonConsidered: false,
+			code:                  http.StatusTooManyRequests,
+			fn:                    IsTooManyRequests,
+		}, {
+			name:                  "Forbidden",
+			knownReason:           metav1.StatusReasonForbidden,
+			otherReason:           metav1.StatusReasonNotFound,
+			otherReasonConsidered: true,
+			code:                  http.StatusForbidden,
+			fn:                    IsForbidden,
+		}, {
+			name:                  "NotFound",
+			knownReason:           metav1.StatusReasonNotFound,
+			otherReason:           metav1.StatusReasonForbidden,
+			otherReasonConsidered: true,
+			code:                  http.StatusNotFound,
+			fn:                    IsNotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("by known reason", func(t *testing.T) {
+				err := &StatusError{
+					metav1.Status{
+						Reason: tc.knownReason,
+					},
+				}
+
+				got := tc.fn(err)
+				if !got {
+					t.Errorf("expected reason %s to match", tc.knownReason)
+				}
+			})
+
+			t.Run("by code and unknown reason", func(t *testing.T) {
+				err := &StatusError{
+					metav1.Status{
+						Reason: metav1.StatusReasonUnknown, // this could be _any_ reason that isn't in knownReasons.
+						Code:   tc.code,
+					},
+				}
+
+				got := tc.fn(err)
+				if !got {
+					t.Errorf("expected code %d with reason %s to match", tc.code, tc.otherReason)
+				}
+			})
+
+			if !tc.otherReasonConsidered {
+				return
+			}
+
+			t.Run("by code and other known reason", func(t *testing.T) {
+				err := &StatusError{
+					metav1.Status{
+						Reason: tc.otherReason,
+						Code:   tc.code,
+					},
+				}
+
+				got := tc.fn(err)
+				if got {
+					t.Errorf("expected code %d with reason %s to not match", tc.code, tc.otherReason)
+				}
+			})
+
+		})
+
 	}
 }

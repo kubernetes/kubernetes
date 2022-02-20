@@ -118,34 +118,34 @@ try {
 
   Dump-DebugInfoToConsole
 
+  $kube_env = Fetch-KubeEnv
+  Set-EnvironmentVars
+
+  # Set to true if there's a feature that needs a reboot
+  $restart_computer = $false
+
+  $should_enable_hyperv = Test-ShouldEnableHyperVFeature
+  $hyperv_feature_enabled = Test-HyperVFeatureEnabled
+  if ($should_enable_hyperv -and -not ($hyperv_feature_enabled)) {
+    Enable-HyperVFeature
+    Log-Output 'Restarting computer after enabling Windows Hyper-V feature'
+    $restart_computer = $true
+  }
+
   if (-not (Test-ContainersFeatureInstalled)) {
     Install-ContainersFeature
     Log-Output 'Restarting computer after enabling Windows Containers feature'
+    $restart_computer = $true
+  }
+
+  if ($restart_computer) {
     Restart-Computer -Force
     # Restart-Computer does not stop the rest of the script from executing.
     exit 0
   }
 
-  $kube_env = Fetch-KubeEnv
-  Set-EnvironmentVars
-
   # Set the TCP/IP Parameters to keep idle connections alive.
   Set-WindowsTCPParameters
-
-  # Install Docker if the select CRI is not containerd and docker is not already
-  # installed.
-  if (${env:CONTAINER_RUNTIME} -ne "containerd") {
-    if (-not (Test-DockerIsInstalled)) {
-      Install-Docker
-    }
-    # For some reason the docker service may not be started automatically on the
-    # first reboot, although it seems to work fine on subsequent reboots.
-    Restart-Service docker
-    Start-Sleep 5
-    if (-not (Test-DockerIsRunning)) {
-        throw "docker service failed to start or stay running"
-    }
-  }
 
   Set-PrerequisiteOptions
 
@@ -205,5 +205,8 @@ catch {
   Write-Host 'Exception caught in script:'
   Write-Host $_.InvocationInfo.PositionMessage
   Write-Host "Kubernetes Windows node setup failed: $($_.Exception.Message)"
+  # Make sure kubelet won't remain running in case any failure happened during the startup.
+  Write-Host "Cleaning up, Unregistering WorkerServices..."
+  Unregister-WorkerServices
   exit 1
 }

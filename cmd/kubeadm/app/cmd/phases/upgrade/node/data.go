@@ -17,10 +17,10 @@ limitations under the License.
 package node
 
 import (
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 // Data is the interface to use for kubeadm upgrade node phases.
@@ -34,4 +34,5 @@ type Data interface {
 	Client() clientset.Interface
 	IgnorePreflightErrors() sets.String
 	PatchesDir() string
+	KubeConfigPath() string
 }

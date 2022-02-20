@@ -17,13 +17,13 @@ limitations under the License.
 package discovery
 
 import (
-	"net"
 	"net/http"
 	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	netutils "k8s.io/utils/net"
 )
 
 func TestGetServerAddressByClientCIDRs(t *testing.T) {
@@ -103,7 +103,7 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 		},
 	}
 
-	_, ipRange, _ := net.ParseCIDR("10.0.0.0/24")
+	_, ipRange, _ := netutils.ParseCIDRSloppy("10.0.0.0/24")
 	discoveryAddresses := DefaultAddresses{DefaultAddress: "ExternalAddress"}
 	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
 		CIDRRule{IPRange: *ipRange, Address: "serviceIP"})

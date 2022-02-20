@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,12 +31,129 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
+)
+
+const (
+	None    string = ""
+	podYAML string = `
+apiVersion: v1
+kind: Pod
+metadata:
+    creationTimestamp: "1998-10-21T18:39:43Z"
+    generateName: foo-b6699dcfb-
+    labels:
+      app: nginx
+      pod-template-hash: b6699dcfb
+    name: foo-b6699dcfb-rnv7t
+    namespace: default
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: foo-b6699dcfb
+      uid: 8fc1088c-15d5-4a8c-8502-4dfcedef97b8
+    resourceVersion: "14203463"
+    uid: e2cc99fa-5a28-44da-b880-4dded28882ef
+spec:
+    containers:
+    - image: nginx
+      imagePullPolicy: IfNotPresent
+      name: nginx
+      ports:
+      - containerPort: 80
+      protocol: TCP
+      resources:
+        limits:
+          cpu: 500m
+          memory: 128Mi
+        requests:
+          cpu: 250m
+          memory: 64Mi  
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-s64k4
+        readOnly: true
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    nodeName: knode0
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+    volumes:
+    - name: kube-api-access-s64k4
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "1998-10-21T18:39:37Z"
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "1998-10-21T18:39:42Z"
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "1998-10-21T18:39:42Z"
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "1998-10-21T18:39:37Z"
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - containerID: containerd://e35792ba1d6e9a56629659b35dbdb93dacaa0a413962ee04775319f5438e493c
+      image: docker.io/library/nginx:latest
+      imageID: docker.io/library/nginx@sha256:644a70516a26004c97d0d85c7fe1d0c3a67ea8ab7ddf4aff193d9f301670cf36
+      lastState: {}
+      name: nginx
+      ready: true
+      restartCount: 0
+      started: true
+      state:
+        running:
+          startedAt: "1998-10-21T18:39:41Z"
+    hostIP: 192.168.0.22
+    phase: Running
+    podIP: 10.42.1.203
+    podIPs:
+    - ip: 10.42.1.203
+    qosClass: Burstable
+    startTime: "1998-10-21T18:39:37Z"
+`
 )
 
 func newUnstructuredList(items ...*unstructured.Unstructured) *unstructured.UnstructuredList {
@@ -104,6 +222,20 @@ func addConditionWithObservedGeneration(in *unstructured.Unstructured, name, sta
 	})
 	unstructured.SetNestedSlice(in.Object, conditions, "status", "conditions")
 	return in
+}
+
+// createUnstructured parses the yaml string into a map[string]interface{}.  Verifies that the string does not have
+// any tab characters.
+func createUnstructured(t *testing.T, config string) *unstructured.Unstructured {
+	t.Helper()
+	result := map[string]interface{}{}
+
+	require.False(t, strings.Contains(config, "\t"), "Yaml %s cannot contain tabs", config)
+	require.NoError(t, yaml.Unmarshal([]byte(config), &result), "Could not parse config:\n\n%s\n", config)
+
+	return &unstructured.Unstructured{
+		Object: result,
+	}
 }
 
 func TestWaitForDeletion(t *testing.T) {
@@ -999,5 +1131,557 @@ func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
 	err := o.RunWait()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestWaitForDifferentJSONPathCondition will run tests on different types of
+// JSONPath expression to check the JSONPath can be parsed correctly from a Pod Yaml
+// and check if the comparison returns as expected.
+func TestWaitForDifferentJSONPathExpression(t *testing.T) {
+	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
+	}
+	listReactionfunc := func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, newUnstructuredList(createUnstructured(t, podYAML)), nil
+	}
+	infos := []*resource.Info{
+		{
+			Mapping: &meta.RESTMapping{
+				Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+			},
+			Name:      "foo-b6699dcfb-rnv7t",
+			Namespace: "default",
+		},
+	}
+
+	tests := []struct {
+		name         string
+		fakeClient   func() *dynamicfakeclient.FakeDynamicClient
+		jsonPathExp  string
+		jsonPathCond string
+
+		expectedErr string
+	}{
+		{
+			name: "JSONPath entry not exist",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.foo.bar}",
+			jsonPathCond: "baz",
+
+			expectedErr: "foo is not found",
+		},
+		{
+			name: "compare boolean JSONPath entry",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.status.containerStatuses[0].ready}",
+			jsonPathCond: "true",
+
+			expectedErr: None,
+		},
+		{
+			name: "compare boolean JSONPath entry wrong value",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.status.containerStatuses[0].ready}",
+			jsonPathCond: "false",
+
+			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
+		},
+		{
+			name: "compare integer JSONPath entry",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.spec.containers[0].ports[0].containerPort}",
+			jsonPathCond: "80",
+
+			expectedErr: None,
+		},
+		{
+			name: "compare integer JSONPath entry wrong value",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.spec.containers[0].ports[0].containerPort}",
+			jsonPathCond: "81",
+
+			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
+		},
+		{
+			name: "compare string JSONPath entry",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.spec.nodeName}",
+			jsonPathCond: "knode0",
+
+			expectedErr: None,
+		},
+		{
+			name: "compare string JSONPath entry wrong value",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.spec.nodeName}",
+			jsonPathCond: "kmaster",
+
+			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
+		},
+		{
+			name: "matches more than one value",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.status.conditions[*]}",
+			jsonPathCond: "foo",
+
+			expectedErr: "given jsonpath expression matches more than one value",
+		},
+		{
+			name: "matches more than one list",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{range .status.conditions[*]}[{.status}] {end}",
+			jsonPathCond: "foo",
+
+			expectedErr: "given jsonpath expression matches more than one list",
+		},
+		{
+			name: "unsupported type []interface{}",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.status.conditions}",
+			jsonPathCond: "True",
+
+			expectedErr: "jsonpath leads to a nested object or list which is not supported",
+		},
+		{
+			name: "unsupported type map[string]interface{}",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(createUnstructured(t, podYAML)), nil
+				})
+				return fakeClient
+			},
+			jsonPathExp:  "{.spec}",
+			jsonPathCond: "foo",
+
+			expectedErr: "jsonpath leads to a nested object or list which is not supported",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := test.fakeClient()
+			j, _ := newJSONPathParser(test.jsonPathExp)
+			o := &WaitOptions{
+				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(infos...),
+				DynamicClient:  fakeClient,
+				Timeout:        1 * time.Millisecond,
+
+				Printer: printers.NewDiscardingPrinter(),
+				ConditionFn: JSONPathWait{
+					jsonPathCondition: test.jsonPathCond,
+					jsonPathParser:    j,
+					errOut:            ioutil.Discard}.IsJSONPathConditionMet,
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+			}
+
+			err := o.RunWait()
+
+			switch {
+			case err == nil && len(test.expectedErr) == 0:
+			case err != nil && len(test.expectedErr) == 0:
+				t.Fatal(err)
+			case err == nil && len(test.expectedErr) != 0:
+				t.Fatalf("missing: %q", test.expectedErr)
+			case err != nil && len(test.expectedErr) != 0:
+				if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+				}
+			}
+		})
+	}
+}
+
+// TestWaitForJSONPathCondition will run tests to check whether
+// the List actions and Watch actions match what we expected
+func TestWaitForJSONPathCondition(t *testing.T) {
+	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
+	}
+
+	tests := []struct {
+		name         string
+		infos        []*resource.Info
+		fakeClient   func() *dynamicfakeclient.FakeDynamicClient
+		timeout      time.Duration
+		jsonPathExp  string
+		jsonPathCond string
+
+		expectedErr     string
+		validateActions func(t *testing.T, actions []clienttesting.Action)
+	}{
+		{
+			name: "present on get",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "foo-b6699dcfb-rnv7t",
+					Namespace: "default",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(
+						createUnstructured(t, podYAML)), nil
+				})
+				return fakeClient
+			},
+			timeout:      3 * time.Second,
+			jsonPathExp:  "{.metadata.name}",
+			jsonPathCond: "foo-b6699dcfb-rnv7t",
+
+			expectedErr: None,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name:  "handles no infos",
+			infos: []*resource.Info{},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
+			},
+			timeout:     10 * time.Second,
+			expectedErr: errNoMatchingResources.Error(),
+
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "handles empty object name",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Namespace: "default",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				return dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+			},
+			timeout: 10 * time.Second,
+
+			expectedErr: "resource name must be provided",
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "times out",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "foo-b6699dcfb-rnv7t",
+					Namespace: "default",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, createUnstructured(t, podYAML), nil
+				})
+				return fakeClient
+			},
+			timeout: 1 * time.Second,
+
+			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "handles watch close out",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "foo-b6699dcfb-rnv7t",
+					Namespace: "default",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					unstructuredObj := createUnstructured(t, podYAML)
+					unstructuredObj.SetResourceVersion("123")
+					unstructuredList := newUnstructuredList(unstructuredObj)
+					unstructuredList.SetResourceVersion("234")
+					return true, unstructuredList, nil
+				})
+				count := 0
+				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					if count == 0 {
+						count++
+						fakeWatch := watch.NewRaceFreeFake()
+						go func() {
+							time.Sleep(100 * time.Millisecond)
+							fakeWatch.Stop()
+						}()
+						return true, fakeWatch, nil
+					}
+					fakeWatch := watch.NewRaceFreeFake()
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout:      3 * time.Second,
+			jsonPathExp:  "{.metadata.name}",
+			jsonPathCond: "foo", // use incorrect name so it'll keep waiting
+
+			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 4 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") || actions[1].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[3].Matches("watch", "theresource") || actions[3].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "handles watch condition change",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "foo-b6699dcfb-rnv7t",
+					Namespace: "default",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					unstructuredObj := createUnstructured(t, podYAML)
+					unstructuredObj.SetName("foo")
+					return true, newUnstructuredList(), nil
+				})
+				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					fakeWatch := watch.NewRaceFreeFake()
+					fakeWatch.Action(watch.Modified, createUnstructured(t, podYAML))
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout:      10 * time.Second,
+			jsonPathExp:  "{.metadata.name}",
+			jsonPathCond: "foo-b6699dcfb-rnv7t",
+
+			expectedErr: None,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "handles watch created",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "foo-b6699dcfb-rnv7t",
+					Namespace: "default",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					fakeWatch := watch.NewRaceFreeFake()
+					fakeWatch.Action(watch.Added, createUnstructured(t, podYAML))
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout:      10 * time.Second,
+			jsonPathExp:  "{.spec.containers[0].image}",
+			jsonPathCond: "nginx",
+
+			expectedErr: None,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "ignores watch error",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "foo-b6699dcfb-rnv7t",
+					Namespace: "default",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
+				})
+				count := 0
+				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					fakeWatch := watch.NewRaceFreeFake()
+					if count == 0 {
+						fakeWatch.Error(newUnstructuredStatus(&metav1.Status{
+							TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"},
+							Status:   "Failure",
+							Code:     500,
+							Message:  "Bad",
+						}))
+						fakeWatch.Stop()
+					} else {
+						fakeWatch.Action(watch.Modified, createUnstructured(t, podYAML))
+					}
+					count++
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout:      10 * time.Second,
+			jsonPathExp:  "{.metadata.name}",
+			jsonPathCond: "foo-b6699dcfb-rnv7t",
+
+			expectedErr: None,
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 4 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=foo-b6699dcfb-rnv7t" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[3].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := test.fakeClient()
+			j, _ := newJSONPathParser(test.jsonPathExp)
+			o := &WaitOptions{
+				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
+				DynamicClient:  fakeClient,
+				Timeout:        test.timeout,
+
+				Printer: printers.NewDiscardingPrinter(),
+				ConditionFn: JSONPathWait{
+					jsonPathCondition: test.jsonPathCond,
+					jsonPathParser:    j, errOut: ioutil.Discard}.IsJSONPathConditionMet,
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+			}
+
+			err := o.RunWait()
+
+			switch {
+			case err == nil && len(test.expectedErr) == 0:
+			case err != nil && len(test.expectedErr) == 0:
+				t.Fatal(err)
+			case err == nil && len(test.expectedErr) != 0:
+				t.Fatalf("missing: %q", test.expectedErr)
+			case err != nil && len(test.expectedErr) != 0:
+				if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+				}
+			}
+
+			test.validateActions(t, fakeClient.Actions())
+		})
 	}
 }

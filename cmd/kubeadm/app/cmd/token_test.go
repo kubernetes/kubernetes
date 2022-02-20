@@ -18,18 +18,10 @@ package cmd
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
-
-	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
-	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +30,12 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
+	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 const (
@@ -201,7 +199,7 @@ func TestNewCmdToken(t *testing.T) {
 	var buf, bufErr bytes.Buffer
 	testConfigTokenFile := "test-config-file"
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -269,7 +267,7 @@ func TestNewCmdToken(t *testing.T) {
 func TestGetClientset(t *testing.T) {
 	testConfigTokenFile := "test-config-file"
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -305,7 +303,7 @@ func TestGetClientset(t *testing.T) {
 func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -360,7 +358,7 @@ func TestTokenOutput(t *testing.T) {
 			outputFormat: "json",
 			expected: `{
     "kind": "BootstrapToken",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
     "token": "abcdef.1234567890123456",
     "description": "valid bootstrap tooken",
     "usages": [
@@ -381,7 +379,7 @@ func TestTokenOutput(t *testing.T) {
 			usages:       []string{"signing", "authentication"},
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "yaml",
-			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha2
 description: valid bootstrap tooken
 groups:
 - system:bootstrappers:kubeadm:default-node-token
@@ -428,9 +426,9 @@ abcdef.1234567890123456   <forever>   <never>   signing,authentication   valid b
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := outputapiv1alpha1.BootstrapToken{
-				BootstrapToken: kubeadmapiv1beta2.BootstrapToken{
-					Token:       &kubeadmapiv1beta2.BootstrapTokenString{ID: tc.id, Secret: tc.secret},
+			token := outputapiv1alpha2.BootstrapToken{
+				BootstrapToken: bootstraptokenv1.BootstrapToken{
+					Token:       &bootstraptokenv1.BootstrapTokenString{ID: tc.id, Secret: tc.secret},
 					Description: tc.description,
 					Usages:      tc.usages,
 					Groups:      tc.extraGroups,

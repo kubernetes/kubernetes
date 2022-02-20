@@ -1,8 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- lavalamp
-- smarterclayton
-- wojtek-t
-- timothysc
-- hongchaodeng
+  - lavalamp
+  - smarterclayton
+  - wojtek-t

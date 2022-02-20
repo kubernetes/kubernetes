@@ -61,16 +61,16 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go rm.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go rm.Run(ctx)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -180,16 +180,16 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 // TestTerminalPodEviction ensures that PDB is not checked for terminal pods.
 func TestTerminalPodEviction(t *testing.T) {
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("terminalpod-eviction", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go rm.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go rm.Run(ctx)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -262,10 +262,10 @@ func TestEvictionVersions(t *testing.T) {
 	s, closeFn, rm, informers, clientSet := rmSetup(t)
 	defer closeFn()
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go rm.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go rm.Run(ctx)
 
 	config := restclient.Config{Host: s.URL}
 

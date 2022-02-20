@@ -19,15 +19,16 @@ package dryrun
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 // FileToPrint represents a temporary file on disk that might want to be aliased when printing
@@ -60,7 +61,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 			continue
 		}
 
-		fileBytes, err := ioutil.ReadFile(file.RealPath)
+		fileBytes, err := os.ReadFile(file.RealPath)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -138,4 +139,33 @@ func (w *Waiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) 
 // WaitForStaticPodHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
 func (w *Waiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return nil
+}
+
+// PrintFilesIfDryRunning prints the static pod manifests to stdout and informs about the temporary directory to go and lookup when dry running
+func PrintFilesIfDryRunning(needPrintManifest bool, manifestDir string, outputWriter io.Writer) error {
+	var files []FileToPrint
+	// Print static pod manifests if it is a control plane
+	if needPrintManifest {
+		fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
+		for _, component := range kubeadmconstants.ControlPlaneComponents {
+			realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
+			outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
+			files = append(files, NewFileToPrint(realPath, outputPath))
+		}
+	} else {
+		fmt.Printf("[dryrun] Wrote certificates and kubeconfig files to the %q directory\n", manifestDir)
+	}
+
+	fmt.Println("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature")
+	fmt.Printf("[dryrun] Please examine the %q directory for details about what would be written\n", manifestDir)
+
+	// Print kubelet config manifests
+	kubeletConfigFiles := []string{kubeadmconstants.KubeletConfigurationFileName, kubeadmconstants.KubeletEnvFileName}
+	for _, filename := range kubeletConfigFiles {
+		realPath := filepath.Join(manifestDir, filename)
+		outputPath := filepath.Join(kubeadmconstants.KubeletRunDirectory, filename)
+		files = append(files, NewFileToPrint(realPath, outputPath))
+	}
+
+	return PrintDryRunFiles(files, outputWriter)
 }

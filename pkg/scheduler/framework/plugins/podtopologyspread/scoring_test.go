@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -123,6 +123,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Label(v1.LabelTopologyZone, "mars").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Label(v1.LabelTopologyZone, "mars").Obj(),
+				// Nodes with no zone are not excluded. They are considered a separate zone.
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
 			},
 			objs: []runtime.Object{
 				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
@@ -143,8 +147,9 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64Ptr(0),
+					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64Ptr(0),
 				},
-				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
+				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(4), topologyNormalizingWeight(2)},
 			},
 		},
 		{
@@ -239,7 +244,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
@@ -277,6 +283,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		existingPods []*v1.Pod
 		nodes        []*v1.Node
 		failedNodes  []*v1.Node // nodes + failedNodes = all nodes
+		objs         []runtime.Object
 		want         framework.NodeScoreList
 	}{
 		// Explanation on the Legend:
@@ -361,8 +368,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			failedNodes: []*v1.Node{},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 40},
-				{Name: "node-b", Score: 80},
+				{Name: "node-a", Score: 20},
+				{Name: "node-b", Score: 60},
 				{Name: "node-c", Score: 100},
 				{Name: "node-d", Score: 0},
 			},
@@ -389,8 +396,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			failedNodes: []*v1.Node{},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 50}, // +10, compared to maxSkew=1
-				{Name: "node-b", Score: 83}, // +3, compared to maxSkew=1
+				{Name: "node-a", Score: 33}, // +13, compared to maxSkew=1
+				{Name: "node-b", Score: 66}, // +6, compared to maxSkew=1
 				{Name: "node-c", Score: 100},
 				{Name: "node-d", Score: 16}, // +16, compared to maxSkew=1
 			},
@@ -421,9 +428,43 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			failedNodes: []*v1.Node{},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 33}, // +19 compared to maxSkew=1
-				{Name: "node-b", Score: 55}, // +13 compared to maxSkew=1
+				{Name: "node-a", Score: 44}, // +16 compared to maxSkew=1
+				{Name: "node-b", Score: 66}, // +9 compared to maxSkew=1
 				{Name: "node-c", Score: 77}, // +6 compared to maxSkew=1
+				{Name: "node-d", Score: 100},
+			},
+		},
+		{
+			name: "system defaulting, nodes don't have zone, pods match service",
+			pod:  st.MakePod().Name("p").Label("foo", "").Obj(),
+			existingPods: []*v1.Pod{
+				// matching pods spread as 4/3/2/1.
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b3").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c2").Node("node-c").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
+			},
+			failedNodes: []*v1.Node{},
+			objs: []runtime.Object{
+				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
+			},
+			want: []framework.NodeScore{
+				// Same scores as if we were using one spreading constraint.
+				{Name: "node-a", Score: 44},
+				{Name: "node-b", Score: 66},
+				{Name: "node-c", Score: 77},
 				{Name: "node-d", Score: 100},
 			},
 		},
@@ -454,8 +495,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-y").Label(v1.LabelHostname, "node-y").Obj(),
 			},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 16},
-				{Name: "node-b", Score: 66},
+				{Name: "node-a", Score: 33},
+				{Name: "node-b", Score: 83},
 				{Name: "node-x", Score: 100},
 			},
 		},
@@ -486,7 +527,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-y").Label(v1.LabelHostname, "node-y").Obj(),
 			},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 20},
+				{Name: "node-a", Score: 16},
 				{Name: "node-b", Score: 0},
 				{Name: "node-x", Score: 100},
 			},
@@ -518,8 +559,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label(v1.LabelHostname, "node-y").Obj(),
 			},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 62},
-				{Name: "node-b", Score: 62},
+				{Name: "node-a", Score: 75},
+				{Name: "node-b", Score: 75},
 				{Name: "node-x", Score: 100},
 			},
 		},
@@ -551,7 +592,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			want: []framework.NodeScore{
 				{Name: "node-a", Score: 100},
-				{Name: "node-x", Score: 54},
+				{Name: "node-x", Score: 63},
 			},
 		},
 		{
@@ -584,10 +625,10 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			failedNodes: []*v1.Node{},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 75},
-				{Name: "node-b", Score: 25},
+				{Name: "node-a", Score: 60},
+				{Name: "node-b", Score: 20},
 				{Name: "node-x", Score: 100},
-				{Name: "node-y", Score: 50},
+				{Name: "node-y", Score: 60},
 			},
 		},
 		{
@@ -612,8 +653,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			failedNodes: []*v1.Node{},
 			want: []framework.NodeScore{
 				{Name: "node-a", Score: 100},
-				{Name: "node-b", Score: 75},
-				{Name: "node-x", Score: 50},
+				{Name: "node-b", Score: 60},
+				{Name: "node-x", Score: 40},
 				{Name: "node-y", Score: 0},
 			},
 		},
@@ -640,7 +681,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label(v1.LabelHostname, "node-y").Obj(),
 			},
 			want: []framework.NodeScore{
-				{Name: "node-a", Score: 75},
+				{Name: "node-a", Score: 50},
 				{Name: "node-b", Score: 25},
 				{Name: "node-x", Score: 100},
 			},
@@ -662,7 +703,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 			want: []framework.NodeScore{
 				{Name: "node-a", Score: 100},
-				{Name: "node-b", Score: 50},
+				{Name: "node-b", Score: 33},
 			},
 		},
 		{
@@ -686,10 +727,12 @@ func TestPodTopologySpreadScore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes))
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
 			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
@@ -700,14 +743,14 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			var gotList framework.NodeScoreList
 			for _, n := range tt.nodes {
 				nodeName := n.Name
-				score, status := p.Score(context.Background(), state, tt.pod, nodeName)
+				score, status := p.Score(ctx, state, tt.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status = p.NormalizeScore(context.Background(), state, tt.pod, gotList)
+			status = p.NormalizeScore(ctx, state, tt.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -827,7 +870,8 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			f, err := frameworkruntime.NewFramework(nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),

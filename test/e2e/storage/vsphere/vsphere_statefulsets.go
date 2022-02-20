@@ -135,7 +135,7 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		// After scale up, verify all vsphere volumes are attached to node VMs.
 		ginkgo.By("Verify all volumes are attached to Nodes after Statefulsets is scaled up")
 		for _, sspod := range ssPodsAfterScaleUp.Items {
-			err := e2epod.WaitForPodsReady(client, statefulset.Namespace, sspod.Name, 0)
+			err := e2epod.WaitTimeoutForPodReadyInNamespace(client, sspod.Name, statefulset.Namespace, framework.PodStartTimeout)
 			framework.ExpectNoError(err)
 			pod, err := client.CoreV1().Pods(namespace).Get(context.TODO(), sspod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)

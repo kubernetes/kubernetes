@@ -1,18 +1,18 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- bowei
-- MrHohn
-- thockin
-- andrewsykim
-- cheftako
+  - bowei
+  - MrHohn
+  - thockin
+  - andrewsykim
+  - cheftako
 approvers:
-- bowei
-- MrHohn
-- thockin
-- andrewsykim
-- cheftako
+  - bowei
+  - MrHohn
+  - thockin
+  - andrewsykim
+  - cheftako
 emeritus_approvers:
-- matchstick
+  - matchstick
 labels:
-- sig/network
+  - sig/network

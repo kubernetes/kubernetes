@@ -4,6 +4,7 @@ package systemd
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
@@ -17,14 +18,16 @@ var (
 	dbusRootless bool
 )
 
-type dbusConnManager struct {
-}
+type dbusConnManager struct{}
 
 // newDbusConnManager initializes systemd dbus connection manager.
 func newDbusConnManager(rootless bool) *dbusConnManager {
+	dbusMu.Lock()
+	defer dbusMu.Unlock()
 	if dbusInited && rootless != dbusRootless {
 		panic("can't have both root and rootless dbus")
 	}
+	dbusInited = true
 	dbusRootless = rootless
 	return &dbusConnManager{}
 }
@@ -52,7 +55,10 @@ func (d *dbusConnManager) getConnection() (*systemdDbus.Conn, error) {
 
 	conn, err := d.newConnection()
 	if err != nil {
-		return nil, err
+		// When dbus-user-session is not installed, we can't detect whether we should try to connect to user dbus or system dbus, so d.dbusRootless is set to false.
+		// This may fail with a cryptic error "read unix @->/run/systemd/private: read: connection reset by peer: unknown."
+		// https://github.com/moby/moby/issues/42793
+		return nil, fmt.Errorf("failed to connect to dbus (hint: for rootless containers, maybe you need to install dbus-user-session package, see https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md): %w", err)
 	}
 	dbusC = conn
 	return conn, nil

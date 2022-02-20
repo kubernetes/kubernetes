@@ -22,11 +22,12 @@ limitations under the License.
 // Generation is governed by comment tags in the source.  Any package may
 // request Status generation by including a comment in the file-comments of
 // one file, of the form:
-//   // +k8s:prerelease-lifecycle-gen=package
+//   // +k8s:prerelease-lifecycle-gen=true
 //
 // // +k8s:prerelease-lifecycle-gen:introduced=1.19
-// // +k8s:prerelease-lifecycle-gen:to-be-deprecated=1.22
-// // +k8s:prerelease-lifecycle-gen:to-be-removed=1.25
+// // +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// // +k8s:prerelease-lifecycle-gen:removed=1.25
+// // +k8s:prerelease-lifecycle-gen:replacement=wardle.example.com,v1,Flunder
 //
 // Note that registration is a whole-package option, and is not available for
 // individual types.
@@ -34,13 +35,11 @@ package main
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
 	generatorargs "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/args"
 	statusgenerators "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/prerelease-lifecycle-generators"
 	"k8s.io/code-generator/pkg/util"
-	"k8s.io/gengo/args"
 	"k8s.io/klog/v2"
 )
 
@@ -50,7 +49,7 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of prerelease-lifecycle-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
+	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)

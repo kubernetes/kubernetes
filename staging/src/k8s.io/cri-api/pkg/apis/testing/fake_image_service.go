@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // FakeImageService fakes the image service.
@@ -154,7 +154,7 @@ func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtim
 }
 
 // ImageStatus returns the status of the image from the FakeImageService.
-func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -163,7 +163,7 @@ func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi
 		return nil, err
 	}
 
-	return r.Images[image.Image], nil
+	return &runtimeapi.ImageStatusResponse{Image: r.Images[image.Image]}, nil
 }
 
 // PullImage emulate pulling the image from the FakeImageService.

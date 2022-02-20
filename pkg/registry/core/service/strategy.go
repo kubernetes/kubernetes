@@ -109,7 +109,6 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
-	NormalizeClusterIPs(nil, service)
 	dropServiceDisabledFields(service, nil)
 }
 
@@ -119,11 +118,8 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
-	patchAllocatedValues(newService, oldService)
-	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
 	dropTypeDependentFields(newService, oldService)
-	trimFieldsForDualStackDowngrade(newService, oldService)
 }
 
 // Validate validates a new service.
@@ -166,20 +162,6 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 //         newSvc.Spec.MyFeature = nil
 //     }
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceDualStackFieldsInUse(oldSvc) {
-		newSvc.Spec.IPFamilies = nil
-		newSvc.Spec.IPFamilyPolicy = nil
-		if len(newSvc.Spec.ClusterIPs) > 1 {
-			newSvc.Spec.ClusterIPs = newSvc.Spec.ClusterIPs[0:1]
-		}
-	}
-
-	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
-		if !allocateLoadBalancerNodePortsInUse(oldSvc) {
-			newSvc.Spec.AllocateLoadBalancerNodePorts = nil
-		}
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
 		if !serviceConditionsInUse(oldSvc) {
@@ -205,27 +187,6 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 			newSvc.Spec.InternalTrafficPolicy = nil
 		}
 	}
-}
-
-// returns true if svc.Spec.AllocateLoadBalancerNodePorts field is in use
-func allocateLoadBalancerNodePortsInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	return svc.Spec.AllocateLoadBalancerNodePorts != nil
-}
-
-// returns true if svc.Spec.ServiceIPFamily field is in use
-func serviceDualStackFieldsInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-
-	ipFamilyPolicyInUse := svc.Spec.IPFamilyPolicy != nil
-	ipFamiliesInUse := len(svc.Spec.IPFamilies) > 0
-	ClusterIPsInUse := len(svc.Spec.ClusterIPs) > 1
-
-	return ipFamilyPolicyInUse || ipFamiliesInUse || ClusterIPsInUse
 }
 
 // returns true when the svc.Status.Conditions field is in use.
@@ -301,106 +262,6 @@ func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 // WarningsOnUpdate returns warnings for the given update.
 func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-// patchAllocatedValues allows clients to avoid a read-modify-write cycle while
-// preserving values that we allocated on their behalf.  For example, they
-// might create a Service without specifying the ClusterIP, in which case we
-// allocate one.  If they resubmit that same YAML, we want it to succeed.
-func patchAllocatedValues(newSvc, oldSvc *api.Service) {
-	if needsClusterIP(oldSvc) && needsClusterIP(newSvc) {
-		if newSvc.Spec.ClusterIP == "" {
-			newSvc.Spec.ClusterIP = oldSvc.Spec.ClusterIP
-		}
-		if len(newSvc.Spec.ClusterIPs) == 0 {
-			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
-		}
-	}
-
-	if needsNodePort(oldSvc) && needsNodePort(newSvc) {
-		// Map NodePorts by name.  The user may have changed other properties
-		// of the port, but we won't see that here.
-		np := map[string]int32{}
-		for i := range oldSvc.Spec.Ports {
-			p := &oldSvc.Spec.Ports[i]
-			np[p.Name] = p.NodePort
-		}
-		for i := range newSvc.Spec.Ports {
-			p := &newSvc.Spec.Ports[i]
-			if p.NodePort == 0 {
-				p.NodePort = np[p.Name]
-			}
-		}
-	}
-
-	if needsHCNodePort(oldSvc) && needsHCNodePort(newSvc) {
-		if newSvc.Spec.HealthCheckNodePort == 0 {
-			newSvc.Spec.HealthCheckNodePort = oldSvc.Spec.HealthCheckNodePort
-		}
-	}
-}
-
-// NormalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
-// consider any other fields.
-func NormalizeClusterIPs(oldSvc, newSvc *api.Service) {
-	// In all cases here, we don't need to over-think the inputs.  Validation
-	// will be called on the new object soon enough.  All this needs to do is
-	// try to divine what user meant with these linked fields. The below
-	// is verbosely written for clarity.
-
-	// **** IMPORTANT *****
-	// as a governing rule. User must (either)
-	// -- Use singular only (old client)
-	// -- singular and plural fields (new clients)
-
-	if oldSvc == nil {
-		// This was a create operation.
-		// User specified singular and not plural (e.g. an old client), so init
-		// plural for them.
-		if len(newSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
-			newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
-			return
-		}
-
-		// we don't init singular based on plural because
-		// new client must use both fields
-
-		// Either both were not specified (will be allocated) or both were
-		// specified (will be validated).
-		return
-	}
-
-	// This was an update operation
-
-	// ClusterIPs were cleared by an old client which was trying to patch
-	// some field and didn't provide ClusterIPs
-	if len(oldSvc.Spec.ClusterIPs) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
-		// if ClusterIP is the same, then it is an old client trying to
-		// patch service and didn't provide ClusterIPs
-		if oldSvc.Spec.ClusterIP == newSvc.Spec.ClusterIP {
-			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
-		}
-	}
-
-	// clusterIP is not the same
-	if oldSvc.Spec.ClusterIP != newSvc.Spec.ClusterIP {
-		// this is a client trying to clear it
-		if len(oldSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIP) == 0 {
-			// if clusterIPs are the same, then clear on their behalf
-			if sameStringSlice(oldSvc.Spec.ClusterIPs, newSvc.Spec.ClusterIPs) {
-				newSvc.Spec.ClusterIPs = nil
-			}
-
-			// if they provided nil, then we are fine (handled by patching case above)
-			// if they changed it then validation will catch it
-		} else {
-			// ClusterIP has changed but not cleared *and* ClusterIPs are the same
-			// then we set ClusterIPs based on ClusterIP
-			if sameStringSlice(oldSvc.Spec.ClusterIPs, newSvc.Spec.ClusterIPs) {
-				newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
-			}
-		}
-	}
 }
 
 func sameStringSlice(a []string, b []string) bool {
@@ -489,9 +350,22 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 		newSvc.Spec.LoadBalancerClass = nil
 	}
 
+	// If a user is switching to a type that doesn't need ExternalTrafficPolicy
+	// AND they did not change this field, it is safe to drop it.
+	if needsExternalTrafficPolicy(oldSvc) && !needsExternalTrafficPolicy(newSvc) && sameExternalTrafficPolicy(oldSvc, newSvc) {
+		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
+	}
+
 	// NOTE: there are other fields like `selector` which we could wipe.
 	// Historically we did not wipe them and they are not allocated from
 	// finite pools, so we are (currently) choosing to leave them alone.
+
+	// Clear the load-balancer status if it is no longer appropriate.  Although
+	// LB de-provisioning is actually asynchronous, we don't need to expose the
+	// user to that complexity.
+	if newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
+		newSvc.Status.LoadBalancer = api.LoadBalancerStatus{}
+	}
 }
 
 func needsClusterIP(svc *api.Service) bool {
@@ -577,32 +451,10 @@ func sameLoadBalancerClass(oldSvc, newSvc *api.Service) bool {
 	return *oldSvc.Spec.LoadBalancerClass == *newSvc.Spec.LoadBalancerClass
 }
 
-// this func allows user to downgrade a service by just changing
-// IPFamilyPolicy to SingleStack
-func trimFieldsForDualStackDowngrade(newService, oldService *api.Service) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return
-	}
+func needsExternalTrafficPolicy(svc *api.Service) bool {
+	return svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer
+}
 
-	// not an update
-	if oldService == nil {
-		return
-	}
-
-	oldIsDualStack := oldService.Spec.IPFamilyPolicy != nil &&
-		(*oldService.Spec.IPFamilyPolicy == api.IPFamilyPolicyRequireDualStack ||
-			*oldService.Spec.IPFamilyPolicy == api.IPFamilyPolicyPreferDualStack)
-
-	newIsNotDualStack := newService.Spec.IPFamilyPolicy != nil && *newService.Spec.IPFamilyPolicy == api.IPFamilyPolicySingleStack
-
-	// if user want to downgrade then we auto remove secondary ip and family
-	if oldIsDualStack && newIsNotDualStack {
-		if len(newService.Spec.ClusterIPs) > 1 {
-			newService.Spec.ClusterIPs = newService.Spec.ClusterIPs[0:1]
-		}
-
-		if len(newService.Spec.IPFamilies) > 1 {
-			newService.Spec.IPFamilies = newService.Spec.IPFamilies[0:1]
-		}
-	}
+func sameExternalTrafficPolicy(oldSvc, newSvc *api.Service) bool {
+	return oldSvc.Spec.ExternalTrafficPolicy == newSvc.Spec.ExternalTrafficPolicy
 }

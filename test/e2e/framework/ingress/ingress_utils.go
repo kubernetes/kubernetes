@@ -26,10 +26,11 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -38,6 +39,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -56,6 +58,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -176,7 +179,7 @@ func SimpleGET(c *http.Client, url, host string) (string, error) {
 		return "", err
 	}
 	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
+	rawBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", err
 	}
@@ -332,7 +335,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 
 	hosts := strings.Split(host, ",")
 	for _, h := range hosts {
-		if ip := net.ParseIP(h); ip != nil {
+		if ip := netutils.ParseIPSloppy(h); ip != nil {
 			template.IPAddresses = append(template.IPAddresses, ip)
 		} else {
 			template.DNSNames = append(template.DNSNames, h)
@@ -531,7 +534,7 @@ func ingressToManifest(ing *networkingv1.Ingress, path string) error {
 		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
 	}
 
-	if err := ioutil.WriteFile(path, serialized, 0600); err != nil {
+	if err := os.WriteFile(path, serialized, 0600); err != nil {
 		return fmt.Errorf("error in writing ingress to file: %s", err)
 	}
 	return nil
@@ -1100,35 +1103,14 @@ func generateBacksideHTTPSServiceSpec() *v1.Service {
 }
 
 func generateBacksideHTTPSDeploymentSpec() *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "echoheaders-https",
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
-				"app": "echoheaders-https",
-			}},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": "echoheaders-https",
-					},
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "echoheaders-https",
-							Image: imageutils.GetE2EImage(imageutils.EchoServer),
-							Ports: []v1.ContainerPort{{
-								ContainerPort: 8443,
-								Name:          "echo-443",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
+	labels := map[string]string{"app": "echoheaders-https"}
+	d := e2edeployment.NewDeployment("echoheaders-https", 0, labels, "echoheaders-https", imageutils.GetE2EImage(imageutils.EchoServer), appsv1.RollingUpdateDeploymentStrategyType)
+	d.Spec.Replicas = nil
+	d.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{
+		ContainerPort: 8443,
+		Name:          "echo-443",
+	}}
+	return d
 }
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
@@ -675,5 +676,31 @@ func TestComplete(t *testing.T) {
 		if !reflect.DeepEqual(test.roleOptions.ResourceNames, test.expected.ResourceNames) {
 			t.Errorf("%s:\nexpected resource names:\n%#v\nsaw resource names:\n%#v", name, test.expected.ResourceNames, test.roleOptions.ResourceNames)
 		}
+	}
+}
+
+func TestAddSpecialVerb(t *testing.T) {
+	resource := schema.GroupResource{
+		Group:    "my.custom.io",
+		Resource: "things",
+	}
+
+	AddSpecialVerb("use", resource)
+
+	found := false
+	resources, ok := specialVerbs["use"]
+	if !ok {
+		t.Errorf("expected resources for verb: use, found none\n")
+	}
+
+	for _, res := range resources {
+		if reflect.DeepEqual(resource, res) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("expected resource:\n%v\nnot found", resource)
 	}
 }

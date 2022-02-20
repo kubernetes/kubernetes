@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -114,12 +115,12 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 				}
 
 				// See if it can unmarshal to object meta
-				spuriousJSON, err := encodingjson.Marshal(spuriousMetaMap)
+				spuriousJSON, err := utiljson.Marshal(spuriousMetaMap)
 				if err != nil {
 					t.Fatalf("error on %v=%#v: %v", pth, v, err)
 				}
 				expectedObjectMeta := &metav1.ObjectMeta{}
-				if err := encodingjson.Unmarshal(spuriousJSON, expectedObjectMeta); err != nil {
+				if err := utiljson.Unmarshal(spuriousJSON, expectedObjectMeta); err != nil {
 					// if standard json unmarshal would fail decoding this field, drop the field entirely
 					truncatedMetaMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fuzzedObjectMeta.DeepCopy())
 					if err != nil {
@@ -133,12 +134,12 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 						DeleteJSONPath(truncatedMetaMap, pth[:1], 0)
 					}
 
-					truncatedJSON, err := encodingjson.Marshal(truncatedMetaMap)
+					truncatedJSON, err := utiljson.Marshal(truncatedMetaMap)
 					if err != nil {
 						t.Fatalf("error on %v=%#v: %v", pth, v, err)
 					}
 					expectedObjectMeta = &metav1.ObjectMeta{}
-					if err := encodingjson.Unmarshal(truncatedJSON, expectedObjectMeta); err != nil {
+					if err := utiljson.Unmarshal(truncatedJSON, expectedObjectMeta); err != nil {
 						t.Fatalf("error on %v=%#v: %v", pth, v, err)
 					}
 				}
@@ -190,7 +191,7 @@ func TestGetObjectMetaNils(t *testing.T) {
 	}
 
 	// double check this what the kube JSON decode is doing
-	bs, _ := encodingjson.Marshal(u.UnstructuredContent())
+	bs, _ := utiljson.Marshal(u.UnstructuredContent())
 	kubeObj, _, err := clientgoscheme.Codecs.UniversalDecoder(corev1.SchemeGroupVersion).Decode(bs, nil, nil)
 	if err != nil {
 		t.Fatal(err)

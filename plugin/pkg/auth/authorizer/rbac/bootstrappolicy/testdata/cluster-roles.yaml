@@ -128,7 +128,6 @@ items:
     - ""
     resources:
     - configmaps
-    - endpoints
     - events
     - persistentvolumeclaims
     - replicationcontrollers
@@ -144,15 +143,11 @@ items:
     - patch
     - update
   - apiGroups:
-    - discovery.k8s.io
+    - ""
     resources:
-    - endpointslices
+    - serviceaccounts/token
     verbs:
     - create
-    - delete
-    - deletecollection
-    - patch
-    - update
   - apiGroups:
     - apps
     resources:

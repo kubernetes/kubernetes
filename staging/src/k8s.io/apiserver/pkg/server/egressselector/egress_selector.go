@@ -91,10 +91,6 @@ func (s EgressType) AsNetworkContext() NetworkContext {
 
 func lookupServiceName(name string) (EgressType, error) {
 	switch strings.ToLower(name) {
-	// 'master' is deprecated, interpret "master" as controlplane internally until removed in v1.22.
-	case "master":
-		klog.Warning("EgressSelection name 'master' is deprecated, use 'controlplane' instead")
-		return ControlPlane, nil
 	case "controlplane":
 		return ControlPlane, nil
 	case "etcd":
@@ -360,6 +356,16 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		cs.egressToDialer[name] = dialerCreator.createDialer()
 	}
 	return cs, nil
+}
+
+// NewEgressSelectorWithMap returns a EgressSelector with the supplied EgressType to DialFunc map.
+func NewEgressSelectorWithMap(m map[EgressType]utilnet.DialFunc) *EgressSelector {
+	if m == nil {
+		m = make(map[EgressType]utilnet.DialFunc)
+	}
+	return &EgressSelector{
+		egressToDialer: m,
+	}
 }
 
 // Lookup gets the dialer function for the network context.

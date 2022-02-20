@@ -19,6 +19,15 @@ package upgrade
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -28,15 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-	utilsexec "k8s.io/utils/exec"
-
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -157,9 +157,19 @@ func runApply(flags *applyFlags, args []string) error {
 	}
 
 	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
-		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
-	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
+	fmt.Printf("[upgrade/postupgrade] Removing the deprecated label %s='' from all control plane Nodes. "+
+		"After this step only the label %s='' will be present on control plane Nodes.\n",
+		kubeadmconstants.LabelNodeRoleOldControlPlane, kubeadmconstants.LabelNodeRoleControlPlane)
+	if err := upgrade.RemoveOldControlPlaneLabel(client); err != nil {
+		return err
+	}
+
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+	fmt.Printf("[upgrade/postupgrade] Adding the new taint %s to all control plane Nodes. "+
+		"After this step both taints %s and %s should be present on control plane Nodes.\n",
+		kubeadmconstants.ControlPlaneTaint.String(), kubeadmconstants.ControlPlaneTaint.String(),
+		kubeadmconstants.OldControlPlaneTaint.String())
+	if err := upgrade.AddNewControlPlaneTaint(client); err != nil {
 		return err
 	}
 
@@ -170,7 +180,7 @@ func runApply(flags *applyFlags, args []string) error {
 	}
 
 	if flags.dryRun {
-		fmt.Println("[dryrun] Finished dryrunning successfully!")
+		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 		return nil
 	}
 

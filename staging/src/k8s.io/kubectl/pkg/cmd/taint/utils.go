@@ -146,7 +146,6 @@ func deleteTaints(taintsToRemove []corev1.Taint, newTaints *[]corev1.Taint) ([]e
 	allErrs := []error{}
 	var removed bool
 	for _, taintToRemove := range taintsToRemove {
-		removed = false
 		if len(taintToRemove.Effect) > 0 {
 			*newTaints, removed = deleteTaint(*newTaints, &taintToRemove)
 		} else {

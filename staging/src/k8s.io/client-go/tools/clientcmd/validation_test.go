@@ -508,6 +508,78 @@ func TestValidateAuthInfoExecInteractiveModeInvalid(t *testing.T) {
 	test.testConfig(t)
 }
 
+func TestValidateAuthInfoImpersonateUser(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Impersonate: "user",
+	}
+	test := configValidationTest{
+		config: config,
+	}
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoImpersonateEverything(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Impersonate:          "user",
+		ImpersonateUID:       "abc123",
+		ImpersonateGroups:    []string{"group-1", "group-2"},
+		ImpersonateUserExtra: map[string][]string{"key": {"val1", "val2"}},
+	}
+	test := configValidationTest{
+		config: config,
+	}
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoImpersonateGroupsWithoutUserInvalid(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		ImpersonateGroups: []string{"group-1", "group-2"},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			`requesting uid, groups or user-extra for user without impersonating a user`,
+		},
+	}
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoImpersonateExtraWithoutUserInvalid(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		ImpersonateUserExtra: map[string][]string{"key": {"val1", "val2"}},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			`requesting uid, groups or user-extra for user without impersonating a user`,
+		},
+	}
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoImpersonateUIDWithoutUserInvalid(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		ImpersonateUID: "abc123",
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			`requesting uid, groups or user-extra for user without impersonating a user`,
+		},
+	}
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
 type configValidationTest struct {
 	config                 *clientcmdapi.Config
 	expectedErrorSubstring []string

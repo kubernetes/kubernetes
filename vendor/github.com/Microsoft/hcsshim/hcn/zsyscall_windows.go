@@ -78,10 +78,6 @@ var (
 	procHcnQuerySdnRouteProperties     = modcomputenetwork.NewProc("HcnQuerySdnRouteProperties")
 	procHcnDeleteSdnRoute              = modcomputenetwork.NewProc("HcnDeleteSdnRoute")
 	procHcnCloseSdnRoute               = modcomputenetwork.NewProc("HcnCloseSdnRoute")
-	procHcnOpenService                 = modcomputenetwork.NewProc("HcnOpenService")
-	procHcnRegisterServiceCallback     = modcomputenetwork.NewProc("HcnRegisterServiceCallback")
-	procHcnUnregisterServiceCallback   = modcomputenetwork.NewProc("HcnUnregisterServiceCallback")
-	procHcnCloseService                = modcomputenetwork.NewProc("HcnCloseService")
 )
 
 func SetCurrentThreadCompartmentId(compartmentId uint32) (hr error) {
@@ -789,62 +785,6 @@ func hcnCloseRoute(route hcnRoute) (hr error) {
 		return
 	}
 	r0, _, _ := syscall.Syscall(procHcnCloseSdnRoute.Addr(), 1, uintptr(route), 0, 0)
-	if int32(r0) < 0 {
-		if r0&0x1fff0000 == 0x00070000 {
-			r0 &= 0xffff
-		}
-		hr = syscall.Errno(r0)
-	}
-	return
-}
-
-func hcnOpenService(service *hcnService, result **uint16) (hr error) {
-	if hr = procHcnOpenService.Find(); hr != nil {
-		return
-	}
-	r0, _, _ := syscall.Syscall(procHcnOpenService.Addr(), 2, uintptr(unsafe.Pointer(service)), uintptr(unsafe.Pointer(result)), 0)
-	if int32(r0) < 0 {
-		if r0&0x1fff0000 == 0x00070000 {
-			r0 &= 0xffff
-		}
-		hr = syscall.Errno(r0)
-	}
-	return
-}
-
-func hcnRegisterServiceCallback(service hcnService, callback int32, context int32, callbackHandle *hcnCallbackHandle) (hr error) {
-	if hr = procHcnRegisterServiceCallback.Find(); hr != nil {
-		return
-	}
-	r0, _, _ := syscall.Syscall6(procHcnRegisterServiceCallback.Addr(), 4, uintptr(service), uintptr(callback), uintptr(context), uintptr(unsafe.Pointer(callbackHandle)), 0, 0)
-	if int32(r0) < 0 {
-		if r0&0x1fff0000 == 0x00070000 {
-			r0 &= 0xffff
-		}
-		hr = syscall.Errno(r0)
-	}
-	return
-}
-
-func hcnUnregisterServiceCallback(callbackHandle hcnCallbackHandle) (hr error) {
-	if hr = procHcnUnregisterServiceCallback.Find(); hr != nil {
-		return
-	}
-	r0, _, _ := syscall.Syscall(procHcnUnregisterServiceCallback.Addr(), 1, uintptr(callbackHandle), 0, 0)
-	if int32(r0) < 0 {
-		if r0&0x1fff0000 == 0x00070000 {
-			r0 &= 0xffff
-		}
-		hr = syscall.Errno(r0)
-	}
-	return
-}
-
-func hcnCloseService(service hcnService) (hr error) {
-	if hr = procHcnCloseService.Find(); hr != nil {
-		return
-	}
-	r0, _, _ := syscall.Syscall(procHcnCloseService.Addr(), 1, uintptr(service), 0, 0)
 	if int32(r0) < 0 {
 		if r0&0x1fff0000 == 0x00070000 {
 			r0 &= 0xffff

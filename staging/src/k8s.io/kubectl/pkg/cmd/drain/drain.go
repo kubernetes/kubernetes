@@ -75,7 +75,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
 		},
 	}
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.drainer.Selector)
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -104,7 +104,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
 		},
 	}
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.drainer.Selector)
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
@@ -192,19 +192,18 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	}
 	cmd.Flags().BoolVar(&o.drainer.Force, "force", o.drainer.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
 	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
-	cmd.Flags().BoolVar(&o.drainer.IgnoreErrors, "ignore-errors", o.drainer.IgnoreErrors, "Ignore errors occurred between drain nodes in group.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-local-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().MarkDeprecated("delete-local-data", "This option is deprecated and will be deleted. Use --delete-emptydir-data.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-emptydir-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&o.drainer.GracePeriodSeconds, "grace-period", o.drainer.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&o.drainer.Timeout, "timeout", o.drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
-	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
 
 	cmdutil.AddChunkSizeFlag(cmd, &o.drainer.ChunkSize)
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.drainer.Selector)
 	return cmd
 }
 
@@ -297,47 +296,40 @@ func (o *DrainCmdOptions) RunDrain() error {
 		return err
 	}
 
-	printObj, err := o.ToPrinter("drained")
-	if err != nil {
-		return err
-	}
-
 	drainedNodes := sets.NewString()
-	var fatal error
+	var fatal []error
 
+	remainingNodes := []string{}
 	for _, info := range o.nodeInfos {
 		if err := o.deleteOrEvictPodsSimple(info); err == nil {
 			drainedNodes.Insert(info.Name)
-			printObj(info.Object, o.Out)
-		} else {
-			if o.drainer.IgnoreErrors && len(o.nodeInfos) > 1 {
-				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error:%s, continuing command...\n", info.Name, err)
-				continue
-			}
-			fmt.Fprintf(o.ErrOut, "DEPRECATED WARNING: Aborting the drain command in a list of nodes will be deprecated in v1.23.\n"+
-				"The new behavior will make the drain command go through all nodes even if one or more nodes failed during the drain.\n"+
-				"For now, users can try such experience via: --ignore-errors\n")
-			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
-			remainingNodes := []string{}
-			fatal = err
-			for _, remainingInfo := range o.nodeInfos {
-				if drainedNodes.Has(remainingInfo.Name) {
-					continue
-				}
-				remainingNodes = append(remainingNodes, remainingInfo.Name)
+
+			printObj, err := o.ToPrinter("drained")
+			if err != nil {
+				return err
 			}
 
-			if len(remainingNodes) > 0 {
-				fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
-				for _, nodeName := range remainingNodes {
-					fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
-				}
+			printObj(info.Object, o.Out)
+		} else {
+			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error:%s, continuing command...\n", info.Name, err)
+
+			if !drainedNodes.Has(info.Name) {
+				fatal = append(fatal, err)
+				remainingNodes = append(remainingNodes, info.Name)
 			}
-			break
+
+			continue
 		}
 	}
 
-	return fatal
+	if len(remainingNodes) > 0 {
+		fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
+		for _, nodeName := range remainingNodes {
+			fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
+		}
+	}
+
+	return utilerrors.NewAggregate(fatal)
 }
 
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {

@@ -212,7 +212,7 @@ func NewBuilder(restClientGetter RESTClientGetter) *Builder {
 
 	return newBuilder(
 		restClientGetter.ToRESTConfig,
-		(&cachingRESTMapperFunc{delegate: restClientGetter.ToRESTMapper}).ToRESTMapper,
+		restClientGetter.ToRESTMapper,
 		(&cachingCategoryExpanderFunc{delegate: categoryExpanderFn}).ToCategoryExpander,
 	)
 }
@@ -1155,10 +1155,9 @@ func (b *Builder) Do() *Result {
 		helpers = append(helpers, RetrieveLazy)
 	}
 	if b.continueOnError {
-		r.visitor = NewDecoratedVisitor(ContinueOnErrorVisitor{r.visitor}, helpers...)
-	} else {
-		r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
+		r.visitor = ContinueOnErrorVisitor{Visitor: r.visitor}
 	}
+	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	return r
 }
 
@@ -1185,28 +1184,6 @@ func HasNames(args []string) (bool, error) {
 		return false, err
 	}
 	return hasCombinedTypes || len(args) > 1, nil
-}
-
-type cachingRESTMapperFunc struct {
-	delegate RESTMapperFunc
-
-	lock   sync.Mutex
-	cached meta.RESTMapper
-}
-
-func (c *cachingRESTMapperFunc) ToRESTMapper() (meta.RESTMapper, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.cached != nil {
-		return c.cached, nil
-	}
-
-	ret, err := c.delegate()
-	if err != nil {
-		return nil, err
-	}
-	c.cached = ret
-	return c.cached, nil
 }
 
 type cachingCategoryExpanderFunc struct {

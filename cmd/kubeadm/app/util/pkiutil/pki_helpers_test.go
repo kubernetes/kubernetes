@@ -23,15 +23,15 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"reflect"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-
 	certutil "k8s.io/client-go/util/cert"
+	netutils "k8s.io/utils/net"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 var (
@@ -175,7 +175,7 @@ func TestHasServerAuth(t *testing.T) {
 }
 
 func TestWriteCertAndKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -192,7 +192,7 @@ func TestWriteCertAndKey(t *testing.T) {
 }
 
 func TestWriteCert(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -209,7 +209,7 @@ func TestWriteCert(t *testing.T) {
 }
 
 func TestWriteCertBundle(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -224,7 +224,7 @@ func TestWriteCertBundle(t *testing.T) {
 }
 
 func TestWriteKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -240,7 +240,7 @@ func TestWriteKey(t *testing.T) {
 }
 
 func TestWritePublicKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -256,7 +256,7 @@ func TestWritePublicKey(t *testing.T) {
 }
 
 func TestCertOrKeyExist(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -305,7 +305,7 @@ func TestCertOrKeyExist(t *testing.T) {
 }
 
 func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -353,7 +353,7 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 }
 
 func TestTryLoadCertFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -401,7 +401,7 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 }
 
 func TestTryLoadCertChainFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -501,7 +501,7 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.desc, func(t *testing.T) {
-			tmpdir, err := ioutil.TempDir("", "")
+			tmpdir, err := os.MkdirTemp("", "")
 			if err != nil {
 				t.Fatalf("Couldn't create tmpdir")
 			}
@@ -633,7 +633,7 @@ func TestGetAPIServerAltNames(t *testing.T) {
 			for _, IPAddress := range rt.expectedIPAddresses {
 				found := false
 				for _, val := range altNames.IPs {
-					if val.Equal(net.ParseIP(IPAddress)) {
+					if val.Equal(netutils.ParseIPSloppy(IPAddress)) {
 						found = true
 						break
 					}
@@ -698,7 +698,7 @@ func TestGetEtcdAltNames(t *testing.T) {
 		t.Run(IPAddress, func(t *testing.T) {
 			found := false
 			for _, val := range altNames.IPs {
-				if val.Equal(net.ParseIP(IPAddress)) {
+				if val.Equal(netutils.ParseIPSloppy(IPAddress)) {
 					found = true
 					break
 				}
@@ -757,7 +757,7 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 			for _, IPAddress := range expectedIPAddresses {
 				found := false
 				for _, val := range altNames.IPs {
-					if val.Equal(net.ParseIP(IPAddress)) {
+					if val.Equal(netutils.ParseIPSloppy(IPAddress)) {
 						found = true
 						break
 					}
@@ -848,7 +848,7 @@ func TestRemoveDuplicateAltNames(t *testing.T) {
 }
 
 func TestVerifyCertChain(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

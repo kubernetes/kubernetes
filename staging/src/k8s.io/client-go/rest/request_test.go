@@ -44,16 +44,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -1434,40 +1435,6 @@ func TestRequestStream(t *testing.T) {
 	}
 }
 
-type fakeUpgradeConnection struct{}
-
-func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
-	return nil, nil
-}
-func (c *fakeUpgradeConnection) Close() error {
-	return nil
-}
-func (c *fakeUpgradeConnection) CloseChan() <-chan bool {
-	return make(chan bool)
-}
-func (c *fakeUpgradeConnection) SetIdleTimeout(timeout time.Duration) {
-}
-
-type fakeUpgradeRoundTripper struct {
-	req  *http.Request
-	conn httpstream.Connection
-}
-
-func (f *fakeUpgradeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	f.req = req
-	b := []byte{}
-	body := ioutil.NopCloser(bytes.NewReader(b))
-	resp := &http.Response{
-		StatusCode: http.StatusSwitchingProtocols,
-		Body:       body,
-	}
-	return resp, nil
-}
-
-func (f *fakeUpgradeRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
-	return f.conn, nil
-}
-
 func TestRequestDo(t *testing.T) {
 	testCases := []struct {
 		Request *Request
@@ -1563,7 +1530,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
-	clock := clock.FakeClock{}
+	clock := testingclock.FakeClock{}
 	request.backoff = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
 		Backoff: flowcontrol.NewFakeBackOff(
@@ -2273,15 +2240,17 @@ func TestStream(t *testing.T) {
 
 func testRESTClientWithConfig(t testing.TB, srv *httptest.Server, contentConfig ClientContentConfig) *RESTClient {
 	base, _ := url.Parse("http://localhost")
+	var c *http.Client
 	if srv != nil {
 		var err error
 		base, err = url.Parse(srv.URL)
 		if err != nil {
 			t.Fatalf("failed to parse test URL: %v", err)
 		}
+		c = srv.Client()
 	}
 	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
-	client, err := NewRESTClient(base, versionedAPIPath, contentConfig, nil, nil)
+	client, err := NewRESTClient(base, versionedAPIPath, contentConfig, nil, c)
 	if err != nil {
 		t.Fatalf("failed to create a client: %v", err)
 	}
@@ -2484,7 +2453,7 @@ func TestThrottledLogger(t *testing.T) {
 	defer func() {
 		globalThrottledLogger.clock = oldClock
 	}()
-	clock := clock.NewFakeClock(now)
+	clock := testingclock.NewFakeClock(now)
 	globalThrottledLogger.clock = clock
 
 	logMessages := 0
@@ -2941,6 +2910,186 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 			if expected.respCount.closes != respCountGot.getCloseCount() {
 				t.Errorf("Expected response body Close to be invoked %d times, but got: %d", expected.respCount.closes, respCountGot.getCloseCount())
 			}
+		})
+	}
+}
+
+func TestReuseRequest(t *testing.T) {
+	var tests = []struct {
+		name        string
+		enableHTTP2 bool
+	}{
+		{"HTTP1", false},
+		{"HTTP2", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte(r.RemoteAddr))
+			}))
+			ts.EnableHTTP2 = tt.enableHTTP2
+			ts.StartTLS()
+			defer ts.Close()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			c := testRESTClient(t, ts)
+
+			req1, err := c.Verb("GET").
+				Prefix("foo").
+				DoRaw(ctx)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			req2, err := c.Verb("GET").
+				Prefix("foo").
+				DoRaw(ctx)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if string(req1) != string(req2) {
+				t.Fatalf("Expected %v to be equal to %v", string(req1), string(req2))
+			}
+
+		})
+	}
+}
+
+func TestHTTP1DoNotReuseRequestAfterTimeout(t *testing.T) {
+	var tests = []struct {
+		name        string
+		enableHTTP2 bool
+	}{
+		{"HTTP1", false},
+		{"HTTP2", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			done := make(chan struct{})
+			ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Logf("TEST Connected from %v on %v\n", r.RemoteAddr, r.URL.Path)
+				if r.URL.Path == "/hang" {
+					t.Logf("TEST hanging %v\n", r.RemoteAddr)
+					<-done
+				}
+				w.Write([]byte(r.RemoteAddr))
+			}))
+			ts.EnableHTTP2 = tt.enableHTTP2
+			ts.StartTLS()
+			defer ts.Close()
+			// close hanging connection before shutting down the http server
+			defer close(done)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			transport, ok := ts.Client().Transport.(*http.Transport)
+			if !ok {
+				t.Fatalf("failed to assert *http.Transport")
+			}
+
+			config := &Config{
+				Host:      ts.URL,
+				Transport: utilnet.SetTransportDefaults(transport),
+				Timeout:   1 * time.Second,
+				// These fields are required to create a REST client.
+				ContentConfig: ContentConfig{
+					GroupVersion:         &schema.GroupVersion{},
+					NegotiatedSerializer: &serializer.CodecFactory{},
+				},
+			}
+			if !tt.enableHTTP2 {
+				config.TLSClientConfig.NextProtos = []string{"http/1.1"}
+			}
+			c, err := RESTClientFor(config)
+			if err != nil {
+				t.Fatalf("failed to create REST client: %v", err)
+			}
+			req1, err := c.Verb("GET").
+				Prefix("foo").
+				DoRaw(ctx)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			_, err = c.Verb("GET").
+				Prefix("/hang").
+				DoRaw(ctx)
+			if err == nil {
+				t.Fatalf("Expected error")
+			}
+
+			req2, err := c.Verb("GET").
+				Prefix("foo").
+				DoRaw(ctx)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// http1 doesn't reuse the connection after it times
+			if tt.enableHTTP2 != (string(req1) == string(req2)) {
+				if tt.enableHTTP2 {
+					t.Fatalf("Expected %v to be the same as %v", string(req1), string(req2))
+				} else {
+					t.Fatalf("Expected %v to be different to %v", string(req1), string(req2))
+				}
+			}
+		})
+	}
+}
+
+func TestTransportConcurrency(t *testing.T) {
+	const numReqs = 10
+	var tests = []struct {
+		name        string
+		enableHTTP2 bool
+	}{
+		{"HTTP1", false},
+		{"HTTP2", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Logf("Connected from %v %v", r.RemoteAddr, r.URL)
+				fmt.Fprintf(w, "%v", r.FormValue("echo"))
+			}))
+			ts.EnableHTTP2 = tt.enableHTTP2
+			ts.StartTLS()
+			defer ts.Close()
+			var wg sync.WaitGroup
+
+			wg.Add(numReqs)
+			c := testRESTClient(t, ts)
+			reqs := make(chan string)
+			defer close(reqs)
+
+			for i := 0; i < 4; i++ {
+				go func() {
+					for req := range reqs {
+						res, err := c.Get().Param("echo", req).DoRaw(context.Background())
+						if err != nil {
+							t.Errorf("error on req %s: %v", req, err)
+							wg.Done()
+							continue
+						}
+
+						if string(res) != req {
+							t.Errorf("body of req %s = %q; want %q", req, res, req)
+						}
+
+						wg.Done()
+					}
+				}()
+			}
+			for i := 0; i < numReqs; i++ {
+				reqs <- fmt.Sprintf("request-%d", i)
+			}
+			wg.Wait()
 		})
 	}
 }

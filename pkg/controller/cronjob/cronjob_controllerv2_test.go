@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
@@ -30,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
@@ -39,8 +41,102 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+var (
+	shortDead  int64 = 10
+	mediumDead int64 = 2 * 60 * 60
+	longDead   int64 = 1000000
+	noDead     int64 = -12345
+
+	errorSchedule = "obvious error schedule"
+	// schedule is hourly on the hour
+	onTheHour = "0 * * * ?"
+)
+
+// returns a cronJob with some fields filled in.
+func cronJob() batchv1.CronJob {
+	return batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "mycronjob",
+			Namespace:         "snazzycats",
+			UID:               types.UID("1a2b3c"),
+			CreationTimestamp: metav1.Time{Time: justBeforeTheHour()},
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:          "* * * * ?",
+			ConcurrencyPolicy: "Allow",
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"a": "b"},
+					Annotations: map[string]string{"x": "y"},
+				},
+				Spec: jobSpec(),
+			},
+		},
+	}
+}
+
+func jobSpec() batchv1.JobSpec {
+	one := int32(1)
+	return batchv1.JobSpec{
+		Parallelism: &one,
+		Completions: &one,
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Image: "foo/bar"},
+				},
+			},
+		},
+	}
+}
+
 func justASecondBeforeTheHour() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:59:59Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func justAfterThePriorHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:01:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func justBeforeThePriorHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T08:59:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func justAfterTheHour() *time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:01:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return &T1
+}
+
+func justBeforeTheHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:59:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
+func weekAfterTheHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-26T10:00:00Z")
 	if err != nil {
 		panic("test setup error")
 	}
@@ -72,10 +168,11 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		ranPreviously bool
 		stillActive   bool
 
-		jobCreationTime time.Time
-
 		// environment
-		now time.Time
+		jobCreationTime time.Time
+		now             time.Time
+		jobCreateError  error
+		jobGetErr       error
 
 		// expectations
 		expectCreate               bool
@@ -84,74 +181,636 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		expectedWarnings           int
 		expectErr                  bool
 		expectRequeueAfter         bool
+		expectUpdateStatus         bool
 		jobStillNotFoundInLister   bool
 		jobPresentInCJActiveStatus bool
-		jobCreateError             error
 	}{
-		"never ran, not valid schedule, A":      {A, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
-		"never ran, not valid schedule, F":      {f, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
-		"never ran, not valid schedule, R":      {f, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
-		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, is time, A":                 {A, F, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"never ran, is time, F":                 {f, F, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"never ran, is time, R":                 {R, F, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"never ran, is time, suspended":         {A, T, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
-		"never ran, is time, past deadline":     {A, F, onTheHour, shortDead, F, F, justAfterThePriorHour(), justAfterTheHour().Add(time.Minute * time.Duration(shortDead+1)), F, F, 0, 0, F, T, F, T, nil},
-		"never ran, is time, not past deadline": {A, F, onTheHour, longDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, not valid schedule, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   errorSchedule,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectedWarnings:           1,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, not valid schedule, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   errorSchedule,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectedWarnings:           1,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, not valid schedule, R": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   errorSchedule,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectedWarnings:           1,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, not time, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true},
+		"never ran, not time, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, not time, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time, suspended": {
+			concurrencyPolicy:          "Allow",
+			suspend:                    true,
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time, past deadline": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   shortDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justAfterTheHour().Add(time.Minute * time.Duration(shortDead+1)),
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time, not past deadline": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
 
-		"prev ran but done, not time, A":                {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, not time, F":                {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, not time, R":                {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, is time, A":                 {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, is time, F":                 {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, is time, R":                 {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, is time, suspended":         {A, T, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
-		"prev ran but done, is time, past deadline":     {A, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, T, F, T, nil},
-		"prev ran but done, is time, not past deadline": {A, F, onTheHour, longDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, not time, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, not time, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, not time, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, create job failed, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			jobCreateError:             errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
+			expectErr:                  true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, suspended": {
+			concurrencyPolicy:          "Allow",
+			suspend:                    true,
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, past deadline": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   shortDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, is time, not past deadline": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
 
-		"still active, not time, A":                {A, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, not time, F":                {f, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, not time, R":                {R, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, is time, A":                 {A, F, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
-		"still active, is time, F":                 {f, F, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, is time, R":                 {R, F, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, T, 1, 0, F, T, F, T, nil},
-		"still active, is time, suspended":         {A, T, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, F, F, T, nil},
-		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
-		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
+		"still active, not time, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, not time, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, not time, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               2,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectDelete:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, get job failed, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			jobGetErr:                  errors.NewBadRequest("request is invalid"),
+			expectActive:               1,
+			expectedWarnings:           1,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, suspended": {
+			concurrencyPolicy:          "Allow",
+			suspend:                    true,
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectActive:               1,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, past deadline": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   shortDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"still active, is time, not past deadline": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        *justAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               2,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
 
 		// Controller should fail to schedule these, as there are too many missed starting times
 		// and either no deadline or a too long deadline.
-		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
-		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, not past deadline, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectedWarnings:           1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, not past deadline, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectedWarnings:           1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, not past deadline, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectedWarnings:           1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, no deadline, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectedWarnings:           1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, no deadline, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectedWarnings:           1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, no deadline, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   noDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectedWarnings:           1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
 
-		"prev ran but done, long overdue, past medium deadline, A": {A, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, long overdue, past short deadline, A":  {A, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past medium deadline, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   mediumDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, past short deadline, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   shortDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
 
-		"prev ran but done, long overdue, past medium deadline, R": {R, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, long overdue, past short deadline, R":  {R, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past medium deadline, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   mediumDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, past short deadline, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   shortDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
 
-		"prev ran but done, long overdue, past medium deadline, F": {f, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
-		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past medium deadline, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   mediumDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"prev ran but done, long overdue, past short deadline, F": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   shortDead,
+			ranPreviously:              true,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        weekAfterTheHour(),
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
 
 		// Tests for time skews
 		// the controller sees job is created, takes no actions
-		"this ran but done, time drifted back, F": {f, F, onTheHour, noDead, T, F, *justAfterTheHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, F, errors.NewAlreadyExists(schema.GroupResource{Resource: "jobs", Group: "batch"}, "")},
+		"this ran but done, time drifted back, F": {
+			concurrencyPolicy:  "Forbid",
+			schedule:           onTheHour,
+			deadline:           noDead,
+			ranPreviously:      true,
+			jobCreationTime:    *justAfterTheHour(),
+			now:                justBeforeTheHour(),
+			jobCreateError:     errors.NewAlreadyExists(schema.GroupResource{Resource: "jobs", Group: "batch"}, ""),
+			expectRequeueAfter: true,
+			expectUpdateStatus: true,
+		},
 
 		// Tests for slow job lister
-		"this started but went missing, not past deadline, A": {A, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
-		"this started but went missing, not past deadline, f": {f, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
-		"this started but went missing, not past deadline, R": {R, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
+		"this started but went missing, not past deadline, A": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            topOfTheHour().Add(time.Millisecond * 100),
+			now:                        justAfterTheHour().Add(time.Millisecond * 100),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobStillNotFoundInLister:   true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"this started but went missing, not past deadline, f": {
+			concurrencyPolicy:          "Forbid",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            topOfTheHour().Add(time.Millisecond * 100),
+			now:                        justAfterTheHour().Add(time.Millisecond * 100),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobStillNotFoundInLister:   true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"this started but went missing, not past deadline, R": {
+			concurrencyPolicy:          "Replace",
+			schedule:                   onTheHour,
+			deadline:                   longDead,
+			ranPreviously:              true,
+			stillActive:                true,
+			jobCreationTime:            topOfTheHour().Add(time.Millisecond * 100),
+			now:                        justAfterTheHour().Add(time.Millisecond * 100),
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			jobStillNotFoundInLister:   true,
+			jobPresentInCJActiveStatus: true,
+		},
 
 		// Tests for slow cronjob list
-		"this started but is not present in cronjob active list, not past deadline, A": {A, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
-		"this started but is not present in cronjob active list, not past deadline, f": {f, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
-		"this started but is not present in cronjob active list, not past deadline, R": {R, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
+		"this started but is not present in cronjob active list, not past deadline, A": {
+			concurrencyPolicy:  "Allow",
+			schedule:           onTheHour,
+			deadline:           longDead,
+			ranPreviously:      true,
+			stillActive:        true,
+			jobCreationTime:    topOfTheHour().Add(time.Millisecond * 100),
+			now:                justAfterTheHour().Add(time.Millisecond * 100),
+			expectActive:       1,
+			expectRequeueAfter: true,
+		},
+		"this started but is not present in cronjob active list, not past deadline, f": {
+			concurrencyPolicy:  "Forbid",
+			schedule:           onTheHour,
+			deadline:           longDead,
+			ranPreviously:      true,
+			stillActive:        true,
+			jobCreationTime:    topOfTheHour().Add(time.Millisecond * 100),
+			now:                justAfterTheHour().Add(time.Millisecond * 100),
+			expectActive:       1,
+			expectRequeueAfter: true,
+		},
+		"this started but is not present in cronjob active list, not past deadline, R": {
+			concurrencyPolicy:  "Replace",
+			schedule:           onTheHour,
+			deadline:           longDead,
+			ranPreviously:      true,
+			stillActive:        true,
+			jobCreationTime:    topOfTheHour().Add(time.Millisecond * 100),
+			now:                justAfterTheHour().Add(time.Millisecond * 100),
+			expectActive:       1,
+			expectRequeueAfter: true,
+		},
 	}
 	for name, tc := range testCases {
 		name := name
@@ -209,7 +868,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 				}
 			}
 
-			jc := &fakeJobControl{Job: job, CreateErr: tc.jobCreateError}
+			jc := &fakeJobControl{Job: job, CreateErr: tc.jobCreateError, Err: tc.jobGetErr}
 			cjc := &fakeCJControl{CronJob: realCJ}
 			recorder := record.NewFakeRecorder(10)
 
@@ -221,7 +880,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 					return tc.now
 				},
 			}
-			cjCopy, requeueAfter, err := jm.syncCronJob(&cj, js)
+			cjCopy, requeueAfter, updateStatus, err := jm.syncCronJob(context.TODO(), &cj, js)
 			if tc.expectErr && err == nil {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}
@@ -234,6 +893,9 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 				if !reflect.DeepEqual(requeueAfter, expectedRequeueAfter) {
 					t.Errorf("%s: expected requeueAfter: %+v, got requeueAfter time: %+v", name, expectedRequeueAfter, requeueAfter)
 				}
+			}
+			if updateStatus != tc.expectUpdateStatus {
+				t.Errorf("%s: expected updateStatus: %t, actually: %t", name, tc.expectUpdateStatus, updateStatus)
 			}
 			expectedCreates := 0
 			if tc.expectCreate {

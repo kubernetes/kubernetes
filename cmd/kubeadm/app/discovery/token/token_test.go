@@ -20,8 +20,7 @@ import (
 	"testing"
 	"time"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"github.com/pmezard/go-difflib/difflib"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +30,8 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	tokenjws "k8s.io/cluster-bootstrap/token/jws"
 
-	"github.com/pmezard/go-difflib/difflib"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 func TestRetrieveValidatedConfigInfo(t *testing.T) {

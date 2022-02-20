@@ -17,15 +17,13 @@ limitations under the License.
 package main
 
 import (
-	goflag "flag"
 	"os"
 
 	"github.com/spf13/pflag"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/cli"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 )
 
@@ -38,20 +36,8 @@ func main() {
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
-
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// cliflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	// cliflag.InitFlags()
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
 	cmd := convert.NewCmdConvert(f, genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr})
 	matchVersionKubeConfigFlags.AddFlags(cmd.PersistentFlags())
-	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
-	}
-
+	code := cli.Run(cmd)
+	os.Exit(code)
 }

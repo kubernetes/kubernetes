@@ -19,31 +19,23 @@ package markcontrolplane
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-
-	"k8s.io/api/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
 )
 
+// labelsToAdd holds a list of labels that are applied on kubeadm managed control plane nodes
 var labelsToAdd = []string{
-	// TODO: remove this label:
-	// https://github.com/kubernetes/kubeadm/issues/2200
-	constants.LabelNodeRoleOldControlPlane,
 	constants.LabelNodeRoleControlPlane,
 	constants.LabelExcludeFromExternalLB,
 }
 
 // MarkControlPlane taints the control-plane and sets the control-plane label
 func MarkControlPlane(client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
-	// TODO: remove this "deprecated" amend and pass "labelsToAdd" directly:
-	// https://github.com/kubernetes/kubeadm/issues/2200
-	labels := make([]string, len(labelsToAdd))
-	copy(labels, labelsToAdd)
-	labels[0] = constants.LabelNodeRoleOldControlPlane + "(deprecated)"
-
 	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the labels: %v\n",
-		controlPlaneName, labels)
+		controlPlaneName, labelsToAdd)
 
 	if len(taints) > 0 {
 		taintStrs := []string{}
