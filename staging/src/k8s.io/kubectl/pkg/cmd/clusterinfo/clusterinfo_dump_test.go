@@ -27,16 +27,31 @@ import (
 )
 
 func TestSetupOutputWriterNoOp(t *testing.T) {
-	tests := []string{"", "-"}
-	for _, test := range tests {
-		_, _, buf, _ := genericclioptions.NewTestIOStreams()
-		f := cmdtesting.NewTestFactory()
-		defer f.Cleanup()
+	tests := []struct {
+		name         string
+		outputWriter string
+	}{
+		{
+			name:         "empty",
+			outputWriter: "",
+		},
+		{
+			name:         "stdout",
+			outputWriter: "-",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, buf, _ := genericclioptions.NewTestIOStreams()
+			f := cmdtesting.NewTestFactory()
+			defer f.Cleanup()
 
-		writer := setupOutputWriter(test, buf, "/some/file/that/should/be/ignored", "")
-		if writer != buf {
-			t.Errorf("expected: %v, saw: %v", buf, writer)
-		}
+			writer := setupOutputWriter(tt.outputWriter, buf, "/some/file/that/should/be/ignored", "")
+			if writer != buf {
+				t.Errorf("expected: %v, saw: %v", buf, writer)
+			}
+		})
 	}
 }
 
