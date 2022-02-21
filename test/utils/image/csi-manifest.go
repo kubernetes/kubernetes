@@ -14,6 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/*
+This file is generated and managed by test/e2e/testing-manifests/storage-csi/update-hostpath.sh
+Do not edit
+*/
+
 package image
 
 const (
