@@ -96,7 +96,7 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affi
 		ttlSeconds = int(v1.DefaultClientIPServiceAffinitySeconds) //default to 3 hours if not specified.  Should 0 be unlimited instead????
 	}
 
-	if _, exists := lb.services[svcPort]; !exists {
+	if state, exists := lb.services[svcPort]; !exists || state == nil {
 		lb.services[svcPort] = &balancerState{affinity: *newAffinityPolicy(affinityType, ttlSeconds)}
 		klog.V(4).InfoS("LoadBalancerRR service does not exist, created", "servicePortName", svcPort)
 	} else if affinityType != "" {
@@ -126,9 +126,10 @@ func (lb *LoadBalancerRR) ServiceHasEndpoints(svcPort proxy.ServicePortName) boo
 	lb.lock.RLock()
 	defer lb.lock.RUnlock()
 	state, exists := lb.services[svcPort]
-	// TODO: while nothing ever assigns nil to the map, *some* of the code using the map
-	// checks for it.  The code should all follow the same convention.
-	return exists && state != nil && len(state.endpoints) > 0
+    if !exists || state == nil {
+        return false
+    }
+	return len(state.endpoints) > 0
 }
 
 // NextEndpoint returns a service endpoint.
@@ -209,7 +210,7 @@ func (lb *LoadBalancerRR) removeStaleAffinity(svcPort proxy.ServicePortName, new
 	}
 
 	state, exists := lb.services[svcPort]
-	if !exists {
+	if !exists || state == nil {
 		return
 	}
 	for _, existingEndpoint := range state.endpoints {
@@ -290,7 +291,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 
 func (lb *LoadBalancerRR) resetService(svcPort proxy.ServicePortName) {
 	// If the service is still around, reset but don't delete.
-	if state, ok := lb.services[svcPort]; ok {
+	if state, ok := lb.services[svcPort]; ok && state != nil {
 		if len(state.endpoints) > 0 {
 			klog.V(2).InfoS("LoadBalancerRR: Removing endpoints service", "servicePortName", svcPort)
 			state.endpoints = []string{}
@@ -330,7 +331,7 @@ func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortNa
 	defer lb.lock.Unlock()
 
 	state, exists := lb.services[svcPort]
-	if !exists {
+	if !exists || state == nil {
 		return
 	}
 	for ip, affinity := range state.affinity.affinityMap {
