@@ -465,22 +465,16 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 					err)
 				continue
 			}
-			attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
-			if attachState == cache.AttachStateAttached {
-				klog.V(10).Infof("Volume %q is attached to node %q. Marking as attached in ActualStateOfWorld",
-					volumeName,
-					nodeName,
-				)
-				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
-				if err != nil {
-					klog.Errorf("Failed to find device path: %v", err)
-					continue
-				}
-				err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
-				if err != nil {
-					klog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
-				}
+			devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
+			if err != nil {
+				klog.Errorf("Failed to find device path: %v", err)
+				continue
 			}
+			err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
+			if err != nil {
+				klog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
+			}
+
 		}
 	}
 
