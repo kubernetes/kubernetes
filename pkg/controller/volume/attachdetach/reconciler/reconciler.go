@@ -207,7 +207,7 @@ func (rc *reconciler) reconcile() {
 			err = rc.nodeStatusUpdater.UpdateNodeStatusForNode(attachedVolume.NodeName)
 			if err != nil {
 				// Skip detaching this volume if unable to update node status
-				klog.Errorf(attachedVolume.GenerateErrorDetailed("UpdateNodeStatuses failed while attempting to report volume as attached", err).Error())
+				klog.Errorf(attachedVolume.GenerateErrorDetailed("UpdateNodeStatusForNode failed while attempting to report volume as attached", err).Error())
 				continue
 			}
 
