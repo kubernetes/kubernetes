@@ -768,7 +768,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// local provider might not be configured to support external load balancer.
+		e2eskipper.SkipIfProviderIs("aws", "local")
 
 		svc := getServeHostnameService("affinity-lb-esipp")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -780,7 +781,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// local provider might not be configured to support external load balancer.
+		e2eskipper.SkipIfProviderIs("aws", "local")
 
 		svc := getServeHostnameService("affinity-lb-esipp-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -792,7 +794,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// local provider might not be configured to support external load balancer.
+		e2eskipper.SkipIfProviderIs("aws", "local")
 
 		svc := getServeHostnameService("affinity-lb")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -804,7 +807,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// local provider might not be configured to support external load balancer.
+		e2eskipper.SkipIfProviderIs("aws", "local")
 
 		svc := getServeHostnameService("affinity-lb-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
