@@ -1387,7 +1387,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 				if err != nil {
 					t.Fatalf("Failed to parse resource version: %v", err)
 				}
-				updateResourceVersionIfNeeded(object, cacher.versioner, resourceVersion)
+				updateResourceVersion(object, cacher.versioner, resourceVersion)
 			}
 
 			var e runtime.Object
