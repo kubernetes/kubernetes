@@ -549,7 +549,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 // RESTStorageProvider is a factory type for REST storage.
 type RESTStorageProvider interface {
 	GroupName() string
-	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error)
+	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error)
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
@@ -564,15 +564,13 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
-		if !apiResourceConfigSource.AnyResourceForGroupEnabled(groupName) {
-			klog.V(1).Infof("Skipping disabled API group %q.", groupName)
-			continue
-		}
-		apiGroupInfo, enabled, err := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo, err := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 		if err != nil {
 			return fmt.Errorf("problem initializing API group %q : %v", groupName, err)
 		}
-		if !enabled {
+		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
+			// If we have no storage for any resource configured, this API group is effectively disabled.
+			// This can happen when an entire API group, version, or development-stage (alpha, beta, GA) is disabled.
 			klog.Warningf("API group %q is not enabled, skipping.", groupName)
 			continue
 		}

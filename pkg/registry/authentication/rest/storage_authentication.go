@@ -33,7 +33,7 @@ type RESTStorageProvider struct {
 	APIAudiences  authenticator.Audiences
 }
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	// TODO figure out how to make the swagger generation stable, while allowing this endpoint to be disabled.
 	// if p.Authenticator == nil {
 	// 	return genericapiserver.APIGroupInfo{}, false
@@ -47,7 +47,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1.SchemeGroupVersion.Version] = storageMap
 	}
 
-	return apiGroupInfo, true, nil
+	return apiGroupInfo, nil
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {

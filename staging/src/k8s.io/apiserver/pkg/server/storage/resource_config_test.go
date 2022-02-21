@@ -32,13 +32,13 @@ func TestDisabledVersion(t *testing.T) {
 	config.DisableVersions(g1v1)
 	config.EnableVersions(g1v2, g2v1)
 
-	if config.VersionEnabled(g1v1) {
+	if config.versionEnabled(g1v1) {
 		t.Errorf("expected disabled for %v, from %v", g1v1, config)
 	}
-	if !config.VersionEnabled(g1v2) {
+	if !config.versionEnabled(g1v2) {
 		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
-	if !config.VersionEnabled(g2v1) {
+	if !config.versionEnabled(g2v1) {
 		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
 }
