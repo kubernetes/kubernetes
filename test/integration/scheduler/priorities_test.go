@@ -173,7 +173,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 }
 
 // TestNodeAffinityScoring verifies that scheduler's node affinity priority function
-// works correctly.s
+// works correctly.
 func TestNodeAffinityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
