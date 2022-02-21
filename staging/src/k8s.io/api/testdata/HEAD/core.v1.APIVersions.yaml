@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: APIVersions
 serverAddressByClientCIDRs:
-- clientCIDR: "3"
-  serverAddress: "4"
+- clientCIDR: clientCIDRValue
+  serverAddress: serverAddressValue
 versions:
-- "2"
+- versionsValue
