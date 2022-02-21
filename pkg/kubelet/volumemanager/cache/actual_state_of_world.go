@@ -655,6 +655,19 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 	return nil
 }
 
+func (asw *actualStateOfWorld) SetVolumeClaimSize(volumeName v1.UniqueVolumeName, claimSize resource.Quantity) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, ok := asw.attachedVolumes[volumeName]
+	// only set volume claim size if claimStatusSize is zero
+	// this can happen when volume was rebuilt after kubelet startup
+	if ok && volumeObj.persistentVolumeSize.IsZero() {
+		volumeObj.persistentVolumeSize = claimSize
+		asw.attachedVolumes[volumeName] = volumeObj
+	}
+}
+
 func (asw *actualStateOfWorld) DeletePodFromVolume(
 	podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
 	asw.Lock()
