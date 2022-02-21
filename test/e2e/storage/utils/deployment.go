@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eframework "k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -52,6 +53,10 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 	rename := o.OldDriverName != "" && o.NewDriverName != "" &&
 		o.OldDriverName != o.NewDriverName
 
+	substKubeletRootDir := func(s string) string {
+		return strings.ReplaceAll(s, "/var/lib/kubelet/", e2eframework.TestContext.KubeletRootDir+"/")
+	}
+
 	patchVolumes := func(volumes []v1.Volume) {
 		if !rename {
 			return
@@ -65,6 +70,8 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 				if file == o.OldDriverName {
 					*p = path.Join(dir, o.NewDriverName)
 				}
+				// Inject non-standard kubelet path.
+				*p = substKubeletRootDir(*p)
 			}
 		}
 	}
@@ -79,6 +86,15 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 					container.Args[e] = strings.Replace(container.Args[e], "/"+o.OldDriverName+"/", "/"+o.NewDriverName+"/", 1)
 				}
 			}
+
+			// Modify --kubelet-registration-path.
+			for e := range container.Args {
+				container.Args[e] = substKubeletRootDir(container.Args[e])
+			}
+			for e := range container.VolumeMounts {
+				container.VolumeMounts[e].MountPath = substKubeletRootDir(container.VolumeMounts[e].MountPath)
+			}
+
 			// Overwrite driver name resp. provider name
 			// by appending a parameter with the right
 			// value.
