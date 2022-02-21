@@ -211,29 +211,14 @@ func (g *genericScheduler) evaluateNominatedNode(ctx context.Context, extenders 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
 func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
-	diagnosis := framework.Diagnosis{
-		NodeToStatusMap:      make(framework.NodeToStatusMap),
-		UnschedulablePlugins: sets.NewString(),
-	}
-
-	// Run "prefilter" plugins.
-	s := fwk.RunPreFilterPlugins(ctx, state, pod)
 	allNodes, err := g.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
-		return nil, diagnosis, err
+		return nil, framework.Diagnosis{}, err
 	}
-	if !s.IsSuccess() {
-		if !s.IsUnschedulable() {
-			return nil, diagnosis, s.AsError()
-		}
-		// All nodes will have the same status. Some non trivial refactoring is
-		// needed to avoid this copy.
-		for _, n := range allNodes {
-			diagnosis.NodeToStatusMap[n.Node().Name] = s
-		}
-		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
-		diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
-		return nil, diagnosis, nil
+
+	diagnosis, err := g.runDiagnosisThatPassPreFilters(ctx, fwk, state, pod, allNodes)
+	if err != nil || len(diagnosis.NodeToStatusMap) > 0 {
+		return nil, diagnosis, err
 	}
 
 	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
@@ -248,6 +233,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 			return feasibleNodes, diagnosis, nil
 		}
 	}
+
 	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, allNodes)
 	if err != nil {
 		return nil, diagnosis, err
@@ -258,6 +244,35 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 		return nil, diagnosis, err
 	}
 	return feasibleNodes, diagnosis, nil
+}
+
+// runDiagnosisThatPassPreFilters run the diagnosis that fit the prefilter plugins.
+func (g *genericScheduler) runDiagnosisThatPassPreFilters(
+	ctx context.Context,
+	fwk framework.Framework,
+	state *framework.CycleState,
+	pod *v1.Pod,
+	nodes []*framework.NodeInfo,
+) (framework.Diagnosis, error) {
+	diagnosis := framework.Diagnosis{
+		NodeToStatusMap:      make(framework.NodeToStatusMap),
+		UnschedulablePlugins: sets.NewString(),
+	}
+
+	if s := fwk.RunPreFilterPlugins(ctx, state, pod); !s.IsSuccess() {
+		if !s.IsUnschedulable() {
+			return diagnosis, s.AsError()
+		}
+		// All nodes will have the same status. Some non trivial refactoring is
+		// needed to avoid this copy.
+		for _, n := range nodes {
+			diagnosis.NodeToStatusMap[n.Node().Name] = s
+		}
+		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
+		diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
+		return diagnosis, nil
+	}
+	return diagnosis, nil
 }
 
 // findNodesThatPassFilters finds the nodes that fit the filter plugins.
