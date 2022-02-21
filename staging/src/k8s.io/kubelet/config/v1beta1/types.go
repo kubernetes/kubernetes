@@ -525,6 +525,8 @@ type KubeletConfiguration struct {
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations.
+	// Note: attaching/detaching CSI volumes is not supported by the kubelet,
+	// so this option needs to be true for that use case.
 	// Default: true
 	// +optional
 	EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach,omitempty"`
