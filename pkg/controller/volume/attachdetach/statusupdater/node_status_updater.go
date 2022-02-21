@@ -104,6 +104,8 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attach
 
 	err = nsu.updateNodeStatus(nodeName, nodeObj, attachedVolumes)
 	if errors.IsNotFound(err) {
+		// If node does not exist, its status cannot be updated.
+		// Do nothing so that there is no retry until node is created.
 		klog.V(2).Infof(
 			"Could not update node status for %q; node does not exist - skipping",
 			nodeName)
