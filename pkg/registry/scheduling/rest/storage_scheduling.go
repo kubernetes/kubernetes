@@ -44,16 +44,16 @@ type RESTStorageProvider struct{}
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(scheduling.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
 	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-		return genericapiserver.APIGroupInfo{}, false, err
+		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = storageMap
 	}
 
-	return apiGroupInfo, true, nil
+	return apiGroupInfo, nil
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {

@@ -76,24 +76,7 @@ var (
 	}
 
 	groupVersionMatchersOrder = []string{APIAll, APIGA, APIBeta, APIAlpha}
-
-	groupVersionResourceMatchers = map[string]func(gvr schema.GroupVersionResource) bool{
-		// allows users to address all api versions
-		APIAll: func(gvr schema.GroupVersionResource) bool { return true },
-		// allows users to address all api versions in the form v[0-9]+
-		APIGA: func(gvr schema.GroupVersionResource) bool { return gaPattern.MatchString(gvr.Version) },
-		// allows users to address all beta api versions
-		APIBeta: func(gvr schema.GroupVersionResource) bool { return betaPattern.MatchString(gvr.Version) },
-		// allows users to address all alpha api versions
-		APIAlpha: func(gvr schema.GroupVersionResource) bool { return alphaPattern.MatchString(gvr.Version) },
-	}
 )
-
-func resourceMatcherForVersion(gv schema.GroupVersion) func(gvr schema.GroupVersionResource) bool {
-	return func(gvr schema.GroupVersionResource) bool {
-		return gv == gvr.GroupVersion()
-	}
-}
 
 // MergeAPIResourceConfigs merges the given defaultAPIResourceConfig with the given resourceConfigOverrides.
 // Exclude the groups not registered in registry, and check if version is
@@ -115,8 +98,6 @@ func MergeAPIResourceConfigs(
 			} else {
 				return nil, fmt.Errorf("invalid value %v=%v", flag, value)
 			}
-			// remove individual resource preferences that were hardcoded into the default.  The override trumps those settings.
-			resourceConfig.RemoveMatchingResourcePreferences(groupVersionResourceMatchers[flag])
 		}
 	}
 
@@ -187,8 +168,6 @@ func MergeAPIResourceConfigs(
 
 	// apply version preferences first, so that we can remove the hardcoded resource preferences that are being overridden
 	for _, versionPreference := range versionPreferences {
-		// if a user has expressed a preference about a version, that preference takes priority over the hardcoded resources
-		resourceConfig.RemoveMatchingResourcePreferences(resourceMatcherForVersion(versionPreference.groupVersion))
 		if versionPreference.enabled {
 			// enable the groupVersion for "group/version=true"
 			resourceConfig.EnableVersions(versionPreference.groupVersion)
