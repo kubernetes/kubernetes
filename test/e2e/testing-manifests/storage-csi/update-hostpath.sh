@@ -147,13 +147,13 @@ set +x # disable shell tracing, so that printed messages can be seden
 # A temp on-disk file for holding information about container images
 # Format: {key}\t{registry variable}\t{image name}\t{image version}
 lookupFile=lookup.tmp
-echo -n "" > $lookupFile
-trap "rm -f $lookupFile" EXIT
+> $lookupFile # clear the file if it exists
+trap 'rm -f $lookupFile' EXIT
 
 
 # Lookup the registry variable name (in manifest.go) for the given registry
 lookupRegistry() {
-    registry=$(echo $1 | sed -e 's/\//\\\//') # escape backslash characters
+    registry=$(echo "$1" | sed -e 's/\//\\\//') # escape backslash characters
     awk "\$0 ~ /\"$registry\"/{print substr(\$1,1,length(\$1)-1)}" $manifest
 }
 
@@ -165,7 +165,7 @@ lookupImageKey() {
 
 # If the given file line contains a templated image reference extract the key used for the container image
 extractKey() {
-    echo "$1" | grep {{.*Image}} | sed -e 's/.*{{\.\([[:upper:]][[:lower:]]*\)Image}}.*/\1/'
+    echo "$1" | grep "{{.*Image}}" | sed -e 's/.*{{\.\([[:upper:]][[:lower:]]*\)Image}}.*/\1/'
 }
 
 # Given a key to a container image, copy the configuration information from csi-manifest into the lookup file
@@ -181,23 +181,23 @@ grep -r image: hostpath/hostpath/csi-hostpath-plugin.yaml | while read -r image;
     version=$(echo "$image" | sed -e 's/.*:\(.*\)/\1/')
     image=$(echo "$image" | sed -e 's/.*image: \([^:]*\).*/\1/')
 
-    key="$(extractKey $image)"
+    key="$(extractKey "$image")"
     if [ -z "${key}" ] ; then
         #echo "DEBUG: Could not find key in image $image, adding new entry to lookup file"
         registry=$(echo "$image" | sed -e 's/\(.*\)\/.*/\1/')
-        name=$(echo $image | sed -e 's/.*\/\(.*\)/\1/')
-        key="$(echo ${name:0:1} | tr '[:lower:]' '[:upper:]')$(echo ${name:1} | sed -e 's/-//g')"
+        name=$(echo "$image" | sed -e 's/.*\/\(.*\)/\1/')
+        key="$(echo "${name:0:1}" | tr '[:lower:]' '[:upper:]')$(echo "${name:1}" | sed -e 's/-//g')"
 
-        mapping=$(lookupRegistry $registry)
+        mapping="$(lookupRegistry "$registry")"
         if [ -z "$mapping" ] ; then
             #echo "Could not find mapping for registry $registry, not updating $image reference"
             continue
         fi
 
-        echo -e "${key}\tlist.${mapping}\t${name}\t${version}" >> $lookupFile
+        printf "${key}\tlist.${mapping}\t${name}\t${version}\n" >> $lookupFile
     else
         #echo "DEBUG: found key $key in image, copying from csi-manifest.go"
-        addExistingToLookup $key
+        addExistingToLookup "$key"
     fi
 done
 
@@ -206,13 +206,10 @@ done
 grep -r --include \*.yaml.in "{{.*Image}}" | while read -r key; do
     key="$(extractKey "$key")"
 
-    mapping=$(awk "\$1 ~ /$key/{print \$3}" $lookupFile)
+    mapping=$(awk "\$1 ~ /$key/{print \$3}" "$lookupFile")
     if [ -z "$mapping" ] ; then
         #echo "DEBUG: Didn't find existing mapping for key $key, copying from csi-manifest.go"
-        addExistingToLookup $key
-    else
-        #echo "DEBUG: Found existing mapping for key $key"
-        a=1 # needed for if/else syntax to be valid
+        addExistingToLookup "$key"
     fi
 done
 
@@ -226,17 +223,17 @@ grep -r --files-with-matches --include \*.yaml --exclude-dir=csi-driver-host-pat
 
     # Find all references to this file and update them to use the templated file
     (cd ../../ && grep -r --include \*.go "${filename}\"") | while read -r reference; do
-        reference=$(echo $reference | sed -e 's/\([^:]\):.*/\1/')
-	sed -i -e "s;${filename}\";${filename}.in\";" ../../$reference
+        reference=$(echo "$reference" | sed -e 's/\([^:]\):.*/\1/')
+	sed -i -e "s;${filename}\";${filename}.in\";" ../../"$reference"
     done
 done
 
 ###########################################################
 # Replace all image references with template references
 grep -r --include \*.yaml.in image: | while read -r image; do
-    file=$(echo $image | sed -e 's/\([^:]\):.*/\1/')
+    file=$(echo "$image" | sed -e 's/\([^:]\):.*/\1/')
     image=$(echo "$image" | sed -e 's/.*image: \([^:]*\).*/\1/')
-    name=$(echo $image | sed -e 's/.*\/\(.*\)/\1/')
+    name=$(echo "$image" | sed -e 's/.*\/\(.*\)/\1/')
 
     key="$(extractKey "$image")"
     if [ -n "$key" ] ; then
@@ -244,13 +241,13 @@ grep -r --include \*.yaml.in image: | while read -r image; do
         continue
     fi
 
-    key="$(lookupImageKey $name)"
+    key="$(lookupImageKey "$name")"
     if [ -z "$key" ] ; then
         echo "Could not find a mapping for image $image, not templating it"
         continue
     fi
 
-    sed -i -e "s;$image:.*;{{.${key}Image}};" $file
+    sed -i -e "s;$image:.*;{{.${key}Image}};" "$file"
 done
 
 ###########################################################
