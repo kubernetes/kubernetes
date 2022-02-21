@@ -45,20 +45,11 @@ func (r *intReader) uint64() uint64 {
 }
 
 // Keep this in sync with constants in iexport.go.
-//
-// Temporarily, the x/tools importer accepts generic code at both version 1 and
-// 2. However, version 2 contains some breaking changes on top of version 1:
-//   - the 'implicit' bit is added to exported constraints
-//   - a 'kind' byte is added to constant values (not yet done)
-//
-// Once we've completed the bump to version 2 in the standard library, we'll
-// remove support for generics here at version 1.
 const (
-	iexportVersionGo1_11 = 0
-	iexportVersionPosCol = 1
-	iexportVersionGo1_18 = 2
-	// TODO: before release, change this back to 2.
-	iexportVersionGenerics = iexportVersionPosCol
+	iexportVersionGo1_11   = 0
+	iexportVersionPosCol   = 1
+	iexportVersionGo1_18   = 2
+	iexportVersionGenerics = 2
 )
 
 type ident struct {
@@ -447,12 +438,7 @@ func (r *importReader) obj(name string) {
 		if r.p.version < iexportVersionGenerics {
 			errorf("unexpected type param type")
 		}
-		// Remove the "path" from the type param name that makes it unique
-		ix := strings.LastIndex(name, ".")
-		if ix < 0 {
-			errorf("missing path for type param")
-		}
-		name0 := name[ix+1:]
+		name0 := tparamName(name)
 		tn := types.NewTypeName(pos, r.currPkg, name0, nil)
 		t := typeparams.NewTypeParam(tn, nil)
 
