@@ -444,6 +444,11 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 				"-f", // force flag
 				source,
 			}
+		} else if fstype == "ntfs" {
+			args = []string{
+				"-F", // force flag
+				source,
+			}
 		}
 
 		klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
