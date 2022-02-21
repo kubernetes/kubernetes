@@ -675,7 +675,6 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(nodeName types.
 	asw.Lock()
 	defer asw.Unlock()
 
-	var attachedVolumes []v1.AttachedVolume
 	nodeToUpdateObj, ok := asw.nodesToUpdateStatusFor[nodeName]
 	if !ok {
 		return false, nil
@@ -684,7 +683,7 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(nodeName types.
 		return false, nil
 	}
 
-	attachedVolumes = asw.getAttachedVolumeFromUpdateObject(nodeToUpdateObj.volumesToReportAsAttached)
+	volumesToReportAttached := asw.getAttachedVolumeFromUpdateObject(nodeToUpdateObj.volumesToReportAsAttached)
 	// When GetVolumesToReportAttached is called by node status updater, the current status
 	// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
 	// the current status is already updated.
@@ -692,7 +691,7 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(nodeName types.
 		klog.Errorf("Failed to update statusUpdateNeeded field when getting volumes: %v", err)
 	}
 
-	return true, attachedVolumes
+	return true, volumesToReportAttached
 }
 
 func (asw *actualStateOfWorld) GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor {
