@@ -45,8 +45,8 @@ func TestSelectorParse(t *testing.T) {
 		"!x",
 		"x>1",
 		"x>1,z<5",
-		"x=*a",
-		"x*=b",
+		"x^=a",
+		"x$=b",
 	}
 	testBadStrings := []string{
 		"x=a||y=b",
@@ -123,10 +123,10 @@ func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "!x", Set{"y": "z"})
 	expectMatch(t, "x>1", Set{"x": "2"})
 	expectMatch(t, "x<1", Set{"x": "0"})
-	expectMatch(t, "x=*a", Set{"x": "abc"})
-	expectMatch(t, "x=*ab", Set{"x": "abc"})
-	expectMatch(t, "x*=c", Set{"x": "abc"})
-	expectMatch(t, "x*=bc", Set{"x": "abc"})
+	expectMatch(t, "x^=a", Set{"x": "abc"})
+	expectMatch(t, "x^=ab", Set{"x": "abc"})
+	expectMatch(t, "x$=c", Set{"x": "abc"})
+	expectMatch(t, "x$=bc", Set{"x": "abc"})
 	expectNoMatch(t, "x=z", Set{})
 	expectNoMatch(t, "x=y", Set{"x": "z"})
 	expectNoMatch(t, "x=y,z=w", Set{"x": "w", "z": "w"})
@@ -135,10 +135,10 @@ func TestSelectorMatches(t *testing.T) {
 	expectNoMatch(t, "!x", Set{"x": "z"})
 	expectNoMatch(t, "x>1", Set{"x": "0"})
 	expectNoMatch(t, "x<1", Set{"x": "2"})
-	expectNoMatch(t, "x=*a", Set{"x": "bcde"})
-	expectNoMatch(t, "x=*ab", Set{"x": "bcde"})
-	expectNoMatch(t, "x*=c", Set{"x": "bcde"})
-	expectNoMatch(t, "x*=bc", Set{"x": "bcde"})
+	expectNoMatch(t, "x^=a", Set{"x": "bcde"})
+	expectNoMatch(t, "x^=ab", Set{"x": "bcde"})
+	expectNoMatch(t, "x$=c", Set{"x": "bcde"})
+	expectNoMatch(t, "x$=bc", Set{"x": "bcde"})
 
 	labelset := Set{
 		"foo": "bar",
@@ -147,17 +147,17 @@ func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "foo=bar", labelset)
 	expectMatch(t, "baz=blah", labelset)
 	expectMatch(t, "foo=bar,baz=blah", labelset)
-	expectMatch(t, "foo=*b", labelset)
-	expectMatch(t, "foo=*b,baz=*b", labelset)
-	expectMatch(t, "foo*=r", labelset)
-	expectMatch(t, "foo*=r,baz*=h", labelset)
+	expectMatch(t, "foo^=b", labelset)
+	expectMatch(t, "foo^=b,baz^=b", labelset)
+	expectMatch(t, "foo$=r", labelset)
+	expectMatch(t, "foo$=r,baz$=h", labelset)
 	expectNoMatch(t, "foo=blah", labelset)
 	expectNoMatch(t, "baz=bar", labelset)
 	expectNoMatch(t, "foo=bar,foobar=bar,baz=blah", labelset)
-	expectNoMatch(t, "foo=*a", labelset)
-	expectNoMatch(t, "foo=*a,baz=*d", labelset)
-	expectNoMatch(t, "foo*=a,baz*=d", labelset)
-	expectNoMatch(t, "foo*=a", labelset)
+	expectNoMatch(t, "foo^=a", labelset)
+	expectNoMatch(t, "foo^=a,baz^=d", labelset)
+	expectNoMatch(t, "foo$=a,baz$=d", labelset)
+	expectNoMatch(t, "foo$=a", labelset)
 }
 
 func expectMatchDirect(t *testing.T, selector, ls Set) {
@@ -302,8 +302,8 @@ func TestParserLookahead(t *testing.T) {
 		{"== != (), = notin", []Token{DoubleEqualsToken, NotEqualsToken, OpenParToken, ClosedParToken, CommaToken, EqualsToken, NotInToken, EndOfStringToken}},
 		{"key>2", []Token{IdentifierToken, GreaterThanToken, IdentifierToken, EndOfStringToken}},
 		{"key<1", []Token{IdentifierToken, LessThanToken, IdentifierToken, EndOfStringToken}},
-		{"key =* value", []Token{IdentifierToken, StartsWithToken, IdentifierToken, EndOfStringToken}},
-		{"key *= value", []Token{IdentifierToken, EndsWithToken, IdentifierToken, EndOfStringToken}},
+		{"key ^= value", []Token{IdentifierToken, StartsWithToken, IdentifierToken, EndOfStringToken}},
+		{"key $= value", []Token{IdentifierToken, EndsWithToken, IdentifierToken, EndOfStringToken}},
 	}
 	for _, v := range testcases {
 		p := &Parser{l: &Lexer{s: v.s, pos: 0}, position: 0}
@@ -340,8 +340,8 @@ func TestParseOperator(t *testing.T) {
 		{"!", fmt.Errorf("found '%s', expected: %v", selection.DoesNotExist, strings.Join(binaryOperators, ", "))},
 		{"exists", fmt.Errorf("found '%s', expected: %v", selection.Exists, strings.Join(binaryOperators, ", "))},
 		{"(", fmt.Errorf("found '%s', expected: %v", "(", strings.Join(binaryOperators, ", "))},
-		{"=*", nil},
-		{"*=", nil},
+		{"^=", nil},
+		{"$=", nil},
 	}
 	for _, testcase := range testcases {
 		p := &Parser{l: &Lexer{s: testcase.token, pos: 0}, position: 0}
@@ -735,10 +735,10 @@ func TestSetSelectorParser(t *testing.T) {
 		{"a notin(", nil, true, false},        // bad formed
 		{"a (", nil, false, false},            // cpar
 		{"(", nil, false, false},              // opar
-		{"x =* a", internalSelector{
+		{"x ^= a", internalSelector{
 			getRequirement("x", selection.StartsWith, sets.NewString("a"), t),
 		}, true, true},
-		{"x *= a", internalSelector{
+		{"x $= a", internalSelector{
 			getRequirement("x", selection.EndsWith, sets.NewString("a"), t),
 		}, true, true},
 	}

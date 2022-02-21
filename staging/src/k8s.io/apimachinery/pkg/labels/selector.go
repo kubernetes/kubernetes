@@ -237,10 +237,10 @@ func (r *Requirement) endsWith(value string) bool {
 //     Requirement's key.
 // (5) The operator is GreaterThanOperator or LessThanOperator, and Labels has
 //     the Requirement's key and the corresponding value satisfies mathematical inequality.
-// (6) The operator is StartsWith, Labels has the Requirement's key  and the label value
+// (6) The operator is StartsWith, Labels has the Requirement's key and the label value
 //     starts with the Requirement's value
 // (7) The operator is EndsWith, Labels has the Requirement's key and the label value
-//     starts with the Requirement's value
+//     ends with the Requirement's value
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
@@ -370,9 +370,9 @@ func (r *Requirement) String() string {
 	case selection.Exists, selection.DoesNotExist:
 		return sb.String()
 	case selection.StartsWith:
-		sb.WriteString("=*")
+		sb.WriteString("^=")
 	case selection.EndsWith:
-		sb.WriteString("*=")
+		sb.WriteString("$=")
 	}
 
 	switch r.operator {
@@ -507,8 +507,8 @@ var string2token = map[string]Token{
 	"!=":    NotEqualsToken,
 	"notin": NotInToken,
 	"(":     OpenParToken,
-	"=*":    StartsWithToken,
-	"*=":    EndsWithToken,
+	"^=":    StartsWithToken,
+	"$=":    EndsWithToken,
 }
 
 // ScannedItem contains the Token and the literal produced by the lexer.
@@ -525,7 +525,7 @@ func isWhitespace(ch byte) bool {
 // isSpecialSymbol detects if the character ch can be an operator
 func isSpecialSymbol(ch byte) bool {
 	switch ch {
-	case '=', '!', '(', ')', ',', '>', '<', '*':
+	case '=', '!', '(', ')', ',', '>', '<', '^', '$':
 		return true
 	}
 	return false
