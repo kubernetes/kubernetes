@@ -1491,6 +1491,21 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 
 	verifyControllerAttachedVolumeFunc := func() volumetypes.OperationContext {
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
+		var claimSize resource.Quantity
+
+		if volumeToMount.VolumeSpec.PersistentVolume != nil {
+			pv := volumeToMount.VolumeSpec.PersistentVolume
+			pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
+			if err != nil {
+				eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume fetching pvc failed", err)
+				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+			}
+			pvcStatusSize := pvc.Status.Capacity.Storage()
+			if pvcStatusSize != nil {
+				claimSize = *pvcStatusSize
+			}
+		}
+
 		if !volumeToMount.PluginIsAttachable {
 			// If the volume does not implement the attacher interface, it is
 			// assumed to be attached and the actual state of the world is
@@ -1503,7 +1518,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 				eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed", addVolumeNodeErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
-
+			actualStateOfWorld.SetVolumeClaimSize(volumeToMount.VolumeName, claimSize)
 			return volumetypes.NewOperationContext(nil, nil, migrated)
 		}
 
@@ -1544,6 +1559,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 					eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 					return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 				}
+				actualStateOfWorld.SetVolumeClaimSize(volumeToMount.VolumeName, claimSize)
 				return volumetypes.NewOperationContext(nil, nil, migrated)
 			}
 		}
