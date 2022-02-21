@@ -1451,6 +1451,21 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				return claim
 			}(),
 		},
+		"with-resource-limits": {
+			isExpectedFailure:      true,
+			enableReadWriteOncePod: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod"},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+					Limits: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("20G"),
+					},
+				},
+			}),
+		},
 		"with-read-write-once-pod-feature-gate-enabled": {
 			isExpectedFailure:      false,
 			enableReadWriteOncePod: true,
@@ -12788,6 +12803,191 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			makeWindowsHostPod(nil),
 			"spec.ephemeralContainers[0].securityContext.windowsOptions.hostProcess: Invalid value: false: pod hostProcess value must be identical",
 		},
+		{
+			"Ephemeral container volumes update with limits set, should fail",
+			&core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{},
+					Labels:          map[string]string{},
+					Name:            "pod",
+					Namespace:       "ns",
+					ResourceVersion: "1",
+				},
+				Spec: core.PodSpec{
+					Containers: []core.Container{{
+						Name:                     "cnt",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+					}},
+					DNSPolicy:           core.DNSClusterFirst,
+					EphemeralContainers: nil,
+					RestartPolicy:       core.RestartPolicyOnFailure,
+					Volumes: []core.Volume{
+						{
+							Name: "foo",
+							VolumeSource: core.VolumeSource{
+								Ephemeral: &core.EphemeralVolumeSource{
+									VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+										Spec: core.PersistentVolumeClaimSpec{
+											AccessModes: []core.PersistentVolumeAccessMode{
+												core.ReadWriteOnce,
+												core.ReadOnlyMany,
+											},
+											Resources: core.ResourceRequirements{
+												Requests: core.ResourceList{
+													core.ResourceName(core.ResourceStorage): resource.MustParse("20G"),
+												},
+												Limits: core.ResourceList{
+													core.ResourceName(core.ResourceStorage): resource.MustParse("20G"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			&core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{},
+					Labels:          map[string]string{},
+					Name:            "pod",
+					Namespace:       "ns",
+					ResourceVersion: "1",
+				},
+				Spec: core.PodSpec{
+					Containers: []core.Container{{
+						Name:                     "cnt",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+					}},
+					DNSPolicy:           core.DNSClusterFirst,
+					EphemeralContainers: nil,
+					RestartPolicy:       core.RestartPolicyOnFailure,
+					Volumes: []core.Volume{
+						{
+							Name: "foo",
+							VolumeSource: core.VolumeSource{
+								Ephemeral: &core.EphemeralVolumeSource{
+									VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+										Spec: core.PersistentVolumeClaimSpec{
+											AccessModes: []core.PersistentVolumeAccessMode{
+												core.ReadWriteOnce,
+												core.ReadOnlyMany,
+											},
+											Resources: core.ResourceRequirements{
+												Requests: core.ResourceList{
+													core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"setting pvc resources limits is not supported",
+		},
+		{
+			"Ephemeral container volumes update with limits set in case old volumes already has limits, should succeed",
+			&core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{},
+					Labels:          map[string]string{},
+					Name:            "pod",
+					Namespace:       "ns",
+					ResourceVersion: "1",
+				},
+				Spec: core.PodSpec{
+					Containers: []core.Container{{
+						Name:                     "cnt",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+					}},
+					DNSPolicy:           core.DNSClusterFirst,
+					EphemeralContainers: nil,
+					RestartPolicy:       core.RestartPolicyOnFailure,
+					Volumes: []core.Volume{
+						{
+							Name: "foo",
+							VolumeSource: core.VolumeSource{
+								Ephemeral: &core.EphemeralVolumeSource{
+									VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+										Spec: core.PersistentVolumeClaimSpec{
+											AccessModes: []core.PersistentVolumeAccessMode{
+												core.ReadWriteOnce,
+												core.ReadOnlyMany,
+											},
+											Resources: core.ResourceRequirements{
+												Requests: core.ResourceList{
+													core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+												},
+												Limits: core.ResourceList{
+													core.ResourceName(core.ResourceStorage): resource.MustParse("30G"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			&core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{},
+					Labels:          map[string]string{},
+					Name:            "pod",
+					Namespace:       "ns",
+					ResourceVersion: "1",
+				},
+				Spec: core.PodSpec{
+					Containers: []core.Container{{
+						Name:                     "cnt",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+					}},
+					DNSPolicy:           core.DNSClusterFirst,
+					EphemeralContainers: nil,
+					RestartPolicy:       core.RestartPolicyOnFailure,
+					Volumes: []core.Volume{
+						{
+							Name: "foo",
+							VolumeSource: core.VolumeSource{
+								Ephemeral: &core.EphemeralVolumeSource{
+									VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+										Spec: core.PersistentVolumeClaimSpec{
+											AccessModes: []core.PersistentVolumeAccessMode{
+												core.ReadWriteOnce,
+												core.ReadOnlyMany,
+											},
+											Resources: core.ResourceRequirements{
+												Requests: core.ResourceList{
+													core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+												},
+												Limits: core.ResourceList{
+													core.ResourceName(core.ResourceStorage): resource.MustParse("20G"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"",
+		},
 	}
 
 	for _, tc := range tests {
@@ -19736,17 +19936,31 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}
 }
 
-func testDataSourceInSpec(name, kind, apiGroup string) *core.PersistentVolumeClaimSpec {
+func testDataSourceInSpec(name, kind, apiGroup string, withLimits bool) *core.PersistentVolumeClaimSpec {
 	scName := "csi-plugin"
+	var resRequirements core.ResourceRequirements
+	if !withLimits {
+		resRequirements = core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		}
+	} else {
+		resRequirements = core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("20G"),
+			},
+		}
+	}
+
 	dataSourceInSpec := core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadOnlyMany,
 		},
-		Resources: core.ResourceRequirements{
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
-			},
-		},
+		Resources:        resRequirements,
 		StorageClassName: &scName,
 		DataSource: &core.TypedLocalObjectReference{
 			APIGroup: &apiGroup,
@@ -19761,48 +19975,92 @@ func testDataSourceInSpec(name, kind, apiGroup string) *core.PersistentVolumeCla
 func TestAlphaVolumePVCDataSource(t *testing.T) {
 	testCases := []struct {
 		testName     string
-		claimSpec    core.PersistentVolumeClaimSpec
+		newClaimSpec core.PersistentVolumeClaimSpec
+		oldClaimSpec core.PersistentVolumeClaimSpec
+		update       bool
 		expectedFail bool
 	}{
 		{
-			testName:  "test create from valid snapshot source",
-			claimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+			testName:     "test create from valid snapshot source",
+			newClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io", false),
+			expectedFail: false,
 		},
 		{
-			testName:  "test create from valid pvc source",
-			claimSpec: *testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", ""),
+			testName:     "test create from valid pvc source",
+			newClaimSpec: *testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", "", false),
+			expectedFail: false,
 		},
 		{
 			testName:     "test missing name in snapshot datasource should fail",
-			claimSpec:    *testDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+			newClaimSpec: *testDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io", false),
 			expectedFail: true,
 		},
 		{
 			testName:     "test missing kind in snapshot datasource should fail",
-			claimSpec:    *testDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io"),
+			newClaimSpec: *testDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io", false),
 			expectedFail: true,
 		},
 		{
-			testName:  "test create from valid generic custom resource source",
-			claimSpec: *testDataSourceInSpec("test_generic", "Generic", "generic.storage.k8s.io"),
+			testName:     "test create from valid generic custom resource source",
+			newClaimSpec: *testDataSourceInSpec("test_generic", "Generic", "generic.storage.k8s.io", false),
+			expectedFail: false,
 		},
 		{
 			testName:     "test invalid datasource should fail",
-			claimSpec:    *testDataSourceInSpec("test_pod", "Pod", ""),
+			newClaimSpec: *testDataSourceInSpec("test_pod", "Pod", "", false),
 			expectedFail: true,
+		},
+		{
+			testName:     "test setting resources limits in new pvc spec only should fail",
+			newClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot1.storage.k8s.io", true),
+			oldClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io", false),
+			update:       true,
+			expectedFail: true,
+		},
+		{
+			testName:     "test setting no resources limits in both old pvc spec",
+			newClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot1.storage.k8s.io", false),
+			oldClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io", false),
+			update:       true,
+			expectedFail: false,
+		},
+		{
+			testName:     "test setting resources limits in old pvc spec only",
+			newClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot1.storage.k8s.io", false),
+			oldClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io", true),
+			update:       true,
+			expectedFail: false,
+		},
+		{
+			testName:     "test setting resources limits in both old and new pvc spec",
+			newClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot1.storage.k8s.io", true),
+			oldClaimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io", true),
+			update:       true,
+			expectedFail: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		opts := PersistentVolumeClaimSpecValidationOptions{}
 		if tc.expectedFail {
-			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
-				t.Errorf("expected failure: %v", errs)
+			if tc.update {
+				if errs := ValidatePersistentVolumeClaimSpecUpdate(&tc.newClaimSpec, &tc.oldClaimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
+					t.Errorf("expected failure: %v", errs)
+				}
+			} else {
+				if errs := ValidatePersistentVolumeClaimSpec(&tc.newClaimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
+					t.Errorf("expected failure: %v", errs)
+				}
 			}
-
 		} else {
-			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
-				t.Errorf("expected success: %v", errs)
+			if tc.update {
+				if errs := ValidatePersistentVolumeClaimSpecUpdate(&tc.newClaimSpec, &tc.oldClaimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
+					t.Errorf("expected success: %v", errs)
+				}
+			} else {
+				if errs := ValidatePersistentVolumeClaimSpec(&tc.newClaimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
+					t.Errorf("expected success: %v", errs)
+				}
 			}
 		}
 	}
@@ -19816,29 +20074,29 @@ func testAnyDataSource(t *testing.T, ds, dsRef bool) {
 	}{
 		{
 			testName:  "test create from valid snapshot source",
-			claimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+			claimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io", false),
 		},
 		{
 			testName:  "test create from valid pvc source",
-			claimSpec: *testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", ""),
+			claimSpec: *testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", "", false),
 		},
 		{
 			testName:     "test missing name in snapshot datasource should fail",
-			claimSpec:    *testDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+			claimSpec:    *testDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io", false),
 			expectedFail: true,
 		},
 		{
 			testName:     "test missing kind in snapshot datasource should fail",
-			claimSpec:    *testDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io"),
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io", false),
 			expectedFail: true,
 		},
 		{
 			testName:  "test create from valid generic custom resource source",
-			claimSpec: *testDataSourceInSpec("test_generic", "Generic", "generic.storage.k8s.io"),
+			claimSpec: *testDataSourceInSpec("test_generic", "Generic", "generic.storage.k8s.io", false),
 		},
 		{
 			testName:     "test invalid datasource should fail",
-			claimSpec:    *testDataSourceInSpec("test_pod", "Pod", ""),
+			claimSpec:    *testDataSourceInSpec("test_pod", "Pod", "", false),
 			expectedFail: true,
 		},
 	}
@@ -19862,6 +20120,506 @@ func testAnyDataSource(t *testing.T, ds, dsRef bool) {
 		} else {
 			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
+			}
+		}
+	}
+}
+
+func TestValidateVolumesUpdate(t *testing.T) {
+	testCases := []struct {
+		testName     string
+		volumes      []core.Volume
+		oldVolumes   []core.Volume
+		expectedFail bool
+	}{
+		{
+			testName: "the existing volumes have the limits set, update with limits should succeed",
+			volumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("30G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldVolumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("20G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFail: false,
+		},
+		{
+			testName: "a volume deleted and another updated with limits, should fail",
+			volumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("30G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldVolumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "bar",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFail: true,
+		},
+		{
+			testName: "one of two old volumes has limits set, update as both have limits set, should failed",
+			volumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "bar",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldVolumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "bar",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFail: true,
+		},
+		{
+			testName: "one of two old volumes has limits set, update as another volume has limits set, should failed",
+			volumes: []core.Volume{
+				{
+					Name: "baz",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldVolumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "bar",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFail: true,
+		},
+		{
+			testName: "a volume deleted and another added with limits, should fail",
+			volumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "baz",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("200G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldVolumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "bar",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFail: true,
+		},
+		{
+			testName: "the order of the volumes rearranged with limits added, should fail",
+			volumes: []core.Volume{
+				{
+					Name: "bar",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+										Limits: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("200G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldVolumes: []core.Volume{
+				{
+					Name: "foo",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "bar",
+					VolumeSource: core.VolumeSource{
+						Ephemeral: &core.EphemeralVolumeSource{
+							VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+								Spec: core.PersistentVolumeClaimSpec{
+									AccessModes: []core.PersistentVolumeAccessMode{
+										core.ReadWriteOnce,
+										core.ReadOnlyMany,
+									},
+									Resources: core.ResourceRequirements{
+										Requests: core.ResourceList{
+											core.ResourceName(core.ResourceStorage): resource.MustParse("100G"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFail: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.expectedFail {
+			if errs := ValidateVolumesUpdate(tc.volumes, tc.oldVolumes, field.NewPath("spec"), PodValidationOptions{}); len(errs) == 0 {
+				t.Errorf("case: %s, expected failure, got: %v", tc.testName, errs)
+			}
+		} else {
+			if errs := ValidateVolumesUpdate(tc.volumes, tc.oldVolumes, field.NewPath("spec"), PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("case: %s, expected success, got: %v", tc.testName, errs)
 			}
 		}
 	}

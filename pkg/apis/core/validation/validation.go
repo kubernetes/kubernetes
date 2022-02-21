@@ -417,6 +417,28 @@ func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath 
 	return vols, allErrs
 }
 
+func ValidateVolumesUpdate(volumes, oldVolumes []core.Volume, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	mapOldVolumeNames := make(map[string]core.Volume)
+	for _, oldVol := range oldVolumes {
+		if oldVol.VolumeSource.Ephemeral == nil {
+			continue
+		}
+		mapOldVolumeNames[oldVol.Name] = oldVol // +k8s:verify-mutation:reason=clone
+	}
+	for i, vol := range volumes {
+		oldVol, ok := mapOldVolumeNames[vol.Name]
+		idxPath := fldPath.Index(i)
+		if !ok {
+			allErrs = append(allErrs, validateVolumeSource(&vol.VolumeSource, idxPath, vol.Name, nil, opts)...)
+			continue
+		}
+		allErrs = append(allErrs, validateVolumeSourceUpdate(&vol.VolumeSource, &oldVol.VolumeSource, idxPath)...)
+	}
+	return allErrs
+}
+
 func IsMatchedVolume(name string, volumes map[string]core.VolumeSource) bool {
 	if _, ok := volumes[name]; ok {
 		return true
@@ -724,6 +746,14 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
 	}
 
+	return allErrs
+}
+
+func validateVolumeSourceUpdate(source, oldSource *core.VolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if source.Ephemeral != nil && oldSource.Ephemeral != nil {
+		allErrs = append(allErrs, validateEphemeralVolumeSourceUpdate(source.Ephemeral, oldSource.Ephemeral, fldPath.Child("ephemeral"))...)
+	}
 	return allErrs
 }
 
@@ -1618,6 +1648,15 @@ func validateEphemeralVolumeSource(ephemeral *core.EphemeralVolumeSource, fldPat
 	return allErrs
 }
 
+func ValidatePersistentVolumeClaimTemplateUpdate(claimTemplate, oldClaimTemplate *core.PersistentVolumeClaimTemplate, fldPath *field.Path, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
+	return ValidatePersistentVolumeClaimSpecUpdate(&claimTemplate.Spec, &oldClaimTemplate.Spec, fldPath.Child("spec"), opts)
+}
+
+func validateEphemeralVolumeSourceUpdate(ephemeral, oldEphemeral *core.EphemeralVolumeSource, fldPath *field.Path) field.ErrorList {
+	opts := ValidationOptionsForPersistentVolumeClaimTemplate(ephemeral.VolumeClaimTemplate, nil)
+	return ValidatePersistentVolumeClaimTemplateUpdate(ephemeral.VolumeClaimTemplate, oldEphemeral.VolumeClaimTemplate, fldPath.Child("volumeClaimTemplate"), opts)
+}
+
 // ValidatePersistentVolumeClaimTemplate verifies that the embedded object meta and spec are valid.
 // Checking of the object data is very minimal because only labels and annotations are used.
 func ValidatePersistentVolumeClaimTemplate(claimTemplate *core.PersistentVolumeClaimTemplate, fldPath *field.Path, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
@@ -2180,6 +2219,10 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(core.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
 	}
 
+	if _, ok := spec.Resources.Limits[core.ResourceStorage]; ok {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources", "Limits"), "setting pvc resources limits is not supported"))
+	}
+
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
 		for _, msg := range ValidateClassName(*spec.StorageClassName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("storageClassName"), *spec.StorageClassName, msg))
@@ -2214,10 +2257,22 @@ func isDataSourceEqualDataSourceRef(dataSource *core.TypedLocalObjectReference, 
 	return reflect.DeepEqual(dataSource.APIGroup, dataSourceRef.APIGroup) && dataSource.Kind == dataSourceRef.Kind && dataSource.Name == dataSourceRef.Name
 }
 
+// ValidatePersistentVolumeClaimSpecUpdate validates an update to a PersistentVolumeClaimSpec
+func ValidatePersistentVolumeClaimSpecUpdate(spec, oldPvcSpec *core.PersistentVolumeClaimSpec, fldPath *field.Path, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	_, newPvcLimits := spec.Resources.Limits[core.ResourceStorage]
+	_, oldPvcLimits := oldPvcSpec.Resources.Limits[core.ResourceStorage]
+	if !oldPvcLimits && newPvcLimits {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("resources", "Limits"), "setting pvc resources limits is not supported"))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeClaimUpdate validates an update to a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeClaim, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePersistentVolumeClaim(newPvc, opts)...)
+	allErrs = append(allErrs, ValidatePersistentVolumeClaimSpecUpdate(&newPvc.Spec, &oldPvc.Spec, field.NewPath("spec"), opts)...)
+
 	newPvcClone := newPvc.DeepCopy()
 	oldPvcClone := oldPvc.DeepCopy()
 
@@ -3691,6 +3746,10 @@ func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.
 	return allErrs
 }
 
+func validatePodMetadataAndSpecUpdate(pod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
+	return ValidatePodSpecUpdate(&pod.Spec, &oldPod.Spec, field.NewPath("spec"), opts)
+}
+
 // validatePodIPs validates IPs in pod status
 func validatePodIPs(pod *core.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -3744,7 +3803,6 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 // and should be left empty unless the spec is from a real pod object.
 func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
 	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
@@ -3829,6 +3887,10 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		}
 	}
 	return allErrs
+}
+
+func ValidatePodSpecUpdate(spec, oldPodSpec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	return ValidateVolumesUpdate(spec.Volumes, oldPodSpec.Volumes, fldPath, opts)
 }
 
 func validateLinux(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
@@ -4514,7 +4576,10 @@ func validateSeccompAnnotationsAndFieldsMatch(annotationValue string, seccompFie
 func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	newPodClone := newPod.DeepCopy()
+	CleanVolumeSourceList(&newPodClone.Spec)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPodClone, opts)...)
+	allErrs = append(allErrs, validatePodMetadataAndSpecUpdate(newPod, oldPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"), opts)...)
 	specPath := field.NewPath("spec")
 
@@ -4681,13 +4746,36 @@ func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) 
 	return allErrs
 }
 
+// CleanVolumeSourceList clean the resource limits for ephemeral volume within PodSpec, if any.
+// It is called for the update validation on volumes which has resource limits.
+// The general validation pattern is: 1) clone the new object 2) clean the limits in the cloned object
+// 3) validation on the cleared object only 4) update validation considering both new and old object.
+// CleanVolumeSourceList is called in step 2)
+func CleanVolumeSourceList(podSpec *core.PodSpec) {
+	if podSpec.Volumes == nil {
+		return
+	}
+	for _, v := range podSpec.Volumes {
+		if v.Ephemeral == nil {
+			continue
+		}
+		if len(v.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits) != 0 {
+			v.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits = nil
+		}
+	}
+}
+
 // ValidatePodEphemeralContainersUpdate tests that a user update to EphemeralContainers is valid.
 // newPod and oldPod must only differ in their EphemeralContainers.
 func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	newPodClone := newPod.DeepCopy()
+	CleanVolumeSourceList(&newPodClone.Spec)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPodClone, opts)...)
+	allUpdateErrs := validatePodMetadataAndSpecUpdate(newPod, oldPod, opts)
+	allErrs = append(allErrs, allUpdateErrs...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"), opts)...)
 
 	// Part 2: Validate that the changes between oldPod.Spec.EphemeralContainers and
@@ -4738,8 +4826,11 @@ func ValidatePodTemplate(pod *core.PodTemplate, opts PodValidationOptions) field
 // that cannot be changed.
 func ValidatePodTemplateUpdate(newPod, oldPod *core.PodTemplate, opts PodValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Template, field.NewPath("template"), opts)...)
-	return allErrs
+	newPodTemplateSpecClone := newPod.Template.DeepCopy()
+	CleanPodTemplateSpec(newPodTemplateSpecClone)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(newPodTemplateSpecClone, field.NewPath("template"), opts)...)
+	allUpdateErrs := ValidatePodTemplateSpecUpdate(&newPod.Template, &oldPod.Template, field.NewPath("template"), opts)
+	return append(allErrs, allUpdateErrs...)
 }
 
 var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityClientIP), string(core.ServiceAffinityNone))
@@ -5096,8 +5187,12 @@ func ValidateReplicationController(controller *core.ReplicationController, opts 
 // ValidateReplicationControllerUpdate tests if required fields in the replication controller are set.
 func ValidateReplicationControllerUpdate(controller, oldController *core.ReplicationController, opts PodValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec, field.NewPath("spec"), opts)...)
-	return allErrs
+	controllerSpecClone := controller.Spec.DeepCopy()
+	CleanPodTemplateSpec(controllerSpecClone.Template)
+	allErrs = append(allErrs, ValidateReplicationControllerSpec(controllerSpecClone, field.NewPath("spec"), opts)...)
+	allUpdateErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateReplicationControllerSpecUpdate(&controller.Spec, &oldController.Spec, field.NewPath("spec"), opts)...)
+	return append(allErrs, allUpdateErrs...)
 }
 
 // ValidateReplicationControllerStatusUpdate tests if required fields in the replication controller are set.
@@ -5169,6 +5264,10 @@ func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap ma
 	return allErrs
 }
 
+func ValidatePodTemplateSpecForRCUpdate(template, oldTemplate *core.PodTemplateSpec, selectorMap map[string]string, replicas int32, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	return ValidatePodTemplateSpecUpdate(template, oldTemplate, fldPath, opts)
+}
+
 // ValidateReplicationControllerSpec tests if required fields in the replication controller spec are set.
 func ValidateReplicationControllerSpec(spec *core.ReplicationControllerSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -5176,6 +5275,14 @@ func ValidateReplicationControllerSpec(spec *core.ReplicationControllerSpec, fld
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
+	return allErrs
+}
+
+func ValidateReplicationControllerSpecUpdate(spec, oldSpec *core.ReplicationControllerSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec.Template != nil && oldSpec.Template != nil {
+		allErrs = append(allErrs, ValidatePodTemplateSpecForRCUpdate(spec.Template, oldSpec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
+	}
 	return allErrs
 }
 
@@ -5192,6 +5299,15 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec", "ephemeralContainers"), "ephemeral containers not allowed in pod template"))
 	}
 
+	return allErrs
+}
+
+// ValidatePodTemplateSpecUpdate validates an update to the spec of a pod template
+func ValidatePodTemplateSpecUpdate(spec, oldSpec *core.PodTemplateSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec != nil && oldSpec != nil {
+		allErrs = append(allErrs, ValidatePodSpecUpdate(&spec.Spec, &oldSpec.Spec, fldPath.Child("spec"), opts)...)
+	}
 	return allErrs
 }
 
@@ -7177,4 +7293,23 @@ func ValidatePodAffinityTermSelector(podAffinityTerm core.PodAffinityTerm, allow
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, labelSelectorValidationOptions, fldPath.Child("labelSelector"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.NamespaceSelector, labelSelectorValidationOptions, fldPath.Child("namespaceSelector"))...)
 	return allErrs
+}
+
+// CleanPodTemplateSpec clean the resource limits for ephemeral volume within PodTemplateSpec, if any.
+// It is called for the update validation on volumes which has resource limits.
+// The general validation pattern is: 1) clone the new object 2) clean the limits in the cloned object
+// 3) validation on the cleared object only 4) update validation considering both new and old object.
+// CleanPodTemplateSpec is called in step 2)
+func CleanPodTemplateSpec(podTemplateSpec *core.PodTemplateSpec) {
+	if podTemplateSpec == nil {
+		return
+	}
+	for _, v := range podTemplateSpec.Spec.Volumes {
+		if v.Ephemeral == nil {
+			continue
+		}
+		if len(v.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits) != 0 {
+			v.Ephemeral.VolumeClaimTemplate.Spec.Resources.Limits = nil
+		}
+	}
 }

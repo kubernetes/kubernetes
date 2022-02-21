@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
+	apicorevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -142,6 +143,8 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newReplicaSet := obj.(*apps.ReplicaSet)
 	oldReplicaSet := old.(*apps.ReplicaSet)
+	newReplicaSetClone := newReplicaSet.DeepCopy()
+	apicorevalidation.CleanPodTemplateSpec(&newReplicaSetClone.Spec.Template)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
 	allErrs := appsvalidation.ValidateReplicaSet(obj.(*apps.ReplicaSet), opts)

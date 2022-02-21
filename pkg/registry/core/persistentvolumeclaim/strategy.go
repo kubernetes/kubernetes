@@ -19,7 +19,6 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
-
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,9 +120,25 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
-	opts := validation.ValidationOptionsForPersistentVolumeClaim(newPvc, oldPvc)
-	errorList := validation.ValidatePersistentVolumeClaim(newPvc, opts)
+	newPvcClone := newPvc.DeepCopy()
+	CleanPvcSpec(&newPvcClone.Spec)
+	opts := validation.ValidationOptionsForPersistentVolumeClaim(newPvcClone, oldPvc)
+	errorList := validation.ValidatePersistentVolumeClaim(newPvcClone, opts)
 	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc, opts)...)
+}
+
+// CleanPvcSpec clean the resource limits for ephemeral volume within PersistentVolumeClaimSpec, if any.
+// It is called for the update validation on volumes which has resource limits.
+// The general validation pattern is: 1) clone the new object 2) clean the limits in the cloned object
+// 3) validation on the cleared object only 4) update validation considering both new and old object.
+// CleanPvcSpec is called in step 2)
+func CleanPvcSpec(pvcSpec *api.PersistentVolumeClaimSpec) {
+	if pvcSpec == nil {
+		return
+	}
+	if len(pvcSpec.Resources.Limits) != 0 {
+		pvcSpec.Resources.Limits = nil
+	}
 }
 
 // WarningsOnUpdate returns warnings for the given update.

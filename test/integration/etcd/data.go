@@ -84,7 +84,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/events/" + namespace + "/event1",
 		},
 		gvr("", "v1", "persistentvolumeclaims"): {
-			Stub:             `{"metadata": {"name": "pvc1"}, "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"limits": {"storage": "1M"}, "requests": {"storage": "2M"}}, "selector": {"matchLabels": {"pvc": "stuff"}}}}`,
+			Stub:             `{"metadata": {"name": "pvc1"}, "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "2M"}}, "selector": {"matchLabels": {"pvc": "stuff"}}}}`,
 			ExpectedEtcdPath: "/registry/persistentvolumeclaims/" + namespace + "/pvc1",
 		},
 		gvr("", "v1", "serviceaccounts"): {

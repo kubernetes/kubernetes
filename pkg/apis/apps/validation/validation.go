@@ -297,13 +297,15 @@ func ValidateDaemonSet(ds *apps.DaemonSet, opts apivalidation.PodValidationOptio
 // ValidateDaemonSetUpdate tests if required fields in the DaemonSet are set.
 func ValidateDaemonSetUpdate(ds, oldDS *apps.DaemonSet, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDaemonSetSpecUpdate(&ds.Spec, &oldDS.Spec, field.NewPath("spec"))...)
-	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"), opts)...)
+	dsSpecClone := ds.Spec.DeepCopy()
+	apivalidation.CleanPodTemplateSpec(&dsSpecClone.Template)
+	allErrs = append(allErrs, ValidateDaemonSetSpec(dsSpecClone, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, ValidateDaemonSetSpecUpdate(&ds.Spec, &oldDS.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
 // ValidateDaemonSetSpecUpdate tests if an update to a DaemonSetSpec is valid.
-func ValidateDaemonSetSpecUpdate(newSpec, oldSpec *apps.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
+func ValidateDaemonSetSpecUpdate(newSpec, oldSpec *apps.DaemonSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// TemplateGeneration shouldn't be decremented
@@ -318,6 +320,7 @@ func ValidateDaemonSetSpecUpdate(newSpec, oldSpec *apps.DaemonSetSpec, fldPath *
 	} else if newSpec.TemplateGeneration > oldSpec.TemplateGeneration && !templateUpdated {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must not be incremented without template update"))
 	}
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecUpdate(&newSpec.Template, &oldSpec.Template, fldPath.Child("template"), opts)...)
 
 	return allErrs
 }
@@ -593,6 +596,11 @@ func ValidateDeploymentSpec(spec *apps.DeploymentSpec, fldPath *field.Path, opts
 	return allErrs
 }
 
+func ValidateDeploymentSpecUpdate(spec, oldSpec *apps.DeploymentSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	return append(allErrs, ValidatePodTemplateSpecForReplicaSetUpdate(&spec.Template, &oldSpec.Template, fldPath.Child("template"), opts)...)
+}
+
 // ValidateDeploymentStatus validates given deployment status.
 func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -623,8 +631,11 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 
 // ValidateDeploymentUpdate tests if an update to a Deployment is valid.
 func ValidateDeploymentUpdate(update, old *apps.Deployment, opts apivalidation.PodValidationOptions) field.ErrorList {
+	updateSpecClone := update.Spec.DeepCopy()
+	apivalidation.CleanPodTemplateSpec(&updateSpecClone.Template)
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, ValidateDeploymentSpec(updateSpecClone, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, ValidateDeploymentSpecUpdate(&update.Spec, &old.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
@@ -678,7 +689,7 @@ func ValidateReplicaSet(rs *apps.ReplicaSet, opts apivalidation.PodValidationOpt
 func ValidateReplicaSetUpdate(rs, oldRs *apps.ReplicaSet, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, ValidateReplicaSetSpecUpdate(&rs.Spec, &oldRs.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
@@ -740,6 +751,10 @@ func ValidateReplicaSetSpec(spec *apps.ReplicaSetSpec, fldPath *field.Path, opts
 	return allErrs
 }
 
+func ValidateReplicaSetSpecUpdate(spec, oldSpec *apps.ReplicaSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+	return ValidatePodTemplateSpecForReplicaSetUpdate(&spec.Template, &oldSpec.Template, fldPath.Child("template"), opts)
+}
+
 // ValidatePodTemplateSpecForReplicaSet validates the given template and ensures that it is in accordance with the desired selector and replicas.
 func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selector labels.Selector, replicas int32, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -766,4 +781,8 @@ func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selecto
 		}
 	}
 	return allErrs
+}
+
+func ValidatePodTemplateSpecForReplicaSetUpdate(template, oldTemplate *api.PodTemplateSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+	return apivalidation.ValidatePodTemplateSpecUpdate(template, oldTemplate, fldPath, opts)
 }

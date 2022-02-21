@@ -319,6 +319,10 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	return allErrs
 }
 
+func validateJobSpecUpdate(spec, oldSpec *batch.JobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+	return apivalidation.ValidatePodTemplateSpecUpdate(&spec.Template, &oldSpec.Template, fldPath.Child("template"), opts)
+}
+
 // validateJobStatus validates a JobStatus and returns an ErrorList with any errors.
 func validateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -372,7 +376,6 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 // ValidateJobSpecUpdate validates an update to a JobSpec and returns an ErrorList with any errors.
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, opts.PodValidationOptions)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, validatePodTemplateUpdate(spec, oldSpec, fldPath, opts)...)
@@ -407,6 +410,8 @@ func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path,
 		oldTemplate.Labels = template.Labels                       // +k8s:verify-mutation:reason=clone
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
+	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpecUpdate(template, oldTemplate, fldPath.Child("template"), opts.PodValidationOptions)...)
+
 	return allErrs
 }
 
@@ -421,7 +426,7 @@ func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList 
 func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCronJobSpec(&cronJob.Spec, nil, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateCronJobSpec(&cronJob.Spec, field.NewPath("spec"), opts)...)
 	if len(cronJob.ObjectMeta.Name) > apimachineryvalidation.DNS1035LabelMaxLength-11 {
 		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
 		// creating a job. The job name length limit is 63 characters.
@@ -435,15 +440,18 @@ func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidat
 // ValidateCronJobUpdate validates an update to a CronJob and returns an ErrorList with any errors.
 func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCronJobSpec(&job.Spec, &oldJob.Spec, field.NewPath("spec"), opts)...)
+	jobSpecClone := job.Spec.DeepCopy()
+	apivalidation.CleanPodTemplateSpec(&jobSpecClone.JobTemplate.Spec.Template)
+	allErrs = append(allErrs, validateCronJobSpec(jobSpecClone, field.NewPath("spec"), opts)...)
+	allUpdateErrs := ValidateCronJobSpecUpdate(&job.Spec, &oldJob.Spec, field.NewPath("spec"), opts)
 
 	// skip the 52-character name validation limit on update validation
 	// to allow old cronjobs with names > 52 chars to be updated/deleted
-	return allErrs
+	return append(allErrs, allUpdateErrs...)
 }
 
 // validateCronJobSpec validates a CronJobSpec and returns an ErrorList with any errors.
-func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func validateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
@@ -456,10 +464,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
 	}
 
-	if oldSpec == nil || !pointer.StringEqual(oldSpec.TimeZone, spec.TimeZone) {
-		allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
-	}
-
+	allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
 	allErrs = append(allErrs, validateConcurrencyPolicy(&spec.ConcurrencyPolicy, fldPath.Child("concurrencyPolicy"))...)
 	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"), opts)...)
 
@@ -473,6 +478,14 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	}
 
 	return allErrs
+}
+
+func ValidateCronJobSpecUpdate(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !pointer.StringEqual(oldSpec.TimeZone, spec.TimeZone) {
+		allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
+	}
+	return append(allErrs, ValidateJobTemplateSpecUpdate(&spec.JobTemplate, &oldSpec.JobTemplate, fldPath.Child("jobTemplate"), opts)...)
 }
 
 func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPath *field.Path) field.ErrorList {
@@ -544,6 +557,9 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "manualSelector"), spec.Spec.ManualSelector, []string{"nil", "false"}))
 	}
 	return allErrs
+}
+func ValidateJobTemplateSpecUpdate(spec, oldSpec *batch.JobTemplateSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+	return validateJobSpecUpdate(&spec.Spec, &oldSpec.Spec, fldPath.Child("spec"), opts)
 }
 
 type JobValidationOptions struct {

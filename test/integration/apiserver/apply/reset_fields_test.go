@@ -105,7 +105,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("", "v1", "namespaces"):                                                    `{"spec": {"finalizers": ["kubernetes2"]}}`,
 	gvr("", "v1", "nodes"):                                                         `{"spec": {"unschedulable": false}}`,
 	gvr("", "v1", "persistentvolumes"):                                             `{"spec": {"capacity": {"storage": "23M"}}}`,
-	gvr("", "v1", "persistentvolumeclaims"):                                        `{"spec": {"resources": {"limits": {"storage": "21M"}}}}`,
+	gvr("", "v1", "persistentvolumeclaims"):                                        `{"spec": {"resources": {"requests": {"storage": "21M"}}}}`,
 	gvr("", "v1", "pods"):                                                          `{"metadata": {"deletionTimestamp": "2020-01-01T00:00:00Z", "ownerReferences":[]}, "spec": {"containers": [{"image": "` + image2 + `", "name": "container7"}]}}`,
 	gvr("", "v1", "replicationcontrollers"):                                        `{"spec": {"selector": {"new": "stuff2"}}}`,
 	gvr("", "v1", "resourcequotas"):                                                `{"spec": {"hard": {"cpu": "25M"}}}`,

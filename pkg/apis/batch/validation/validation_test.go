@@ -1980,6 +1980,65 @@ func TestValidateCronJobSpec(t *testing.T) {
 	validPodTemplateSpec.Labels = map[string]string{}
 
 	type testCase struct {
+		spec      *batch.CronJobSpec
+		expectErr bool
+	}
+
+	cases := map[string]testCase{
+		"no validation because timeZone is nil": {
+			spec: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"check validation on valid timeZone": {
+			spec: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"check validation on invalid timeZone": {
+			spec: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for k, v := range cases {
+		errs := validateCronJobSpec(v.spec, field.NewPath("spec"), corevalidation.PodValidationOptions{})
+		if len(errs) > 0 && !v.expectErr {
+			t.Errorf("unexpected error for %s: %v", k, errs)
+		} else if len(errs) == 0 && v.expectErr {
+			t.Errorf("expected error for %s but got nil", k)
+		}
+	}
+}
+
+func TestValidateCronJobSpecUpdate(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+
+	type testCase struct {
 		old       *batch.CronJobSpec
 		new       *batch.CronJobSpec
 		expectErr bool
@@ -2168,7 +2227,7 @@ func TestValidateCronJobSpec(t *testing.T) {
 	}
 
 	for k, v := range cases {
-		errs := validateCronJobSpec(v.new, v.old, field.NewPath("spec"), corevalidation.PodValidationOptions{})
+		errs := ValidateCronJobSpecUpdate(v.new, v.old, field.NewPath("spec"), corevalidation.PodValidationOptions{})
 		if len(errs) > 0 && !v.expectErr {
 			t.Errorf("unexpected error for %s: %v", k, errs)
 		} else if len(errs) == 0 && v.expectErr {
