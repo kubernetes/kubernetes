@@ -124,6 +124,11 @@ type DesiredStateOfWorld interface {
 
 	// MarkVolumeAttachability updates the volume's attachability for a given volume
 	MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool)
+
+	// UpdatePersistentVolumeSize updates persistentVolumeSize in desired state of the world
+	// so as it can be compared against actual size and volume expansion performed
+	// if necessary
+	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity)
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -356,6 +361,19 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	if len(dsw.volumesToMount[volumeName].podsToMount) == 0 {
 		// Delete volume if no child pods left
 		delete(dsw.volumesToMount, volumeName)
+	}
+}
+
+// UpdatePersistentVolumeSize updates last known PV size. This is used for volume expansion and
+// should be only used for persistent volumes.
+func (dsw *desiredStateOfWorld) UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity) {
+	dsw.Lock()
+	defer dsw.Unlock()
+
+	vol, volExists := dsw.volumesToMount[volumeName]
+	if volExists {
+		vol.persistentVolumeSize = size
+		dsw.volumesToMount[volumeName] = vol
 	}
 }
 
