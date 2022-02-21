@@ -22,7 +22,6 @@ import (
 
 // APIResourceConfigSource is the interface to determine which groups and versions are enabled
 type APIResourceConfigSource interface {
-	VersionEnabled(version schema.GroupVersion) bool
 	ResourceEnabled(resource schema.GroupVersionResource) bool
 	AnyResourceForGroupEnabled(group string) bool
 }

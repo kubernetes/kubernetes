@@ -36,12 +36,10 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.VersionEnabled(networkingapiv1.SchemeGroupVersion) {
-		if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1.SchemeGroupVersion.Version] = storageMap
-		}
+	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, false, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, true, nil
@@ -49,27 +47,34 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
+
 	// networkpolicies
-	networkPolicyStorage, err := networkpolicystore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
+	if resource := "networkpolicies"; apiResourceConfigSource.ResourceEnabled(networkingapiv1.SchemeGroupVersion.WithResource(resource)) {
+		networkPolicyStorage, err := networkpolicystore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = networkPolicyStorage
 	}
-	storage["networkpolicies"] = networkPolicyStorage
 
 	// ingresses
-	ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
+	if resource := "ingresses"; apiResourceConfigSource.ResourceEnabled(networkingapiv1.SchemeGroupVersion.WithResource(resource)) {
+		ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = ingressStorage
+		storage[resource+"/status"] = ingressStatusStorage
 	}
-	storage["ingresses"] = ingressStorage
-	storage["ingresses/status"] = ingressStatusStorage
 
 	// ingressclasses
-	ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
+	if resource := "ingressclasses"; apiResourceConfigSource.ResourceEnabled(networkingapiv1.SchemeGroupVersion.WithResource(resource)) {
+		ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = ingressClassStorage
 	}
-	storage["ingressclasses"] = ingressClassStorage
 
 	return storage, nil
 }
