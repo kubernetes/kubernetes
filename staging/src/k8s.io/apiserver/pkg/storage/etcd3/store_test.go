@@ -541,7 +541,7 @@ func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	}
 }
 
-func TestGetToList(t *testing.T) {
+func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	prevKey, prevStoredObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prev"}})
 
@@ -640,7 +640,13 @@ func TestGetToList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := &example.PodList{}
-			err := store.GetToList(ctx, tt.key, storage.ListOptions{ResourceVersion: tt.rv, ResourceVersionMatch: tt.rvMatch, Predicate: tt.pred}, out)
+			storageOpts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate:            tt.pred,
+				Recursive:            false,
+			}
+			err := store.GetList(ctx, tt.key, storageOpts, out)
 
 			if tt.expectRVTooLarge {
 				if err == nil || !storage.IsTooLargeResourceVersion(err) {
@@ -650,7 +656,7 @@ func TestGetToList(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("%s: GetToList failed: %v", tt.name, err)
+				t.Fatalf("GetList failed: %v", err)
 			}
 			if len(out.ResourceVersion) == 0 {
 				t.Errorf("%s: unset resourceVersion", tt.name)
@@ -1080,8 +1086,9 @@ func TestTransformationFailure(t *testing.T) {
 	var got example.PodList
 	storageOpts := storage.ListOptions{
 		Predicate: storage.Everything,
+		Recursive: true,
 	}
-	if err := store.List(ctx, "/", storageOpts, &got); !storage.IsInternalError(err) {
+	if err := store.GetList(ctx, "/", storageOpts, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
@@ -1166,7 +1173,7 @@ func TestList(t *testing.T) {
 
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{Predicate: storage.Everything}, initialList); err != nil {
+	if err := store.GetList(ctx, "/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
 		t.Errorf("Unexpected List error: %v", err)
 	}
 	initialRV := initialList.ResourceVersion
@@ -1183,9 +1190,10 @@ func TestList(t *testing.T) {
 	storageOpts := storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/two-level", storageOpts, list); err != nil {
-		t.Errorf("Unexpected List error: %v", err)
+	if err := store.GetList(ctx, "/two-level", storageOpts, list); err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
 	secondContinuation, err := encodeContinue("/two-level/2", "/two-level/", int64(continueRV))
@@ -1576,12 +1584,13 @@ func TestList(t *testing.T) {
 				ResourceVersion:      tt.rv,
 				ResourceVersionMatch: tt.rvMatch,
 				Predicate:            tt.pred,
+				Recursive:            true,
 			}
 			var err error
 			if tt.disablePaging {
-				err = disablePagingStore.List(ctx, tt.prefix, storageOpts, out)
+				err = disablePagingStore.GetList(ctx, tt.prefix, storageOpts, out)
 			} else {
-				err = store.List(ctx, tt.prefix, storageOpts, out)
+				err = store.GetList(ctx, tt.prefix, storageOpts, out)
 			}
 			if tt.expectRVTooLarge {
 				if err == nil || !storage.IsTooLargeResourceVersion(err) {
@@ -1592,7 +1601,7 @@ func TestList(t *testing.T) {
 
 			if err != nil {
 				if !tt.expectError {
-					t.Fatalf("List failed: %v", err)
+					t.Fatalf("GetList failed: %v", err)
 				}
 				return
 			}
@@ -1690,8 +1699,9 @@ func TestListContinuation(t *testing.T) {
 	options := storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(1, ""),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1716,8 +1726,9 @@ func TestListContinuation(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(0, continueFromSecondItem),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1742,8 +1753,9 @@ func TestListContinuation(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(1, continueFromSecondItem),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1767,8 +1779,9 @@ func TestListContinuation(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(1, continueFromThirdItem),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1861,8 +1874,9 @@ func TestListContinuationWithFilter(t *testing.T) {
 	options := storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(2, ""),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1894,8 +1908,9 @@ func TestListContinuationWithFilter(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(2, cont),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1976,8 +1991,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 	options := storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(1, ""),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2021,8 +2037,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(0, continueFromSecondItem),
+		Recursive:       true,
 	}
-	err = store.List(ctx, "/", options, out)
+	err = store.GetList(ctx, "/", options, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -2042,8 +2059,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(1, inconsistentContinueFromSecondItem),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -2060,8 +2078,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred(1, continueFromThirdItem),
+		Recursive:       true,
 	}
-	if err := store.List(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -2316,8 +2335,9 @@ func TestConsistentList(t *testing.T) {
 	result1 := example.PodList{}
 	options := storage.ListOptions{
 		Predicate: predicate,
+		Recursive: true,
 	}
-	if err := store.List(ctx, "/", options, &result1); err != nil {
+	if err := store.GetList(ctx, "/", options, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2326,10 +2346,11 @@ func TestConsistentList(t *testing.T) {
 		Predicate:            predicate,
 		ResourceVersion:      result1.ResourceVersion,
 		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		Recursive:            true,
 	}
 
 	result2 := example.PodList{}
-	if err := store.List(ctx, "/", options, &result2); err != nil {
+	if err := store.GetList(ctx, "/", options, &result2); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2341,7 +2362,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 
 	result3 := example.PodList{}
-	if err := store.List(ctx, "/", options, &result3); err != nil {
+	if err := store.GetList(ctx, "/", options, &result3); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2349,7 +2370,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 
 	result4 := example.PodList{}
-	if err := store.List(ctx, "/", options, &result4); err != nil {
+	if err := store.GetList(ctx, "/", options, &result4); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 

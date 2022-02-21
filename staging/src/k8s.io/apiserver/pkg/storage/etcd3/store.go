@@ -456,11 +456,6 @@ func (s *store) GuaranteedUpdate(
 	}
 }
 
-// GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, key string, listOpts storage.ListOptions, listObj runtime.Object) error {
-	return s.list(ctx, key, listOpts, listObj, false)
-}
-
 func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Object {
 	// For unstructured lists with a target group/version, preserve the group/version in the instantiated list items
 	if unstructuredList, isUnstructured := listObj.(*unstructured.UnstructuredList); isUnstructured {
@@ -557,12 +552,9 @@ func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 	return base64.RawURLEncoding.EncodeToString(out), nil
 }
 
-// List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	return s.list(ctx, key, opts, listObj, true)
-}
-
-func (s *store) list(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, recursive bool) error {
+// GetList implements storage.Interface.
+func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	recursive := opts.Recursive
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
 	pred := opts.Predicate

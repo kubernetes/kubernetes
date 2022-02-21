@@ -604,23 +604,6 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
 }
 
-// GetToList implements storage.Interface.
-func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	return c.list(ctx, key, opts, listObj, false)
-}
-
-// List implements storage.Interface.
-func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	return c.list(ctx, key, opts, listObj, true)
-}
-
-func (c *Cacher) delegateList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, recursive bool) error {
-	if !recursive {
-		return c.storage.GetToList(ctx, key, opts, listObj)
-	}
-	return c.storage.List(ctx, key, opts, listObj)
-}
-
 func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
@@ -635,11 +618,13 @@ func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPred
 	return c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
 }
 
-func (c *Cacher) list(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, recursive bool) error {
+// GetList implements storage.Interface
+func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	recursive := opts.Recursive
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
 	if shouldDelegateList(opts) {
-		return c.delegateList(ctx, key, opts, listObj, recursive)
+		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
 	// If resourceVersion is specified, serve it from cache.
@@ -653,7 +638,7 @@ func (c *Cacher) list(ctx context.Context, key string, opts storage.ListOptions,
 	if listRV == 0 && !c.ready.check() {
 		// If Cacher is not yet initialized and we don't require any specific
 		// minimal resource version, simply forward the request to storage.
-		return c.delegateList(ctx, key, opts, listObj, recursive)
+		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
 	trace := utiltrace.New("cacher list", utiltrace.Field{Key: "type", Value: c.objectType.String()})
@@ -1090,8 +1075,9 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 	storageOpts := storage.ListOptions{
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            pred,
+		Recursive:            true,
 	}
-	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, storageOpts, list); err != nil {
+	if err := lw.storage.GetList(context.TODO(), lw.resourcePrefix, storageOpts, list); err != nil {
 		return nil, err
 	}
 	return list, nil
