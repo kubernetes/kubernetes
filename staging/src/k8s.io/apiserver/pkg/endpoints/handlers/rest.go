@@ -356,16 +356,6 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 	}
 }
 
-// ensureNonNilItems ensures that for empty lists we don't return <nil> items.
-func ensureNonNilItems(obj runtime.Object) error {
-	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func summarizeData(data []byte, maxLength int) string {
 	switch {
 	case len(data) == 0:
