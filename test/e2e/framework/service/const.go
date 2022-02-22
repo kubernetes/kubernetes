@@ -48,13 +48,12 @@ const (
 	// on AWS. A few minutes is typical, so use 10m.
 	LoadBalancerLagTimeoutAWS = 10 * time.Minute
 
-	// LoadBalancerCreateTimeoutDefault is the default time to wait for a load balancer to be created/modified.
-	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
-	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
-	loadBalancerCreateTimeoutDefault = 15 * time.Minute
-	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
-	// Hideen - use GetServiceLoadBalancerCreateTimeout function instead.
-	loadBalancerCreateTimeoutLarge = 45 * time.Minute
+	// loadBalancerCreationTimeoutDefault is the default time to wait for a load balancer to be created/modified.
+	// Hideen - use GetServiceLoadBalancerCreationTimeout function instead.
+	loadBalancerCreationTimeoutDefault = 15 * time.Minute
+	// loadBalancerCreationTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
+	// Hideen - use GetServiceLoadBalancerCreationTimeout function instead.
+	loadBalancerCreationTimeoutLarge = 45 * time.Minute
 
 	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
 	// be targeted by load balancers.

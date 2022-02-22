@@ -104,9 +104,9 @@ func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
-		return loadBalancerCreateTimeoutLarge
+		return loadBalancerCreationTimeoutLarge
 	}
-	return loadBalancerCreateTimeoutDefault
+	return loadBalancerCreationTimeoutDefault
 }
 
 // GetServiceLoadBalancerPropagationTimeout returns a timeout value for propagating a load balancer of a service.
