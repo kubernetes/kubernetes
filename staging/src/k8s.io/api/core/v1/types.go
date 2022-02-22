@@ -3169,8 +3169,7 @@ type PodSpec struct {
 	// +optional
 	SecurityContext *PodSecurityContext `json:"securityContext,omitempty" protobuf:"bytes,14,opt,name=securityContext"`
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
-	// If specified, these secrets will be passed to individual puller implementations for them to use. For example,
-	// in the case of docker, only DockerConfig type secrets are honored.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#specifying-imagepullsecrets-on-a-pod
 	// +optional
 	// +patchMergeKey=name

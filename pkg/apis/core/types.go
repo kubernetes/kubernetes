@@ -2160,7 +2160,7 @@ type Container struct {
 	Name string
 	// Required.
 	Image string
-	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
+	// Optional: The container image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -2168,7 +2168,7 @@ type Container struct {
 	// of whether the variable exists or not.
 	// +optional
 	Command []string
-	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	// Optional: The container image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -2176,7 +2176,7 @@ type Container struct {
 	// of whether the variable exists or not.
 	// +optional
 	Args []string
-	// Optional: Defaults to Docker's default.
+	// Optional: Defaults to the container runtime's default working directory.
 	// +optional
 	WorkingDir string
 	// +optional
@@ -2867,8 +2867,7 @@ type PodSpec struct {
 	// +optional
 	SecurityContext *PodSecurityContext
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
-	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
-	// in the case of docker, only DockerConfig type secrets are honored.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.
 	// +optional
 	ImagePullSecrets []LocalObjectReference
 	// Specifies the hostname of the Pod.
@@ -3230,7 +3229,7 @@ type EphemeralContainerCommon struct {
 	Name string
 	// Required.
 	Image string
-	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
+	// Optional: The container image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -3238,7 +3237,7 @@ type EphemeralContainerCommon struct {
 	// of whether the variable exists or not.
 	// +optional
 	Command []string
-	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	// Optional: The container image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -3246,7 +3245,7 @@ type EphemeralContainerCommon struct {
 	// of whether the variable exists or not.
 	// +optional
 	Args []string
-	// Optional: Defaults to Docker's default.
+	// Optional: Defaults to the container runtime's default working directory.
 	// +optional
 	WorkingDir string
 	// Ports are not allowed for ephemeral containers.
@@ -3377,11 +3376,7 @@ type PodStatus struct {
 	// startTime set.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
 	InitContainerStatuses []ContainerStatus
-	// The list has one entry per container in the manifest. Each entry is
-	// currently the output of `docker inspect`. This output format is *not*
-	// final and should not be relied upon.
-	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
-	// when we have done this.
+	// The list has one entry per app container in the manifest.
 	// +optional
 	ContainerStatuses []ContainerStatus
 
