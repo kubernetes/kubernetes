@@ -144,4 +144,6 @@ type TLSConfig struct {
 	NextProtos []string
 
 	GetCert func() (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
+	// caches TLS transport even when custom GetCert / Dialer is used
+	CacheTLSTransportOverride bool
 }

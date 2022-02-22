@@ -133,7 +133,8 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		return tlsCacheKey{}, false, err
 	}
 
-	if c.TLS.GetCert != nil || c.Dial != nil || c.Proxy != nil {
+	// c.TLS.CacheTLSTransportOverride is used by clients that don't mind caching together with their custom c.TLS.GetCert / c.Dial
+	if (!c.TLS.CacheTLSTransportOverride && (c.TLS.GetCert != nil || c.Dial != nil)) || c.Proxy != nil {
 		// cannot determine equality for functions
 		return tlsCacheKey{}, false, nil
 	}

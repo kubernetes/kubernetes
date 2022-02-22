@@ -303,6 +303,7 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 		return errors.New("can't add TLS certificate callback: transport.Config.TLS.GetCert already set")
 	}
 	c.TLS.GetCert = a.cert
+	c.TLS.CacheTLSTransportOverride = true
 
 	var d *connrotation.Dialer
 	if c.Dial != nil {
