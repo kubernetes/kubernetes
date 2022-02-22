@@ -19,20 +19,22 @@ package disruption
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
-	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/api/policy/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -47,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 )
 
 func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
@@ -494,4 +497,144 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestPatchCompatibility(t *testing.T) {
+	s, _, _, clientSet, _, _ := setup(t)
+	defer s.TearDownFn()
+
+	testcases := []struct {
+		name             string
+		version          string
+		startingSelector *metav1.LabelSelector
+		patchType        types.PatchType
+		patch            string
+		force            *bool
+		fieldManager     string
+		expectSelector   *metav1.LabelSelector
+	}{
+		{
+			name:      "v1beta1-smp",
+			version:   "v1beta1",
+			patchType: types.StrategicMergePatchType,
+			patch:     `{"spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
+			// matchLabels portion is merged, matchExpressions portion is replaced (because it's a list with no patchStrategy defined)
+			expectSelector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{"basematch": "true", "patchmatch": "true"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
+			},
+		},
+		{
+			name:      "v1-smp",
+			version:   "v1",
+			patchType: types.StrategicMergePatchType,
+			patch:     `{"spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
+			// matchLabels and matchExpressions are both replaced (because selector patchStrategy=replace in v1)
+			expectSelector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{"patchmatch": "true"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
+			},
+		},
+
+		{
+			name:      "v1beta1-mergepatch",
+			version:   "v1beta1",
+			patchType: types.MergePatchType,
+			patch:     `{"spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
+			// matchLabels portion is merged, matchExpressions portion is replaced (because it's a list)
+			expectSelector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{"basematch": "true", "patchmatch": "true"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
+			},
+		},
+		{
+			name:      "v1-mergepatch",
+			version:   "v1",
+			patchType: types.MergePatchType,
+			patch:     `{"spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
+			// matchLabels portion is merged, matchExpressions portion is replaced (because it's a list)
+			expectSelector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{"basematch": "true", "patchmatch": "true"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
+			},
+		},
+
+		{
+			name:         "v1beta1-apply",
+			version:      "v1beta1",
+			patchType:    types.ApplyPatchType,
+			patch:        `{"apiVersion":"policy/v1beta1","kind":"PodDisruptionBudget","spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
+			force:        pointer.Bool(true),
+			fieldManager: "test",
+			// entire selector is replaced (because structType=atomic)
+			expectSelector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{"patchmatch": "true"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
+			},
+		},
+		{
+			name:         "v1-apply",
+			version:      "v1",
+			patchType:    types.ApplyPatchType,
+			patch:        `{"apiVersion":"policy/v1","kind":"PodDisruptionBudget","spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
+			force:        pointer.Bool(true),
+			fieldManager: "test",
+			// entire selector is replaced (because structType=atomic)
+			expectSelector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{"patchmatch": "true"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := "default"
+			maxUnavailable := int32(2)
+			pdb := &policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pdb",
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: maxUnavailable},
+					Selector: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"basematch": "true"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "baseexpression", Operator: "In", Values: []string{"true"}}},
+					},
+				},
+			}
+			if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Error creating PodDisruptionBudget: %v", err)
+			}
+			defer func() {
+				err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Delete(context.TODO(), pdb.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			var resultSelector *metav1.LabelSelector
+			switch tc.version {
+			case "v1":
+				result, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Patch(context.TODO(), pdb.Name, tc.patchType, []byte(tc.patch), metav1.PatchOptions{Force: tc.force, FieldManager: tc.fieldManager})
+				if err != nil {
+					t.Fatal(err)
+				}
+				resultSelector = result.Spec.Selector
+			case "v1beta1":
+				result, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Patch(context.TODO(), pdb.Name, tc.patchType, []byte(tc.patch), metav1.PatchOptions{Force: tc.force, FieldManager: tc.fieldManager})
+				if err != nil {
+					t.Fatal(err)
+				}
+				resultSelector = result.Spec.Selector
+			default:
+				t.Error("unknown version")
+			}
+
+			if !reflect.DeepEqual(resultSelector, tc.expectSelector) {
+				t.Fatalf("unexpected selector:\n%s", cmp.Diff(tc.expectSelector, resultSelector))
+			}
+		})
+	}
+
 }
