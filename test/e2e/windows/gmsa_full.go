@@ -32,6 +32,8 @@ limitations under the License.
 //  * the cluster comprises at least one Linux node that accepts workloads - it
 //    can be the master, but any other Linux node is fine too. This is needed for
 //    the webhook's pod.
+//  * in order to run "can read and write file to remote folder" test case, a folder (e.g. "write_test") need to be created
+//    in that AD domain and it should be shared with that GMSA account.
 // All these assumptions are fulfilled by an AKS extension when setting up the AKS
 // cluster we run daily e2e tests against, but they do make running this test
 // outside of that very specific context pretty hard.
@@ -44,12 +46,14 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -81,6 +85,9 @@ const (
 
 	// The name of the expected domain
 	gmsaDomain = "k8sgmsa.lan"
+
+	// The shared folder on the expected domain for file-writing test
+	gmsaSharedFolder = "write_test"
 )
 
 var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
@@ -161,6 +168,73 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 					return false
 				}
 				return true
+			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
+		})
+
+		ginkgo.It("can read and write file to remote SMB folder", func() {
+			defer ginkgo.GinkgoRecover()
+
+			ginkgo.By("finding the worker node that fulfills this test's assumptions")
+			nodes := findPreconfiguredGmsaNodes(f.ClientSet)
+			if len(nodes) != 1 {
+				e2eskipper.Skipf("Expected to find exactly one node with the %q label, found %d", gmsaFullNodeLabel, len(nodes))
+			}
+			node := nodes[0]
+
+			ginkgo.By("retrieving the contents of the GMSACredentialSpec custom resource manifest from the node")
+			crdManifestContents := retrieveCRDManifestFileContents(f, node)
+
+			ginkgo.By("downloading the GMSA webhook deploy script")
+			deployScriptPath, err := downloadFile(gmsaWebhookDeployScriptURL)
+			defer func() { os.Remove(deployScriptPath) }()
+			if err != nil {
+				framework.Failf(err.Error())
+			}
+
+			ginkgo.By("deploying the GMSA webhook")
+			webhookCleanUp, err := deployGmsaWebhook(f, deployScriptPath)
+			defer webhookCleanUp()
+			if err != nil {
+				framework.Failf(err.Error())
+			}
+
+			ginkgo.By("creating the GMSA custom resource")
+			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
+			defer customResourceCleanup()
+			if err != nil {
+				framework.Failf(err.Error())
+			}
+
+			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
+			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
+			defer rbacRoleCleanup()
+			if err != nil {
+				framework.Failf(err.Error())
+			}
+
+			ginkgo.By("creating a service account")
+			serviceAccountName := createServiceAccount(f)
+
+			ginkgo.By("binding the RBAC role to the service account")
+			bindRBACRoleToServiceAccount(f, serviceAccountName, rbacRoleName)
+
+			ginkgo.By("creating a pod using the GMSA cred spec")
+			podName := createPodWithGmsa(f, serviceAccountName)
+
+			ginkgo.By("getting the ip of GMSA domain")
+			gmsaDomainIP := getGmsaDomainIP(f, podName)
+
+			ginkgo.By("checking that file can be read and write from the remote folder successfully")
+			filePath := fmt.Sprintf("\\\\%s\\%s\\write-test-%s.txt", gmsaDomainIP, gmsaSharedFolder, string(uuid.NewUUID())[0:4])
+			gomega.Eventually(func() bool {
+				// The filePath is a remote folder, do not change the format of it
+				_, _ = runKubectlExecInNamespace(f.Namespace.Name, podName, "--", "powershell.exe", "-Command", "echo 'This is a test file.' > "+filePath)
+				output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "powershell.exe", "--", "cat", filePath)
+				if err != nil {
+					framework.Logf("unable to get file from AD server: %s", err)
+					return false
+				}
+				return strings.Contains(output, "This is a test file.")
 			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 		})
 	})
@@ -419,4 +493,17 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 func runKubectlExecInNamespace(namespace string, args ...string) (string, error) {
 	namespaceOption := fmt.Sprintf("--namespace=%s", namespace)
 	return framework.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
+}
+
+func getGmsaDomainIP(f *framework.Framework, podName string) string {
+	output, _ := runKubectlExecInNamespace(f.Namespace.Name, podName, "powershell.exe", "--", "nslookup", gmsaDomain)
+	re := regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)
+	idx := strings.Index(output, gmsaDomain)
+
+	submatchall := re.FindAllString(output[idx:], -1)
+	if len(submatchall) < 1 {
+		framework.Logf("fail to get the ip of the gmsa domain")
+		return ""
+	}
+	return submatchall[0]
 }
