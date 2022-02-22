@@ -392,24 +392,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	// install legacy rest storage
-	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
-		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-			StorageFactory:              c.ExtraConfig.StorageFactory,
-			ProxyTransport:              c.ExtraConfig.ProxyTransport,
-			KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
-			EventTTL:                    c.ExtraConfig.EventTTL,
-			ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
-			SecondaryServiceIPRange:     c.ExtraConfig.SecondaryServiceIPRange,
-			ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
-			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
-			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
-			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-		}
-		if err := m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider); err != nil {
-			return nil, err
-		}
+
+	if err := m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter); err != nil {
+		return nil, err
 	}
 
 	// The order here is preserved in discovery.
@@ -524,10 +509,27 @@ func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
 }
 
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
-func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
-	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
+func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
+	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
+		StorageFactory:              c.ExtraConfig.StorageFactory,
+		ProxyTransport:              c.ExtraConfig.ProxyTransport,
+		KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
+		EventTTL:                    c.ExtraConfig.EventTTL,
+		ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
+		SecondaryServiceIPRange:     c.ExtraConfig.SecondaryServiceIPRange,
+		ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
+		LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+		ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+		ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
+		ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+		APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
+	}
+	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
 	if err != nil {
 		return fmt.Errorf("error building core storage: %v", err)
+	}
+	if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 { // if all core storage is disabled, return.
+		return nil
 	}
 
 	controllerName := "bootstrap-controller"

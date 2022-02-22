@@ -39,6 +39,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
+	"k8s.io/apiserver/pkg/server/storage"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/client-go/discovery"
@@ -156,7 +157,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
 	}
 
-	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(apiserverCfg.GenericConfig.RESTOptionsGetter)
+	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(storage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
