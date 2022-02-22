@@ -17,7 +17,9 @@ limitations under the License.
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -70,17 +72,18 @@ const (
 )
 
 type fakeKubelet struct {
-	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	containerInfoFunc   func(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	rawInfoFunc         func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
-	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
-	podsFunc            func() []*v1.Pod
-	runningPodsFunc     func() ([]*v1.Pod, error)
-	logFunc             func(w http.ResponseWriter, req *http.Request)
-	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
-	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
-	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
+	podByNameFunc         func(namespace, name string) (*v1.Pod, bool)
+	containerInfoFunc     func(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
+	reqContainersInfoFunc func(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)
+	rawInfoFunc           func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
+	machineInfoFunc       func() (*cadvisorapi.MachineInfo, error)
+	podsFunc              func() []*v1.Pod
+	runningPodsFunc       func() ([]*v1.Pod, error)
+	logFunc               func(w http.ResponseWriter, req *http.Request)
+	runFunc               func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
+	getExecCheck          func(string, types.UID, string, []string, remotecommandserver.Options)
+	getAttachCheck        func(string, types.UID, string, remotecommandserver.Options)
+	getPortForwardCheck   func(string, string, types.UID, portforward.V4Options)
 
 	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	hostnameFunc      func() string
@@ -103,7 +106,7 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 }
 
 func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
-	return map[string]*cadvisorapi.ContainerInfo{}, nil
+	return fk.reqContainersInfoFunc(containerName, options)
 }
 
 func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
@@ -1409,4 +1412,106 @@ func TestTrimURLPath(t *testing.T) {
 	for _, test := range tests {
 		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
 	}
+}
+
+func TestCadvisorMetrics(t *testing.T) {
+	mi := &cadvisorapi.MachineInfo{}
+	b, err := ioutil.ReadFile("testdata/machine-info.json")
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(b, mi))
+
+	containerInfoMap := map[string]*cadvisorapi.ContainerInfo{}
+	b, err = ioutil.ReadFile("testdata/requested-container-info.json")
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(b, &containerInfoMap))
+
+	expected, err := ioutil.ReadFile("testdata/expected-cadvisor-metrics.txt")
+	require.NoError(t, err)
+
+	fw := newServerTest()
+	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) { return mi, nil }
+	fw.fakeKubelet.reqContainersInfoFunc = func(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+		return containerInfoMap, nil
+	}
+	defer fw.testHTTPServer.Close()
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/metrics/cadvisor")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	// Convert values and timestamps for `container_last_seen` to static "$NOW" string.
+	// This is because it's impossible to inject fake current time to cadvisor - which is used as both value and sam.
+	body = replaceValuesOfContainerLastSeenMetric("container_last_seen", " $NOW $NOW", body)
+	assert.Equal(t, string(expected), string(body))
+
+	// Second call should lead the same result.
+	resp, err = http.Get(fw.testHTTPServer.URL + "/metrics/cadvisor")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body, err = ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	body = replaceValuesOfContainerLastSeenMetric("container_last_seen", " $NOW $NOW", body)
+	assert.Equal(t, string(expected), string(body))
+}
+
+func replaceValuesOfContainerLastSeenMetric(metricName, replacement string, metrics []byte) []byte {
+	var nl = []byte("\n")
+	var lines [][]byte
+	for _, line := range bytes.Split(metrics, nl) {
+		if bytes.HasPrefix(line, []byte(metricName+"{")) {
+			i := bytes.Index(line, []byte("}"))
+			line = append(line[:i+1], []byte(replacement)...)
+		}
+		lines = append(lines, line)
+	}
+	return bytes.Join(lines, nl)
+}
+
+func TestReplaceValuesOfMetric(t *testing.T) {
+	input := []byte(`container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Sound.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420953
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Wacom.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420948
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.XSettings.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420931
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420930
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pipewire.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420952
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pulseaudio.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420925
+# HELP container_memory_cache Number of bytes of page cache memory.
+# TYPE container_memory_cache gauge
+container_memory_cache{container="",id="/",image="",name="",namespace="",pod=""} 1.4702788608e+10 1645535816939
+container_memory_cache{container="",id="/e2e",image="",name="",namespace="",pod=""} 0 1645535816816
+container_memory_cache{container="",id="/e2e/e2e",image="",name="",namespace="",pod=""} 0 1645535816824
+container_memory_cache{container="",id="/init.scope",image="",name="",namespace="",pod=""} 8.45824e+06 1645535816834
+container_memory_cache{container="",id="/kubepods",image="",name="",namespace="",pod=""} 0 1645535816968
+container_memory_cache{container="",id="/kubepods/besteffort",image="",name="",namespace="",pod=""} 0 1645535816834
+container_memory_cache{container="",id="/kubepods/burstable",image="",name="",namespace="",pod=""} 0 1645535816846
+container_memory_cache{container="",id="/system.slice",image="",name="",namespace="",pod=""} 2.175922176e+09 1645535816832
+container_memory_cache{container="",id="/system.slice/ModemManager.service",image="",name="",namespace="",pod=""} 1.368064e+06 1645535816836
+container_memory_cache{container="",id="/system.slice/NetworkManager.service",image="",name="",namespace="",pod=""} 4.534272e+06 1645535816815
+container_memory_cache{container="",id="/system.slice/accounts-daemon.service",image="",name="",namespace="",pod=""} 561152 1645535816839
+container_memory_cache{container="",id="/system.slice/acpid.service",image="",name="",namespace="",pod=""} 65536 1645535816838`)
+
+	expected := []byte(`container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Sound.service",image="",name="",namespace="",pod=""} $NOW $NOW
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Wacom.service",image="",name="",namespace="",pod=""} $NOW $NOW
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.XSettings.service",image="",name="",namespace="",pod=""} $NOW $NOW
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service",image="",name="",namespace="",pod=""} $NOW $NOW
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pipewire.service",image="",name="",namespace="",pod=""} $NOW $NOW
+container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pulseaudio.service",image="",name="",namespace="",pod=""} $NOW $NOW
+# HELP container_memory_cache Number of bytes of page cache memory.
+# TYPE container_memory_cache gauge
+container_memory_cache{container="",id="/",image="",name="",namespace="",pod=""} 1.4702788608e+10 1645535816939
+container_memory_cache{container="",id="/e2e",image="",name="",namespace="",pod=""} 0 1645535816816
+container_memory_cache{container="",id="/e2e/e2e",image="",name="",namespace="",pod=""} 0 1645535816824
+container_memory_cache{container="",id="/init.scope",image="",name="",namespace="",pod=""} 8.45824e+06 1645535816834
+container_memory_cache{container="",id="/kubepods",image="",name="",namespace="",pod=""} 0 1645535816968
+container_memory_cache{container="",id="/kubepods/besteffort",image="",name="",namespace="",pod=""} 0 1645535816834
+container_memory_cache{container="",id="/kubepods/burstable",image="",name="",namespace="",pod=""} 0 1645535816846
+container_memory_cache{container="",id="/system.slice",image="",name="",namespace="",pod=""} 2.175922176e+09 1645535816832
+container_memory_cache{container="",id="/system.slice/ModemManager.service",image="",name="",namespace="",pod=""} 1.368064e+06 1645535816836
+container_memory_cache{container="",id="/system.slice/NetworkManager.service",image="",name="",namespace="",pod=""} 4.534272e+06 1645535816815
+container_memory_cache{container="",id="/system.slice/accounts-daemon.service",image="",name="",namespace="",pod=""} 561152 1645535816839
+container_memory_cache{container="",id="/system.slice/acpid.service",image="",name="",namespace="",pod=""} 65536 1645535816838`)
+	require.Equal(t, string(expected), string(replaceValuesOfContainerLastSeenMetric("container_last_seen", " $NOW $NOW", input)))
 }
