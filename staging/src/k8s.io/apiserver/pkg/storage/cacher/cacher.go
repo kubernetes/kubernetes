@@ -851,14 +851,14 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		// from it justifies increased memory usage, so for now we drop the cached
 		// serializations after dispatching this event.
 		//
-		// Given the deep-copies that are done to create cachingObjects,
-		// we try to cache serializations only if there are at least 3 watchers.
-		if len(c.watchersBuffer) >= 3 {
-			// Make a shallow copy to allow overwriting Object and PrevObject.
-			wcEvent := *event
-			setCachingObjects(&wcEvent, c.versioner)
-			event = &wcEvent
-		}
+		// Given that CachingObject is just wrapping the object and not perfoming
+		// deep-copying (until some field is explicitly being modified), we create
+		// it unconditionally to ensure safety and reduce deep-copying.
+		//
+		// Make a shallow copy to allow overwriting Object and PrevObject.
+		wcEvent := *event
+		setCachingObjects(&wcEvent, c.versioner)
+		event = &wcEvent
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
@@ -1288,9 +1288,9 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: event.Object}
+		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: event.Object}
+		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
 		oldObj := getMutableObject(event.PrevObject)

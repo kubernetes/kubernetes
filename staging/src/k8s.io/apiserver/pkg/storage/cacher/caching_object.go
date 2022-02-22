@@ -137,6 +137,10 @@ func (o *cachingObject) CacheEncode(id runtime.Identifier, encode func(runtime.O
 	result := o.getSerializationResult(id)
 	result.once.Do(func() {
 		buffer := bytes.NewBuffer(nil)
+		// TODO(wojtek-t): This is currently making a copy to avoid races
+		//   in cases where encoding is making subtle object modifications,
+		//   e.g. #82497
+		//   Figure out if we can somehow avoid this under some conditions.
 		result.err = encode(o.GetObject(), buffer)
 		result.raw = buffer.Bytes()
 	})
