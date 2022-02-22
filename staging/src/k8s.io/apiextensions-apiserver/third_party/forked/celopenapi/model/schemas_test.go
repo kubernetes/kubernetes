@@ -318,7 +318,6 @@ func schemaWithMaxLengths() *schema.Structural {
 					Default: schema.JSON{Object: "test-data"},
 				},
 				ValueValidation: &schema.ValueValidation{
-					Format:    "byte",
 					MaxLength: maxPtr(20),
 				},
 			},

@@ -133,6 +133,12 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 				return DurationType
 			case "date", "date-time":
 				return TimestampType
+			case "":
+				if s.ValueValidation.MaxLength != nil {
+					strWithMaxLength := newSimpleType("string", decls.String, types.String(""))
+					strWithMaxLength.MaxLength = *s.ValueValidation.MaxLength
+					return strWithMaxLength
+				}
 			}
 		}
 		return StringType
