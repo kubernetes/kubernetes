@@ -37,6 +37,7 @@ import (
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -591,6 +592,19 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(scaleColumnDefinitions, printScale)
+
+	clusterCIDRConfigColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "IPv4", Type: "string", Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["ipv4"]},
+		{Name: "IPv6", Type: "string", Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["ipv6"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "IPv4-PerNodeMaskSize", Type: "string", Description: "Per Node Mask Size for IPv4 CIDR"},
+		{Name: "IPv6-PerNodeMaskSize", Type: "string", Description: "Per Node Mask Size for IPv6 CIDR"},
+		{Name: "NodeSelector", Type: "string", Priority: 1, Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["nodeSelector"]},
+	}
+
+	h.TableHandler(clusterCIDRConfigColumnDefinitions, printClusterCIDRConfig)
+	h.TableHandler(clusterCIDRConfigColumnDefinitions, printClusterCIDRConfigList)
 }
 
 // Pass ports=nil for all ports.
@@ -2616,6 +2630,50 @@ func printPriorityLevelConfigurationList(list *flowcontrol.PriorityLevelConfigur
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPriorityLevelConfiguration(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printClusterCIDRConfig(obj *networking.ClusterCIDRConfig, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	ipv4 := "<none>"
+	ipv6 := "<none>"
+	if obj.Spec.IPv4 != nil {
+		ipv4 = obj.Spec.IPv4.CIDR
+	}
+	if obj.Spec.IPv6 != nil {
+		ipv6 = obj.Spec.IPv6.CIDR
+	}
+
+	row.Cells = append(row.Cells, obj.Name, ipv4, ipv6, translateTimestampSince(obj.CreationTimestamp))
+	if options.Wide {
+		ipv4PerNodeMaskSize := "<none>"
+		ipv6PerNodeMaskSize := "<none>"
+		if obj.Spec.IPv4 != nil {
+			ipv4PerNodeMaskSize = strconv.Itoa(int(obj.Spec.IPv4.PerNodeMaskSize))
+		}
+		if obj.Spec.IPv6 != nil {
+			ipv6PerNodeMaskSize = strconv.Itoa(int(obj.Spec.IPv6.PerNodeMaskSize))
+		}
+
+		row.Cells = append(row.Cells, ipv4PerNodeMaskSize)
+		row.Cells = append(row.Cells, ipv6PerNodeMaskSize)
+		row.Cells = append(row.Cells, metav1.FormatLabelSelector(obj.Spec.NodeSelector))
+	}
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printClusterCIDRConfigList(list *networking.ClusterCIDRConfigList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printClusterCIDRConfig(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

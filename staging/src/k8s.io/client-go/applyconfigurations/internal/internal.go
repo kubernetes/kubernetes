@@ -9531,6 +9531,61 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: number
       type:
         scalar: numeric
+- name: io.k8s.api.networking.v1alpha1.CIDRConfig
+  map:
+    fields:
+    - name: cidr
+      type:
+        scalar: string
+      default: ""
+    - name: perNodeMaskSize
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfig
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigStatus
+      default: {}
+- name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigSpec
+  map:
+    fields:
+    - name: ipv4
+      type:
+        namedType: io.k8s.api.networking.v1alpha1.CIDRConfig
+    - name: ipv6
+      type:
+        namedType: io.k8s.api.networking.v1alpha1.CIDRConfig
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+- name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: io.k8s.api.networking.v1beta1.HTTPIngressPath
   map:
     fields:
