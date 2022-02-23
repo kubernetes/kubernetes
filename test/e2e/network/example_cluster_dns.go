@@ -19,8 +19,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -38,6 +36,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/network/common"
 )
 
@@ -64,25 +63,26 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		c = f.ClientSet
 	})
 
-	ginkgo.It("should create pod that uses dns", func() {
-		mkpath := func(file string) string {
-			return filepath.Join(os.Getenv("GOPATH"), "src/k8s.io/examples/staging/cluster-dns", file)
+	read := func(file string) string {
+		data, err := e2etestfiles.Read(file)
+		if err != nil {
+			framework.Fail(err.Error())
 		}
+		return string(data)
+	}
 
+	ginkgo.It("should create pod that uses dns", func() {
 		// contrary to the example, this test does not use contexts, for simplicity
 		// namespaces are passed directly.
 		// Also, for simplicity, we don't use yamls with namespaces, but we
 		// create testing namespaces instead.
 
-		backendRcYaml := mkpath("dns-backend-rc.yaml")
 		backendRcName := "dns-backend"
-		backendSvcYaml := mkpath("dns-backend-service.yaml")
 		backendSvcName := "dns-backend"
 		backendPodName := "dns-backend"
-		frontendPodYaml := mkpath("dns-frontend-pod.yaml")
 		frontendPodName := "dns-frontend"
 		frontendPodContainerName := "dns-frontend"
-
+		clusterDnsPath := "test/e2e/testing-manifests/cluster-dns"
 		podOutput := "Hello World!"
 
 		// we need two namespaces anyway, so let's forget about
@@ -96,11 +96,11 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendRcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDieInput(ns.Name, read(filepath.Join(clusterDnsPath, "dns-backend-rc.yaml")), "create", "-f", "-")
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendSvcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDieInput(ns.Name, read(filepath.Join(clusterDnsPath, "dns-backend-service.yaml")), "create", "-f", "-")
 		}
 
 		// wait for objects
@@ -144,11 +144,11 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
 		framework.ExpectNoError(err, "waiting for output from pod exec")
 
-		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
+		updatedPodYaml := strings.Replace(read(filepath.Join(clusterDnsPath, "dns-frontend-pod.yaml")), fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain), 1)
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
-			framework.NewKubectlCommand(ns.Name, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
+			framework.RunKubectlOrDieInput(ns.Name, updatedPodYaml, "create", "-f", "-")
 		}
 
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
@@ -165,21 +165,6 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 	})
 })
-
-func getNsCmdFlag(ns *v1.Namespace) string {
-	return fmt.Sprintf("--namespace=%v", ns.Name)
-}
-
-// pass enough context with the 'old' parameter so that it replaces what your really intended.
-func prepareResourceWithReplacedString(inputFile, old, new string) string {
-	f, err := os.Open(inputFile)
-	framework.ExpectNoError(err, "failed to open file: %s", inputFile)
-	defer f.Close()
-	data, err := io.ReadAll(f)
-	framework.ExpectNoError(err, "failed to read from file: %s", inputFile)
-	podYaml := strings.Replace(string(data), old, new, 1)
-	return podYaml
-}
 
 // waitForServiceResponding waits for the service to be responding.
 func waitForServiceResponding(c clientset.Interface, ns, name string) error {
