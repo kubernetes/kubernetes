@@ -268,6 +268,102 @@ func TestMaxLengths(t *testing.T) {
 	}
 }
 
+func TestEstimateMaxLengthJSON(t *testing.T) {
+	type maxLengthTest struct {
+		Name              string
+		InputSchema       *schema.Structural
+		ExpectedMaxLength int64
+	}
+	tests := []maxLengthTest{
+		{
+			Name: "numberArray",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "integer",
+					},
+					ValueValidation: &schema.ValueValidation{
+						Format: "int64",
+					},
+				},
+			},
+			// expected JSON is [0,0,...] so our length should be (3000000 - 2) / 2
+			ExpectedMaxLength: 1499999,
+		},
+		{
+			Name: "stringArray",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "string",
+					},
+				},
+			},
+			// expected JSON is ["","",...] so our length should be (3000000 - 2) / 3
+			ExpectedMaxLength: 999999,
+		},
+		{
+			Name: "stringMap",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					}},
+				},
+			},
+			// expected JSON is {"":"","":"",...} so our length should be (3000000 - 2) / 6
+			ExpectedMaxLength: 499999,
+		},
+		{
+			Name: "objectOptionalPropertyArray",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "object",
+					},
+					Properties: map[string]schema.Structural{
+						"required": schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
+							},
+						},
+						"optional": schema.Structural{
+							Generic: schema.Generic{
+								Type: "string",
+							},
+						},
+					},
+					ValueValidation: &schema.ValueValidation{
+						Required: []string{"required"},
+					},
+				},
+			},
+			// expected JSON is [{"required":"",},{"required":"",},...] so our length should be (3000000 - 2) / 17
+			ExpectedMaxLength: 176470,
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.Name, func(t *testing.T) {
+			decl := SchemaDeclType(testCase.InputSchema, false)
+			if decl.MaxLength != testCase.ExpectedMaxLength {
+				t.Errorf("wrong maxLength estimate (got %d, expected %d)", decl.MaxLength, testCase.ExpectedMaxLength)
+			}
+		})
+	}
+}
+
 func maxPtr(max int64) *int64 {
 	return &max
 }

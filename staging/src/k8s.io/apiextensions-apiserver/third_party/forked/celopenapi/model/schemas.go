@@ -20,6 +20,10 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
+const (
+	maxRequestSizeBytes = 3000000
+)
+
 // SchemaDeclType converts the structural schema to a CEL declaration, or returns nil if the
 // the structural schema should not be exposed in CEL expressions.
 // Set isResourceRoot to true for the root of a custom resource or embedded resource.
@@ -63,13 +67,15 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 	case "array":
 		if s.Items != nil {
 			itemsType := SchemaDeclType(s.Items, s.Items.XEmbeddedResource)
-			// TODO(DangerOnTheRanger): calculate maxLength if not given in the schema
-			// TODO(DangerOnTheRanger): refactor -1 (indicating no length given) out into a constant
-			maxItems := int64(-1)
+			var maxItems int64
 			if s.Items.ValueValidation != nil {
 				if s.Items.ValueValidation.MaxItems != nil {
 					maxItems = *s.Items.ValueValidation.MaxItems
+				} else {
+					maxItems = estimateMaxSizeJSON(s)
 				}
+			} else {
+				maxItems = estimateMaxSizeJSON(s)
 			}
 			if itemsType != nil {
 				return NewListType(itemsType, maxItems)
@@ -80,12 +86,15 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
 			propsType := SchemaDeclType(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource)
 			if propsType != nil {
-				// TODO(DangerOnTheRanger): refactor -1 (indicating no length given) out into a constant
-				maxProperties := int64(-1)
+				var maxProperties int64
 				if s.ValueValidation != nil {
 					if s.ValueValidation.MaxProperties != nil {
 						maxProperties = *s.ValueValidation.MaxProperties
+					} else {
+						maxProperties = estimateMaxSizeJSON(s)
 					}
+				} else {
+					maxProperties = estimateMaxSizeJSON(s)
 				}
 				return NewMapType(StringType, propsType, maxProperties)
 			}
@@ -123,6 +132,9 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.ValueValidation != nil {
 			switch s.ValueValidation.Format {
 			case "byte":
+				// TODO(DangerOnTheRanger): we can't easily fall back to estimateMaxSizeJSON here since we could be
+				// looking at a string inside another object - we need to pass that information down
+				// recursive calls to SchemaDeclType first
 				if s.ValueValidation.MaxLength != nil {
 					byteWithMaxLength := newSimpleType("bytes", decls.Bytes, types.Bytes([]byte{}))
 					byteWithMaxLength.MaxLength = *s.ValueValidation.MaxLength
@@ -186,4 +198,66 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 	result.Properties = props
 
 	return result
+}
+
+// estimateMinSizeJSON estimates the minimum size in bytes of the given schema when serialized in JSON.
+// minLength/minProperties/minItems is not currently taken into account, so the estimate is a little
+// smaller than the actual smallest size.
+func estimateMinSizeJSON(s *schema.Structural) int64 {
+	switch s.Type {
+	// take a comma into account for all cases since we'll generally call this function for arrays/maps
+	case "boolean":
+		// true,
+		return 5
+	case "number":
+		// 0,
+		return 2
+	case "integer":
+		// 0,
+		return 2
+	case "string":
+		// "",
+		return 3
+	case "array":
+		// [],
+		return 3
+	case "object":
+		objSize := int64(3) // {},
+		// sum of all non-optional properties
+		if s.ValueValidation != nil {
+			for _, propName := range s.ValueValidation.Required {
+				prop := s.Properties[propName]
+				// add 3, 2 for quotations around the property name and 1 for the colon
+				objSize += int64(len(propName)) + estimateMinSizeJSON(&prop) + 3
+			}
+		}
+		return objSize
+	}
+	// TODO(DangerOnTheRanger): better error handling (We should never get here in normal operation)
+	return -1
+}
+
+// estimateMaxSizeJSON estimates the maximum number of elements that can fit in s considering request size
+// constraints.
+func estimateMaxSizeJSON(s *schema.Structural) int64 {
+	switch s.Type {
+	case "array":
+		// subtract 2 to account for [ and ]
+		return (maxRequestSizeBytes - 2) / estimateMinSizeJSON(s.Items)
+	case "object":
+		if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
+			// smallest possible key ("") + colon + smallest possible value, realistically the actual keys
+			// will all vary in length
+			// TODO(DangerOnTheRanger): is there a way to calculate how many bytes unique keys will need?
+			keyValuePairSize := estimateMinSizeJSON(s.AdditionalProperties.Structural) + 3
+			// subtract 2 to account for { and }
+			return (maxRequestSizeBytes - 2) / keyValuePairSize
+		} else {
+			// this codepath executes in the case of non-map objects,
+			// but regular objects have no concept of maxProperties
+			return -1
+		}
+	}
+	// TODO(DangerOnTheRanger): better error handling (We should never get here in normal operation)
+	return -1
 }
