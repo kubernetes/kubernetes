@@ -92,7 +92,11 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 func (m *Model) GetProbeTimeoutSeconds() int {
 	timeoutSeconds := 1
 	if framework.NodeOSDistroIs("windows") {
-		timeoutSeconds = 3
+		// Initial RTO in Windows container image 'agnhost' is 3s, if the first
+		// 'connect' packet is lost, the retranmission happens 3s later, here
+		// we set the timeout to 5s to give the tcp connection one more chance
+		// in case of bad network.
+		timeoutSeconds = 5
 	}
 	return timeoutSeconds
 }
