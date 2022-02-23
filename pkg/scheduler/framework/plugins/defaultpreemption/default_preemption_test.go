@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -96,6 +95,7 @@ func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
 }
 
 var nodeResourcesFitFunc = frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit)
+var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, podtopologyspread.New)
 
 // TestPlugin returns Error status when trying to `AddPod` or `RemovePod` on the nodes which have the {k,v} label pair defined on the nodes.
 type TestPlugin struct {
@@ -636,7 +636,7 @@ func TestDryRunPreemption(t *testing.T) {
 		{
 			name: "preemption to resolve pod topology spread filter failure",
 			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterPluginAsExtensions(podtopologyspread.Name, podtopologyspread.New, "PreFilter", "Filter"),
+				st.RegisterPluginAsExtensions(podtopologyspread.Name, podTopologySpreadFunc, "PreFilter", "Filter"),
 			},
 			nodeNames: []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
 			testPods: []*v1.Pod{
@@ -1495,7 +1495,7 @@ func TestPreempt(t *testing.T) {
 				st.MakePod().Name("p-x2").UID("p-x2").Namespace(v1.NamespaceDefault).Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
 			},
 			nodeNames:      []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
-			registerPlugin: st.RegisterPluginAsExtensions(podtopologyspread.Name, podtopologyspread.New, "PreFilter", "Filter"),
+			registerPlugin: st.RegisterPluginAsExtensions(podtopologyspread.Name, podTopologySpreadFunc, "PreFilter", "Filter"),
 			want:           framework.NewPostFilterResultWithNominatedNode("node-b"),
 			expectedPods:   []string{"p-b1"},
 		},

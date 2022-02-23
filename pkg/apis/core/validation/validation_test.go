@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -18804,57 +18805,115 @@ func TestAnyDataSource(t *testing.T) {
 }
 
 func TestValidateTopologySpreadConstraints(t *testing.T) {
+	fieldPath := field.NewPath("field")
+	subFldPath0 := fieldPath.Index(0)
+	fieldPathMinDomains := subFldPath0.Child("minDomains")
+	fieldPathMaxSkew := subFldPath0.Child("maxSkew")
+	fieldPathTopologyKey := subFldPath0.Child("topologyKey")
+	fieldPathWhenUnsatisfiable := subFldPath0.Child("whenUnsatisfiable")
+	fieldPathTopologyKeyAndWhenUnsatisfiable := subFldPath0.Child("{topologyKey, whenUnsatisfiable}")
 	testCases := []struct {
-		name        string
-		constraints []core.TopologySpreadConstraint
-		errtype     field.ErrorType
-		errfield    string
+		name            string
+		constraints     []core.TopologySpreadConstraint
+		wantFieldErrors field.ErrorList
 	}{
 		{
 			name: "all required fields ok",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        pointer.Int32(3),
+				},
 			},
+			wantFieldErrors: field.ErrorList{},
 		},
 		{
 			name: "missing MaxSkew",
 			constraints: []core.TopologySpreadConstraint{
 				{TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "maxSkew",
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(0), isNotPositiveErrorMsg)},
 		},
 		{
-			name: "invalid MaxSkew",
+			name: "negative MaxSkew",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 0, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
+				{MaxSkew: -1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "maxSkew",
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(-1), isNotPositiveErrorMsg)},
+		},
+		{
+			name: "can use MinDomains with ScheduleAnyway, when MinDomains = nil",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        nil,
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "negative minDomains is invalid",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        pointer.Int32(-1),
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg)},
+		},
+		{
+			name: "cannot use non-nil MinDomains with ScheduleAnyway",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        pointer.Int32(10),
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
+		},
+		{
+			name: "use negative MinDomains with ScheduleAnyway(invalid)",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        pointer.Int32(-1),
+				},
+			},
+			wantFieldErrors: []*field.Error{
+				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg),
+				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
+			},
 		},
 		{
 			name: "missing TopologyKey",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "topologyKey",
+			wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
 		},
 		{
 			name: "missing scheduling mode",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone"},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "whenUnsatisfiable",
+			wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), supportedScheduleActions.List())},
 		},
 		{
 			name: "unsupported scheduling mode",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.UnsatisfiableConstraintAction("N/A")},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "whenUnsatisfiable",
+			wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), supportedScheduleActions.List())},
 		},
 		{
 			name: "multiple constraints ok with all required fields",
@@ -18862,15 +18921,15 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 				{MaxSkew: 2, TopologyKey: "k8s.io/node", WhenUnsatisfiable: core.ScheduleAnyway},
 			},
+			wantFieldErrors: field.ErrorList{},
 		},
 		{
 			name: "multiple constraints missing TopologyKey on partial ones",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
-				{MaxSkew: 2, WhenUnsatisfiable: core.ScheduleAnyway},
+				{MaxSkew: 1, WhenUnsatisfiable: core.ScheduleAnyway},
+				{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "topologyKey",
+			wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
 		},
 		{
 			name: "duplicate constraints",
@@ -18878,25 +18937,19 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 				{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeDuplicate,
-			errfield: "{topologyKey, whenUnsatisfiable}",
+			wantFieldErrors: []*field.Error{
+				field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, fmt.Sprintf("{%v, %v}", "k8s.io/zone", core.DoNotSchedule)),
+			},
 		},
 	}
 
-	for i, tc := range testCases {
-		errs := validateTopologySpreadConstraints(tc.constraints, field.NewPath("field"))
-
-		if len(errs) > 0 && tc.errtype == "" {
-			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
-		} else if len(errs) == 0 && tc.errtype != "" {
-			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
-		} else if len(errs) >= 1 {
-			if errs[0].Type != tc.errtype {
-				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
-			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
-				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath)
+			if diff := cmp.Diff(tc.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
-		}
+		})
 	}
 }
 

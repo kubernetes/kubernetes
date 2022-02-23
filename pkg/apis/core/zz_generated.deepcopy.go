@@ -5629,6 +5629,11 @@ func (in *TopologySpreadConstraint) DeepCopyInto(out *TopologySpreadConstraint) 
 		*out = new(v1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.MinDomains != nil {
+		in, out := &in.MinDomains, &out.MinDomains
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
