@@ -46,7 +46,6 @@ import (
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
-	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1 "k8s.io/api/policy/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
@@ -665,7 +664,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		eventsv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
 		nodev1.SchemeGroupVersion,
-		nodev1beta1.SchemeGroupVersion,
+		nodev1beta1.SchemeGroupVersion, // remove in 1.26
 		policyapiv1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
@@ -678,7 +677,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
 		apiserverinternalv1alpha1.SchemeGroupVersion,
-		nodev1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
 	)

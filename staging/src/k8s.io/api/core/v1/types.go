@@ -3233,7 +3233,6 @@ type PodSpec struct {
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
-	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
