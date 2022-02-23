@@ -125,8 +125,9 @@ func TestNestedEncodeError(t *testing.T) {
 	gvk1 := schema.GroupVersionKind{Kind: "test", Group: "other", Version: "v1"}
 	gvk2 := schema.GroupVersionKind{Kind: "test", Group: "other", Version: "v2"}
 	n.SetGroupVersionKind(gvk1)
+	encoder := &mockSerializer{obj: n}
 	codec := NewCodec(
-		nil, nil,
+		encoder, nil,
 		&mockConvertor{},
 		nil,
 		&mockTyper{gvks: []schema.GroupVersionKind{gvk1, gvk2}},
