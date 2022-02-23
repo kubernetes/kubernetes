@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -526,7 +525,6 @@ func newUIDSet(uids ...types.UID) sets.String {
 }
 
 func init() {
-	klog.InitFlags(nil)
 	flag.Lookup("v").Value.Set("5")
 }
 
