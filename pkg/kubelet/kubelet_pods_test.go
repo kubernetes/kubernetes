@@ -3708,7 +3708,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	kl := testKubelet.kubelet
 
 	// convertToAPIContainerStatuses is purely transformative and shouldn't alter the state of the kubelet
-	// as there are no synchronisation events in that function (no locks, no channels, ...) each test routine
+	// as there are no synchronization events in that function (no locks, no channels, ...) each test routine
 	// should have its own vector clock increased independently. Golang race detector uses pure happens-before
 	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
 	for i := 0; i < 2; i++ {

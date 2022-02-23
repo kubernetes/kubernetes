@@ -430,7 +430,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 		},
 	}
 
-	// testcases for the default behaviour of the policy.
+	// testcases for the default behavior of the policy.
 	defaultOptionsTestCases := []staticPolicyTest{
 		{
 			description:     "GuPodSingleCore, SingleSocketHT, ExpectAllocOneCPU",

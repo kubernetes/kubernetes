@@ -73,22 +73,22 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 			expectedProfile: "runtime/default",
 		},
 		{
-			description:     "seccomp field defined at pod level should not be honoured",
+			description:     "seccomp field defined at pod level should not be honored",
 			pod:             newSeccompPod(&v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}, nil, "", ""),
 			expectedProfile: "runtime/default",
 		},
 		{
-			description:     "seccomp field defined at container level should not be honoured",
+			description:     "seccomp field defined at container level should not be honored",
 			pod:             newSeccompPod(nil, &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}, "", ""),
 			expectedProfile: "runtime/default",
 		},
 		{
-			description:     "seccomp annotation defined at pod level should not be honoured",
+			description:     "seccomp annotation defined at pod level should not be honored",
 			pod:             newSeccompPod(nil, nil, "unconfined", ""),
 			expectedProfile: "runtime/default",
 		},
 		{
-			description:     "seccomp annotation defined at container level should not be honoured",
+			description:     "seccomp annotation defined at container level should not be honored",
 			pod:             newSeccompPod(nil, nil, "", "unconfined"),
 			expectedProfile: "runtime/default",
 		},

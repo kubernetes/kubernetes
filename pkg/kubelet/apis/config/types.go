@@ -58,7 +58,7 @@ const (
 	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
 	// pods with optimal NUMA node alignment for requested resources
 	RestrictedTopologyManagerPolicy = "restricted"
-	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favor
 	// pods with NUMA alignment of CPU and device resources.
 	BestEffortTopologyManagerPolicy = "best-effort"
 	// NoneTopologyManagerPolicy is a mode in which kubelet has no knowledge
@@ -222,7 +222,7 @@ type KubeletConfiguration struct {
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerPolicy string
 	// CPUManagerPolicyOptions is a set of key=value which 	allows to set extra options
-	// to fine tune the behaviour of the cpu manager policies.
+	// to fine tune the behavior of the cpu manager policies.
 	// Requires  both the "CPUManager" and "CPUManagerPolicyOptions" feature gates to be enabled.
 	CPUManagerPolicyOptions map[string]string
 	// CPU Manager reconciliation period.

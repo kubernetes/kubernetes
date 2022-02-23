@@ -40,7 +40,7 @@ import (
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
-// deterministic behaviour in testing.
+// deterministic behavior in testing.
 type fakePodWorkers struct {
 	lock      sync.Mutex
 	syncPodFn syncPodFnType

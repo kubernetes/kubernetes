@@ -495,13 +495,13 @@ func TestGetSeccompProfilePath(t *testing.T) {
 			expectedProfile: seccompLocalhostPath("filename2"),
 		},
 		{
-			description:     "prioritise container field over pod field",
+			description:     "prioritize container field over pod field",
 			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
 			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
 			expectedProfile: "runtime/default",
 		},
 		{
-			description: "prioritise container field over container annotation, pod field and pod annotation",
+			description: "prioritize container field over container annotation, pod field and pod annotation",
 			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			containerSc: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-cont-profile.json")}},
 			annotation: map[string]string{
@@ -512,7 +512,7 @@ func TestGetSeccompProfilePath(t *testing.T) {
 			expectedProfile: seccompLocalhostPath("field-cont-profile.json"),
 		},
 		{
-			description: "prioritise container annotation over pod field",
+			description: "prioritize container annotation over pod field",
 			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			annotation: map[string]string{
 				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
@@ -522,7 +522,7 @@ func TestGetSeccompProfilePath(t *testing.T) {
 			expectedProfile: seccompLocalhostPath("annota-cont-profile.json"),
 		},
 		{
-			description: "prioritise pod field over pod annotation",
+			description: "prioritize pod field over pod annotation",
 			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			annotation: map[string]string{
 				v1.SeccompPodAnnotationKey: "localhost/annota-pod-profile.json",
@@ -685,13 +685,13 @@ func TestGetSeccompProfilePathDefaultSeccomp(t *testing.T) {
 			expectedProfile: seccompLocalhostPath("filename2"),
 		},
 		{
-			description:     "prioritise container field over pod field",
+			description:     "prioritize container field over pod field",
 			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
 			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
 			expectedProfile: "runtime/default",
 		},
 		{
-			description: "prioritise container field over container annotation, pod field and pod annotation",
+			description: "prioritize container field over container annotation, pod field and pod annotation",
 			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			containerSc: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-cont-profile.json")}},
 			annotation: map[string]string{
@@ -702,7 +702,7 @@ func TestGetSeccompProfilePathDefaultSeccomp(t *testing.T) {
 			expectedProfile: seccompLocalhostPath("field-cont-profile.json"),
 		},
 		{
-			description: "prioritise container annotation over pod field",
+			description: "prioritize container annotation over pod field",
 			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			annotation: map[string]string{
 				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
@@ -712,7 +712,7 @@ func TestGetSeccompProfilePathDefaultSeccomp(t *testing.T) {
 			expectedProfile: seccompLocalhostPath("annota-cont-profile.json"),
 		},
 		{
-			description: "prioritise pod field over pod annotation",
+			description: "prioritize pod field over pod annotation",
 			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			annotation: map[string]string{
 				v1.SeccompPodAnnotationKey: "localhost/annota-pod-profile.json",
@@ -799,13 +799,13 @@ func TestGetSeccompProfile(t *testing.T) {
 			},
 		},
 		{
-			description:     "prioritise container field over pod field",
+			description:     "prioritize container field over pod field",
 			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
 			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
 			expectedProfile: runtimeDefaultProfile,
 		},
 		{
-			description:   "prioritise container field over pod field",
+			description:   "prioritize container field over pod field",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-cont-profile.json")}},
 			containerName: "container1",
@@ -893,13 +893,13 @@ func TestGetSeccompProfileDefaultSeccomp(t *testing.T) {
 			},
 		},
 		{
-			description:     "prioritise container field over pod field",
+			description:     "prioritize container field over pod field",
 			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
 			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
 			expectedProfile: runtimeDefaultProfile,
 		},
 		{
-			description:   "prioritise container field over pod field",
+			description:   "prioritize container field over pod field",
 			podSc:         &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
 			containerSc:   &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-cont-profile.json")}},
 			containerName: "container1",

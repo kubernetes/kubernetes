@@ -758,7 +758,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	p.lastUndeliveredWorkUpdate[pod.UID] = work
 
 	if (becameTerminating || wasGracePeriodShortened) && status.cancelFn != nil {
-		klog.V(3).InfoS("Cancelling current pod sync", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", work.WorkType)
+		klog.V(3).InfoS("Canceling current pod sync", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", work.WorkType)
 		status.cancelFn()
 		return
 	}
@@ -941,7 +941,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 
 		switch {
 		case err == context.Canceled:
-			// when the context is cancelled we expect an update to already be queued
+			// when the context is canceled we expect an update to already be queued
 			klog.V(2).InfoS("Sync exited with context cancellation error", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
 
 		case err != nil:

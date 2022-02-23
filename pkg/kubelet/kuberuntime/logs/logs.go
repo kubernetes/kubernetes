@@ -443,7 +443,7 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 	for {
 		select {
 		case <-ctx.Done():
-			return false, false, fmt.Errorf("context cancelled")
+			return false, false, fmt.Errorf("context canceled")
 		case e := <-w.Events:
 			switch e.Op {
 			case fsnotify.Write:

@@ -33,7 +33,7 @@ const (
 
 	// PolicyStatic is the name of the static policy.
 	// Should options be given, these will be ignored and backward (up to 1.21 included)
-	// compatible behaviour will be enforced
+	// compatible behavior will be enforced
 	PolicyStatic policyName = "static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
@@ -100,7 +100,7 @@ type staticPolicy struct {
 	affinity topologymanager.Store
 	// set of CPUs to reuse across allocations in a pod
 	cpusToReuse map[string]cpuset.CPUSet
-	// options allow to fine-tune the behaviour of the policy
+	// options allow to fine-tune the behavior of the policy
 	options StaticPolicyOptions
 }
 
@@ -260,7 +260,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 			// in Failed state, with SMTAlignmentError as reason. Since the allocation happens in terms of physical cores
 			// and the scheduler is responsible for ensuring that the workload goes to a node that has enough CPUs,
 			// the pod would be placed on a node where there are enough physical cores available to be allocated.
-			// Just like the behaviour in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
+			// Just like the behavior in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
 			// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
 			// CPUs on a physical core. Allocation of individual threads would never have to occur.
 			return SMTAlignmentError{

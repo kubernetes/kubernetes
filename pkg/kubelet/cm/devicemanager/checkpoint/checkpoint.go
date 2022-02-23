@@ -86,7 +86,7 @@ func NewV2(devEntries []PodDevicesEntry, devices map[string][]string) DeviceMana
 	}
 }
 
-// MarshalCheckpoint returns marshalled data
+// MarshalCheckpoint returns marshaled data
 func (cp *Data) MarshalCheckpoint() ([]byte, error) {
 	cp.Checksum = checksum.New(cp.Data)
 	return json.Marshal(*cp)

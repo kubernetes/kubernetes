@@ -69,7 +69,7 @@ func newCPUManagerCheckpointV2() *CPUManagerCheckpointV2 {
 	}
 }
 
-// MarshalCheckpoint returns marshalled checkpoint in v1 format
+// MarshalCheckpoint returns marshaled checkpoint in v1 format
 func (cp *CPUManagerCheckpointV1) MarshalCheckpoint() ([]byte, error) {
 	// make sure checksum wasn't set before so it doesn't affect output checksum
 	cp.Checksum = 0
@@ -77,7 +77,7 @@ func (cp *CPUManagerCheckpointV1) MarshalCheckpoint() ([]byte, error) {
 	return json.Marshal(*cp)
 }
 
-// MarshalCheckpoint returns marshalled checkpoint in v2 format
+// MarshalCheckpoint returns marshaled checkpoint in v2 format
 func (cp *CPUManagerCheckpointV2) MarshalCheckpoint() ([]byte, error) {
 	// make sure checksum wasn't set before so it doesn't affect output checksum
 	cp.Checksum = 0

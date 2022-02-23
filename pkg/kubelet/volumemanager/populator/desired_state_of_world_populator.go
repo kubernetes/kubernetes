@@ -375,7 +375,7 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		return
 	}
 	// volumeSpec.ReadOnly is the value that determines if volume could be formatted when being mounted.
-	// This is the same flag that determines filesystem resizing behaviour for offline resizing and hence
+	// This is the same flag that determines filesystem resizing behavior for offline resizing and hence
 	// we should use it here. This value comes from Pod.spec.volumes.persistentVolumeClaim.readOnly.
 	if volumeSpec.ReadOnly {
 		// This volume is used as read only by this pod, we don't perform resize for read only volumes.

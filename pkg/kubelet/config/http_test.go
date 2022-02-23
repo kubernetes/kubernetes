@@ -341,7 +341,7 @@ func TestURLWithHeader(t *testing.T) {
 	}
 	data, err := json.Marshal(pod)
 	if err != nil {
-		t.Fatalf("Unexpected json marshalling error: %v", err)
+		t.Fatalf("Unexpected json marshaling error: %v", err)
 	}
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   http.StatusOK,
