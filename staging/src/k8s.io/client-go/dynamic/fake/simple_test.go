@@ -335,6 +335,8 @@ func TestListWithUnstructuredObjectsAndTypedScheme(t *testing.T) {
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
 	expectedList.SetResourceVersion("") // by product of the fake setting resource version
+	expectedList.SetContinue("")
+	expectedList.SetSelfLink("")
 	expectedList.Items = append(expectedList.Items, u)
 
 	if diff := cmp.Diff(expectedList, list); diff != "" {
@@ -363,6 +365,8 @@ func TestListWithNoFixturesAndTypedScheme(t *testing.T) {
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
 	expectedList.SetResourceVersion("") // by product of the fake setting resource version
+	expectedList.SetContinue("")
+	expectedList.SetSelfLink("")
 
 	if diff := cmp.Diff(expectedList, list); diff != "" {
 		t.Fatal("unexpected diff (-want, +got): ", diff)
@@ -395,6 +399,8 @@ func TestListWithNoScheme(t *testing.T) {
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
 	expectedList.SetResourceVersion("") // by product of the fake setting resource version
+	expectedList.SetContinue("")
+	expectedList.SetSelfLink("")
 	expectedList.Items = append(expectedList.Items, u)
 
 	if diff := cmp.Diff(expectedList, list); diff != "" {
@@ -437,6 +443,8 @@ func TestListWithTypedFixtures(t *testing.T) {
 	expectedList := &unstructured.UnstructuredList{}
 	expectedList.SetGroupVersionKind(listGVK)
 	expectedList.SetResourceVersion("") // by product of the fake setting resource version
+	expectedList.SetContinue("")
+	expectedList.SetSelfLink("")
 	expectedList.Items = []unstructured.Unstructured{u}
 
 	if diff := cmp.Diff(expectedList, list); diff != "" {
