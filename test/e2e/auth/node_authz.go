@@ -45,7 +45,6 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 	var c clientset.Interface
 	var ns string
 	var asUser string
-	var defaultSaSecret string
 	var nodeName string
 	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name
@@ -55,11 +54,6 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		framework.ExpectNotEqual(len(nodeList.Items), 0)
 		nodeName = nodeList.Items[0].Name
 		asUser = nodeNamePrefix + nodeName
-		saName := "default"
-		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(context.TODO(), saName, metav1.GetOptions{})
-		framework.ExpectNotEqual(len(sa.Secrets), 0)
-		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
-		defaultSaSecret = sa.Secrets[0].Name
 		ginkgo.By("Creating a kubernetes client that impersonates a node")
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "failed to load kubernetes client config")
@@ -77,7 +71,17 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 	})
 
 	ginkgo.It("Getting an existing secret should exit with the Forbidden error", func() {
-		_, err := c.CoreV1().Secrets(ns).Get(context.TODO(), defaultSaSecret, metav1.GetOptions{})
+		ginkgo.By("Create a secret for testing")
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      "node-auth-secret",
+			},
+			StringData: map[string]string{},
+		}
+		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(context.TODO(), secret, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create secret (%s:%s) %+v", ns, secret.Name, *secret)
+		_, err = c.CoreV1().Secrets(ns).Get(context.TODO(), secret.Name, metav1.GetOptions{})
 		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 

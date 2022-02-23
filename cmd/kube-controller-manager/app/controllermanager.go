@@ -64,6 +64,7 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -631,6 +632,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
+			AutoGenerate:   !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenNoAutoGeneration),
 		},
 	)
 	if err != nil {

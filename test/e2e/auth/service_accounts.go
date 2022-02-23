@@ -46,121 +46,18 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
+const rootCAConfigMapName = "kube-root-ca.crt"
+
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 
-	ginkgo.It("should ensure a single API token exists", func() {
-		// wait for the service account to reference a single secret
-		var secrets []v1.ObjectReference
-		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
-			ginkgo.By("waiting for a single token reference")
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				framework.Logf("default service account was not found")
-				return false, nil
-			}
-			if err != nil {
-				framework.Logf("error getting default service account: %v", err)
-				return false, err
-			}
-			switch len(sa.Secrets) {
-			case 0:
-				framework.Logf("default service account has no secret references")
-				return false, nil
-			case 1:
-				framework.Logf("default service account has a single secret reference")
-				secrets = sa.Secrets
-				return true, nil
-			default:
-				return false, fmt.Errorf("default service account has too many secret references: %#v", sa.Secrets)
-			}
-		}))
-
-		// make sure the reference doesn't flutter
+	ginkgo.It("no secret-based service account token should be auto-generated", func() {
 		{
-			ginkgo.By("ensuring the single token reference persists")
-			time.Sleep(2 * time.Second)
+			ginkgo.By("ensuring no secret-based service account token exists")
+			time.Sleep(10 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(sa.Secrets, secrets)
-		}
-
-		// delete the referenced secret
-		ginkgo.By("deleting the service account token")
-		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secrets[0].Name, metav1.DeleteOptions{}))
-
-		// wait for the referenced secret to be removed, and another one autocreated
-		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			ginkgo.By("waiting for a new token reference")
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
-			if err != nil {
-				framework.Logf("error getting default service account: %v", err)
-				return false, err
-			}
-			switch len(sa.Secrets) {
-			case 0:
-				framework.Logf("default service account has no secret references")
-				return false, nil
-			case 1:
-				if sa.Secrets[0] == secrets[0] {
-					framework.Logf("default service account still has the deleted secret reference")
-					return false, nil
-				}
-				framework.Logf("default service account has a new single secret reference")
-				secrets = sa.Secrets
-				return true, nil
-			default:
-				return false, fmt.Errorf("default service account has too many secret references: %#v", sa.Secrets)
-			}
-		}))
-
-		// make sure the reference doesn't flutter
-		{
-			ginkgo.By("ensuring the single token reference persists")
-			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(sa.Secrets, secrets)
-		}
-
-		// delete the reference from the service account
-		ginkgo.By("deleting the reference to the service account token")
-		{
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			sa.Secrets = nil
-			_, updateErr := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Update(context.TODO(), sa, metav1.UpdateOptions{})
-			framework.ExpectNoError(updateErr)
-		}
-
-		// wait for another one to be autocreated
-		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			ginkgo.By("waiting for a new token to be created and added")
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
-			if err != nil {
-				framework.Logf("error getting default service account: %v", err)
-				return false, err
-			}
-			switch len(sa.Secrets) {
-			case 0:
-				framework.Logf("default service account has no secret references")
-				return false, nil
-			case 1:
-				framework.Logf("default service account has a new single secret reference")
-				secrets = sa.Secrets
-				return true, nil
-			default:
-				return false, fmt.Errorf("default service account has too many secret references: %#v", sa.Secrets)
-			}
-		}))
-
-		// make sure the reference doesn't flutter
-		{
-			ginkgo.By("ensuring the single token reference persists")
-			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(sa.Secrets, secrets)
+			framework.ExpectEmpty(sa.Secrets)
 		}
 	})
 
@@ -174,42 +71,8 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	                Account mount path MUST be auto mounted to the Container.
 	*/
 	framework.ConformanceIt("should mount an API token into pods ", func() {
-		var rootCAContent string
-
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount-test"}}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-
-		// Standard get, update retry loop
-		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			ginkgo.By("getting the auto-created API token")
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "mount-test", metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				framework.Logf("mount-test service account was not found")
-				return false, nil
-			}
-			if err != nil {
-				framework.Logf("error getting mount-test service account: %v", err)
-				return false, err
-			}
-			if len(sa.Secrets) == 0 {
-				framework.Logf("mount-test service account has no secret references")
-				return false, nil
-			}
-			for _, secretRef := range sa.Secrets {
-				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
-				if err != nil {
-					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
-					continue
-				}
-				if secret.Type == v1.SecretTypeServiceAccountToken {
-					rootCAContent = string(secret.Data[v1.ServiceAccountRootCAKey])
-					return true, nil
-				}
-			}
-
-			framework.Logf("default service account has no secret references to valid service account tokens")
-			return false, nil
-		}))
 
 		zero := int64(0)
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
@@ -239,7 +102,10 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 
 		// CA and namespace should be identical
-		framework.ExpectEqual(mountedCA, rootCAContent)
+		rootCA, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
+		framework.ExpectEqual(mountedCA, rootCA.Data["ca.crt"])
 		framework.ExpectEqual(mountedNamespace, f.Namespace.Name)
 		// Token should be a valid credential that identifies the pod's service account
 		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: mountedToken}}
@@ -290,37 +156,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 		nomountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), nomountSA, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-
-		// Standard get, update retry loop
-		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			ginkgo.By("getting the auto-created API token")
-			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), mountSA.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				framework.Logf("mount service account was not found")
-				return false, nil
-			}
-			if err != nil {
-				framework.Logf("error getting mount service account: %v", err)
-				return false, err
-			}
-			if len(sa.Secrets) == 0 {
-				framework.Logf("mount service account has no secret references")
-				return false, nil
-			}
-			for _, secretRef := range sa.Secrets {
-				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
-				if err != nil {
-					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
-					continue
-				}
-				if secret.Type == v1.SecretTypeServiceAccountToken {
-					return true, nil
-				}
-			}
-
-			framework.Logf("default service account has no secret references to valid service account tokens")
-			return false, nil
-		}))
 
 		testcases := []struct {
 			PodName            string
@@ -883,8 +718,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			3. Reconciled if modified
 	*/
 	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func() {
-		const rootCAConfigMapName = "kube-root-ca.crt"
-
 		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
