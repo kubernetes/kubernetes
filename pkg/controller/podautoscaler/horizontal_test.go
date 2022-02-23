@@ -2272,7 +2272,7 @@ func TestMoreReplicasThanSpecNoScale(t *testing.T) {
 		minReplicas:             1,
 		maxReplicas:             8,
 		specReplicas:            4,
-		statusReplicas:          5, // Deployment update with 25% surge.
+		statusReplicas:          4, // Deployment update with 25% surge.
 		expectedDesiredReplicas: 4,
 		CPUTarget:               50,
 		reportedLevels:          []uint64{500, 500, 500, 500, 500},
