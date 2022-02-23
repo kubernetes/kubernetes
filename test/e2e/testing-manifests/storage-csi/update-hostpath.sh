@@ -147,7 +147,7 @@ set +x # disable shell tracing, so that printed messages can be seden
 # A temp on-disk file for holding information about container images
 # Format: {key}\t{registry variable}\t{image name}\t{image version}
 lookupFile=lookup.tmp
-> $lookupFile # clear the file if it exists
+rm -f $lookupFile # clear the file if it exists
 trap 'rm -f $lookupFile' EXIT
 
 
@@ -186,7 +186,9 @@ grep -r image: hostpath/hostpath/csi-hostpath-plugin.yaml | while read -r image;
         #echo "DEBUG: Could not find key in image $image, adding new entry to lookup file"
         registry=$(echo "$image" | sed -e 's/\(.*\)\/.*/\1/')
         name=$(echo "$image" | sed -e 's/.*\/\(.*\)/\1/')
-        key="$(echo "${name:0:1}" | tr '[:lower:]' '[:upper:]')$(echo "${name:1}" | sed -e 's/-//g')"
+        keyPre="$(echo "$name" | awk '{ print substr($0, 1, 1) }' | tr '[:lower:]' '[:upper:]')"
+        keyPost="$(echo "$name" | awk '{ print substr($0, 2, length($0)) }')"
+        key="$(echo "${keyPre}${keyPost}" | sed -e 's/-//g')"
 
         mapping="$(lookupRegistry "$registry")"
         if [ -z "$mapping" ] ; then
@@ -194,7 +196,7 @@ grep -r image: hostpath/hostpath/csi-hostpath-plugin.yaml | while read -r image;
             continue
         fi
 
-        printf "${key}\tlist.${mapping}\t${name}\t${version}\n" >> $lookupFile
+        printf "%s\t%s\t%s\t%s\n" "${key}" "list.${mapping}" "${name}" "${version}" >> $lookupFile
     else
         #echo "DEBUG: found key $key in image, copying from csi-manifest.go"
         addExistingToLookup "$key"
