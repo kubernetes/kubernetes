@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -482,6 +483,15 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "invalid configuration: memoryThrottlingFactor 1.1 must be greater than 0 and less than or equal to 1.0",
+		},
+		{
+			name: "invalid Taint.TimeAdded",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				now := metav1.Now()
+				conf.RegisterWithTaints = []v1.Taint{{TimeAdded: &now}}
+				return conf
+			},
+			errMsg: "invalid configuration: taint.TimeAdded is not nil",
 		},
 	}
 
