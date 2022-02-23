@@ -888,6 +888,7 @@ template:
             matchLabels:
               matchLabelsKey: matchLabelsValue
           maxSkew: 1
+          minDomains: 5
           topologyKey: topologyKeyValue
           whenUnsatisfiable: whenUnsatisfiableValue
         volumes:

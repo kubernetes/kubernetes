@@ -30,12 +30,15 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/pointer"
 )
+
+var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, New)
 
 func TestPreScoreStateEmptyNodes(t *testing.T) {
 	tests := []struct {
@@ -66,11 +69,13 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						MaxSkew:     1,
 						TopologyKey: "zone",
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+						MinDomains:  1,
 					},
 					{
 						MaxSkew:     1,
 						TopologyKey: v1.LabelHostname,
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+						MinDomains:  1,
 					},
 				},
 				IgnoredNodes: sets.NewString(),
@@ -101,11 +106,13 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						MaxSkew:     1,
 						TopologyKey: "zone",
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+						MinDomains:  1,
 					},
 					{
 						MaxSkew:     1,
 						TopologyKey: v1.LabelHostname,
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("bar").Obj()),
+						MinDomains:  1,
 					},
 				},
 				IgnoredNodes: sets.NewString("node-x"),
@@ -137,11 +144,13 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						MaxSkew:     3,
 						TopologyKey: v1.LabelHostname,
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+						MinDomains:  1,
 					},
 					{
 						MaxSkew:     5,
 						TopologyKey: v1.LabelTopologyZone,
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+						MinDomains:  1,
 					},
 				},
 				IgnoredNodes: sets.NewString(),
@@ -175,11 +184,13 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						MaxSkew:     1,
 						TopologyKey: v1.LabelHostname,
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+						MinDomains:  1,
 					},
 					{
 						MaxSkew:     2,
 						TopologyKey: "planet",
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+						MinDomains:  1,
 					},
 				},
 				IgnoredNodes: sets.NewString(),
@@ -232,6 +243,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						MaxSkew:     2,
 						TopologyKey: "planet",
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("baz", "sup").Obj()),
+						MinDomains:  1,
 					},
 				},
 				IgnoredNodes: sets.NewString(),
@@ -253,7 +265,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
 			}
-			pl, err := New(&tt.config, f)
+			pl, err := New(&tt.config, f, feature.Features{})
 			if err != nil {
 				t.Fatalf("Failed creating plugin: %v", err)
 			}
@@ -732,7 +744,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
 			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
@@ -802,7 +814,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			pl := plugintesting.SetupPlugin(b, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
 			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes)
@@ -879,7 +891,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			if err != nil {
 				b.Fatalf("Failed creating framework runtime: %v", err)
 			}
-			pl, err := New(&config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, f)
+			pl, err := New(&config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, f, feature.Features{})
 			if err != nil {
 				b.Fatalf("Failed creating plugin: %v", err)
 			}

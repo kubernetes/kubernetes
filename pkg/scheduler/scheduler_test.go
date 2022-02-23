@@ -66,6 +66,8 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
+var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, podtopologyspread.New)
+
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2096,7 +2098,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterPluginAsExtensions(
 					podtopologyspread.Name,
-					podtopologyspread.New,
+					podTopologySpreadFunc,
 					"PreFilter",
 					"Filter",
 				),
@@ -2143,7 +2145,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterPluginAsExtensions(
 					podtopologyspread.Name,
-					podtopologyspread.New,
+					podTopologySpreadFunc,
 					"PreFilter",
 					"Filter",
 				),
