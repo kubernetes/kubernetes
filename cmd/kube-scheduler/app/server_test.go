@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 func TestSetup(t *testing.T) {
@@ -217,10 +216,10 @@ leaderElection:
 		wantLeaderElection *componentbaseconfig.LeaderElectionConfiguration
 	}{
 		{
-			name: "default config with an alpha feature enabled and an beta feature disabled",
+			name: "default config with an alpha feature enabled",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
-				"--feature-gates=VolumeCapacityPriority=true,DefaultPodTopologySpread=false",
+				"--feature-gates=VolumeCapacityPriority=true",
 			},
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
@@ -235,17 +234,11 @@ leaderElection:
 						PreBind:    defaults.ExpandedPluginsV1beta3.PreBind,
 						Reserve:    defaults.ExpandedPluginsV1beta3.Reserve,
 					}
-					plugins.PreScore.Enabled = append(plugins.PreScore.Enabled, config.Plugin{Name: names.SelectorSpread, Weight: 0})
-					plugins.Score.Enabled = append(
-						plugins.Score.Enabled,
-						config.Plugin{Name: names.SelectorSpread, Weight: 1},
-					)
 					return plugins
 				}(),
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority:   false,
-				features.DefaultPodTopologySpread: true,
+				features.VolumeCapacityPriority: false,
 			},
 		},
 		{
