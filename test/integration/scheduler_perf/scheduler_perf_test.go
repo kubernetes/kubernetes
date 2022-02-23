@@ -600,8 +600,17 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 
 	var mu sync.Mutex
 	var dataItems []DataItem
-	numPodsScheduledPerNamespace := make(map[string]int)
 	nextNodeIndex := 0
+	// numPodsScheduledPerNamespace has all namespaces created in workload and the number of pods they (will) have.
+	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
+	numPodsScheduledPerNamespace := make(map[string]int)
+	b.Cleanup(func() {
+		for namespace, _ := range numPodsScheduledPerNamespace {
+			if err := client.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{}); err != nil {
+				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
+			}
+		}
+	})
 
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
@@ -636,27 +645,29 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				nsPreparer.cleanup()
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			b.Cleanup(func() {
-				nsPreparer.cleanup()
-			})
+			for _, n := range nsPreparer.namespaces() {
+				if _, ok := numPodsScheduledPerNamespace[n]; ok {
+					// this namespace has been already created.
+					continue
+				}
+				numPodsScheduledPerNamespace[n] = 0
+			}
 
 		case *createPodsOp:
 			var namespace string
+			// define Pod's namespace automatically, and create that namespace.
+			namespace = fmt.Sprintf("namespace-%d", opIndex)
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
-			} else {
-				// define Pod's namespace automatically, and create that namespace.
-				namespace = fmt.Sprintf("namespace-%d", opIndex)
+			}
+			if _, ok := numPodsScheduledPerNamespace[namespace]; !ok {
+				// The namespace has not created yet.
+				// So, creat that and register it to numPodsScheduledPerNamespace.
 				_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
-				if err != nil && !apierrors.IsAlreadyExists(err) {
+				if err != nil {
 					b.Fatalf("failed to create namespace for Pod: %v", namespace)
 				}
-				b.Cleanup(func() {
-					err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
-					if err != nil {
-						b.Errorf("failed to delete namespace %v", namespace)
-					}
-				})
+				numPodsScheduledPerNamespace[namespace] = 0
 			}
 			var collectors []testDataCollector
 			var collectorCtx context.Context
@@ -1104,6 +1115,15 @@ func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface
 	}, nil
 }
 
+// namespaces returns namespace names have been (or will be) created by this namespacePreparer
+func (p *namespacePreparer) namespaces() []string {
+	namespaces := make([]string, p.count)
+	for i := 0; i < p.count; i++ {
+		namespaces[i] = fmt.Sprintf("%s-%d", p.prefix, i)
+	}
+	return namespaces
+}
+
 // prepare creates the namespaces.
 func (p *namespacePreparer) prepare() error {
 	base := &v1.Namespace{}
@@ -1115,7 +1135,7 @@ func (p *namespacePreparer) prepare() error {
 		n := base.DeepCopy()
 		n.Name = fmt.Sprintf("%s-%d", p.prefix, i)
 		if err := testutils.RetryWithExponentialBackOff(func() (bool, error) {
-			_, err := p.client.CoreV1().Namespaces().Create(context.TODO(), n, metav1.CreateOptions{})
+			_, err := p.client.CoreV1().Namespaces().Create(context.Background(), n, metav1.CreateOptions{})
 			return err == nil || apierrors.IsAlreadyExists(err), nil
 		}); err != nil {
 			return err
@@ -1129,7 +1149,7 @@ func (p *namespacePreparer) cleanup() error {
 	var errRet error
 	for i := 0; i < p.count; i++ {
 		n := fmt.Sprintf("%s-%d", p.prefix, i)
-		if err := p.client.CoreV1().Namespaces().Delete(context.TODO(), n, metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Namespaces().Delete(context.Background(), n, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Deleting Namespace: %v", err)
 			errRet = err
 		}
