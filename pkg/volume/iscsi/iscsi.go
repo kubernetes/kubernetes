@@ -346,9 +346,9 @@ var _ volume.Mounter = &iscsiDiskMounter{}
 
 func (b *iscsiDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: true,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: true,
 	}
 }
 

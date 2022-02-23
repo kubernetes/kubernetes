@@ -686,9 +686,9 @@ func getUniqueVolumeName(spec *Spec) (string, error) {
 
 func (_ *FakeVolume) GetAttributes() Attributes {
 	return Attributes{
-		ReadOnly:        false,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       false,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
 }
 

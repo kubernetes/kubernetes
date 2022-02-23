@@ -18,10 +18,11 @@ package nfs
 
 import (
 	"fmt"
-	netutil "k8s.io/utils/net"
 	"os"
 	"runtime"
 	"time"
+
+	netutil "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -232,9 +233,9 @@ var _ volume.Mounter = &nfsMounter{}
 
 func (nfsMounter *nfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        nfsMounter.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       nfsMounter.readOnly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
 }
 

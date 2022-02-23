@@ -153,9 +153,9 @@ var _ volume.Mounter = &downwardAPIVolumeMounter{}
 // downward API volumes are always ReadOnlyManaged
 func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
 }
 

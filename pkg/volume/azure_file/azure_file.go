@@ -239,9 +239,9 @@ var _ volume.Mounter = &azureFileMounter{}
 
 func (b *azureFileMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: false,
 	}
 }
 

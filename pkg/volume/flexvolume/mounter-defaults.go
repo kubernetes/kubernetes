@@ -45,9 +45,9 @@ func (f *mounterDefaults) SetUpAt(dir string, mounterArgs volume.MounterArgs) er
 func (f *mounterDefaults) GetAttributes() volume.Attributes {
 	klog.V(5).Info(logPrefix(f.plugin), "using default GetAttributes")
 	return volume.Attributes{
-		ReadOnly:        f.readOnly,
-		Managed:         !f.readOnly,
-		SupportsSELinux: f.flexVolume.plugin.capabilities.SELinuxRelabel,
+		ReadOnly:       f.readOnly,
+		Managed:        !f.readOnly,
+		SELinuxRelabel: f.flexVolume.plugin.capabilities.SELinuxRelabel,
 	}
 }
 

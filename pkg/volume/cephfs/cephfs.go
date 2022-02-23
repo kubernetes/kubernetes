@@ -206,9 +206,9 @@ var _ volume.Mounter = &cephfsMounter{}
 
 func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        cephfsVolume.readonly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       cephfsVolume.readonly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
 }
 

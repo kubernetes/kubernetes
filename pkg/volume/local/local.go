@@ -504,9 +504,9 @@ var _ volume.Mounter = &localVolumeMounter{}
 
 func (m *localVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        m.readOnly,
-		Managed:         !m.readOnly,
-		SupportsSELinux: true,
+		ReadOnly:       m.readOnly,
+		Managed:        !m.readOnly,
+		SELinuxRelabel: true,
 	}
 }
 

@@ -157,9 +157,9 @@ var _ volume.Mounter = &configMapVolumeMounter{}
 
 func (sv *configMapVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
 }
 
