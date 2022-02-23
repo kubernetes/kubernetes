@@ -77,11 +77,8 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// Also, for simplicity, we don't use yamls with namespaces, but we
 		// create testing namespaces instead.
 
-		backendRcName := "dns-backend"
-		backendSvcName := "dns-backend"
-		backendPodName := "dns-backend"
-		frontendPodName := "dns-frontend"
-		frontendPodContainerName := "dns-frontend"
+		backendName := "dns-backend"
+		frontendName := "dns-frontend"
 		clusterDnsPath := "test/e2e/testing-manifests/cluster-dns"
 		podOutput := "Hello World!"
 
@@ -105,21 +102,21 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for objects
 		for _, ns := range namespaces {
-			e2eresource.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
-			e2enetwork.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
+			e2eresource.WaitForControlledPodsRunning(c, ns.Name, backendName, api.Kind("ReplicationController"))
+			e2enetwork.WaitForService(c, ns.Name, backendName, true, framework.Poll, framework.ServiceStartTimeout)
 		}
 		// it is not enough that pods are running because they may be set to running, but
 		// the application itself may have not been initialized. Just query the application.
 		for _, ns := range namespaces {
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendName}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns.Name).List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to list pods in namespace: %s", ns.Name)
-			err = e2epod.PodsResponding(c, ns.Name, backendPodName, false, pods)
+			err = e2epod.PodsResponding(c, ns.Name, backendName, false, pods)
 			framework.ExpectNoError(err, "waiting for all pods to respond")
 			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
-			err = waitForServiceResponding(c, ns.Name, backendSvcName)
+			err = waitForServiceResponding(c, ns.Name, backendName)
 			framework.ExpectNoError(err, "waiting for the service to respond")
 		}
 
@@ -131,7 +128,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// This complicated code may be removed if the pod itself retried after
 		// dns error or timeout.
 		// This code is probably unnecessary, but let's stay on the safe side.
-		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendPodName}))
+		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendName}))
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.CoreV1().Pods(namespaces[0].Name).List(context.TODO(), options)
 
@@ -140,7 +137,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 		podName := pods.Items[0].Name
 
-		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendSvcName+"."+namespaces[0].Name)
+		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendName+"."+namespaces[0].Name)
 		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
 		framework.ExpectNoError(err, "waiting for output from pod exec")
 
@@ -154,14 +151,14 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
 		// that we cannot wait for the pods to be running because our pods terminate by themselves.
 		for _, ns := range namespaces {
-			err := e2epod.WaitForPodNotPending(c, ns.Name, frontendPodName)
+			err := e2epod.WaitForPodNotPending(c, ns.Name, frontendName)
 			framework.ExpectNoError(err)
 		}
 
 		// wait for pods to print their result
 		for _, ns := range namespaces {
-			_, err := framework.LookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, framework.PodStartTimeout)
-			framework.ExpectNoError(err, "pod %s failed to print result in logs", frontendPodName)
+			_, err := framework.LookForStringInLog(ns.Name, frontendName, frontendName, podOutput, framework.PodStartTimeout)
+			framework.ExpectNoError(err, "pod %s failed to print result in logs", frontendName)
 		}
 	})
 })
