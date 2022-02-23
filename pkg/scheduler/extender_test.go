@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -58,10 +58,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},
@@ -76,10 +78,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.FalsePredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.FalsePredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},
@@ -94,10 +98,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
 			nodes: []string{"node1", "node2"},
@@ -116,10 +122,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.Node2PredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.Node2PredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},
@@ -134,6 +142,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.ErrorPrioritizerExtender, Weight: 10}},
 					Weight:       1,
@@ -155,11 +164,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
 					Weight:       1,
 				},
 				{
+					ExtenderName: "FakeExtender2",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.Node2PrioritizerExtender, Weight: 10}},
 					Weight:       5,
@@ -182,6 +193,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
 					Weight:       1,
@@ -211,6 +223,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.ErrorPrioritizerExtender, Weight: 10}},
 					UnInterested: true,
@@ -238,11 +251,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
-					Ignorable:  true,
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
+					Ignorable:    true,
 				},
 				{
-					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},

@@ -227,7 +227,10 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
 			},
-			extender:   &st.FakeExtender{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
+			extender: &st.FakeExtender{
+				ExtenderName: "FakeExtender1",
+				Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
+			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
 			wantStatus: framework.NewStatus(framework.Success),
 		},
@@ -1506,8 +1509,14 @@ func TestPreempt(t *testing.T) {
 			},
 			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
-				{Predicates: []st.FitPredicate{st.TruePredicateExtender}},
-				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
+				},
+				{
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
+				},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			want:           framework.NewPostFilterResultWithNominatedNode("node1"),
@@ -1523,7 +1532,10 @@ func TestPreempt(t *testing.T) {
 			},
 			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
-				{Predicates: []st.FitPredicate{st.FalsePredicateExtender}},
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.FalsePredicateExtender},
+				},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			want:           nil,
@@ -1539,8 +1551,15 @@ func TestPreempt(t *testing.T) {
 			},
 			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
-				{Predicates: []st.FitPredicate{st.ErrorPredicateExtender}, Ignorable: true},
-				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
+				{
+					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
+					Ignorable:    true,
+					ExtenderName: "FakeExtender1",
+				},
+				{
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
+					ExtenderName: "FakeExtender2",
+				},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			want:           framework.NewPostFilterResultWithNominatedNode("node1"),
@@ -1556,8 +1575,15 @@ func TestPreempt(t *testing.T) {
 			},
 			nodeNames: []string{"node1", "node2"},
 			extenders: []*st.FakeExtender{
-				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}, UnInterested: true},
-				{Predicates: []st.FitPredicate{st.TruePredicateExtender}},
+				{
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
+					UnInterested: true,
+				},
+				{
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
+				},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			// sum of priorities of all victims on node1 is larger than node2, node2 is chosen.
