@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -99,13 +100,15 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return kerr
 	}
 
-	if strategy.NamespaceScoped() {
-		if !ValidNamespace(ctx, objectMeta) {
-			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
-		}
-	} else if len(objectMeta.GetNamespace()) > 0 {
-		objectMeta.SetNamespace(metav1.NamespaceNone)
+	// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+	requestNamespace, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return errors.NewInternalError(fmt.Errorf("no namespace information found in request context"))
 	}
+	if err := EnsureObjectNamespaceMatchesRequestNamespace(ExpectedNamespaceForScope(requestNamespace, strategy.NamespaceScoped()), objectMeta); err != nil {
+		return err
+	}
+
 	objectMeta.SetDeletionTimestamp(nil)
 	objectMeta.SetDeletionGracePeriodSeconds(nil)
 	strategy.PrepareForCreate(ctx, obj)

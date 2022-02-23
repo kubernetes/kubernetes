@@ -203,8 +203,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		treqWithBadNamespace := treq.DeepCopy()
 		treqWithBadNamespace.Namespace = "invalid-namespace"
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treqWithBadNamespace, metav1.CreateOptions{}); err == nil || !strings.Contains(err.Error(), "must match the service account namespace") {
-			t.Fatalf("expected err creating token with mismatched namespace but got: %#v", resp)
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(context.TODO(), sa.Name, treqWithBadNamespace, metav1.CreateOptions{}); err == nil || !strings.Contains(err.Error(), "does not match the namespace") {
+			t.Fatalf("expected err creating token with mismatched namespace but got: %#v, %v", resp, err)
 		}
 
 		warningHandler.clear()
