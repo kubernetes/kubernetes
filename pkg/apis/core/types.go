@@ -3988,7 +3988,10 @@ type ServiceAccount struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
+	// Secrets is a list of the secrets in the same namespace that pods running using this ServiceAccount are allowed to use.
+	// Pods are only limited to this list if this service account has a "kubernetes.io/enforce-mountable-secrets" annotation set to "true".
+	// This field should not be used to find auto-generated service account token secrets for use outside of pods.
+	// Instead, tokens can be requested directly using the TokenRequest API, or service account token secrets can be manually created.
 	Secrets []ObjectReference
 
 	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
