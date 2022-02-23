@@ -893,10 +893,6 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.natChains.Reset()
 	proxier.natRules.Reset()
 
-	// Write table headers.
-	proxier.filterChains.Write("*filter")
-	proxier.natChains.Write("*nat")
-
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
@@ -1507,24 +1503,31 @@ func (proxier *Proxier) syncProxyRules() {
 		"-j", "ACCEPT",
 	)
 
-	numberFilterIptablesRules := utilproxy.CountBytesLines(proxier.filterRules.Bytes())
-	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(numberFilterIptablesRules))
-	numberNatIptablesRules := utilproxy.CountBytesLines(proxier.natRules.Bytes())
-	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(numberNatIptablesRules))
-
-	// Write the end-of-table markers.
-	proxier.filterRules.Write("COMMIT")
-	proxier.natRules.Write("COMMIT")
+	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
+	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines()))
 
 	// Sync rules.
-	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
 	proxier.iptablesData.Reset()
+	proxier.iptablesData.WriteString("*filter\n")
 	proxier.iptablesData.Write(proxier.filterChains.Bytes())
 	proxier.iptablesData.Write(proxier.filterRules.Bytes())
+	proxier.iptablesData.WriteString("COMMIT\n")
+	proxier.iptablesData.WriteString("*nat\n")
 	proxier.iptablesData.Write(proxier.natChains.Bytes())
 	proxier.iptablesData.Write(proxier.natRules.Bytes())
+	proxier.iptablesData.WriteString("COMMIT\n")
 
-	klog.V(5).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
+	klog.V(2).InfoS("Reloading service iptables data",
+		"numServices", len(proxier.serviceMap),
+		"numEndpoints", proxier.endpointChainsNumber,
+		"numFilterChains", proxier.filterChains.Lines(),
+		"numFilterRules", proxier.filterRules.Lines(),
+		"numNATChains", proxier.natChains.Lines(),
+		"numNATRules", proxier.natRules.Lines(),
+	)
+	klog.V(9).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
+
+	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {

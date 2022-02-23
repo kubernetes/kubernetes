@@ -1185,6 +1185,9 @@ func TestLineBufferWrite(t *testing.T) {
 			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
 				t.Fatalf("write word is %v\n expected: %q, got: %q", testCase.input, want, got)
 			}
+			if testBuffer.Lines() != 1 {
+				t.Fatalf("expected 1 line, got: %d", testBuffer.Lines())
+			}
 		})
 	}
 }
@@ -1267,7 +1270,7 @@ func TestWriteCountLines(t *testing.T) {
 			for i := 0; i < testCase.expected; i++ {
 				testBuffer.Write(randSeq())
 			}
-			n := CountBytesLines(testBuffer.Bytes())
+			n := testBuffer.Lines()
 			if n != testCase.expected {
 				t.Fatalf("lines expected: %d, got: %d", testCase.expected, n)
 			}
