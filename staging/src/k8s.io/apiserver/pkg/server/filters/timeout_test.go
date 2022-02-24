@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/klog/v2"
 )
 
@@ -239,6 +240,113 @@ func TestTimeoutHeaders(t *testing.T) {
 	defer ts.Close()
 
 	res, err := http.Get(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	res.Body.Close()
+}
+
+func TestTimeoutRequestHeaders(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Add dummy request info, otherwise we skip postTimeoutFn
+	ctx = request.WithRequestInfo(ctx, &request.RequestInfo{})
+
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+
+	ts := httptest.NewServer(
+		withDeadline(
+			WithTimeoutForNonLongRunningRequests(
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					// trigger the timeout
+					cancel()
+					// mutate request Headers
+					// Authorization filter does it for example
+					for j := 0; j < 10000; j++ {
+						req.Header.Set("Test", "post")
+					}
+				}),
+				func(r *http.Request, requestInfo *request.RequestInfo) bool {
+					return false
+				},
+			),
+		),
+	)
+	defer ts.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPatch, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCde %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	res.Body.Close()
+}
+
+func TestTimeoutWithLogging(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+
+	ts := httptest.NewServer(
+		httplog.WithLogging(
+			withDeadline(
+				WithTimeoutForNonLongRunningRequests(
+					http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						// trigger the timeout
+						cancel()
+						// mutate request Headers
+						// Authorization filter does it for example
+						for j := 0; j < 10000; j++ {
+							req.Header.Set("Test", "post")
+						}
+					}),
+					func(r *http.Request, requestInfo *request.RequestInfo) bool {
+						return false
+					},
+				),
+			), httplog.DefaultStacktracePred,
+		),
+	)
+	defer ts.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPatch, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
