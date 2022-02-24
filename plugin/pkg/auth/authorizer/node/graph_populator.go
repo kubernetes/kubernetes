@@ -18,6 +18,7 @@ package node
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -155,9 +156,13 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 			return
 		}
 	}
-	klog.V(4).Infof("updatePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+
+	startTime := time.Now()
+	klog.V(5).Infof("updatePod %s/%s for node %s started at %s", pod.Namespace, pod.Name, pod.Spec.NodeName, startTime)
 	g.graph.AddPod(pod)
-	klog.V(4).Infof("pod %s in namespace %s is updated for the node %s", pod.Name, pod.Namespace, pod.Spec.NodeName)
+
+	endTime := time.Now()
+	klog.V(5).Infof("pod %s in namespace %s is updated for the node %s completed at %s", pod.Name, pod.Namespace, pod.Spec.NodeName, endTime)
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {
@@ -173,9 +178,13 @@ func (g *graphPopulator) deletePod(obj interface{}) {
 		klog.V(5).Infof("deletePod %s/%s, no node", pod.Namespace, pod.Name)
 		return
 	}
-	klog.V(4).Infof("deletePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+
+	startTime := time.Now()
+	klog.V(5).Infof("deletePod %s/%s for node %s started at %s", pod.Namespace, pod.Name, pod.Spec.NodeName, startTime)
 	g.graph.DeletePod(pod.Name, pod.Namespace)
-	klog.V(4).Infof("pod %s in namespace %s is deleted from the node %s", pod.Name, pod.Namespace, pod.Spec.NodeName)
+
+	endTime := time.Now()
+	klog.V(5).Infof("pod %s in namespace %s is deleted from the node %s completed at %s", pod.Name, pod.Namespace, pod.Spec.NodeName, endTime)
 }
 
 func (g *graphPopulator) addPV(obj interface{}) {
