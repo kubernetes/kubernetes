@@ -55,7 +55,6 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewNodeStatusUpdater(
@@ -91,7 +90,6 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -143,7 +141,6 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -216,7 +213,6 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -289,7 +285,6 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
@@ -365,7 +360,6 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -458,7 +452,6 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -549,7 +542,6 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -611,7 +603,6 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -713,7 +704,6 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -819,7 +809,6 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			fakeKubeClient,
 			volumePluginMgr,
 			fakeRecorder,
-			false, /* checkNodeCapabilitiesBeforeMount */
 			fakeHandler))
 		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 		rc := NewReconciler(
