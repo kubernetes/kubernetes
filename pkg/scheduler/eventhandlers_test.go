@@ -225,21 +225,19 @@ func TestUpdatePodInCache(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			schedulerCache := cache.New(ttl, ctx.Done())
-			schedulerQueue := queue.NewTestQueue(ctx, nil)
 			sched := &Scheduler{
-				SchedulerCache:  schedulerCache,
-				SchedulingQueue: schedulerQueue,
+				Cache:           cache.New(ttl, ctx.Done()),
+				SchedulingQueue: queue.NewTestQueue(ctx, nil),
 			}
 			sched.addPodToCache(tt.oldObj)
 			sched.updatePodInCache(tt.oldObj, tt.newObj)
 
 			if tt.oldObj.(*v1.Pod).UID != tt.newObj.(*v1.Pod).UID {
-				if pod, err := sched.SchedulerCache.GetPod(tt.oldObj.(*v1.Pod)); err == nil {
-					t.Errorf("Get pod UID %v from SchedulerCache but it should not happen", pod.UID)
+				if pod, err := sched.Cache.GetPod(tt.oldObj.(*v1.Pod)); err == nil {
+					t.Errorf("Get pod UID %v from cache but it should not happen", pod.UID)
 				}
 			}
-			pod, err := sched.SchedulerCache.GetPod(tt.newObj.(*v1.Pod))
+			pod, err := sched.Cache.GetPod(tt.newObj.(*v1.Pod))
 			if err != nil {
 				t.Errorf("Failed to get pod from scheduler: %v", err)
 			}

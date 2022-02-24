@@ -189,7 +189,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	)
 
 	return &Scheduler{
-		SchedulerCache:  c.schedulerCache,
+		Cache:           c.schedulerCache,
 		Algorithm:       algo,
 		Extenders:       extenders,
 		Profiles:        profiles,
