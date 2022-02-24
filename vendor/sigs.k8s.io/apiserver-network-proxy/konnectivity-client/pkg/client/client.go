@@ -76,6 +76,7 @@ func CreateSingleUseGrpcTunnel(ctx context.Context, address string, opts ...grpc
 
 	stream, err := grpcClient.Proxy(ctx)
 	if err != nil {
+		c.Close()
 		return nil, err
 	}
 
