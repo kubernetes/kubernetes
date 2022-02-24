@@ -15,6 +15,8 @@
 package model
 
 import (
+	"time"
+
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -22,6 +24,13 @@ import (
 
 const (
 	maxRequestSizeBytes = 3000000
+	// chosen as the numbers of digits of the largest 64-bit integer
+	// we add 4 to account for a unit (like ms) plus the quotation marks that will be used
+	maxDurationSizeJSON = 23
+	// OpenAPI datetime strings follow RFC 3339, section 5.6, and the longest possible
+	// such string is 9999-12-31T23:59:59.999999999Z, which has length 30 - we add 2
+	// to allow for quotation marks
+	maxDatetimeSizeJSON = 32
 )
 
 // SchemaDeclType converts the structural schema to a CEL declaration, or returns nil if the
@@ -129,31 +138,33 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		}
 		return NewObjectType("object", fields)
 	case "string":
-		if s.ValueValidation != nil {
+		if s.ValueValidation != nil && s.ValueValidation.Format != "" {
 			switch s.ValueValidation.Format {
 			case "byte":
-				// TODO(DangerOnTheRanger): we can't easily fall back to estimateMaxSizeJSON here since we could be
-				// looking at a string inside another object - we need to pass that information down
-				// recursive calls to SchemaDeclType first
+				byteWithMaxLength := newSimpleType("bytes", decls.Bytes, types.Bytes([]byte{}))
 				if s.ValueValidation.MaxLength != nil {
-					byteWithMaxLength := newSimpleType("bytes", decls.Bytes, types.Bytes([]byte{}))
 					byteWithMaxLength.MaxLength = *s.ValueValidation.MaxLength
-					return byteWithMaxLength
+				} else {
+					byteWithMaxLength.MaxLength = estimateMaxSizeJSON(s)
 				}
-				return BytesType
+				return byteWithMaxLength
 			case "duration":
+				durationWithMaxLength := newSimpleType("duration", decls.Duration, types.Duration{Duration: time.Duration(0)})
+				durationWithMaxLength.MaxLength = estimateMaxSizeJSON(s)
 				return DurationType
 			case "date", "date-time":
+				timestampWithMaxLength := newSimpleType("timestamp", decls.Timestamp, types.Timestamp{Time: time.Time{}})
+				timestampWithMaxLength.MaxLength = estimateMaxSizeJSON(s)
 				return TimestampType
-			case "":
-				if s.ValueValidation.MaxLength != nil {
-					strWithMaxLength := newSimpleType("string", decls.String, types.String(""))
-					strWithMaxLength.MaxLength = *s.ValueValidation.MaxLength
-					return strWithMaxLength
-				}
 			}
 		}
-		return StringType
+		strWithMaxLength := newSimpleType("string", decls.String, types.String(""))
+		if s.ValueValidation != nil && s.ValueValidation.MaxLength != nil {
+			strWithMaxLength.MaxLength = *s.ValueValidation.MaxLength
+		} else {
+			strWithMaxLength.MaxLength = estimateMaxSizeJSON(s)
+		}
+		return strWithMaxLength
 	case "boolean":
 		return BoolType
 	case "number":
@@ -241,6 +252,17 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 // constraints.
 func estimateMaxSizeJSON(s *schema.Structural) int64 {
 	switch s.Type {
+	case "string":
+		if s.ValueValidation != nil && s.ValueValidation.Format != "" && s.ValueValidation.Format != "byte" {
+			switch s.Type {
+			case "duration":
+				return maxDurationSizeJSON
+			case "date", "date-time":
+				return maxDatetimeSizeJSON
+			}
+		}
+		// subtract 2 to account for ""
+		return (maxRequestSizeBytes - 2)
 	case "array":
 		// subtract 2 to account for [ and ]
 		return (maxRequestSizeBytes - 2) / estimateMinSizeJSON(s.Items)
