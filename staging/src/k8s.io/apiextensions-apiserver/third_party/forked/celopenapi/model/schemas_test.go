@@ -239,35 +239,6 @@ func testSchema() *schema.Structural {
 	return ts
 }
 
-func TestMaxLengths(t *testing.T) {
-	ts := schemaWithMaxLengths()
-	cust := SchemaDeclType(ts, true).MaybeAssignTypeName("CustomObject")
-	list, ok := cust.FindField("listWithLength")
-	if !ok {
-		t.Error("could not find listWithLength")
-	}
-
-	if list.Type.MaxLength != 10 {
-		t.Errorf("Wrong MaxLength found (got %d, expected %d)", list.Type.MaxLength, 10)
-	}
-
-	str, ok := cust.FindField("stringWithLength")
-	if !ok {
-		t.Error("could not find stringWithLength")
-	}
-	if str.Type.MaxLength != 20 {
-		t.Errorf("Wrong MaxLength found (got %d, expected %d)", str.Type.MaxLength, 20)
-	}
-
-	celMap, ok := cust.FindField("mapWithLength")
-	if !ok {
-		t.Error("could not find mapWithLength")
-	}
-	if celMap.Type.MaxLength != 15 {
-		t.Errorf("Wrong MaxLength found (got %d, expected %d)", celMap.Type.MaxLength, 15)
-	}
-}
-
 func TestEstimateMaxLengthJSON(t *testing.T) {
 	type maxLengthTest struct {
 		Name              string
@@ -353,47 +324,9 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			// expected JSON is [{"required":"",},{"required":"",},...] so our length should be (3000000 - 2) / 17
 			ExpectedMaxLength: 176470,
 		},
-	}
-	for _, testCase := range tests {
-		t.Run(testCase.Name, func(t *testing.T) {
-			decl := SchemaDeclType(testCase.InputSchema, false)
-			if decl.MaxLength != testCase.ExpectedMaxLength {
-				t.Errorf("wrong maxLength estimate (got %d, expected %d)", decl.MaxLength, testCase.ExpectedMaxLength)
-			}
-		})
-	}
-}
-
-func maxPtr(max int64) *int64 {
-	return &max
-}
-
-func schemaWithMaxLengths() *schema.Structural {
-	// Manual construction of a schema with the following definition:
-	//
-	// schema:
-	//   type: object
-	//   metadata:
-	//     custom_type: "CustomObject"
-	//   properties:
-	//     listWithLength:
-	//       type: array
-	//       maxItems: 10
-	//       default: [1, 2, 3, 4, 5]
-	//     stringWithLength:
-	//       type: string
-	//       maxLength: 20
-	//       default: "test-data"
-	//     mapWithLength:
-	//       type: object
-	//       maxProperties: 15
-	//       additionalProperties: true
-	ts := &schema.Structural{
-		Generic: schema.Generic{
-			Type: "object",
-		},
-		Properties: map[string]schema.Structural{
-			"listWithLength": {
+		{
+			Name: "listWithLength",
+			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
 					Type:    "array",
 					Default: schema.JSON{Object: [5]int64{1, 2, 3, 4, 5}},
@@ -408,7 +341,12 @@ func schemaWithMaxLengths() *schema.Structural {
 					},
 				},
 			},
-			"stringWithLength": {
+			// manually set by MaxItems
+			ExpectedMaxLength: 10,
+		},
+		{
+			Name: "stringWithLength",
+			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
 					Type:    "string",
 					Default: schema.JSON{Object: "test-data"},
@@ -417,7 +355,12 @@ func schemaWithMaxLengths() *schema.Structural {
 					MaxLength: maxPtr(20),
 				},
 			},
-			"mapWithLength": {
+			// manually set by MaxLength
+			ExpectedMaxLength: 20,
+		},
+		{
+			Name: "mapWithLength",
+			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
 					Type: "object",
 					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
@@ -431,7 +374,20 @@ func schemaWithMaxLengths() *schema.Structural {
 					MaxProperties: maxPtr(15),
 				},
 			},
+			// manually set by MaxProperties
+			ExpectedMaxLength: 15,
 		},
 	}
-	return ts
+	for _, testCase := range tests {
+		t.Run(testCase.Name, func(t *testing.T) {
+			decl := SchemaDeclType(testCase.InputSchema, false)
+			if decl.MaxLength != testCase.ExpectedMaxLength {
+				t.Errorf("wrong maxLength (got %d, expected %d)", decl.MaxLength, testCase.ExpectedMaxLength)
+			}
+		})
+	}
+}
+
+func maxPtr(max int64) *int64 {
+	return &max
 }
