@@ -59,7 +59,8 @@ func Encode(e Encoder, obj Object) ([]byte, error) {
 	if err := e.Encode(obj, buf); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	bufClone := append([]byte(nil), buf.Bytes()...)
+	return bufClone, nil
 }
 
 // Decode is a convenience wrapper for decoding data into an Object.
