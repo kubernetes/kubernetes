@@ -127,6 +127,9 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 
 // Empty returns true if the predicate performs no filtering.
 func (s *SelectionPredicate) Empty() bool {
+	if s.Label == nil && s.Field == nil {
+		return true
+	}
 	return s.Label.Empty() && s.Field.Empty()
 }
 
