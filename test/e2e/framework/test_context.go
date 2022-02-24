@@ -316,7 +316,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
-	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
+	// Expect the test suite to work with both the new and legacy non-blocking control plane taints by default
+	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane,node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests. The default taint 'node-role.kubernetes.io/master' is DEPRECATED and will be removed from the list in a future release.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 	flags.BoolVar(&TestContext.ListConformanceTests, "list-conformance-tests", false, "If true, will show list of conformance tests.")
