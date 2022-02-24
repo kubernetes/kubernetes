@@ -187,7 +187,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.MaxPods = int32(opt.MaxPods)
 	c.PodsPerCore = int32(opt.PodsPerCore)
 	c.ClusterDNS = []string{}
-	c.ImageGCHighThresholdPercent = 90
+	c.ImageGCHighThresholdPercent = 85
 	c.ImageGCLowThresholdPercent = 80
 	c.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
 	c.VolumeStatsAggPeriod.Duration = time.Minute
