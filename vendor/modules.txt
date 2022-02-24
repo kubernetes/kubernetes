@@ -2603,15 +2603,16 @@ k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 ## explicit
 # k8s.io/system-validators => k8s.io/system-validators v1.4.0
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20210521133846-da695404a2bc => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+# k8s.io/utils v0.0.0-20211116205334-6203023598ed => k8s.io/utils v0.0.0-20211116205334-6203023598ed
 ## explicit
-# k8s.io/utils => k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+# k8s.io/utils => k8s.io/utils v0.0.0-20211116205334-6203023598ed
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec
 k8s.io/utils/exec/testing
 k8s.io/utils/inotify
 k8s.io/utils/integer
+k8s.io/utils/internal/third_party/forked/golang/net
 k8s.io/utils/io
 k8s.io/utils/keymutex
 k8s.io/utils/mount
