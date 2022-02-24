@@ -28,8 +28,16 @@ import (
 	"strings"
 	"testing"
 
+	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -50,6 +58,7 @@ import (
 	kubeversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -173,7 +182,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, _, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -458,5 +467,58 @@ func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 		if enable && strings.Contains(gv.Version, "alpha") {
 			t.Errorf("Alpha API version %s enabled by default", gv.String())
 		}
+	}
+}
+
+func TestNoBetaVersionsEnabledByDefault(t *testing.T) {
+	config := DefaultAPIResourceConfigSource()
+	for gv, enable := range config.GroupVersionConfigs {
+		if enable && strings.Contains(gv.Version, "beta") {
+			t.Errorf("Beta API version %s enabled by default", gv.String())
+		}
+	}
+}
+
+func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
+	// legacyEnabledBetaResources is nearly a duplication from elsewhere.  This is intentional.  These types already have
+	// GA equivalents available and should therefore never have a beta enabled by default again.
+	legacyEnabledBetaResources := map[schema.GroupVersionResource]bool{
+		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
+		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
+		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"):                       true,
+		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):                true,
+		eventsv1beta1.SchemeGroupVersion.WithResource("events"):                           true,
+		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):                     true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"):         true,
+	}
+
+	// legacyBetaResourcesWithoutStableEquivalents contains those groupresources that were enabled by default as beta
+	// before we changed that policy and do not have stable versions. These resources are allowed to have additional
+	// beta versions enabled by default.  Nothing new should be added here.  There are no future exceptions because there
+	// are no more beta resources enabled by default.
+	legacyBetaResourcesWithoutStableEquivalents := map[schema.GroupResource]bool{
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities").GroupResource():         true,
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas").GroupResource():                 true,
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
+	}
+
+	config := DefaultAPIResourceConfigSource()
+	for gvr, enable := range config.ResourceConfigs {
+		if !strings.Contains(gvr.Version, "beta") {
+			continue // only check beta things
+		}
+		if !enable {
+			continue // only check things that are enabled
+		}
+		if legacyEnabledBetaResources[gvr] {
+			continue // this is a legacy beta resource
+		}
+		if legacyBetaResourcesWithoutStableEquivalents[gvr.GroupResource()] {
+			continue // this is another beta of a legacy beta resource with no stable equivalent
+		}
+		t.Errorf("no new beta resources can be enabled by default, see https://github.com/kubernetes/enhancements/blob/0ad0fc8269165ca300d05ca51c7ce190a79976a5/keps/sig-architecture/3136-beta-apis-off-by-default/README.md: %v", gvr)
 	}
 }

@@ -80,8 +80,15 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
 			},
-			expectedEnabledAPIs: defaultFakeEnabledResources(),
-			err:                 false,
+			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"):   false, // this becomes false because the DisableVersions set in the defaultConfig is now order dependent.
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"): false,
+				extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):  false,
+				appsv1.SchemeGroupVersion.WithResource("deployments"):               true,
+				apiv1.SchemeGroupVersion.WithResource("pods"):                       true,
+			},
+			err: false,
 		},
 		{
 			name: "version-enabled-by-runtimeConfig-override",
@@ -147,8 +154,6 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.EnableVersions(scheme.PrioritizedVersionsAllGroups()...)
-				// disabling groups of APIs removes the individual resource preferences from the default
-				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -174,8 +179,6 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(appsv1.SchemeGroupVersion)
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
-				// disabling groups of APIs removes the individual resource preferences from the default
-				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -243,8 +246,6 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
-				// disabling groups of APIs removes the individual resource preferences from the default
-				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -290,8 +291,6 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
-				// disabling groups of APIs removes the individual resource preferences from the default
-				config.RemoveMatchingResourcePreferences(matchAllExplicitResourcesForFake)
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -566,17 +565,6 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 	)
 
 	return ret
-}
-
-func matchAllExplicitResourcesForFake(gvr schema.GroupVersionResource) bool {
-	switch gvr {
-	case extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"):
-		return true
-	}
-	return false
 }
 
 // apiResourcesToCheck are the apis we use in this set of unit tests.  They will be check for enable/disable status
