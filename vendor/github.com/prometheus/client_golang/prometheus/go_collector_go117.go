@@ -20,6 +20,7 @@ import (
 	"math"
 	"runtime"
 	"runtime/metrics"
+	"strings"
 	"sync"
 
 	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
@@ -31,10 +32,14 @@ import (
 type goCollector struct {
 	base baseGoCollector
 
+	// mu protects updates to all fields ensuring a consistent
+	// snapshot is always produced by Collect.
+	mu sync.Mutex
+
 	// rm... fields all pertain to the runtime/metrics package.
 	rmSampleBuf []metrics.Sample
 	rmSampleMap map[string]*metrics.Sample
-	rmMetrics   []Metric
+	rmMetrics   []collectorMetric
 
 	// With Go 1.17, the runtime/metrics package was introduced.
 	// From that point on, metric names produced by the runtime/metrics
@@ -52,13 +57,24 @@ type goCollector struct {
 // Deprecated: Use collectors.NewGoCollector instead.
 func NewGoCollector() Collector {
 	descriptions := metrics.All()
-	descMap := make(map[string]*metrics.Description)
-	for i := range descriptions {
-		descMap[descriptions[i].Name] = &descriptions[i]
+
+	// Collect all histogram samples so that we can get their buckets.
+	// The API guarantees that the buckets are always fixed for the lifetime
+	// of the process.
+	var histograms []metrics.Sample
+	for _, d := range descriptions {
+		if d.Kind == metrics.KindFloat64Histogram {
+			histograms = append(histograms, metrics.Sample{Name: d.Name})
+		}
+	}
+	metrics.Read(histograms)
+	bucketsMap := make(map[string][]float64)
+	for i := range histograms {
+		bucketsMap[histograms[i].Name] = histograms[i].Value.Float64Histogram().Buckets
 	}
 
 	// Generate a Desc and ValueType for each runtime/metrics metric.
-	metricSet := make([]Metric, 0, len(descriptions))
+	metricSet := make([]collectorMetric, 0, len(descriptions))
 	sampleBuf := make([]metrics.Sample, 0, len(descriptions))
 	sampleMap := make(map[string]*metrics.Sample, len(descriptions))
 	for i := range descriptions {
@@ -76,9 +92,10 @@ func NewGoCollector() Collector {
 		sampleBuf = append(sampleBuf, metrics.Sample{Name: d.Name})
 		sampleMap[d.Name] = &sampleBuf[len(sampleBuf)-1]
 
-		var m Metric
+		var m collectorMetric
 		if d.Kind == metrics.KindFloat64Histogram {
 			_, hasSum := rmExactSumMap[d.Name]
+			unit := d.Name[strings.IndexRune(d.Name, ':')+1:]
 			m = newBatchHistogram(
 				NewDesc(
 					BuildFQName(namespace, subsystem, name),
@@ -86,6 +103,7 @@ func NewGoCollector() Collector {
 					nil,
 					nil,
 				),
+				internal.RuntimeMetricsBucketsForUnit(bucketsMap[d.Name], unit),
 				hasSum,
 			)
 		} else if d.Cumulative {
@@ -130,9 +148,25 @@ func (c *goCollector) Collect(ch chan<- Metric) {
 	// Collect base non-memory metrics.
 	c.base.Collect(ch)
 
+	// Collect must be thread-safe, so prevent concurrent use of
+	// rmSampleBuf. Just read into rmSampleBuf but write all the data
+	// we get into our Metrics or MemStats.
+	//
+	// This lock also ensures that the Metrics we send out are all from
+	// the same updates, ensuring their mutual consistency insofar as
+	// is guaranteed by the runtime/metrics package.
+	//
+	// N.B. This locking is heavy-handed, but Collect is expected to be called
+	// relatively infrequently. Also the core operation here, metrics.Read,
+	// is fast (O(tens of microseconds)) so contention should certainly be
+	// low, though channel operations and any allocations may add to that.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	// Populate runtime/metrics sample buffer.
 	metrics.Read(c.rmSampleBuf)
 
+	// Update all our metrics from rmSampleBuf.
 	for i, sample := range c.rmSampleBuf {
 		// N.B. switch on concrete type because it's significantly more efficient
 		// than checking for the Counter and Gauge interface implementations. In
@@ -157,7 +191,6 @@ func (c *goCollector) Collect(ch chan<- Metric) {
 			panic("unexpected metric type")
 		}
 	}
-
 	// ms is a dummy MemStats that we populate ourselves so that we can
 	// populate the old metrics from it.
 	var ms runtime.MemStats
@@ -280,13 +313,27 @@ type batchHistogram struct {
 	// but Write calls may operate concurrently with updates.
 	// Contention between these two sources should be rare.
 	mu      sync.Mutex
-	buckets []float64 // Inclusive lower bounds.
+	buckets []float64 // Inclusive lower bounds, like runtime/metrics.
 	counts  []uint64
 	sum     float64 // Used if hasSum is true.
 }
 
-func newBatchHistogram(desc *Desc, hasSum bool) *batchHistogram {
-	h := &batchHistogram{desc: desc, hasSum: hasSum}
+// newBatchHistogram creates a new batch histogram value with the given
+// Desc, buckets, and whether or not it has an exact sum available.
+//
+// buckets must always be from the runtime/metrics package, following
+// the same conventions.
+func newBatchHistogram(desc *Desc, buckets []float64, hasSum bool) *batchHistogram {
+	h := &batchHistogram{
+		desc:    desc,
+		buckets: buckets,
+		// Because buckets follows runtime/metrics conventions, there's
+		// 1 more value in the buckets list than there are buckets represented,
+		// because in runtime/metrics, the bucket values represent *boundaries*,
+		// and non-Inf boundaries are inclusive lower bounds for that bucket.
+		counts: make([]uint64, len(buckets)-1),
+		hasSum: hasSum,
+	}
 	h.init(h)
 	return h
 }
@@ -294,28 +341,25 @@ func newBatchHistogram(desc *Desc, hasSum bool) *batchHistogram {
 // update updates the batchHistogram from a runtime/metrics histogram.
 //
 // sum must be provided if the batchHistogram was created to have an exact sum.
+// h.buckets must be a strict subset of his.Buckets.
 func (h *batchHistogram) update(his *metrics.Float64Histogram, sum float64) {
 	counts, buckets := his.Counts, his.Buckets
-	// Skip a -Inf bucket altogether. It's not clear how to represent that.
-	if math.IsInf(buckets[0], -1) {
-		buckets = buckets[1:]
-		counts = counts[1:]
-	}
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Check if we're initialized.
-	if h.buckets == nil {
-		// Make copies of counts and buckets. It's really important
-		// that we don't retain his.Counts or his.Buckets anywhere since
-		// it's going to get reused.
-		h.buckets = make([]float64, len(buckets))
-		copy(h.buckets, buckets)
-
-		h.counts = make([]uint64, len(counts))
+	// Clear buckets.
+	for i := range h.counts {
+		h.counts[i] = 0
 	}
-	copy(h.counts, counts)
+	// Copy and reduce buckets.
+	var j int
+	for i, count := range counts {
+		h.counts[j] += count
+		if buckets[i+1] == h.buckets[j+1] {
+			j++
+		}
+	}
 	if h.hasSum {
 		h.sum = sum
 	}
