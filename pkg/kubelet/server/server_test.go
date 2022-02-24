@@ -1445,6 +1445,7 @@ func TestCadvisorMetrics(t *testing.T) {
 	// Convert values and timestamps for `container_last_seen` to static "$NOW" string.
 	// This is because it's impossible to inject fake current time to cadvisor - which is used as both value and sam.
 	body = replaceValuesOfContainerLastSeenMetric("container_last_seen", " $NOW $NOW", body)
+
 	assert.Equal(t, string(expected), string(body))
 
 	// Second call should lead the same result.

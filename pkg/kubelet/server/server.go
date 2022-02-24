@@ -386,7 +386,7 @@ func (s *Server) InstallDefaultHandlers() {
 		MaxAge: func() *time.Duration { maxAge := 5 * time.Second; return &maxAge }(),
 	}
 	s.restfulCont.Handle(cadvisorMetricsPath, promhttp.HandlerForTransactional(
-		metrics.UpdateOnMaxAgeGatherer(cadvisorOpts, metrics.NewCachedGatherer(container.Collect, machine.Collect)),
+		metrics.UpdateOnMaxAgeGatherer(cadvisorOpts, metrics.NewCachedGatherer(container, machine)),
 		promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError},
 	))
 

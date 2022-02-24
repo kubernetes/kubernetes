@@ -17,9 +17,8 @@ package metrics
 import (
 	"strconv"
 
-	v2 "github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/metrics/cache"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/cache"
 
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
@@ -63,12 +62,19 @@ type machineMetric struct {
 type MachineCollector struct {
 	infoProvider   infoProvider
 	machineMetrics []machineMetric
+
+	machineScrapeErrors cache.Metric
 }
 
 // NewMachineCollector returns a new MachineCollector.
 func NewMachineCollector(i infoProvider, includedMetrics container.MetricSet) *MachineCollector {
 	c := &MachineCollector{
 		infoProvider: i,
+		machineScrapeErrors: cache.Metric{
+			FQName:    "machine_scrape_error",
+			Help:      "1 if there was an error while getting machine metrics, 0 otherwise.",
+			ValueType: prometheus.GaugeValue,
+		},
 		machineMetrics: []machineMetric{
 			{
 				name:      "machine_cpu_physical_cores",
@@ -189,29 +195,24 @@ func NewMachineCollector(i infoProvider, includedMetrics container.MetricSet) *M
 }
 
 // Collect fetches latest statistics about machines in form of prometheus cache inserts.
-func (c *MachineCollector) Collect(_ v2.RequestOptions, inserts []cache.Insert) []cache.Insert {
-	errorsGauge := 0
-	inserts, err := c.collectMachineInfo(inserts)
-	if err != nil {
+func (c *MachineCollector) Collect(cacheInsertFn cacheInsertFn) {
+	errorsGauge := 0.0
+	if err := c.collectMachineInfo(cacheInsertFn); err != nil {
 		errorsGauge = 1
 		klog.Warningf("Couldn't get machine info: %s", err)
 	}
 
-	// TODO(bwplotka): Consider moving this to normal metric or returning error directly instead of metric.
-	return append(inserts, cache.Insert{
-		Key:       cache.Key{FQName: "machine_scrape_error"},
-		Help:      "1 if there was an error while getting machine metrics, 0 otherwise",
-		ValueType: prometheus.GaugeValue,
-		Value:     float64(errorsGauge),
-	})
+	c.machineScrapeErrors.Value = errorsGauge
+	_ = cacheInsertFn(c.machineScrapeErrors)
 }
 
-func (c *MachineCollector) collectMachineInfo(inserts []cache.Insert) ([]cache.Insert, error) {
+func (c *MachineCollector) collectMachineInfo(cacheInsertFn cacheInsertFn) error {
 	machineInfo, err := c.infoProvider.GetMachineInfo()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	merr := prometheus.MultiError{}
 	labels := make([]string, len(baseLabelsNames))
 	copy(labels, baseLabelsNames)
 	baseLabelsValues := []string{machineInfo.MachineID, machineInfo.SystemUUID, machineInfo.BootID}
@@ -227,26 +228,26 @@ func (c *MachineCollector) collectMachineInfo(inserts []cache.Insert) ([]cache.I
 			labels = append(labels, metric.extraLabels...)
 			values = append(values, metricValue.labels...)
 
-			inserts = append(inserts, cache.Insert{
-				Key: cache.Key{
-					FQName:      metric.name,
-					LabelNames:  labels,
-					LabelValues: values,
-				},
-				Help:      metric.help,
-				ValueType: metric.valueType,
-				Value:     metricValue.value,
-			})
+			m := cache.Metric{
+				FQName:      metric.name,
+				LabelNames:  labels,
+				LabelValues: values,
+				Help:        metric.help,
+				ValueType:   metric.valueType,
+				Value:       metricValue.value,
+			}
 
 			if !metricValue.timestamp.IsZero() {
-				inserts[len(inserts)-1].Timestamp = &metricValue.timestamp
+				m.Timestamp = &metricValue.timestamp
 			}
+
+			merr.Append(cacheInsertFn(m))
 
 			labels = labels[:len(labels)-len(metric.extraLabels)]
 			values = values[:len(values)-len(metricValue.labels)]
 		}
 	}
-	return inserts, nil
+	return merr.MaybeUnwrap()
 }
 
 func getMemoryByType(machineInfo *info.MachineInfo, property string) metricValues {

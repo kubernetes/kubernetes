@@ -66,7 +66,7 @@ require (
 	github.com/opencontainers/selinux v1.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/prometheus/client_golang v1.12.1-0.20220126194218-961f8ca5e65b
+	github.com/prometheus/client_golang v1.12.2-0.20220223112252-1f81b3e9130f
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
 	github.com/quobyte/api v0.1.8
@@ -267,7 +267,8 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/bwplotka/cadvisor v0.42.1-0.20220217184120-b98e3bbd0a2f
+	// TODO(bwplotka): Remove when https://github.com/google/cadvisor/pull/2974 is merged.
+	github.com/google/cadvisor => github.com/bwplotka/cadvisor v0.42.1-0.20220224131916-31697c93a118
 	github.com/google/cel-go => github.com/google/cel-go v0.9.0
 	github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
@@ -380,7 +381,7 @@ replace (
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/posener/complete => github.com/posener/complete v1.1.1
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.1-0.20220126194218-961f8ca5e65b
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.2-0.20220223112252-1f81b3e9130f
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common => github.com/prometheus/common v0.32.1
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.7.3

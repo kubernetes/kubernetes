@@ -72,7 +72,7 @@ func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedM
 	}
 }
 
-// Get cgroup and networking stats of the specified container
+// GetStats gets cgroup and networking stats of the specified container.
 func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	ignoreStatsError := false
 	if cgroups.IsCgroup2UnifiedMode() {

@@ -20,8 +20,8 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/metrics/cache"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/cache"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -45,27 +45,30 @@ type infoProvider interface {
 	GetMachineInfo() (*info.MachineInfo, error)
 }
 
-type CollectFn func(opts v2.RequestOptions, inserts []cache.Insert) []cache.Insert
-
 var _ prometheus.TransactionalGatherer = &CachedGatherer{}
 
 // CachedGatherer is an TransactionalGatherer that is able to cache and update in place metrics from defined Cadvisor collectors.
 // Caller has responsibility to use `UpdateOnMaxAge` whenever cache has to be updated.
+// TODO(bwplotka): While this cache improves efficiency containerData has memoryCache which might be not needed if this layer caches.
 type CachedGatherer struct {
 	*cache.CachedTGatherer
-	buf []cache.Insert
+
+	container *ContainerCollector
+	machine   *MachineCollector
 
 	mu         sync.Mutex
-	collectFns []CollectFn
 	lastUpdate time.Time
 }
 
-func NewCachedGatherer(cfs ...CollectFn) *CachedGatherer {
+func NewCachedGatherer(container *ContainerCollector, machine *MachineCollector) *CachedGatherer {
 	return &CachedGatherer{
 		CachedTGatherer: cache.NewCachedTGatherer(),
-		collectFns:      cfs,
+		container:       container,
+		machine:         machine,
 	}
 }
+
+type cacheInsertFn func(entry cache.Metric) error
 
 // UpdateOnMaxAge updates cache using provided collectorFns whenever cache is older than provided `MaxAge`. If `MaxAge` is nil, we always update cache.
 // UpdateOnMaxAge is goroutine safe.
@@ -76,13 +79,10 @@ func (c *CachedGatherer) UpdateOnMaxAge(opts v2.RequestOptions) {
 	if opts.MaxAge == nil || time.Since(c.lastUpdate) > *opts.MaxAge {
 		c.lastUpdate = time.Now()
 
-		c.buf = c.buf[:0]
-		for _, collect := range c.collectFns {
-			c.buf = collect(opts, c.buf)
-		}
-		if err := c.CachedTGatherer.Update(true, c.buf, nil); err != nil {
-			panic(err) // Programmatic error.
-		}
+		stop := c.CachedTGatherer.StartUpdateSession()
+		c.container.Collect(opts, c.CachedTGatherer.InsertInPlace)
+		c.machine.Collect(c.CachedTGatherer.InsertInPlace)
+		stop()
 	}
 }
 

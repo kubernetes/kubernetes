@@ -87,6 +87,9 @@ func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
 	return HandlerForTransactional(prometheus.ToTransactionalGatherer(reg), opts)
 }
 
+// HandlerForTransactional is like HandlerFor, but it uses transactional gather, which
+// can safely change in-place returned *dto.MetricFamily before call to `Gather` and after
+// call to `done` of that `Gather`.
 func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerOpts) http.Handler {
 	var (
 		inFlightSem chan struct{}
@@ -117,7 +120,6 @@ func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerO
 
 	h := http.HandlerFunc(func(rsp http.ResponseWriter, req *http.Request) {
 		if inFlightSem != nil {
-			// TODO(bwplotka): Implement single-flight which is essential for blocking TransactionalGatherer.
 			select {
 			case inFlightSem <- struct{}{}: // All good, carry on.
 				defer func() { <-inFlightSem }()

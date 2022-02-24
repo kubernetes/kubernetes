@@ -3646,7 +3646,7 @@ container_processes{container="",id="/user.slice/user-1000.slice/user@1000.servi
 container_processes{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service",image="",name="",namespace="",pod=""} 0 1645535816827
 container_processes{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pipewire.service",image="",name="",namespace="",pod=""} 0 1645535816822
 container_processes{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pulseaudio.service",image="",name="",namespace="",pod=""} 0 1645535816846
-# HELP container_scrape_error 1 if there was an error while getting container metrics, 0 otherwise
+# HELP container_scrape_error 1 if there was an error while getting container metrics, 0 otherwise.
 # TYPE container_scrape_error gauge
 container_scrape_error 0
 # HELP container_sockets Number of open sockets for the container.
@@ -3937,7 +3937,7 @@ container_spec_cpu_period{container="",id="/user.slice/user-1000.slice/user@1000
 container_spec_cpu_period{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service",image="",name="",namespace="",pod=""} 0
 container_spec_cpu_period{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pipewire.service",image="",name="",namespace="",pod=""} 0
 container_spec_cpu_period{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pulseaudio.service",image="",name="",namespace="",pod=""} 0
-# HELP container_spec_cpu_shares CPU share of the container.
+# HELP container_spec_cpu_shares CPU share (limit) of the container.
 # TYPE container_spec_cpu_shares gauge
 container_spec_cpu_shares{container="",id="/",image="",name="",namespace="",pod=""} 0
 container_spec_cpu_shares{container="",id="/e2e",image="",name="",namespace="",pod=""} 2597
