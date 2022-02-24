@@ -398,7 +398,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			var gotForgetPod *v1.Pod
 			var gotAssumedPod *v1.Pod
 			var gotBinding *v1.Binding
-			sCache := &fakecache.Cache{
+			cache := &fakecache.Cache{
 				ForgetFunc: func(pod *v1.Pod) {
 					gotForgetPod = pod
 				},
@@ -436,9 +436,9 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			defer cancel()
 
 			s := &Scheduler{
-				SchedulerCache: sCache,
-				Algorithm:      item.algo,
-				client:         client,
+				Cache:     cache,
+				Algorithm: item.algo,
+				client:    client,
 				Error: func(p *framework.QueuedPodInfo, err error) {
 					gotPod = p.Pod
 					gotError = err
@@ -881,7 +881,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, broadcaster events.EventBroadcaster, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, cache internalcache.Cache, informerFactory informers.SharedInformerFactory, broadcaster events.EventBroadcaster, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 	bindingChan := make(chan *v1.Binding, 1)
 	client := clientsetfake.NewSimpleClientset()
 	client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -915,15 +915,15 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, s
 	)
 
 	algo := NewGenericScheduler(
-		scache,
+		cache,
 		internalcache.NewEmptySnapshot(),
 		schedulerapi.DefaultPercentageOfNodesToScore,
 	)
 
 	errChan := make(chan error, 1)
 	sched := &Scheduler{
-		SchedulerCache: scache,
-		Algorithm:      algo,
+		Cache:     cache,
+		Algorithm: algo,
 		NextPod: func() *framework.QueuedPodInfo {
 			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
@@ -1180,16 +1180,16 @@ func TestSchedulerBinding(t *testing.T) {
 			}
 			stop := make(chan struct{})
 			defer close(stop)
-			scache := internalcache.New(100*time.Millisecond, stop)
+			cache := internalcache.New(100*time.Millisecond, stop)
 			algo := NewGenericScheduler(
-				scache,
+				cache,
 				nil,
 				0,
 			)
 			sched := Scheduler{
-				Algorithm:      algo,
-				Extenders:      test.extenders,
-				SchedulerCache: scache,
+				Algorithm: algo,
+				Extenders: test.extenders,
+				Cache:     cache,
 			}
 			err = sched.bind(context.Background(), fwk, pod, "node", nil)
 			if err != nil {

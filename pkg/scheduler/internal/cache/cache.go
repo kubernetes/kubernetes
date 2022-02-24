@@ -39,7 +39,7 @@ var (
 // "ttl" is how long the assumed pod will get expired.
 // "stop" is the channel that would close the background goroutine.
 func New(ttl time.Duration, stop <-chan struct{}) Cache {
-	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop)
+	cache := newCache(ttl, cleanAssumedPeriod, stop)
 	cache.run()
 	return cache
 }
@@ -97,7 +97,7 @@ func (cache *cacheImpl) createImageStateSummary(state *imageState) *framework.Im
 	}
 }
 
-func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *cacheImpl {
+func newCache(ttl, period time.Duration, stop <-chan struct{}) *cacheImpl {
 	return &cacheImpl{
 		ttl:    ttl,
 		period: period,

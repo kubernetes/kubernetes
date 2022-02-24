@@ -67,7 +67,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 		return
 	}
 
-	nodeInfo := sched.SchedulerCache.AddNode(node)
+	nodeInfo := sched.Cache.AddNode(node)
 	klog.V(3).InfoS("Add event for node", "node", klog.KObj(node))
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd, preCheckForNode(nodeInfo))
 }
@@ -84,7 +84,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 		return
 	}
 
-	nodeInfo := sched.SchedulerCache.UpdateNode(oldNode, newNode)
+	nodeInfo := sched.Cache.UpdateNode(oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
 	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != nil {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(*event, preCheckForNode(nodeInfo))
@@ -108,7 +108,7 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		return
 	}
 	klog.V(3).InfoS("Delete event for node", "node", klog.KObj(node))
-	if err := sched.SchedulerCache.RemoveNode(node); err != nil {
+	if err := sched.Cache.RemoveNode(node); err != nil {
 		klog.ErrorS(err, "Scheduler cache RemoveNode failed")
 	}
 }
@@ -129,7 +129,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		return
 	}
 
-	isAssumed, err := sched.SchedulerCache.IsAssumedPod(newPod)
+	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", newPod.Namespace, newPod.Name, err))
 	}
@@ -185,7 +185,7 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 	}
 	klog.V(3).InfoS("Add event for scheduled pod", "pod", klog.KObj(pod))
 
-	if err := sched.SchedulerCache.AddPod(pod); err != nil {
+	if err := sched.Cache.AddPod(pod); err != nil {
 		klog.ErrorS(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
 
@@ -205,7 +205,7 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	}
 	klog.V(4).InfoS("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 
-	if err := sched.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
+	if err := sched.Cache.UpdatePod(oldPod, newPod); err != nil {
 		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
@@ -229,7 +229,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		return
 	}
 	klog.V(3).InfoS("Delete event for scheduled pod", "pod", klog.KObj(pod))
-	if err := sched.SchedulerCache.RemovePod(pod); err != nil {
+	if err := sched.Cache.RemovePod(pod); err != nil {
 		klog.ErrorS(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
