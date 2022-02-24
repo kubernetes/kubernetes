@@ -5,11 +5,13 @@ go_library(
     srcs = [
         "ipnet.go",
         "net.go",
+        "parse.go",
         "port.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/utils/net",
     importpath = "k8s.io/utils/net",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/k8s.io/utils/internal/third_party/forked/golang/net:go_default_library"],
 )
 
 filegroup(

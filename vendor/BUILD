@@ -500,6 +500,7 @@ filegroup(
         "//vendor/k8s.io/utils/exec:all-srcs",
         "//vendor/k8s.io/utils/inotify:all-srcs",
         "//vendor/k8s.io/utils/integer:all-srcs",
+        "//vendor/k8s.io/utils/internal/third_party/forked/golang/net:all-srcs",
         "//vendor/k8s.io/utils/io:all-srcs",
         "//vendor/k8s.io/utils/keymutex:all-srcs",
         "//vendor/k8s.io/utils/mount:all-srcs",
