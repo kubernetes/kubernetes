@@ -24,6 +24,9 @@ import (
 func TestItemExponentialFailureRateLimiter(t *testing.T) {
 	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second)
 
+	if e, a := 0*time.Millisecond, limiter.When("one"); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	if e, a := 1*time.Millisecond, limiter.When("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
@@ -36,17 +39,14 @@ func TestItemExponentialFailureRateLimiter(t *testing.T) {
 	if e, a := 8*time.Millisecond, limiter.When("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 16*time.Millisecond, limiter.When("one"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
 	if e, a := 5, limiter.NumRequeues("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	if e, a := 1*time.Millisecond, limiter.When("two"); e != a {
+	if e, a := 0*time.Millisecond, limiter.When("two"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 2*time.Millisecond, limiter.When("two"); e != a {
+	if e, a := 1*time.Millisecond, limiter.When("two"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 2, limiter.NumRequeues("two"); e != a {
@@ -57,7 +57,7 @@ func TestItemExponentialFailureRateLimiter(t *testing.T) {
 	if e, a := 0, limiter.NumRequeues("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 1*time.Millisecond, limiter.When("one"); e != a {
+	if e, a := 0*time.Millisecond, limiter.When("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -68,7 +68,7 @@ func TestItemExponentialFailureRateLimiterOverFlow(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		limiter.When("one")
 	}
-	if e, a := 32*time.Millisecond, limiter.When("one"); e != a {
+	if e, a := 16*time.Millisecond, limiter.When("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -83,7 +83,7 @@ func TestItemExponentialFailureRateLimiterOverFlow(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		limiter.When("two")
 	}
-	if e, a := 4*time.Minute, limiter.When("two"); e != a {
+	if e, a := 2*time.Minute, limiter.When("two"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 

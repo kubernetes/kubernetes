@@ -37,6 +37,14 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 	queue.DelayingInterface = delayingQueue
 
+	// No initial delay on first entry
+	queue.AddRateLimited("one")
+	select {
+	case <-delayingQueue.waitingForAddCh:
+		t.Fatalf("unexpected wait")
+	default:
+	}
+
 	queue.AddRateLimited("one")
 	waitEntry := <-delayingQueue.waitingForAddCh
 	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
@@ -47,8 +55,16 @@ func TestRateLimitingQueue(t *testing.T) {
 	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 2, queue.NumRequeues("one"); e != a {
+	if e, a := 3, queue.NumRequeues("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// No initial delay on first entry
+	queue.AddRateLimited("two")
+	select {
+	case <-delayingQueue.waitingForAddCh:
+		t.Fatalf("unexpected wait")
+	default:
 	}
 
 	queue.AddRateLimited("two")
@@ -67,9 +83,9 @@ func TestRateLimitingQueue(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("one")
-	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+	select {
+	case <-delayingQueue.waitingForAddCh:
+		t.Fatalf("unexpected wait")
+	default:
 	}
-
 }

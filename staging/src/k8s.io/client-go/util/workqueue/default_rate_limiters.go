@@ -64,6 +64,8 @@ func (r *BucketRateLimiter) Forget(item interface{}) {
 
 // ItemExponentialFailureRateLimiter does a simple baseDelay*2^<num-failures> limit
 // dealing with max failures and expiration are up to the caller
+//
+// When num-failures is 0 it will not wait
 type ItemExponentialFailureRateLimiter struct {
 	failuresLock sync.Mutex
 	failures     map[interface{}]int
@@ -90,8 +92,15 @@ func (r *ItemExponentialFailureRateLimiter) When(item interface{}) time.Duration
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
-	exp := r.failures[item]
-	r.failures[item] = r.failures[item] + 1
+	failures := r.failures[item]
+	r.failures[item] = failures + 1
+
+	if failures == 0 {
+		return 0
+	}
+
+	// first delay should be baseDelay so offset the count
+	exp := failures - 1
 
 	// The backoff is capped such that 'calculated' value never overflows.
 	backoff := float64(r.baseDelay.Nanoseconds()) * math.Pow(2, float64(exp))
