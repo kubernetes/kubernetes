@@ -479,11 +479,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		var nginxController *e2eingress.NginxIngressController
 
 		ginkgo.BeforeEach(func() {
-			// Skip until nginx-ingress controller works against kubernetes 1.22+
-			// Those versions no longer server ingress v1beta1
-			// xref: https://github.com/kubernetes/ingress-nginx/issues/7145
-			e2eskipper.Skipf("Skipping because nginx-controller requires ingress/v1beta1 API")
-
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing nginx controller")
 			jig.Class = "nginx"
