@@ -41,7 +41,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -1105,35 +1104,12 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		return fmt.Errorf("the SeccompDefault feature gate must be enabled in order to use the SeccompDefault configuration")
 	}
 
-	k, err := createAndInitKubelet(&kubeServer.KubeletConfiguration,
+	k, err := createAndInitKubelet(kubeServer,
 		kubeDeps,
-		&kubeServer.ContainerRuntimeOptions,
 		hostname,
 		hostnameOverridden,
 		nodeName,
-		nodeIPs,
-		kubeServer.ProviderID,
-		kubeServer.CloudProvider,
-		kubeServer.CertDirectory,
-		kubeServer.RootDirectory,
-		kubeServer.ImageCredentialProviderConfigFile,
-		kubeServer.ImageCredentialProviderBinDir,
-		kubeServer.RegisterNode,
-		kubeServer.RegisterWithTaints,
-		kubeServer.AllowedUnsafeSysctls,
-		kubeServer.ExperimentalMounterPath,
-		kubeServer.KernelMemcgNotification,
-		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
-		kubeServer.MinimumGCAge,
-		kubeServer.MaxPerPodContainerCount,
-		kubeServer.MaxContainerCount,
-		kubeServer.MasterServiceNamespace,
-		kubeServer.RegisterSchedulable,
-		kubeServer.KeepTerminatedPodVolumes,
-		kubeServer.NodeLabels,
-		kubeServer.NodeStatusMaxImages,
-		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault,
-	)
+		nodeIPs)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %w", err)
 	}
@@ -1178,67 +1154,43 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 	}
 }
 
-func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+func createAndInitKubelet(kubeServer *options.KubeletServer,
 	kubeDeps *kubelet.Dependencies,
-	crOptions *config.ContainerRuntimeOptions,
 	hostname string,
 	hostnameOverridden bool,
 	nodeName types.NodeName,
-	nodeIPs []net.IP,
-	providerID string,
-	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
-	imageCredentialProviderConfigFile string,
-	imageCredentialProviderBinDir string,
-	registerNode bool,
-	registerWithTaints []v1.Taint,
-	allowedUnsafeSysctls []string,
-	experimentalMounterPath string,
-	kernelMemcgNotification bool,
-	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
-	minimumGCAge metav1.Duration,
-	maxPerPodContainerCount int32,
-	maxContainerCount int32,
-	masterServiceNamespace string,
-	registerSchedulable bool,
-	keepTerminatedPodVolumes bool,
-	nodeLabels map[string]string,
-	nodeStatusMaxImages int32,
-	seccompDefault bool,
-) (k kubelet.Bootstrap, err error) {
+	nodeIPs []net.IP) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg,
+	k, err = kubelet.NewMainKubelet(&kubeServer.KubeletConfiguration,
 		kubeDeps,
-		crOptions,
+		&kubeServer.ContainerRuntimeOptions,
 		hostname,
 		hostnameOverridden,
 		nodeName,
 		nodeIPs,
-		providerID,
-		cloudProvider,
-		certDirectory,
-		rootDirectory,
-		imageCredentialProviderConfigFile,
-		imageCredentialProviderBinDir,
-		registerNode,
-		registerWithTaints,
-		allowedUnsafeSysctls,
-		experimentalMounterPath,
-		kernelMemcgNotification,
-		experimentalNodeAllocatableIgnoreEvictionThreshold,
-		minimumGCAge,
-		maxPerPodContainerCount,
-		maxContainerCount,
-		masterServiceNamespace,
-		registerSchedulable,
-		keepTerminatedPodVolumes,
-		nodeLabels,
-		nodeStatusMaxImages,
-		seccompDefault,
-	)
+		kubeServer.ProviderID,
+		kubeServer.CloudProvider,
+		kubeServer.CertDirectory,
+		kubeServer.RootDirectory,
+		kubeServer.ImageCredentialProviderConfigFile,
+		kubeServer.ImageCredentialProviderBinDir,
+		kubeServer.RegisterNode,
+		kubeServer.RegisterWithTaints,
+		kubeServer.AllowedUnsafeSysctls,
+		kubeServer.ExperimentalMounterPath,
+		kubeServer.KernelMemcgNotification,
+		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
+		kubeServer.MinimumGCAge,
+		kubeServer.MaxPerPodContainerCount,
+		kubeServer.MaxContainerCount,
+		kubeServer.MasterServiceNamespace,
+		kubeServer.RegisterSchedulable,
+		kubeServer.KeepTerminatedPodVolumes,
+		kubeServer.NodeLabels,
+		kubeServer.NodeStatusMaxImages,
+		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault)
 	if err != nil {
 		return nil, err
 	}
