@@ -48,7 +48,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20211110012726-3cc51fd1e909
-	k8s.io/utils v0.0.0-20210521133846-da695404a2bc
+	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
 	sigs.k8s.io/yaml v1.2.0
