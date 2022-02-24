@@ -190,10 +190,9 @@ func (c *Converter) RegisterIgnoredConversion(from, to interface{}) error {
 }
 
 // Convert will translate src to dest if it knows how. Both must be pointers.
-// If no conversion func is registered and the default copying mechanism
-// doesn't work on this type pair, an error will be returned.
-// 'meta' is given to allow you to pass information to conversion functions,
-// it is not used by Convert() other than storing it in the scope.
+// If no conversion func is registered for this type pair, an error will be
+// returned. 'meta' is given to allow you to pass information to conversion
+// functions, it is not used by Convert() other than storing it in the scope.
 // Not safe for objects with cyclic references!
 func (c *Converter) Convert(src, dest interface{}, meta *Meta) error {
 	pair := typePair{reflect.TypeOf(src), reflect.TypeOf(dest)}
