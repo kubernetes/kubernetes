@@ -202,44 +202,46 @@ func TestStatus(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, s, closeFn := framework.RunAnAPIServer(tc.controlPlaneConfig)
-		defer closeFn()
+		t.Run(tc.name, func(t *testing.T) {
+			_, s, closeFn := framework.RunAnAPIServer(tc.controlPlaneConfig)
+			defer closeFn()
 
-		u := s.URL + tc.reqPath
-		resp, err := http.Get(u)
-		if err != nil {
-			t.Fatalf("unexpected error getting %s: %v", u, err)
-		}
-		if resp.StatusCode != tc.statusCode {
-			t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
-		}
-		defer resp.Body.Close()
-		data, _ := io.ReadAll(resp.Body)
-		decodedData := map[string]interface{}{}
-		if err := json.Unmarshal(data, &decodedData); err != nil {
+			u := s.URL + tc.reqPath
+			resp, err := http.Get(u)
+			if err != nil {
+				t.Fatalf("unexpected error getting %s: %v", u, err)
+			}
+			if resp.StatusCode != tc.statusCode {
+				t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
+			}
+			defer resp.Body.Close()
+			data, _ := io.ReadAll(resp.Body)
+			decodedData := map[string]interface{}{}
+			if err := json.Unmarshal(data, &decodedData); err != nil {
+				t.Logf("body: %s", string(data))
+				t.Fatalf("got error decoding data: %v", err)
+			}
 			t.Logf("body: %s", string(data))
-			t.Fatalf("got error decoding data: %v", err)
-		}
-		t.Logf("body: %s", string(data))
 
-		if got, expected := decodedData["apiVersion"], "v1"; got != expected {
-			t.Errorf("unexpected apiVersion %q, expected %q", got, expected)
-		}
-		if got, expected := decodedData["kind"], "Status"; got != expected {
-			t.Errorf("unexpected kind %q, expected %q", got, expected)
-		}
-		if got, expected := decodedData["status"], "Failure"; got != expected {
-			t.Errorf("unexpected status %q, expected %q", got, expected)
-		}
-		if got, expected := decodedData["code"], float64(tc.statusCode); got != expected {
-			t.Errorf("unexpected code %v, expected %v", got, expected)
-		}
-		if got, expected := decodedData["reason"], tc.reason; got != expected {
-			t.Errorf("unexpected reason %v, expected %v", got, expected)
-		}
-		if got, expected := decodedData["message"], tc.message; got != expected {
-			t.Errorf("unexpected message %v, expected %v", got, expected)
-		}
+			if got, expected := decodedData["apiVersion"], "v1"; got != expected {
+				t.Errorf("unexpected apiVersion %q, expected %q", got, expected)
+			}
+			if got, expected := decodedData["kind"], "Status"; got != expected {
+				t.Errorf("unexpected kind %q, expected %q", got, expected)
+			}
+			if got, expected := decodedData["status"], "Failure"; got != expected {
+				t.Errorf("unexpected status %q, expected %q", got, expected)
+			}
+			if got, expected := decodedData["code"], float64(tc.statusCode); got != expected {
+				t.Errorf("unexpected code %v, expected %v", got, expected)
+			}
+			if got, expected := decodedData["reason"], tc.reason; got != expected {
+				t.Errorf("unexpected reason %v, expected %v", got, expected)
+			}
+			if got, expected := decodedData["message"], tc.message; got != expected {
+				t.Errorf("unexpected message %v, expected %v", got, expected)
+			}
+		})
 	}
 }
 
