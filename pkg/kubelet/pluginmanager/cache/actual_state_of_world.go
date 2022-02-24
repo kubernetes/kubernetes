@@ -43,7 +43,7 @@ type ActualStateOfWorld interface {
 	// Note that this is different from desired world cache's AddOrUpdatePlugin
 	// because for the actual state of world cache, there won't be a scenario where
 	// we need to update an existing plugin if the timestamps don't match. This is
-	// because the plugin should have been unregistered in the reconciller and therefore
+	// because the plugin should have been unregistered in the reconciler and therefore
 	// removed from the actual state of world cache first before adding it back into
 	// the actual state of world cache again with the new timestamp
 	AddPlugin(pluginInfo PluginInfo) error
