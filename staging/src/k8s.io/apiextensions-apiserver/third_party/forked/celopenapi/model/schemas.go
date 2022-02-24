@@ -76,14 +76,13 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 	case "array":
 		if s.Items != nil {
 			itemsType := SchemaDeclType(s.Items, s.Items.XEmbeddedResource)
-			var maxItems int64
+			maxItems := int64(-1)
 			if s.Items.ValueValidation != nil {
 				if s.Items.ValueValidation.MaxItems != nil {
 					maxItems = *s.Items.ValueValidation.MaxItems
-				} else {
-					maxItems = estimateMaxSizeJSON(s)
 				}
-			} else {
+			}
+			if maxItems == -1 {
 				maxItems = estimateMaxSizeJSON(s)
 			}
 			if itemsType != nil {
@@ -95,14 +94,13 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
 			propsType := SchemaDeclType(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource)
 			if propsType != nil {
-				var maxProperties int64
+				maxProperties := int64(-1)
 				if s.ValueValidation != nil {
 					if s.ValueValidation.MaxProperties != nil {
 						maxProperties = *s.ValueValidation.MaxProperties
-					} else {
-						maxProperties = estimateMaxSizeJSON(s)
 					}
-				} else {
+				}
+				if maxProperties == -1 {
 					maxProperties = estimateMaxSizeJSON(s)
 				}
 				return NewMapType(StringType, propsType, maxProperties)
