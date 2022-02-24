@@ -605,7 +605,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
 	numPodsScheduledPerNamespace := make(map[string]int)
 	b.Cleanup(func() {
-		for namespace, _ := range numPodsScheduledPerNamespace {
+		for namespace := range numPodsScheduledPerNamespace {
 			if err := client.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{}); err != nil {
 				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
 			}
