@@ -248,6 +248,113 @@ func TestTimeoutHeaders(t *testing.T) {
 	res.Body.Close()
 }
 
+func TestTimeoutRequestHeaders(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Add dummy request info, otherwise we skip postTimeoutFn
+	ctx = request.WithRequestInfo(ctx, &request.RequestInfo{})
+
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+
+	ts := httptest.NewServer(
+		withDeadline(
+			WithTimeoutForNonLongRunningRequests(
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					// trigger the timeout
+					cancel()
+					// mutate request Headers
+					// Authorization filter does it for example
+					for j := 0; j < 10000; j++ {
+						req.Header.Set("Test", "post")
+					}
+				}),
+				func(r *http.Request, requestInfo *request.RequestInfo) bool {
+					return false
+				},
+			),
+		),
+	)
+	defer ts.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPatch, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCde %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	res.Body.Close()
+}
+
+func TestTimeoutWithLogging(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			handler.ServeHTTP(w, req.WithContext(ctx))
+		})
+	}
+
+	ts := httptest.NewServer(
+		WithHTTPLogging(
+			withDeadline(
+				WithTimeoutForNonLongRunningRequests(
+					http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						// trigger the timeout
+						cancel()
+						// mutate request Headers
+						// Authorization filter does it for example
+						for j := 0; j < 10000; j++ {
+							req.Header.Set("Test", "post")
+						}
+					}),
+					func(r *http.Request, requestInfo *request.RequestInfo) bool {
+						return false
+					},
+				),
+			),
+		),
+	)
+	defer ts.Close()
+
+	client := &http.Client{}
+	req, err := http.NewRequest(http.MethodPatch, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusGatewayTimeout {
+		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	}
+	res.Body.Close()
+}
+
 func captureStdErr() (func() string, func(), error) {
 	var buf bytes.Buffer
 	reader, writer, err := os.Pipe()
