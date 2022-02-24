@@ -18,6 +18,8 @@ package json
 
 import (
 	gojson "encoding/json"
+	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -69,6 +71,14 @@ func (d *Decoder) DisallowDuplicateFields() {
 	d.d.disallowDuplicateFields = true
 }
 
+func (d *decodeState) newFieldError(msg, field string) error {
+	if len(d.strictFieldStack) > 0 {
+		return fmt.Errorf("%s %q", msg, strings.Join(d.strictFieldStack, "")+"."+field)
+	} else {
+		return fmt.Errorf("%s %q", msg, field)
+	}
+}
+
 // saveStrictError saves a strict decoding error,
 // for reporting at the end of the unmarshal if no other errors occurred.
 func (d *decodeState) saveStrictError(err error) {
@@ -88,6 +98,24 @@ func (d *decodeState) saveStrictError(err error) {
 	// accumulate the error
 	d.seenStrictErrors[msg] = struct{}{}
 	d.savedStrictErrors = append(d.savedStrictErrors, err)
+}
+
+func (d *decodeState) appendStrictFieldStackKey(key string) {
+	if !d.disallowDuplicateFields && !d.disallowUnknownFields {
+		return
+	}
+	if len(d.strictFieldStack) > 0 {
+		d.strictFieldStack = append(d.strictFieldStack, ".", key)
+	} else {
+		d.strictFieldStack = append(d.strictFieldStack, key)
+	}
+}
+
+func (d *decodeState) appendStrictFieldStackIndex(i int) {
+	if !d.disallowDuplicateFields && !d.disallowUnknownFields {
+		return
+	}
+	d.strictFieldStack = append(d.strictFieldStack, "[", strconv.Itoa(i), "]")
 }
 
 // UnmarshalStrictError holds errors resulting from use of strict disallow___ decoder directives.
