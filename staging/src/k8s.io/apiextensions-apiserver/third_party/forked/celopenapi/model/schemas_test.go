@@ -239,6 +239,20 @@ func testSchema() *schema.Structural {
 	return ts
 }
 
+func arraySchema(arrayType string, validation *schema.ValueValidation) *schema.Structural {
+	return &schema.Structural{
+		Generic: schema.Generic{
+			Type: "array",
+		},
+		Items: &schema.Structural{
+			Generic: schema.Generic{
+				Type: arrayType,
+			},
+			ValueValidation: validation,
+		},
+	}
+}
+
 func TestEstimateMaxLengthJSON(t *testing.T) {
 	type maxLengthTest struct {
 		Name              string
@@ -248,34 +262,15 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 	tests := []maxLengthTest{
 		{
 			Name: "numberArray",
-			InputSchema: &schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Items: &schema.Structural{
-					Generic: schema.Generic{
-						Type: "integer",
-					},
-					ValueValidation: &schema.ValueValidation{
-						Format: "int64",
-					},
-				},
-			},
+			InputSchema: arraySchema("integer", &schema.ValueValidation{
+				Format: "int64",
+			}),
 			// expected JSON is [0,0,...] so our length should be (3000000 - 2) / 2
 			ExpectedMaxLength: 1499999,
 		},
 		{
-			Name: "stringArray",
-			InputSchema: &schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Items: &schema.Structural{
-					Generic: schema.Generic{
-						Type: "string",
-					},
-				},
-			},
+			Name:        "stringArray",
+			InputSchema: arraySchema("string", nil),
 			// expected JSON is ["","",...] so our length should be (3000000 - 2) / 3
 			ExpectedMaxLength: 999999,
 		},
@@ -326,21 +321,10 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 		},
 		{
 			Name: "listWithLength",
-			InputSchema: &schema.Structural{
-				Generic: schema.Generic{
-					Type:    "array",
-					Default: schema.JSON{Object: [5]int64{1, 2, 3, 4, 5}},
-				},
-				Items: &schema.Structural{
-					Generic: schema.Generic{
-						Type: "integer",
-					},
-					ValueValidation: &schema.ValueValidation{
-						Format:   "int64",
-						MaxItems: maxPtr(10),
-					},
-				},
-			},
+			InputSchema: arraySchema("integer", &schema.ValueValidation{
+				Format:   "int64",
+				MaxItems: maxPtr(10),
+			}),
 			// manually set by MaxItems
 			ExpectedMaxLength: 10,
 		},
