@@ -224,6 +224,7 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 		return 2
 	case "string":
 		// "",
+		// TODO(DangerOnTheRanger): does an empty string constitute a valid date/datetime string?
 		return 3
 	case "array":
 		// [],
@@ -248,6 +249,14 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 // constraints.
 func estimateMaxSizeJSON(s *schema.Structural) int64 {
 	switch s.Type {
+	case "boolean":
+		// false,
+		return 6
+	case "number", "integer":
+		// we're concerned with the theoretical largest number that could be written as a string given the
+		// request limit, not the largest 64-bit integer (which is significantly smaller), so this is the
+		// same case as a string without ValueValidation
+		return (maxRequestSizeBytes - 2)
 	case "string":
 		if s.ValueValidation != nil && s.ValueValidation.Format != "" && s.ValueValidation.Format != "byte" {
 			switch s.Type {
