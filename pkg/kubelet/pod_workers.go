@@ -174,6 +174,16 @@ type PodWorkers interface {
 	// Intended for use by the kubelet sync* methods, but not subsystems, which should
 	// use ShouldPod*().
 	IsPodTerminationRequested(uid types.UID) bool
+	// IsPodTerminating returns true when pod termination has been requested
+	// until all containers have stopped and the pod is ready to be cleaned up. This
+	// should not be used in cleanup loops because it will return false if the pod has
+	// already been cleaned up - use ShouldPodContainersBeTerminating instead. Also,
+	// this method may return true while containers are still being initialized by the
+	// pod worker.
+	//
+	// Intended for use by the kubelet config loops, but not subsystems, which should
+	// use ShouldPod*().
+	IsPodTerminating(uid types.UID) bool
 
 	// ShouldPodContainersBeTerminating returns false before pod workers have synced,
 	// or once a pod has started terminating. This check is similar to
@@ -462,6 +472,22 @@ func (p *podWorkers) IsPodTerminationRequested(uid types.UID) bool {
 	if status, ok := p.podSyncStatuses[uid]; ok {
 		// the pod may still be setting up at this point.
 		return status.IsTerminationRequested()
+	}
+	// an unknown pod is considered not to be terminating (use ShouldPodContainersBeTerminating in
+	// cleanup loops to avoid failing to cleanup pods that have already been removed from config)
+	return false
+}
+
+func (p *podWorkers) IsPodTerminating(uid types.UID) bool {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	if status, ok := p.podSyncStatuses[uid]; ok {
+		// ignore pods that have never had termination requested
+		if !status.IsTerminationRequested() {
+			return false
+		}
+		// if the pod is currently not terminated, it is terminating
+		return !status.IsTerminated()
 	}
 	// an unknown pod is considered not to be terminating (use ShouldPodContainersBeTerminating in
 	// cleanup loops to avoid failing to cleanup pods that have already been removed from config)

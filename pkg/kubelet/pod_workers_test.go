@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"flag"
+	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
@@ -103,6 +104,11 @@ func (f *fakePodWorkers) IsPodTerminationRequested(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.terminationRequested[uid]
+}
+func (f *fakePodWorkers) IsPodTerminating(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.terminationRequested[uid] && !f.terminated[uid]
 }
 func (f *fakePodWorkers) ShouldPodContainersBeTerminating(uid types.UID) bool {
 	f.statusLock.Lock()
@@ -1039,7 +1045,13 @@ func TestSyncKnownPods(t *testing.T) {
 	if !podWorkers.IsPodTerminationRequested(types.UID("0")) {
 		t.Errorf("Expected pod to be terminating")
 	}
+	if podWorkers.IsPodTerminating(types.UID("0")) {
+		t.Errorf("Expected pod to not be terminating")
+	}
 	if podWorkers.IsPodTerminationRequested(types.UID("2")) {
+		t.Errorf("Expected pod to not be requested for termination")
+	}
+	if podWorkers.IsPodTerminating(types.UID("2")) {
 		t.Errorf("Expected pod to not be terminating")
 	}
 
@@ -1095,6 +1107,9 @@ func TestSyncKnownPods(t *testing.T) {
 	}
 	if !podWorkers.ShouldPodContentBeRemoved(types.UID("abc")) {
 		t.Errorf("Expected pod to be suitable for removal (does not exist and synced at least once)")
+	}
+	if podWorkers.IsPodTerminating(types.UID("abc")) {
+		t.Errorf("Expected pod to no longer be terminating")
 	}
 
 	// verify workers that are not terminated stay open even if config no longer
@@ -1676,5 +1691,66 @@ func Test_allowPodStart(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIsPodTerminating(t *testing.T) {
+	podWorkers, _ := createPodWorkers()
+	podWorkers.syncTerminatingPodFn = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+		if pod.UID == "1" {
+			// pod 1 cannot move into terminated
+			return fmt.Errorf("failed")
+		}
+		return nil
+	}
+	podWorkers.syncTerminatedPodFn = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+		if pod.UID == "2" {
+			// pod 2 cannot leave terminated
+			return fmt.Errorf("failed")
+		}
+		return nil
+	}
+	var channels WorkChannel
+	podWorkers.workerChannelFn = channels.Intercept
+
+	// start a pod
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        newNamedPod("1", "test1", "pod1", false),
+		UpdateType: kubetypes.SyncPodUpdate,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        newNamedPod("2", "test1", "pod2", false),
+		UpdateType: kubetypes.SyncPodUpdate,
+	})
+	drainAllWorkers(podWorkers)
+
+	// should observe pod 1 terminating, and pod 2 terminated
+	if podWorkers.IsPodTerminating(types.UID("1")) {
+		t.Fatalf("unexpected pod state")
+	}
+	if podWorkers.IsPodTerminating(types.UID("2")) {
+		t.Fatalf("unexpected pod state")
+	}
+
+	// terminate both pods
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        newNamedPod("1", "test1", "pod1", false),
+		UpdateType: kubetypes.SyncPodKill,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        newNamedPod("2", "test1", "pod2", false),
+		UpdateType: kubetypes.SyncPodKill,
+	})
+	drainAllWorkers(podWorkers)
+
+	// should observe pod 1 terminating, and pod 2 terminated
+	if !podWorkers.IsPodTerminating(types.UID("1")) {
+		t.Fatalf("unexpected pod state")
+	}
+	if podWorkers.IsPodTerminating(types.UID("2")) {
+		t.Fatalf("unexpected pod state")
+	}
+	if pod2 := podWorkers.podSyncStatuses[types.UID("2")]; pod2 == nil || pod2.IsFinished() {
+		t.Fatalf("unexpected pod state")
 	}
 }
