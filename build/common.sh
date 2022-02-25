@@ -189,8 +189,8 @@ function kube::build::verify_prereqs() {
 
 function kube::build::docker_available_on_osx() {
   if [[ -z "${DOCKER_HOST}" ]]; then
-    if [[ -S "/var/run/docker.sock" ]] || [[ -S "${HOME}/.colima/docker.sock" ]]; then
-      kube::log::status "Using Docker for MacOS"
+    if [[ -S "/var/run/docker.sock" ]] || [[ -S "$(docker context inspect | jq -r '.[0].Endpoints.docker.Host' | awk -F 'unix://' '{print $2}')" ]]; then
+      kube::log::status "Using docker on macOS"
       return 0
     fi
 
