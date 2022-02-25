@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -36,13 +35,10 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
-	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
@@ -55,7 +51,6 @@ import (
 	serializerjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -649,7 +644,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 }
 
 func TestDecoder(t *testing.T) {
-	multiVersion := `
+	multiVersionJSON := `
 	{
 	"apiVersion": "stable.example.com/v1beta1",
 	"kind": "MultiVersion",
@@ -670,19 +665,40 @@ num: 1
 num: 2
 unknown: foo`
 
-	decoded := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	decoded.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "stable.example.com",
-		Version: "v1beta1",
-		Kind:    "MultiVersion",
-	})
-	decoded.SetName("my-mv")
-	decoded.SetGeneration(1)
-	unstructured.SetNestedField(decoded.Object, int64(2), "num")
-	unstructured.SetNestedField(decoded.Object, nil, "metadata", "creationTimestamp")
+	expectedObjUnknownNotPreserved := &unstructured.Unstructured{}
+	err := expectedObjUnknownNotPreserved.UnmarshalJSON([]byte(`
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"creationTimestamp": null,
+		"generation": 1,
+		"name": "my-mv"
+	},
+	"num": 2
+	}
+	`))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	decodedPreserveUnknown := decoded.DeepCopy()
-	unstructured.SetNestedField(decodedPreserveUnknown.Object, "foo", "unknown")
+	expectedObjUnknownPreserved := &unstructured.Unstructured{}
+	err = expectedObjUnknownPreserved.UnmarshalJSON([]byte(`
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"creationTimestamp": null,
+		"generation": 1,
+		"name": "my-mv"
+	},
+	"num": 2,
+	"unknown": "foo"
+	}
+	`))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testcases := []struct {
 		name                  string
@@ -690,42 +706,37 @@ unknown: foo`
 		yaml                  bool
 		strictDecoding        bool
 		preserveUnknownFields bool
-		crd                   *v1.CustomResourceDefinition
 		expectedObj           *unstructured.Unstructured
 		expectedErr           error
 	}{
 		{
 			name:           "strict-decoding",
-			body:           multiVersion,
+			body:           multiVersionJSON,
 			strictDecoding: true,
-			crd:            multiVersionFixture.DeepCopy(),
-			expectedObj:    decoded,
+			expectedObj:    expectedObjUnknownNotPreserved,
 			expectedErr:    errors.New(`strict decoding error: duplicate field "num", unknown field "unknown"`),
 		},
 		{
 			name:           "non-strict-decoding",
-			body:           multiVersion,
+			body:           multiVersionJSON,
 			strictDecoding: false,
-			crd:            multiVersionFixture.DeepCopy(),
-			expectedObj:    decoded,
+			expectedObj:    expectedObjUnknownNotPreserved,
 			expectedErr:    nil,
 		},
 		{
 			name:                  "strict-decoding-preserve-unknown",
-			body:                  multiVersion,
+			body:                  multiVersionJSON,
 			strictDecoding:        true,
 			preserveUnknownFields: true,
-			crd:                   multiVersionFixture.DeepCopy(),
-			expectedObj:           decodedPreserveUnknown,
+			expectedObj:           expectedObjUnknownPreserved,
 			expectedErr:           errors.New(`strict decoding error: duplicate field "num"`),
 		},
 		{
 			name:                  "non-strict-decoding-preserve-unknown",
-			body:                  multiVersion,
+			body:                  multiVersionJSON,
 			strictDecoding:        false,
 			preserveUnknownFields: true,
-			crd:                   multiVersionFixture.DeepCopy(),
-			expectedObj:           decodedPreserveUnknown,
+			expectedObj:           expectedObjUnknownPreserved,
 			expectedErr:           nil,
 		},
 		{
@@ -733,8 +744,7 @@ unknown: foo`
 			body:           multiVersionYAML,
 			yaml:           true,
 			strictDecoding: true,
-			crd:            multiVersionFixture.DeepCopy(),
-			expectedObj:    decoded,
+			expectedObj:    expectedObjUnknownNotPreserved,
 			expectedErr: errors.New(`strict decoding error: yaml: unmarshal errors:
   line 7: key "num" already set in map, unknown field "unknown"`),
 		},
@@ -743,8 +753,7 @@ unknown: foo`
 			body:           multiVersionYAML,
 			yaml:           true,
 			strictDecoding: false,
-			crd:            multiVersionFixture.DeepCopy(),
-			expectedObj:    decoded,
+			expectedObj:    expectedObjUnknownNotPreserved,
 			expectedErr:    nil,
 		},
 		{
@@ -753,8 +762,7 @@ unknown: foo`
 			yaml:                  true,
 			strictDecoding:        true,
 			preserveUnknownFields: true,
-			crd:                   multiVersionFixture.DeepCopy(),
-			expectedObj:           decodedPreserveUnknown,
+			expectedObj:           expectedObjUnknownPreserved,
 			expectedErr: errors.New(`strict decoding error: yaml: unmarshal errors:
   line 7: key "num" already set in map`),
 		},
@@ -764,21 +772,22 @@ unknown: foo`
 			yaml:                  true,
 			strictDecoding:        false,
 			preserveUnknownFields: true,
-			crd:                   multiVersionFixture.DeepCopy(),
-			expectedObj:           decodedPreserveUnknown,
+			expectedObj:           expectedObjUnknownPreserved,
 			expectedErr:           nil,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			v := "v1beta1"
-
-			var err error
 			structuralSchemas := map[string]*structuralschema.Structural{}
-			structuralSchemas[v], err = generateStructuralSchema(tc.crd, v)
+			structuralSchema, err := structuralschema.NewStructural(&apiextensions.JSONSchemaProps{
+				Type:       "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{"num": {Type: "integer", Description: "v1beta1 num field"}},
+			})
 			if err != nil {
 				t.Fatal(err)
 			}
+			structuralSchemas[v] = structuralSchema
 			delegate := serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, unstructuredCreator{}, nil, serializerjson.SerializerOptions{tc.yaml, false, tc.strictDecoding})
 			decoder := &schemaCoercingDecoder{
 				delegate: delegate,
@@ -822,40 +831,6 @@ unknown: foo`
 			}
 		})
 	}
-
-}
-
-func generateStructuralSchema(crd *v1.CustomResourceDefinition, version string) (*structuralschema.Structural, error) {
-	val, err := apiextensionshelpers.GetSchemaForVersion(crd, version)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return nil, fmt.Errorf("the server could not properly serve the CR schema")
-	}
-	if val == nil {
-		return nil, nil
-	}
-	internalValidation := &apiextensionsinternal.CustomResourceValidation{}
-	if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(val, internalValidation, nil); err != nil {
-		return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
-	}
-	s, err := structuralschema.NewStructural(internalValidation.OpenAPIV3Schema)
-	if crd.Spec.PreserveUnknownFields == false && err != nil {
-		// This should never happen. If it does, it is a programming error.
-		utilruntime.HandleError(fmt.Errorf("failed to convert schema to structural: %v", err))
-		return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
-	}
-
-	if crd.Spec.PreserveUnknownFields == false {
-		// we don't own s completely, e.g. defaults are not deep-copied. So better make a copy here.
-		s = s.DeepCopy()
-
-		if err := structuraldefaulting.PruneDefaults(s); err != nil {
-			// This should never happen. If it does, it is a programming error.
-			utilruntime.HandleError(fmt.Errorf("failed to prune defaults: %v", err))
-			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
-		}
-	}
-	return s, nil
 
 }
 
