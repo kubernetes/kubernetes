@@ -326,6 +326,14 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 
 }
 
+// TerminatePod ensures that the status of containers is properly defaulted at the end of the pod
+// lifecycle. As the Kubelet must reconcile with the container runtime to observe container status
+// there is always the possibility we are unable to retrieve one or more container statuses due to
+// garbage collection, admin action, or loss of temporary data on a restart. This method ensures
+// that any absent container status is treated as a failure so that we do not incorrectly describe
+// the pod as successful. If we have not yet initialized the pod in the presence of init containers,
+// the init container failure status is sufficient to describe the pod as failing, and we do not need
+// to override waiting containers (unless there is evidence the pod previously started those containers).
 func (m *manager) TerminatePod(pod *v1.Pod) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
