@@ -23,6 +23,8 @@ import (
 )
 
 const (
+	// the largest request that will be accepted is 3MB
+	// TODO(DangerOnTheRanger): find out where this is originally declared so we don't have two constants
 	maxRequestSizeBytes = 3000000
 	// chosen as the numbers of digits of the largest 64-bit integer
 	// we add 4 to account for a unit (like ms) plus the quotation marks that will be used
