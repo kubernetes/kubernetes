@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
-	ginkgo.Describe("with low downscale stabilization window", func() {
+	ginkgo.Describe("with short downscale stabilization window", func() {
 		ginkgo.It("should scale down soon after the stabilization period", func() {
 			ginkgo.By("setting up resource consumer and HPA")
 			podCPURequest := 500
@@ -50,10 +50,11 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			)
 			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
 
-			// 30s of metrics window and
-			// up to 30s until the old metrics window finishes
-			// and additional 15s until metrics available on a new pod
-			metricsAvailableDelay := 75 * time.Second
+			fullWindowOfNewUsage := 30 * time.Second
+			windowWithOldUsagePasses := 30 * time.Second
+			newPodMetricsDelay := 15 * time.Second
+			metricsAvailableDelay := fullWindowOfNewUsage + windowWithOldUsagePasses + newPodMetricsDelay
+
 			hpaReconciliationInterval := 15 * time.Second
 			actuationDelay := 10 * time.Second
 			maxHPAReactionTime := metricsAvailableDelay + hpaReconciliationInterval + actuationDelay
@@ -64,6 +65,8 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 
 			waitBuffer := 1 * time.Minute
 
+			// making sure HPA is ready, doing its job and already has a recommendation recorded
+			// for stabilization logic before lowering the consumption
 			ginkgo.By("triggering scale up to record a recommendation")
 			rc.ConsumeCPU(3 * usageForSingleReplica)
 			rc.WaitForReplicas(3, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
