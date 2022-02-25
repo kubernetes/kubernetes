@@ -222,7 +222,7 @@ func (c *codec) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.Memor
 				return encoder.EncodeWithAllocator(obj, w, memAlloc)
 			}
 		} else {
-			klog.V(4).Infof("a memory allocator was provided but the encoder %T doesn't implement the runtime.EncoderWithAllocator, using regular encoder.Encode method")
+			klog.V(4).Infof("a memory allocator was provided but the encoder %s doesn't implement the runtime.EncoderWithAllocator, using regular encoder.Encode method", c.encoder.Identifier())
 		}
 	}
 	switch obj := obj.(type) {
