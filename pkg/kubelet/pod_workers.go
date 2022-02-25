@@ -226,6 +226,8 @@ type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *
 // the function to invoke to cleanup a pod that is terminated
 type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 
+type generateAPIPodStatusFnType func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus
+
 const (
 	// jitter factor for resyncInterval
 	workerResyncIntervalJitterFactor = 0.5
@@ -388,9 +390,10 @@ type podWorkers struct {
 	// NOTE: This function has to be thread-safe - it can be called for
 	// different pods at the same time.
 
-	syncPodFn            syncPodFnType
-	syncTerminatingPodFn syncTerminatingPodFnType
-	syncTerminatedPodFn  syncTerminatedPodFnType
+	syncPodFn              syncPodFnType
+	syncTerminatingPodFn   syncTerminatingPodFnType
+	syncTerminatedPodFn    syncTerminatedPodFnType
+	generateAPIPodStatusFn generateAPIPodStatusFnType
 
 	// workerChannelFn is exposed for testing to allow unit tests to impose delays
 	// in channel communication. The function is invoked once each time a new worker
@@ -414,6 +417,7 @@ func newPodWorkers(
 	syncPodFn syncPodFnType,
 	syncTerminatingPodFn syncTerminatingPodFnType,
 	syncTerminatedPodFn syncTerminatedPodFnType,
+	generateAPIPodStatusFn generateAPIPodStatusFnType,
 	recorder record.EventRecorder,
 	workQueue queue.WorkQueue,
 	resyncInterval, backOffPeriod time.Duration,
@@ -428,6 +432,7 @@ func newPodWorkers(
 		syncPodFn:                          syncPodFn,
 		syncTerminatingPodFn:               syncTerminatingPodFn,
 		syncTerminatedPodFn:                syncTerminatedPodFn,
+		generateAPIPodStatusFn:             generateAPIPodStatusFn,
 		recorder:                           recorder,
 		workQueue:                          workQueue,
 		resyncInterval:                     resyncInterval,
@@ -612,6 +617,15 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		return
 	}
 
+	// Consider the pod terminal if it's phase is terminal OR the pod status which is cached (after merge) is terminal
+	isPodPhaseTerminal := pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
+	podStatusCached, err := p.podCache.Get(pod.UID)
+	isPodCachedPhaseTerminal := false
+	if err == nil {
+		podStatus := p.generateAPIPodStatusFn(pod, podStatusCached)
+		isPodCachedPhaseTerminal = podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded
+	}
+
 	// check for a transition to terminating
 	var becameTerminating bool
 	if !status.IsTerminationRequested() {
@@ -626,7 +640,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 			status.deleted = true
 			status.terminatingAt = now
 			becameTerminating = true
-		case pod.Status.Phase == v1.PodFailed, pod.Status.Phase == v1.PodSucceeded:
+		case isPodPhaseTerminal || isPodCachedPhaseTerminal:
 			klog.V(4).InfoS("Pod is in a terminal phase (success/failed), begin teardown", "pod", klog.KObj(pod), "podUID", pod.UID)
 			status.terminatingAt = now
 			becameTerminating = true

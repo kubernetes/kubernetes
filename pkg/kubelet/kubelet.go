@@ -603,7 +603,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.syncPod,
 		klet.syncTerminatingPod,
 		klet.syncTerminatedPod,
-
+		klet.generateAPIPodStatus,
 		kubeDeps.Recorder,
 		klet.workQueue,
 		klet.resyncInterval,
@@ -1556,7 +1556,10 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		metrics.PodStartDuration.Observe(metrics.SinceInSeconds(firstSeenTime))
 	}
 
-	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	didUpdateStatus := kl.setPodStatusIfNotTerminal(pod, apiPodStatus)
+	if !didUpdateStatus {
+		klog.V(1).InfoS("DEBUG: porterdavid(syncPod) skipping pod status update", "pod", klog.KObj(pod), "podUID", pod.UID, "phase", apiPodStatus.Phase, "couldHaveRunningContainers", kl.podWorkers.CouldHaveRunningContainers(pod.UID))
+	}
 
 	// Pods that are not runnable must be stopped - return a typed error to the pod worker
 	if !runnable.Admit {
@@ -1712,6 +1715,14 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	return nil
 }
 
+func (kl *Kubelet) setPodStatusIfNotTerminal(pod *v1.Pod, status v1.PodStatus) bool {
+	if (status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed) && kl.podWorkers.CouldHaveRunningContainers(pod.UID) {
+		return false
+	}
+	kl.statusManager.SetPodStatus(pod, status)
+	return true
+}
+
 // syncTerminatingPod is expected to terminate all running containers in a pod. Once this method
 // returns without error, the pod's local state can be safely cleaned up. If runningPod is passed,
 // we perform no status updates.
@@ -1740,10 +1751,13 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	}
 
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+	didUpdateStatus := kl.setPodStatusIfNotTerminal(pod, apiPodStatus)
+	if !didUpdateStatus {
+		klog.V(1).InfoS("DEBUG: porterdavid(syncTerminatingPod) skipping pod status update", "pod", klog.KObj(pod), "podUID", pod.UID, "phase", apiPodStatus.Phase, "couldHaveRunningContainers", kl.podWorkers.CouldHaveRunningContainers(pod.UID))
+	}
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
 	}
-	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	if gracePeriod != nil {
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
@@ -1811,7 +1825,11 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
-	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+
+	didUpdateStatus := kl.setPodStatusIfNotTerminal(pod, apiPodStatus)
+	if !didUpdateStatus {
+		klog.V(1).InfoS("DEBUG: porterdavid(syncTerminatedPod) skipping pod status update", "pod", klog.KObj(pod), "podUID", pod.UID, "phase", apiPodStatus.Phase, "couldHaveRunningContainers", kl.podWorkers.CouldHaveRunningContainers(pod.UID))
+	}
 
 	// volumes are unmounted after the pod worker reports ShouldPodRuntimeBeRemoved (which is satisfied
 	// before syncTerminatedPod is invoked)
@@ -1843,6 +1861,7 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	}
 
 	// mark the final pod status
+	klog.V(1).InfoS("DEBUG: porterdavid3 terminating pod to status manager", "pod", klog.KObj(pod), "podUID", pod.UID, "phase", apiPodStatus.Phase, "couldHaveRunningContainers", kl.podWorkers.CouldHaveRunningContainers(pod.UID))
 	kl.statusManager.TerminatePod(pod)
 	klog.V(4).InfoS("Pod is terminated and will need no more status updates", "pod", klog.KObj(pod), "podUID", pod.UID)
 
