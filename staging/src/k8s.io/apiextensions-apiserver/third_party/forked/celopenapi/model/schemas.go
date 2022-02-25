@@ -220,10 +220,7 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 	case "boolean":
 		// true,
 		return 5
-	case "number":
-		// 0,
-		return 2
-	case "integer":
+	case "number", "integer":
 		// 0,
 		return 2
 	case "string":
