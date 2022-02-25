@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -106,6 +107,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	if !fit {
+		var others []string
+		for _, p := range pods {
+			others = append(others, fmt.Sprintf("%s/%s(%s) %t %s", p.Namespace, p.Name, p.UID, p.DeletionTimestamp != nil, p.Status.Phase))
+		}
+		klog.InfoS("DEBUG: failed to fit pod\n"+strings.Join(others, "\n"), "pod", klog.KObj(admitPod), "podUID", admitPod.UID)
 		var reason string
 		var message string
 		if len(reasons) == 0 {
