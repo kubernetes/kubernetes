@@ -25,6 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,6 +36,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -45,6 +47,10 @@ var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
 	parallelism := int32(2)
 	completions := int32(4)
+
+	largeParallelism := int32(90)
+	largeCompletions := int32(90)
+
 	backoffLimit := int32(6) // default value
 
 	// Simplest case: N pods succeed
@@ -360,6 +366,52 @@ var _ = SIGDescribe("Job", func() {
 		for _, pod := range pods.Items {
 			framework.ExpectEqual(pod.Status.Phase, v1.PodFailed)
 		}
+	})
+
+	ginkgo.It("should run a job to completion with CPU requests [Serial]", func() {
+		ginkgo.By("Creating a job that with CPU requests")
+
+		testNodeName := scheduling.GetNodeThatCanRunPod(f)
+		targetNode, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+
+		cpu, ok := targetNode.Status.Allocatable[v1.ResourceCPU]
+		if !ok {
+			framework.Failf("Unable to get node's %q cpu", targetNode.Name)
+		}
+
+		cpuRequest := fmt.Sprint(int64(0.2 * float64(cpu.Value())))
+
+		backoff := 0
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, largeParallelism, largeCompletions, nil, int32(backoff))
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse(cpuRequest),
+				},
+			}
+			job.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": testNodeName}
+		}
+
+		framework.Logf("Creating job %q with a node hostname selector %q wth cpu request %q", job.Name, testNodeName, cpuRequest)
+		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, largeCompletions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods for job exist")
+		pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		successes := int32(0)
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodSucceeded {
+				successes++
+			}
+		}
+		framework.ExpectEqual(successes, largeCompletions, "expected %d successful job pods, but got  %d", largeCompletions, successes)
 	})
 })
 
