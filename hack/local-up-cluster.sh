@@ -1096,6 +1096,14 @@ function install_cni {
 EOF
 }
 
+function install_cni_if_needed {
+  echo "Checking CNI Installation at /opt/cni/bin"
+  if ! command -v /opt/cni/bin/loopback &> /dev/null ; then
+    echo "CNI Installation not found at /opt/cni/bin"
+    install_cni
+  fi
+}
+
 # If we are running in the CI, we need a few more things before we can start
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   echo "Preparing to test ..."
@@ -1166,6 +1174,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
+    install_cni_if_needed
   ## TODO remove this check if/when kubelet is supported on darwin
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
