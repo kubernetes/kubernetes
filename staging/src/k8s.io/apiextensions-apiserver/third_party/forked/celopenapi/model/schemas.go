@@ -26,9 +26,8 @@ const (
 	// the largest request that will be accepted is 3MB
 	// TODO(DangerOnTheRanger): find out where this is originally declared so we don't have two constants
 	maxRequestSizeBytes = 3000000
-	// chosen as the numbers of digits of the largest 64-bit integer
-	// we add 4 to account for a unit (like ms) plus the quotation marks that will be used
-	maxDurationSizeJSON = 23
+	// OpenAPI duration strings follow RFC 3339, section 5.6 - see the comment on maxDatetimeSizeJSON
+	maxDurationSizeJSON = 32
 	// OpenAPI datetime strings follow RFC 3339, section 5.6, and the longest possible
 	// such string is 9999-12-31T23:59:59.999999999Z, which has length 30 - we add 2
 	// to allow for quotation marks
