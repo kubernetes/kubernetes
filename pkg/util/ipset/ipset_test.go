@@ -927,7 +927,7 @@ func TestValidateIPSet(t *testing.T) {
 		{ // case[3]
 			ipset: &IPSet{
 				Name:       "bar",
-				SetType:    BitmapPort,
+				SetType:    HashIPPort,
 				HashFamily: ProtocolFamilyIPV6,
 				HashSize:   0,
 				MaxElem:    2048,
@@ -938,7 +938,7 @@ func TestValidateIPSet(t *testing.T) {
 		{ // case[4]
 			ipset: &IPSet{
 				Name:       "baz",
-				SetType:    BitmapPort,
+				SetType:    HashIPPort,
 				HashFamily: ProtocolFamilyIPV6,
 				HashSize:   1024,
 				MaxElem:    -1,
