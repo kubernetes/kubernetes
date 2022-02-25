@@ -30,7 +30,7 @@ endif
 #   clean: Clean up.
 
 # It's necessary to set this because some environments don't link sh -> bash.
-SHELL := /usr/bin/env bash
+SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
 
 # Define variables so `make --warn-undefined-variables` works.
 PRINT_HELP ?=
