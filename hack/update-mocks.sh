@@ -26,6 +26,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # Explicitly opt into go modules
 export GO111MODULE=on
 
+kube::golang::new::setup_env
 kube::golang::verify_go_version
 kube::golang::old::setup_env
 
@@ -79,10 +80,10 @@ git_find -z ':(glob)**/*.go' | while read -r -d $'\0' file; do
     echo -n "$build_tag_string" > "$temp_file_name"
 
     # if +build tag is defined in interface file
-    BUILD_TAG_FILE=$temp_file_name go generate -v "$file"
+    BUILD_TAG_FILE=$temp_file_name go generate -mod=readonly -v "$file"
   else
     # if no +build tag is defined in interface file
-    go generate -v "$file"
+    go generate -mod=readonly -v "$file"
   fi
 done
 
