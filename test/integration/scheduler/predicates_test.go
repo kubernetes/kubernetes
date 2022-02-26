@@ -26,10 +26,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 // This file tests the scheduler predicates functionality.
@@ -1032,124 +1036,217 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 	}
 }
 
-// TestEvenPodsSpreadPredicate verifies that EvenPodsSpread predicate functions well.
-func TestEvenPodsSpreadPredicate(t *testing.T) {
-	testCtx := initTest(t, "eps-predicate")
-	cs := testCtx.ClientSet
-	ns := testCtx.NS.Name
-	defer testutils.CleanupTest(t, testCtx)
-
-	for i := 0; i < 4; i++ {
-		// Create nodes with labels "zone: zone-{0,1}" and "node: <node name>" to each node.
-		nodeName := fmt.Sprintf("node-%d", i)
-		zone := fmt.Sprintf("zone-%d", i/2)
-		_, err := createNode(cs, st.MakeNode().Name(nodeName).Label("node", nodeName).Label("zone", zone).Obj())
-		if err != nil {
-			t.Fatalf("Cannot create node: %v", err)
-		}
-	}
-
+// TestPodTopologySpreadFilter verifies that EvenPodsSpread predicate functions well.
+func TestPodTopologySpreadFilter(t *testing.T) {
 	pause := imageutils.GetPauseImageName()
 	tests := []struct {
-		name           string
-		incomingPod    *v1.Pod
-		existingPods   []*v1.Pod
-		fits           bool
-		candidateNodes []string // nodes expected to schedule onto
+		name             string
+		incomingPod      *v1.Pod
+		existingPods     []*v1.Pod
+		fits             bool
+		candidateNodes   []string // nodes expected to schedule onto
+		enableMinDomains bool
 	}{
 		// note: naming starts at index 0
 		{
 			name: "place pod on a 1/1/0/1 cluster with MaxSkew=1, node-2 is the only fit",
-			incomingPod: st.MakePod().Namespace(ns).Name("p").Label("foo", "").Container(pause).
-				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
 				Obj(),
 			existingPods: []*v1.Pod{
-				st.MakePod().Namespace(ns).Name("p0").Node("node-0").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p1").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p0").Node("node-0").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p1").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
 			fits:           true,
 			candidateNodes: []string{"node-2"},
 		},
 		{
 			name: "place pod on a 2/0/0/1 cluster with MaxSkew=2, node-{1,2,3} are good fits",
-			incomingPod: st.MakePod().Namespace(ns).Name("p").Label("foo", "").Container(pause).
-				SpreadConstraint(2, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				SpreadConstraint(2, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
 				Obj(),
 			existingPods: []*v1.Pod{
-				st.MakePod().Namespace(ns).Name("p0a").Node("node-0").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p0b").Node("node-0").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p0a").Node("node-0").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p0b").Node("node-0").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
 			fits:           true,
 			candidateNodes: []string{"node-1", "node-2", "node-3"},
 		},
 		{
 			name: "pod is required to be placed on zone0, so only node-1 fits",
-			incomingPod: st.MakePod().Namespace(ns).Name("p").Label("foo", "").Container(pause).
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
 				NodeAffinityIn("zone", []string{"zone-0"}).
-				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
 				Obj(),
 			existingPods: []*v1.Pod{
-				st.MakePod().Namespace(ns).Name("p0").Node("node-0").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p0").Node("node-0").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
 			fits:           true,
 			candidateNodes: []string{"node-1"},
 		},
 		{
 			name: "two constraints: pod can only be placed to zone-1/node-2",
-			incomingPod: st.MakePod().Namespace(ns).Name("p").Label("foo", "").Container(pause).
-				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
 				Obj(),
 			existingPods: []*v1.Pod{
-				st.MakePod().Namespace(ns).Name("p0").Node("node-0").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p1").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p3b").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p0").Node("node-0").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p1").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3b").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
 			fits:           true,
 			candidateNodes: []string{"node-2"},
 		},
 		{
 			name: "pod cannot be placed onto any node",
-			incomingPod: st.MakePod().Namespace(ns).Name("p").Label("foo", "").Container(pause).
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
 				NodeAffinityNotIn("node", []string{"node-0"}). // mock a 3-node cluster
-				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
 				Obj(),
 			existingPods: []*v1.Pod{
-				st.MakePod().Namespace(ns).Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p1b").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().Namespace(ns).Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p1b").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
 			fits: false,
 		},
 		{
 			name: "high priority pod can preempt others",
-			incomingPod: st.MakePod().Namespace(ns).Name("p").Label("foo", "").Container(pause).Priority(100).
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).Priority(100).
 				NodeAffinityNotIn("node", []string{"node-0"}). // mock a 3-node cluster
-				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil).
 				Obj(),
 			existingPods: []*v1.Pod{
-				st.MakePod().ZeroTerminationGracePeriod().Namespace(ns).Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().ZeroTerminationGracePeriod().Namespace(ns).Name("p1b").Node("node-1").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().ZeroTerminationGracePeriod().Namespace(ns).Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().ZeroTerminationGracePeriod().Namespace(ns).Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
-				st.MakePod().ZeroTerminationGracePeriod().Namespace(ns).Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p1b").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
 			fits:           true,
 			candidateNodes: []string{"node-1", "node-2", "node-3"},
 		},
+		{
+			name: "pods spread across nodes as 2/2/1, maxSkew is 2, and the number of domains < minDomains, then the third node fits",
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				NodeAffinityNotIn("node", []string{"node-0"}). // mock a 3-node cluster
+				SpreadConstraint(
+					2,
+					"node",
+					hardSpread,
+					st.MakeLabelSelector().Exists("foo").Obj(),
+					pointer.Int32(4), // larger than the number of domains (= 3)
+				).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().ZeroTerminationGracePeriod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p1b").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
+			},
+			fits:             true,
+			candidateNodes:   []string{"node-3"},
+			enableMinDomains: true,
+		},
+		{
+			name: "pods spread across nodes as 2/2/1, maxSkew is 2, and the number of domains > minDomains, then the all nodes fit",
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				NodeAffinityNotIn("node", []string{"node-0"}). // mock a 3-node cluster
+				SpreadConstraint(
+					2,
+					"node",
+					hardSpread,
+					st.MakeLabelSelector().Exists("foo").Obj(),
+					pointer.Int32(2), // smaller than the number of domains (= 3)
+				).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().ZeroTerminationGracePeriod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p1b").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().ZeroTerminationGracePeriod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
+			},
+			fits:             true,
+			candidateNodes:   []string{"node-1", "node-2", "node-3"},
+			enableMinDomains: true,
+		},
+		{
+			name: "pods spread across zone as 2/1, maxSkew is 2 and the number of domains < minDomains, then the third and fourth nodes fit",
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				SpreadConstraint(
+					2,
+					"zone",
+					v1.DoNotSchedule,
+					st.MakeLabelSelector().Exists("foo").Obj(),
+					pointer.Int32(3), // larger than the number of domains(2)
+				).Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p1a").Node("node-0").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2a").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+			},
+			fits:             true,
+			candidateNodes:   []string{"node-2", "node-3"},
+			enableMinDomains: true,
+		},
+		{
+			name: "pods spread across zone as 2/1, maxSkew is 2 and the number of domains < minDomains, then the all nodes fit",
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				SpreadConstraint(
+					2,
+					"zone",
+					v1.DoNotSchedule,
+					st.MakeLabelSelector().Exists("foo").Obj(),
+					pointer.Int32(1), // smaller than the number of domains(2)
+				).Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
+			},
+			fits:             true,
+			candidateNodes:   []string{"node-0", "node-1", "node-2", "node-3"},
+			enableMinDomains: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, tt.enableMinDomains)()
+			testCtx := initTest(t, "pts-predicate")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+			defer testutils.CleanupTest(t, testCtx)
+
+			for i := 0; i < 4; i++ {
+				// Create nodes with labels "zone: zone-{0,1}" and "node: <node name>" to each node.
+				nodeName := fmt.Sprintf("node-%d", i)
+				zone := fmt.Sprintf("zone-%d", i/2)
+				_, err := createNode(cs, st.MakeNode().Name(nodeName).Label("node", nodeName).Label("zone", zone).Obj())
+				if err != nil {
+					t.Fatalf("Cannot create node: %v", err)
+				}
+			}
+
+			// set namespace to pods
+			for i := range tt.existingPods {
+				tt.existingPods[i].SetNamespace(ns)
+			}
+			tt.incomingPod.SetNamespace(ns)
+
 			allPods := append(tt.existingPods, tt.incomingPod)
 			defer testutils.CleanupPods(cs, t, allPods)
+
 			for _, pod := range tt.existingPods {
 				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 				if err != nil {
