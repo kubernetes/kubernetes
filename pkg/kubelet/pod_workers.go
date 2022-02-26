@@ -218,7 +218,7 @@ type PodWorkers interface {
 }
 
 // the function to invoke to perform a sync (reconcile the kubelet state to the desired shape of the pod)
-type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error
+type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
 
 // the function to invoke to terminate a pod (ensure no running processes are present)
 type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
@@ -886,6 +886,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 		}
 
 		klog.V(4).InfoS("Processing pod event", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
+		var isTerminal bool
 		err := func() error {
 			// The worker is responsible for ensuring the sync method sees the appropriate
 			// status updates on resyncs (the result of the last sync), transitions to
@@ -932,13 +933,14 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 				err = p.syncTerminatingPodFn(ctx, pod, status, update.Options.RunningPod, gracePeriod, podStatusFn)
 
 			default:
-				err = p.syncPodFn(ctx, update.Options.UpdateType, pod, update.Options.MirrorPod, status)
+				isTerminal, err = p.syncPodFn(ctx, update.Options.UpdateType, pod, update.Options.MirrorPod, status)
 			}
 
 			lastSyncTime = time.Now()
 			return err
 		}()
 
+		var phaseTransition bool
 		switch {
 		case err == context.Canceled:
 			// when the context is cancelled we expect an update to already be queued
@@ -969,10 +971,17 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 			}
 			// otherwise we move to the terminating phase
 			p.completeTerminating(pod)
+			phaseTransition = true
+
+		case isTerminal:
+			// if syncPod indicated we are now terminal, set the appropriate pod status to move to terminating
+			klog.V(4).InfoS("Pod is terminal", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
+			p.completeSync(pod)
+			phaseTransition = true
 		}
 
-		// queue a retry for errors if necessary, then put the next event in the channel if any
-		p.completeWork(pod, err)
+		// queue a retry if necessary, then put the next event in the channel if any
+		p.completeWork(pod, phaseTransition, err)
 		if start := update.Options.StartTime; !start.IsZero() {
 			metrics.PodWorkerDuration.WithLabelValues(update.Options.UpdateType.String()).Observe(metrics.SinceInSeconds(start))
 		}
@@ -1001,6 +1010,33 @@ func (p *podWorkers) acknowledgeTerminating(pod *v1.Pod) PodStatusFunc {
 		return status.statusPostTerminating[l-1]
 	}
 	return nil
+}
+
+// completeSync is invoked when syncPod completes successfully and indicates the pod is now terminal and should
+// be terminated. This happens when the natural pod lifecycle completes - any pod which is not RestartAlways
+// exits. Unnatural completions, such as evictions, API driven deletion or phase transition, are handled by
+// UpdatePod.
+func (p *podWorkers) completeSync(pod *v1.Pod) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+
+	klog.V(4).InfoS("Pod indicated lifecycle completed naturally and should now terminate", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	if status, ok := p.podSyncStatuses[pod.UID]; ok {
+		if status.terminatingAt.IsZero() {
+			status.terminatingAt = time.Now()
+		} else {
+			klog.V(4).InfoS("Pod worker attempted to set terminatingAt twice, likely programmer error", "pod", klog.KObj(pod), "podUID", pod.UID)
+		}
+		status.startedTerminating = true
+	}
+
+	p.lastUndeliveredWorkUpdate[pod.UID] = podWork{
+		WorkType: TerminatingPodWork,
+		Options: UpdatePodOptions{
+			Pod: pod,
+		},
+	}
 }
 
 // completeTerminating is invoked when syncTerminatingPod completes successfully, which means
@@ -1115,9 +1151,11 @@ func (p *podWorkers) completeUnstartedTerminated(pod *v1.Pod) {
 
 // completeWork requeues on error or the next sync interval and then immediately executes any pending
 // work.
-func (p *podWorkers) completeWork(pod *v1.Pod, syncErr error) {
+func (p *podWorkers) completeWork(pod *v1.Pod, phaseTransition bool, syncErr error) {
 	// Requeue the last update if the last sync returned error.
 	switch {
+	case phaseTransition:
+		p.workQueue.Enqueue(pod.UID, 0)
 	case syncErr == nil:
 		// No error; requeue at the regular resync interval.
 		p.workQueue.Enqueue(pod.UID, wait.Jitter(p.resyncInterval, workerResyncIntervalJitterFactor))
