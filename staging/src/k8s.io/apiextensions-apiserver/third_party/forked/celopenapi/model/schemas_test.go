@@ -261,10 +261,30 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 	}
 	tests := []maxLengthTest{
 		{
-			Name: "numberArray",
-			InputSchema: arraySchema("integer", &schema.ValueValidation{
-				Format: "int64",
+			Name:        "booleanArray",
+			InputSchema: arraySchema("boolean", nil),
+			// expected JSON is [true,true,...], so our length should be (3000000 - 2) / 5
+			ExpectedMaxLength: 599999,
+		},
+		{
+			Name: "durationArray",
+			InputSchema: arraySchema("string", &schema.ValueValidation{
+				Format: "duration",
 			}),
+			// expected JSON is ["P1D","P1D",...] so our length should be (3000000 - 2) / 6
+			ExpectedMaxLength: 499999,
+		},
+		{
+			Name: "datetimeArray",
+			InputSchema: arraySchema("string", &schema.ValueValidation{
+				Format: "date-time",
+			}),
+			// expected JSON is ["2000-01-01T01:01:01","2000-01-01T01:01:01",...] so our length should be (3000000 - 2) / 22
+			ExpectedMaxLength: 136363,
+		},
+		{
+			Name:        "numberArray",
+			InputSchema: arraySchema("integer", nil),
 			// expected JSON is [0,0,...] so our length should be (3000000 - 2) / 2
 			ExpectedMaxLength: 1499999,
 		},
@@ -320,7 +340,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			ExpectedMaxLength: 176470,
 		},
 		{
-			Name: "listWithLength",
+			Name: "arrayWithLength",
 			InputSchema: arraySchema("integer", &schema.ValueValidation{
 				Format:   "int64",
 				MaxItems: maxPtr(10),
@@ -332,8 +352,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			Name: "stringWithLength",
 			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
-					Type:    "string",
-					Default: schema.JSON{Object: "test-data"},
+					Type: "string",
 				},
 				ValueValidation: &schema.ValueValidation{
 					MaxLength: maxPtr(20),
@@ -360,6 +379,45 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			},
 			// manually set by MaxProperties
 			ExpectedMaxLength: 15,
+		},
+		{
+			Name: "durationMaxSize",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "duration",
+				},
+			},
+			// should be exactly equal to maxDurationSizeJSON
+			ExpectedMaxLength: maxDurationSizeJSON,
+		},
+		{
+			Name: "dateSize",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "date",
+				},
+			},
+			// should be exactly equal to dateSizeJSON
+			ExpectedMaxLength: dateSizeJSON,
+		},
+		{
+			Name: "maxdatetimeSize",
+			InputSchema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "string",
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: "date-time",
+				},
+			},
+			// should be exactly equal to maxDatetimeSizeJSON
+			ExpectedMaxLength: maxDatetimeSizeJSON,
 		},
 	}
 	for _, testCase := range tests {

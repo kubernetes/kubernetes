@@ -32,6 +32,17 @@ const (
 	// such string is 9999-12-31T23:59:59.999999999Z, which has length 30 - we add 2
 	// to allow for quotation marks
 	maxDatetimeSizeJSON = 32
+	// RFC 3339 durations need at least 1 character for the duration, one character for the unit, and
+	// "P" at the start of the string, e.g, P1W, so with 3 for quotation marks and a comma, that makes 6
+	minDurationSizeJSON = 6
+	// RFC 3339 dates require YYYY-MM-DD, and then we add 2 to allow for quotation marks
+	dateSizeJSON = 12
+	// RFC 3339 times require 2-digit 24-hour time at the very least plus a capital T at the start,
+	// e.g., T23, and we add 3 to allow for quotation marks and a comma as usual
+	minTimeSizeJSON = 6
+	/// RFC 3339 datetimes require a full date (YYYY-MM-DD) and full time (HH:MM:SS), and we add 4 for
+	// quotation marks and a comma like always in addition to the capital T that separates the date and time
+	minDatetimeSizeJSON = 22
 )
 
 // SchemaDeclType converts the structural schema to a CEL declaration, or returns nil if the
@@ -150,11 +161,11 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 			case "duration":
 				durationWithMaxLength := newSimpleType("duration", decls.Duration, types.Duration{Duration: time.Duration(0)})
 				durationWithMaxLength.MaxLength = estimateMaxSizeJSON(s)
-				return DurationType
+				return durationWithMaxLength
 			case "date", "date-time":
 				timestampWithMaxLength := newSimpleType("timestamp", decls.Timestamp, types.Timestamp{Time: time.Time{}})
 				timestampWithMaxLength.MaxLength = estimateMaxSizeJSON(s)
-				return TimestampType
+				return timestampWithMaxLength
 			}
 		}
 		strWithMaxLength := newSimpleType("string", decls.String, types.String(""))
@@ -223,8 +234,19 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 		// 0,
 		return 2
 	case "string":
+		if s.ValueValidation != nil && s.ValueValidation.Format != "" && s.ValueValidation.Format != "byte" {
+			switch s.ValueValidation.Format {
+			case "duration":
+				return minDurationSizeJSON
+			case "date":
+				// add 1 to make room for a comma; since we're in estimateMinSizeJSON we need to account for
+				// this date being an array element
+				return dateSizeJSON + 1
+			case "date-time":
+				return minDatetimeSizeJSON
+			}
+		}
 		// "",
-		// TODO(DangerOnTheRanger): does an empty string constitute a valid date/datetime string?
 		return 3
 	case "array":
 		// [],
@@ -249,9 +271,6 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 // constraints.
 func estimateMaxSizeJSON(s *schema.Structural) int64 {
 	switch s.Type {
-	case "boolean":
-		// false,
-		return 6
 	case "number", "integer":
 		// we're concerned with the theoretical largest number that could be written as a string given the
 		// request limit, not the largest 64-bit integer (which is significantly smaller), so this is the
@@ -259,10 +278,12 @@ func estimateMaxSizeJSON(s *schema.Structural) int64 {
 		return (maxRequestSizeBytes - 2)
 	case "string":
 		if s.ValueValidation != nil && s.ValueValidation.Format != "" && s.ValueValidation.Format != "byte" {
-			switch s.Type {
+			switch s.ValueValidation.Format {
 			case "duration":
 				return maxDurationSizeJSON
-			case "date", "date-time":
+			case "date":
+				return dateSizeJSON
+			case "date-time":
 				return maxDatetimeSizeJSON
 			}
 		}
