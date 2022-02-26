@@ -54,9 +54,12 @@ import (
 	pvstore "k8s.io/kubernetes/pkg/registry/core/persistentvolume/storage"
 	pvcstore "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/storage"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
+	podschedulingstore "k8s.io/kubernetes/pkg/registry/core/podscheduling/storage"
 	podtemplatestore "k8s.io/kubernetes/pkg/registry/core/podtemplate/storage"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
+	resourceclaimstore "k8s.io/kubernetes/pkg/registry/core/resourceclaim/storage"
+	resourceclassstore "k8s.io/kubernetes/pkg/registry/core/resourceclass/storage"
 	resourcequotastore "k8s.io/kubernetes/pkg/registry/core/resourcequota/storage"
 	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
@@ -374,6 +377,32 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 
 	if resource := "componentstatuses"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate)
+	}
+
+	if resource := "resourceclasses"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		resourceClassStorage, err := resourceclassstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		}
+		storage[resource] = resourceClassStorage
+	}
+
+	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		}
+		storage[resource] = resourceClaimStorage
+		storage[resource+"/status"] = resourceClaimStatusStorage
+	}
+
+	if resource := "podschedulings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		}
+		storage[resource] = podSchedulingStorage
+		storage[resource+"/status"] = podSchedulingStatusStorage
 	}
 
 	if len(storage) > 0 {

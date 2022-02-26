@@ -457,3 +457,9 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 		obj.Type = &typeVol
 	}
 }
+
+func SetDefaults_ResourceClaimSpec(obj *v1.ResourceClaimSpec) {
+	if obj.AllocationMode == "" {
+		obj.AllocationMode = v1.AllocationModeWaitForFirstConsumer
+	}
+}

@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"time"
@@ -543,6 +544,23 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if j.Service == nil {
 				j.Service = &empty
 			}
+		},
+		func(obj *core.ResourceClass, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		},
+		func(obj *core.ResourceClaim, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+
+			// Custom fuzzing for allocation mode.
+			modes := []core.AllocationMode{
+				core.AllocationMode(fmt.Sprintf("%d", c.Rand.Int31())),
+				core.AllocationModeImmediate,
+				core.AllocationModeWaitForFirstConsumer,
+			}
+			obj.Spec.AllocationMode = modes[c.Rand.Intn(len(modes))]
+		},
+		func(obj *core.PodScheduling, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
 		},
 	}
 }

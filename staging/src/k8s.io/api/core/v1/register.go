@@ -90,6 +90,16 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ConfigMapList{},
 	)
 
+	// TODO: should this depend on the feature gate?
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&ResourceClass{},
+		&ResourceClassList{},
+		&ResourceClaim{},
+		&ResourceClaimList{},
+		&PodScheduling{},
+		&PodSchedulingList{},
+	)
+
 	// Add common types
 	scheme.AddKnownTypes(SchemeGroupVersion, &metav1.Status{})
 
