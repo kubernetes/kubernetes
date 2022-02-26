@@ -696,17 +696,20 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   local -a tests=()
 
-  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=("${binary}")
+      kube::log::info "    ${binary} (test)"
     elif kube::golang::is_statically_linked_library "${binary}"; then
       statics+=("${binary}")
+      kube::log::info "    ${binary} (static)"
     else
       nonstatics+=("${binary}")
+      kube::log::info "    ${binary} (non-static)"
     fi
   done
+
+  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
@@ -718,7 +721,6 @@ kube::golang::build_binaries_for_platform() {
       -ldflags "${goldflags:-}"
       -tags "${gotags:-}"
     )
-    V=1 kube::log::info "> static build CGO_ENABLED=0: ${statics[*]}"
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
   fi
 
@@ -730,7 +732,6 @@ kube::golang::build_binaries_for_platform() {
       -ldflags "${goldflags:-}"
       -tags "${gotags:-}"
     )
-    V=1 kube::log::info "> non-static build: ${nonstatics[*]}"
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 
@@ -872,7 +873,7 @@ kube::golang::build_binaries() {
       exit "${fails}"
     else
       for platform in "${platforms[@]}"; do
-        kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
+        kube::log::status "Building go targets for ${platform}"
         (
           kube::golang::set_platform_envs "${platform}"
           kube::golang::build_binaries_for_platform "${platform}"
