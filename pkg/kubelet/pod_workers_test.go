@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"context"
-	"flag"
 	"reflect"
 	"strconv"
 	"sync"
@@ -47,6 +46,7 @@ type fakePodWorkers struct {
 	t         TestingInterface
 
 	triggeredDeletion []types.UID
+	triggeredTerminal []types.UID
 
 	statusLock            sync.Mutex
 	running               map[types.UID]bool
@@ -78,8 +78,12 @@ func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
 	case kubetypes.SyncPodKill:
 		f.triggeredDeletion = append(f.triggeredDeletion, uid)
 	default:
-		if err := f.syncPodFn(context.Background(), options.UpdateType, options.Pod, options.MirrorPod, status); err != nil {
+		isTerminal, err := f.syncPodFn(context.Background(), options.UpdateType, options.Pod, options.MirrorPod, status)
+		if err != nil {
 			f.t.Errorf("Unexpected error: %v", err)
+		}
+		if isTerminal {
+			f.triggeredTerminal = append(f.triggeredTerminal, uid)
 		}
 	}
 }
@@ -243,7 +247,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
 	fakeQueue := &fakeQueue{}
 	w := newPodWorkers(
-		func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+		func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -253,7 +257,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 					updateType: updateType,
 				})
 			}()
-			return nil
+			return false, nil
 		},
 		func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 			func() {
@@ -524,8 +528,84 @@ func newUIDSet(uids ...types.UID) sets.String {
 	return set
 }
 
-func init() {
-	flag.Lookup("v").Value.Set("5")
+type terminalPhaseSync struct {
+	lock     sync.Mutex
+	fn       syncPodFnType
+	terminal sets.String
+}
+
+func (s *terminalPhaseSync) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+	isTerminal, err := s.fn(ctx, updateType, pod, mirrorPod, podStatus)
+	if err != nil {
+		return false, err
+	}
+	if !isTerminal {
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		isTerminal = s.terminal.Has(string(pod.UID))
+	}
+	return isTerminal, nil
+}
+
+func (s *terminalPhaseSync) SetTerminal(uid types.UID) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.terminal.Insert(string(uid))
+}
+
+func newTerminalPhaseSync(fn syncPodFnType) *terminalPhaseSync {
+	return &terminalPhaseSync{
+		fn:       fn,
+		terminal: sets.NewString(),
+	}
+}
+
+func TestTerminalPhaseTransition(t *testing.T) {
+	podWorkers, _ := createPodWorkers()
+	var channels WorkChannel
+	podWorkers.workerChannelFn = channels.Intercept
+	terminalPhaseSyncer := newTerminalPhaseSync(podWorkers.syncPodFn)
+	podWorkers.syncPodFn = terminalPhaseSyncer.SyncPod
+
+	// start pod
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        newNamedPod("1", "test1", "pod1", false),
+		UpdateType: kubetypes.SyncPodUpdate,
+	})
+	drainAllWorkers(podWorkers)
+
+	// should observe pod running
+	pod1 := podWorkers.podSyncStatuses[types.UID("1")]
+	if pod1.IsTerminated() {
+		t.Fatalf("unexpected pod state: %#v", pod1)
+	}
+
+	// send another update to the pod
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        newNamedPod("1", "test1", "pod1", false),
+		UpdateType: kubetypes.SyncPodUpdate,
+	})
+	drainAllWorkers(podWorkers)
+
+	// should observe pod still running
+	pod1 = podWorkers.podSyncStatuses[types.UID("1")]
+	if pod1.IsTerminated() {
+		t.Fatalf("unexpected pod state: %#v", pod1)
+	}
+
+	// the next sync should result in a transition to terminal
+	terminalPhaseSyncer.SetTerminal(types.UID("1"))
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        newNamedPod("1", "test1", "pod1", false),
+		UpdateType: kubetypes.SyncPodUpdate,
+	})
+	drainAllWorkers(podWorkers)
+
+	// should observe pod terminating
+	pod1 = podWorkers.podSyncStatuses[types.UID("1")]
+	if !pod1.IsTerminationRequested() || !pod1.IsTerminated() {
+		t.Fatalf("unexpected pod state: %#v", pod1)
+	}
 }
 
 func TestStaticPodExclusion(t *testing.T) {
@@ -1196,15 +1276,15 @@ type simpleFakeKubelet struct {
 	wg        sync.WaitGroup
 }
 
-func (kl *simpleFakeKubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+func (kl *simpleFakeKubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
 	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
-	return nil
+	return false, nil
 }
 
-func (kl *simpleFakeKubelet) syncPodWithWaitGroup(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+func (kl *simpleFakeKubelet) syncPodWithWaitGroup(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
 	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
 	kl.wg.Done()
-	return nil
+	return false, nil
 }
 
 func (kl *simpleFakeKubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
