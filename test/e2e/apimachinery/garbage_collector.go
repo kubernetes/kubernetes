@@ -170,6 +170,56 @@ func newGCPod(name string) *v1.Pod {
 	}
 }
 
+func createOwnerRC(f *framework.Framework, rcName string, totalNumberPods int32, uniqLabels map[string]string) *v1.ReplicationController {
+	clientSet := f.ClientSet
+	rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+	rc := newOwnerRC(f, rcName, totalNumberPods/2, uniqLabels)
+
+	ginkgo.By("create the rc with half the expected capacity")
+	rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
+	if err != nil {
+		framework.Failf("Failed to create replication controller: %v", err)
+	}
+
+	// wait for rc to create pods
+	waitForReplicas := func() (bool, error) {
+		rc, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to get rc: %v", err)
+		}
+		if rc.Status.Replicas == *rc.Spec.Replicas {
+			return true, nil
+		}
+		return false, nil
+	}
+	if err := wait.Poll(5*time.Second, 30*time.Second, waitForReplicas); err != nil {
+		framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+	}
+
+	ginkgo.By("wait for 30 seconds to give the current pods a chance to spawn")
+	time.Sleep(30 * time.Second)
+
+	ginkgo.By("scale the rc to the expected capacity")
+	scale, err := rcClient.GetScale(context.TODO(), rc.Name, metav1.GetOptions{})
+	if err != nil {
+		framework.Failf("Failed to get scale subresource: %v", err)
+	}
+	scale.ResourceVersion = ""
+	scale.Spec.Replicas = totalNumberPods
+	rcClient.UpdateScale(context.TODO(), rc.Name, scale, metav1.UpdateOptions{})
+
+	// We need to get the updated RC with the new number of Replicas.
+	rc, err = rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
+	if err != nil {
+		framework.Failf("Failed to get RC: %v", err)
+	}
+	if err := wait.Poll(5*time.Second, 30*time.Second, waitForReplicas); err != nil {
+		framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+	}
+
+	return rc
+}
+
 // verifyRemainingObjects verifies if the number of remaining objects.
 // It returns error if the communication with the API server fails.
 func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (bool, error) {
@@ -371,26 +421,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		uniqLabels := getUniqLabel("gctest", "orphan_pods")
-		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
-		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
-		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
-		}
-		// wait for rc to create pods
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			rc, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %v", err)
-			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
+		totalNumberPods := estimateMaximumPods(clientSet, 10, 100)
+		rc := createOwnerRC(f, rcName, totalNumberPods, uniqLabels)
 
-		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
-		}
 		ginkgo.By("delete the rc")
 		deleteOptions := getOrphanOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
@@ -430,6 +463,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err = e2epod.DeletePodsWithGracePeriod(clientSet, pods.Items, 0); err != nil {
 			framework.Logf("WARNING: failed to delete pods: %v", err)
 		}
+
+		// NOTE(claudiub): DeletePodsWithGracePeriod does not wait for the pods to disappear,
+		// which means that the nodes will be busy deleting the pods while the next test starts,
+		// which would potentially lead it to a timeout. Wait for the last pod to disapear.
+		e2epod.WaitForPodNotFoundInNamespace(clientSet, pods.Items[len(pods.Items)-1].Name, f.Namespace.Name, f.Timeouts.PodDelete)
 	})
 
 	// deleteOptions.OrphanDependents is deprecated in 1.7 and preferred to use the PropagationPolicy.
@@ -651,25 +689,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		uniqLabels := getUniqLabel("gctest", "delete_pods_foreground")
-		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
-		ginkgo.By("create the rc")
-		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
-		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
-		}
-		// wait for rc to create pods
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			rc, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %v", err)
-			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
-		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
-		}
+		totalNumberPods := estimateMaximumPods(clientSet, 10, 100)
+		rc := createOwnerRC(f, rcName, totalNumberPods, uniqLabels)
+
 		ginkgo.By("delete the rc")
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
@@ -737,34 +759,19 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rc1Name := "simpletest-rc-to-be-deleted"
 		replicas := int32(estimateMaximumPods(clientSet, 10, 100))
 		halfReplicas := int(replicas / 2)
-		uniqLabelsDeleted := getUniqLabel("gctest_d", "valid_and_pending_owners_d")
-		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabelsDeleted)
-		ginkgo.By("create the rc1")
-		rc1, err := rcClient.Create(context.TODO(), rc1, metav1.CreateOptions{})
-		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
-		}
+
 		rc2Name := "simpletest-rc-to-stay"
 		uniqLabelsStay := getUniqLabel("gctest_s", "valid_and_pending_owners_s")
 		rc2 := newOwnerRC(f, rc2Name, 0, uniqLabelsStay)
 		ginkgo.By("create the rc2")
-		rc2, err = rcClient.Create(context.TODO(), rc2, metav1.CreateOptions{})
+		rc2, err := rcClient.Create(context.TODO(), rc2, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
-		// wait for rc1 to be stable
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			rc1, err := rcClient.Get(context.TODO(), rc1.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %v", err)
-			}
-			if rc1.Status.Replicas == *rc1.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
-		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
-		}
+
+		uniqLabelsDeleted := getUniqLabel("gctest_d", "valid_and_pending_owners_d")
+		rc1 := createOwnerRC(f, rc1Name, replicas, uniqLabelsDeleted)
+
 		ginkgo.By(fmt.Sprintf("set half of pods created by rc %s to have rc %s as owner as well", rc1Name, rc2Name))
 		pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list pods in namespace: %s", f.Namespace.Name)
