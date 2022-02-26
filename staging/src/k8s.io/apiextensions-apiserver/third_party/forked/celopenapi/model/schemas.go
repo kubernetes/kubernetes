@@ -88,13 +88,13 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 	case "array":
 		if s.Items != nil {
 			itemsType := SchemaDeclType(s.Items, s.Items.XEmbeddedResource)
-			maxItems := int64(-1)
+			maxItems := int64(noMaxLength)
 			if s.Items.ValueValidation != nil {
 				if s.Items.ValueValidation.MaxItems != nil {
 					maxItems = *s.Items.ValueValidation.MaxItems
 				}
 			}
-			if maxItems == -1 {
+			if maxItems == noMaxLength {
 				maxItems = estimateMaxSizeJSON(s)
 			}
 			if itemsType != nil {
@@ -106,13 +106,13 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
 			propsType := SchemaDeclType(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource)
 			if propsType != nil {
-				maxProperties := int64(-1)
+				maxProperties := int64(noMaxLength)
 				if s.ValueValidation != nil {
 					if s.ValueValidation.MaxProperties != nil {
 						maxProperties = *s.ValueValidation.MaxProperties
 					}
 				}
-				if maxProperties == -1 {
+				if maxProperties == noMaxLength {
 					maxProperties = estimateMaxSizeJSON(s)
 				}
 				return NewMapType(StringType, propsType, maxProperties)
@@ -264,7 +264,7 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 		return objSize
 	}
 	// TODO(DangerOnTheRanger): better error handling (We should never get here in normal operation)
-	return -1
+	return noMaxLength
 }
 
 // estimateMaxSizeJSON estimates the maximum number of elements that can fit in s considering request size
@@ -303,9 +303,9 @@ func estimateMaxSizeJSON(s *schema.Structural) int64 {
 		} else {
 			// this codepath executes in the case of non-map objects,
 			// but regular objects have no concept of maxProperties
-			return -1
+			return noMaxLength
 		}
 	}
 	// TODO(DangerOnTheRanger): better error handling (We should never get here in normal operation)
-	return -1
+	return noMaxLength
 }

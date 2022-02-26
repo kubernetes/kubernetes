@@ -16,6 +16,7 @@ package model
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -31,7 +32,7 @@ import (
 )
 
 const (
-	noMaxLength = -1
+	noMaxLength = math.MaxInt
 )
 
 // NewListType returns a parameterized list type with a specified element type.
@@ -51,7 +52,7 @@ func NewMapType(key, elem *DeclType, maxProperties int64) *DeclType {
 		name:         "map",
 		KeyType:      key,
 		ElemType:     elem,
-		MaxLength: maxProperties,
+		MaxLength:    maxProperties,
 		exprType:     decls.NewMapType(key.ExprType(), elem.ExprType()),
 		defaultValue: NewMapValue(),
 	}
@@ -557,5 +558,5 @@ var (
 	ListType = NewListType(AnyType, noMaxLength)
 
 	// MapType is equivalent to the CEL 'map' type.
-	MapType = NewMapType(AnyType, AnyType, -1)
+	MapType = NewMapType(AnyType, AnyType, noMaxLength)
 )
