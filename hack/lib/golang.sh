@@ -803,15 +803,20 @@ kube::golang::build_binaries() {
     # build_binaries_for_platform.
     local goflags goldflags goasmflags gogcflags gotags
 
-    goasmflags="-trimpath=${KUBE_ROOT}"
+    # This is $(pwd) because we use run-in-gopath to build.  Once that is
+    # excised, this can become ${KUBE_ROOT}.
+    local trimroot # two lines to appease shellcheck SC2155
+    trimroot=$(pwd)
 
-    gogcflags="-trimpath=${KUBE_ROOT} ${GOGCFLAGS:-}"
+    goasmflags="all=-trimpath=${trimroot}"
+
+    gogcflags="all=-trimpath=${trimroot} ${GOGCFLAGS:-}"
     if [[ "${DBG:-}" == 1 ]]; then
         # Debugging - disable optimizations and inlining.
         gogcflags="${gogcflags} -N -l"
     fi
 
-    goldflags="$(kube::version::ldflags) ${GOLDFLAGS:-}"
+    goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
     if [[ "${DBG:-}" != 1 ]]; then
         # Not debugging - disable symbols and DWARF.
         goldflags="${goldflags} -s -w"
