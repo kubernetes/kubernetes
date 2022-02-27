@@ -648,15 +648,6 @@ const (
 	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
 	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
 
-	// owner: @hbagdi
-	// kep: http://kep.k8s.io/2365
-	// alpha: v1.21
-	// beta: v1.22
-	// GA: v1.23
-	//
-	// Enable Scope and Namespace fields on IngressClassParametersReference.
-	IngressClassNamespacedParams featuregate.Feature = "IngressClassNamespacedParams"
-
 	// owner: @maplain @andrewsykim
 	// kep: http://kep.k8s.io/2086
 	// alpha: v1.21
@@ -981,7 +972,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TopologyAwareHints:                             {Default: true, PreRelease: featuregate.Beta},
 	PodAffinityNamespaceSelector:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	ServiceLoadBalancerClass:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-	IngressClassNamespacedParams:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	ServiceInternalTrafficPolicy:                   {Default: true, PreRelease: featuregate.Beta},
 	LogarithmicScaleDown:                           {Default: true, PreRelease: featuregate.Beta},
 	SuspendJob:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
