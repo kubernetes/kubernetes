@@ -714,12 +714,12 @@ kube::golang::build_binaries_for_platform() {
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
     build_args=(
-      -installsuffix static
+      -installsuffix=static
       ${goflags:+"${goflags[@]}"}
-      -gcflags "${gogcflags:-}"
-      -asmflags "${goasmflags:-}"
-      -ldflags "${goldflags:-}"
-      -tags "${gotags:-}"
+      -gcflags="${gogcflags}"
+      -asmflags="${goasmflags}"
+      -ldflags="${goldflags}"
+      -tags="${gotags:-}"
     )
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
   fi
@@ -727,10 +727,10 @@ kube::golang::build_binaries_for_platform() {
   if [[ "${#nonstatics[@]}" != 0 ]]; then
     build_args=(
       ${goflags:+"${goflags[@]}"}
-      -gcflags "${gogcflags:-}"
-      -asmflags "${goasmflags:-}"
-      -ldflags "${goldflags:-}"
-      -tags "${gotags:-}"
+      -gcflags="${gogcflags}"
+      -asmflags="${goasmflags}"
+      -ldflags="${goldflags}"
+      -tags="${gotags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
@@ -743,10 +743,10 @@ kube::golang::build_binaries_for_platform() {
     mkdir -p "$(dirname "${outfile}")"
     go test -c \
       ${goflags:+"${goflags[@]}"} \
-      -gcflags "${gogcflags:-}" \
-      -asmflags "${goasmflags:-}" \
-      -ldflags "${goldflags:-}" \
-      -tags "${gotags:-}" \
+      -gcflags="${gogcflags}" \
+      -asmflags="${goasmflags}" \
+      -ldflags="${goldflags}" \
+      -tags="${gotags:-}" \
       -o "${outfile}" \
       "${testpkg}"
   done
@@ -798,17 +798,26 @@ kube::golang::build_binaries() {
     local host_platform
     host_platform=$(kube::golang::host_platform)
 
+    # These are "local" but are visible to and relied on by functions this
+    # function calls.  They are effectively part of the calling API to
+    # build_binaries_for_platform.
     local goflags goldflags goasmflags gogcflags gotags
-    # If GOLDFLAGS is unset, then set it to the a default of "-s -w".
-    # Disable SC2153 for this, as it will throw a warning that the local
-    # variable goldflags will exist, and it suggest changing it to this.
-    # shellcheck disable=SC2153
-    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
-    goasmflags="-trimpath=${KUBE_ROOT}"
-    gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
-    # extract tags if any specified in GOFLAGS
-    # shellcheck disable=SC2001
+    goasmflags="-trimpath=${KUBE_ROOT}"
+
+    gogcflags="-trimpath=${KUBE_ROOT} ${GOGCFLAGS:-}"
+    if [[ "${DBG:-}" == 1 ]]; then
+        # Debugging - disable optimizations and inlining.
+        gogcflags="${gogcflags} -N -l"
+    fi
+
+    goldflags="$(kube::version::ldflags) ${GOLDFLAGS:-}"
+    if [[ "${DBG:-}" != 1 ]]; then
+        # Not debugging - disable symbols and DWARF.
+        goldflags="${goldflags} -s -w"
+    fi
+
+    # Extract tags if any specified in GOFLAGS
     gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
     local -a targets=()

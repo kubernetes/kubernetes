@@ -73,6 +73,8 @@ define ALL_HELP_INFO
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
+#   DBG: If set to "1", build with optimizations disabled for easier
+#     debugging.  Any other value is ignored.
 #
 # Example:
 #   make
