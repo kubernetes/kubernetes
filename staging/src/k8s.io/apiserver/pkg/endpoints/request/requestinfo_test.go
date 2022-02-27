@@ -55,6 +55,9 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
+		{"GET", "/apis/stable.example.com/v1/namespaces/example", "get", "apis", "stable.example.com", "v1", "", "namespaces", "", "example", []string{"namespaces", "example"}},
+		{"GET", "/apis/stable.example.com/v1/namespaces/other/namespaces/example", "get", "apis", "stable.example.com", "v1", "other", "namespaces", "", "example", []string{"namespaces", "example"}},
+
 		// special verbs
 		{"GET", "/api/v1/proxy/namespaces/other/pods/foo", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1/proxy/namespaces/other/pods/foo/subpath/not/a/subresource", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo", "subpath", "not", "a", "subresource"}},
@@ -64,23 +67,35 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/api/v1/watch/namespaces/other/pods", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 		{"GET", "/api/v1/namespaces/other/pods?watch=1", "watch", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 		{"GET", "/api/v1/namespaces/other/pods?watch=0", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		// watch cluster-scoped CRs
+		{"GET", "/apis/stable.example.com/v1/namespaces?watch=true", "watch", "apis", "stable.example.com", "v1", "", "namespaces", "", "", []string{"namespaces"}},
+		{"GET", "/apis/stable.example.com/v1/namespaces/other/namespaces?watch=true", "watch", "apis", "stable.example.com", "v1", "other", "namespaces", "", "", []string{"namespaces"}},
+		// watch namespace-scoped CRs in all namespaces
+		{"GET", "/apis/stable.example.com/v1/namespaces?watch=true", "watch", "apis", "stable.example.com", "v1", namespaceAll, "namespaces", "", "", []string{"namespaces"}},
 
 		// subresource identification
 		{"GET", "/api/v1/namespaces/other/pods/foo/status", "get", "api", "", "v1", "other", "pods", "status", "foo", []string{"pods", "foo", "status"}},
 		{"GET", "/api/v1/namespaces/other/pods/foo/proxy/subpath", "get", "api", "", "v1", "other", "pods", "proxy", "foo", []string{"pods", "foo", "proxy", "subpath"}},
 		{"PUT", "/api/v1/namespaces/other/finalize", "update", "api", "", "v1", "other", "namespaces", "finalize", "other", []string{"namespaces", "other", "finalize"}},
 		{"PUT", "/api/v1/namespaces/other/status", "update", "api", "", "v1", "other", "namespaces", "status", "other", []string{"namespaces", "other", "status"}},
+		{"GET", "/apis/stable.example.com/v1/namespaces/example/status", "get", "apis", "stable.example.com", "v1", "", "namespaces", "status", "example", []string{"namespaces", "example", "status"}},
+		{"GET", "/apis/stable.example.com/v1/namespaces/other/namespaces/example/status", "get", "apis", "stable.example.com", "v1", "other", "namespaces", "status", "example", []string{"namespaces", "example", "status"}},
 
 		// verb identification
 		{"PATCH", "/api/v1/namespaces/other/pods/foo", "patch", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"DELETE", "/api/v1/namespaces/other/pods/foo", "delete", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"POST", "/api/v1/namespaces/other/pods", "create", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
+		{"POST", "/apis/stable.example.com/v1/namespaces", "create", "apis", "stable.example.com", "v1", "", "namespaces", "", "", []string{"namespaces"}},
+		{"POST", "/apis/stable.example.com/v1/namespaces/other/namespaces", "create", "apis", "stable.example.com", "v1", "other", "namespaces", "", "", []string{"namespaces"}},
+
 
 		// deletecollection verb identification
 		{"DELETE", "/api/v1/nodes", "deletecollection", "api", "", "v1", "", "nodes", "", "", []string{"nodes"}},
 		{"DELETE", "/api/v1/namespaces", "deletecollection", "api", "", "v1", "", "namespaces", "", "", []string{"namespaces"}},
 		{"DELETE", "/api/v1/namespaces/other/pods", "deletecollection", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 		{"DELETE", "/apis/extensions/v1/namespaces/other/pods", "deletecollection", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},
+		{"DELETE", "/apis/stable.example.com/v1/namespaces", "deletecollection", "apis", "stable.example.com", "v1", "", "namespaces", "", "", []string{"namespaces"}},
+		{"DELETE", "/apis/stable.example.com/v1/namespaces/other/namespaces", "deletecollection", "apis", "stable.example.com", "v1", "other", "namespaces", "", "", []string{"namespaces"}},
 
 		// api group identification
 		{"POST", "/apis/extensions/v1/namespaces/other/pods", "create", "api", "extensions", "v1", "other", "pods", "", "", []string{"pods"}},

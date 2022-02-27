@@ -77,6 +77,11 @@ var specialVerbsNoSubresources = sets.NewString("proxy")
 // this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
 var namespaceSubresources = sets.NewString("status", "finalize")
 
+// crSubresources contains allowed subresources of a CR:
+// https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources
+// this list allows the parser to distinguish between a cluster-scoped CR's subresources and a list of namespace-scoped CRs
+var crSubresources = sets.NewString("status", "scale")
+
 // NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/controlplane/master_test.go, so we never drift
 var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
 
@@ -178,7 +183,7 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 
 	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
 	if currentParts[0] == "namespaces" {
-		if len(currentParts) > 1 {
+		if hasNamespace(requestInfo.APIPrefix, currentParts) {
 			requestInfo.Namespace = currentParts[1]
 
 			// if there is another step after the namespace name and it is not a known namespace subresource
@@ -244,6 +249,22 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 	}
 
 	return &requestInfo, nil
+}
+
+func hasNamespace(apiPrefix string, currentParts []string) bool {
+	if len(currentParts) <= 1 {
+		return false
+	}
+	if apiPrefix != "apis" {
+		return true
+	}
+	if len(currentParts) == 2 {
+		return false
+	}
+	if len(currentParts) == 3 && crSubresources.Has(currentParts[2]) {
+		return false
+	}
+	return true
 }
 
 type requestInfoKeyType int
