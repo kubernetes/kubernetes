@@ -162,7 +162,7 @@ gen_prerelease_lifecycle: $(PRERELEASE_LIFECYCLE_GEN) $(META_DIR)/$(PRERELEASE_L
 	        echo "DBG: running $(PRERELEASE_LIFECYCLE_GEN) for $$pkgs";            \
 	    fi;                                                                        \
 	    N=$$(cat $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo | wc -l);            \
-	    echo "Generating prerelease lifecycle code for $$N targets";               \
+	    kube::log::status "Generating prerelease lifecycle code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(PRERELEASE_LIFECYCLE_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                                    \
 	        --logtostderr                                                          \
@@ -255,7 +255,7 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 	        echo "DBG: running $(DEEPCOPY_GEN) for $$pkgs";            \
 	    fi;                                                            \
 	    N=$$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | wc -l);            \
-	    echo "Generating deepcopy code for $$N targets";               \
+	    kube::log::status "Generating deepcopy code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                        \
 	        --logtostderr                                              \
@@ -357,7 +357,7 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 	        echo "DBG: running $(DEFAULTER_GEN) for $$pkgs";            \
 	    fi;                                                             \
 	    N=$$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | wc -l);            \
-	    echo "Generating defaulter code for $$N targets";               \
+	    kube::log::status "Generating defaulter code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                         \
 	        --logtostderr                                               \
@@ -469,7 +469,7 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 	        echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
 	    fi;                                                              \
 	    N=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | wc -l);            \
-	    echo "Generating conversion code for $$N targets";               \
+	    kube::log::status "Generating conversion code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                        \
 	        --extra-peer-dirs $$(echo $(CONVERSION_EXTRA_PEER_PKGS) | sed 's/ /,/g') \
 	        --extra-dirs $$(echo $(CONVERSION_EXTRA_PKGS) | sed 's/ /,/g') \
@@ -606,7 +606,7 @@ endif
 # checked-in violation file, and prints error message to request developer to
 # fix either the API source code, or the known API rule violation file.
 $$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME)
-	echo "Generating openapi code for $(prefix)";                                              \
+	kube::log::status "Generating openapi code for $(prefix)";                                 \
 	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                                     \
 	    --v $(KUBE_VERBOSE)                                                                    \
 	    --logtostderr                                                                          \
