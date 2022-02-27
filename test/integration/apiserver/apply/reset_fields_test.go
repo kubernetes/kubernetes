@@ -68,11 +68,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 // resetFieldsStatusDefault conflicts with statusDefault
 const resetFieldsStatusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"False"}]}}`
 
-var resetFieldsSkippedResources = map[string]struct{}{
-	// TODO: flowschemas is flaking,
-	// possible bug in the flowschemas controller.
-	"flowschemas": {},
-}
+var resetFieldsSkippedResources = map[string]struct{}{}
 
 // noConflicts is the set of reources for which
 // a conflict cannot occur.
