@@ -901,6 +901,11 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		}
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
+		// The value -1 or a value of 0 with a non-nil Body indicates that the length is unknown.
+		// https://pkg.go.dev/net/http#Request
+		if req.ContentLength >= 0 && !(req.Body != nil && req.ContentLength == 0) {
+			metrics.RequestSize.Observe(ctx, r.verb, r.URL().Host, float64(req.ContentLength))
+		}
 		if err != nil {
 			r.backoff.UpdateBackoff(r.URL(), err, 0)
 		} else {
@@ -963,6 +968,9 @@ func (r *Request) Do(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
+	if result.err == nil || len(result.body) > 0 {
+		metrics.ResponseSize.Observe(ctx, r.verb, r.URL().Host, float64(len(result.body)))
+	}
 	return result
 }
 
@@ -978,6 +986,9 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if result.err == nil || len(result.body) > 0 {
+		metrics.ResponseSize.Observe(ctx, r.verb, r.URL().Host, float64(len(result.body)))
 	}
 	return result.body, result.err
 }
