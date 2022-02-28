@@ -317,11 +317,10 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 	klog.Infof("stopped %d of %d monitors", stopped, len(monitors))
 }
 
-// Event Group v1 events.k8s.io/v1
+// Event Group events.k8s.io
 var ignoredResources = map[schema.GroupResource]struct{}{
-	{Group: "", Resource: "events"}:                 {},
-	{Group: "v1", Resource: "events"}:               {},
-	{Group: "events.k8s.io/v1", Resource: "events"}: {},
+	{Group: "", Resource: "events"}:              {},
+	{Group: "events.k8s.io", Resource: "events"}: {},
 }
 
 // DefaultIgnoredResources returns the default set of resources that the garbage collector controller
