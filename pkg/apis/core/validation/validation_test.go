@@ -2531,7 +2531,7 @@ func TestValidateGlusterfsPersistentVolumeSource(t *testing.T) {
 	}
 }
 
-func TestValidateCSIVolumeSource(t *testing.T) {
+func TestValidateCSIPersistentVolumeSource(t *testing.T) {
 	testCases := []struct {
 		name     string
 		csi      *core.CSIPersistentVolumeSource
@@ -2645,6 +2645,38 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 		{
 			name: "valid controllerExpandSecretRef",
 			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
+		{
+			name:     "controllerPublishSecretRef: invalid name missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerPublishSecretRef: &core.SecretReference{Namespace: "default"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "controllerPublishSecretRef.name",
+		},
+		{
+			name:     "controllerPublishSecretRef: invalid namespace missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerPublishSecretRef: &core.SecretReference{Name: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "controllerPublishSecretRef.namespace",
+		},
+		{
+			name: "valid controllerPublishSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerPublishSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
+		{
+			name: "valid nodePublishSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
+		{
+			name:     "nodePublishSecretRef: invalid name missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Namespace: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodePublishSecretRef.name",
+		},
+		{
+			name:     "nodePublishSecretRef: invalid namespace missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodePublishSecretRef.namespace",
 		},
 	}
 
