@@ -30,8 +30,6 @@ import (
 
 	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog/v2"
-
-	"k8s.io/kubernetes/pkg/util/env"
 )
 
 var etcdURL = ""
@@ -68,14 +66,14 @@ func startEtcd() (func(), error) {
 		os.Setenv("ETCD_UNSUPPORTED_ARCH", "arm64")
 	}
 
-	etcdURL = env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
-	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
-	if err == nil {
-		klog.Infof("etcd already running at %s", etcdURL)
-		conn.Close()
-		return func() {}, nil
-	}
-	klog.V(1).Infof("could not connect to etcd: %v", err)
+	//etcdURL = env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+	//conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
+	//if err == nil {
+	//	klog.Infof("etcd already running at %s", etcdURL)
+	//	conn.Close()
+	//	return func() {}, nil
+	//}
+	//klog.V(1).Infof("could not connect to etcd: %v", err)
 
 	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil)
 	if err != nil {
