@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1371,7 +1371,15 @@ func Test_prioritizeNodesPluginToNodeScores(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			assert.Equal(t, test.wantPluginToNodeScores, scoreMap)
+			for i := range scoreMap {
+				sort.Slice(scoreMap[i], func(j, k int) bool {
+					return scoreMap[i][j].Name < scoreMap[i][k].Name
+				})
+			}
+
+			if diff := cmp.Diff(test.wantPluginToNodeScores, scoreMap); diff != "" {
+				t.Errorf("returned score map (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
