@@ -110,8 +110,7 @@ type PodTopologySpreadArgs struct {
 	//   Nodes and Zones.
 	// - "List": Use constraints defined in .defaultConstraints.
 	//
-	// Defaults to "List" if feature gate DefaultPodTopologySpread is disabled
-	// and to "System" if enabled.
+	// Defaults to "System".
 	// +optional
 	DefaultingType PodTopologySpreadConstraintsDefaulting `json:"defaultingType,omitempty"`
 }
