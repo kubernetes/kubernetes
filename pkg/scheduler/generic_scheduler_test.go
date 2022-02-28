@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1216,6 +1217,165 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 	}
 }
 
+// Test_prioritizeNodesPluginToNodeScores is to check
+// if prioritizeNodes returns expected PluginToNodeScores.
+func Test_prioritizeNodesPluginToNodeScores(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name                   string
+		pod                    *v1.Pod
+		pods                   []*v1.Pod
+		nodes                  []*v1.Node
+		pluginRegistrations    []st.RegisterPluginFunc
+		extenders              []st.FakeExtender
+		wantPluginToNodeScores framework.PluginToNodeScores
+	}{
+		{
+			name:  "the score from all plugins should be recorded in PluginToNodeScores",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: nil,
+			wantPluginToNodeScores: framework.PluginToNodeScores{
+				"NodeResourcesBalancedAllocation": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 100,
+					},
+					{
+						Name:  "node2",
+						Score: 100,
+					},
+				},
+				"Node2Prioritizer": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 10,
+					},
+					{
+						Name:  "node2",
+						Score: 100,
+					},
+				},
+			},
+		},
+		{
+			name:  "the score from extender should also be recorded in PluginToNodeScores with plugin scores",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: []st.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   3,
+							Function: st.Node1PrioritizerExtender,
+						},
+					},
+				},
+				{
+					ExtenderName: "FakeExtender2",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   2,
+							Function: st.Node2PrioritizerExtender,
+						},
+					},
+				},
+			},
+			wantPluginToNodeScores: framework.PluginToNodeScores{
+				"NodeResourcesBalancedAllocation": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 100,
+					},
+					{
+						Name:  "node2",
+						Score: 100,
+					},
+				},
+				"extenders/FakeExtender1": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 300,
+					},
+					{
+						Name:  "node2",
+						Score: 30,
+					},
+				},
+				"extenders/FakeExtender2": framework.NodeScoreList{
+					{
+						Name:  "node1",
+						Score: 20,
+					},
+					{
+						Name:  "node2",
+						Score: 200,
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
+			fwk, err := st.NewFramework(
+				test.pluginRegistrations, "",
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+			)
+			if err != nil {
+				t.Fatalf("error creating framework: %+v", err)
+			}
+
+			scheduler := NewGenericScheduler(
+				nil,
+				emptySnapshot,
+				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+			scheduler.nodeInfoSnapshot = snapshot
+
+			ctx := context.Background()
+			state := framework.NewCycleState()
+			_, _, err = scheduler.findNodesThatFitPod(ctx, nil, fwk, state, test.pod)
+			if err != nil {
+				t.Fatalf("error filtering nodes: %+v", err)
+			}
+			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
+			var extenders []framework.Extender
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
+			}
+			_, scoreMap, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			assert.Equal(t, test.wantPluginToNodeScores, scoreMap)
+		})
+	}
+}
+
 // The point of this test is to show that you:
 // - get the same priority for a zero-request pod as for a pod with the defaults requests,
 //   both when the zero-request pod is already on the machine and when the zero-request pod
@@ -1348,7 +1508,7 @@ func TestZeroRequest(t *testing.T) {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
 			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
-			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, test.nodes)
+			list, _, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
