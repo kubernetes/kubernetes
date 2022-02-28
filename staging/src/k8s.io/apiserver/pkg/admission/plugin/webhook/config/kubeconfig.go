@@ -27,7 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
+	v1 "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
 )
 
@@ -61,7 +61,7 @@ func LoadConfig(configFile io.Reader) (string, error) {
 			return "", fmt.Errorf("unexpected type: %T", decodedObj)
 		}
 
-		if !path.IsAbs(config.KubeConfigFile) {
+		if len(config.KubeConfigFile) > 0 && !path.IsAbs(config.KubeConfigFile) {
 			return "", field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
 		}
 
