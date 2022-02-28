@@ -120,39 +120,114 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 	}
 
 	cases := []struct {
-		labels     map[string]string
-		labelKey   string
-		labelValue string
-		want       map[string]string
+		name             string
+		labels           map[string]string
+		matchExpressions []metav1.LabelSelectorRequirement
+		labelKey         string
+		labelValue       string
+		want             metav1.LabelSelector
 	}{
 		{
+			name:   "don't add a label when labelKey is empty",
 			labels: labels,
-			want:   labels,
-		},
-		{
-			labels:     labels,
-			labelKey:   "foo4",
-			labelValue: "89",
-			want: map[string]string{
-				"foo1": "bar1",
-				"foo2": "bar2",
-				"foo3": "bar3",
-				"foo4": "89",
+			want: metav1.LabelSelector{
+				MatchLabels: labels,
 			},
 		},
 		{
+			name:       "add a label",
+			labels:     labels,
+			labelKey:   "foo4",
+			labelValue: "89",
+			want: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo1": "bar1",
+					"foo2": "bar2",
+					"foo3": "bar3",
+					"foo4": "89",
+				},
+			},
+		},
+		{
+			name:       "add a label when selector MatchLabels is nil",
 			labels:     nil,
 			labelKey:   "foo4",
 			labelValue: "12",
-			want: map[string]string{
-				"foo4": "12",
+			want: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo4": "12",
+				},
+				MatchExpressions: nil,
+			},
+		},
+		{
+			name:             "add a label when selector MatchLabels is not nil",
+			labels:           labels,
+			matchExpressions: nil,
+			labelKey:         "foo4",
+			labelValue:       "89",
+			want: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo1": "bar1",
+					"foo2": "bar2",
+					"foo3": "bar3",
+					"foo4": "89",
+				},
+				MatchExpressions: nil,
+			},
+		},
+		{
+			name:   "selector matchExpressions is not nil and matchExpressions.Values is nil",
+			labels: labels,
+			matchExpressions: []metav1.LabelSelectorRequirement{{
+				Key:      "foo1",
+				Operator: metav1.LabelSelectorOpExists,
+			}},
+			labelKey:   "foo4",
+			labelValue: "89",
+			want: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo1": "bar1",
+					"foo2": "bar2",
+					"foo3": "bar3",
+					"foo4": "89",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{
+					Key:      "foo1",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   nil,
+				}},
+			},
+		},
+		{
+			name:   "selector matchExpressions.Values is not nil",
+			labels: labels,
+			matchExpressions: []metav1.LabelSelectorRequirement{{
+				Key:      "foo1",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"bar", "bar1"},
+			}},
+			labelKey:   "foo4",
+			labelValue: "89",
+			want: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo1": "bar1",
+					"foo2": "bar2",
+					"foo3": "bar3",
+					"foo4": "89",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{{
+					Key:      "foo1",
+					Operator: metav1.LabelSelectorOpIn,
+					Values:   []string{"bar", "bar1"},
+				}},
 			},
 		},
 	}
 
 	for _, tc := range cases {
-		ls_in := metav1.LabelSelector{MatchLabels: tc.labels}
-		ls_out := metav1.LabelSelector{MatchLabels: tc.want}
+		ls_in := metav1.LabelSelector{MatchLabels: tc.labels, MatchExpressions: tc.matchExpressions}
+		ls_out := metav1.LabelSelector{MatchLabels: tc.want.MatchLabels, MatchExpressions: tc.matchExpressions}
 
 		got := CloneSelectorAndAddLabel(&ls_in, tc.labelKey, tc.labelValue)
 		if !reflect.DeepEqual(got, &ls_out) {
@@ -206,6 +281,54 @@ func TestAddLabelToSelector(t *testing.T) {
 		got := AddLabelToSelector(&ls_in, tc.labelKey, tc.labelValue)
 		if !reflect.DeepEqual(got, &ls_out) {
 			t.Errorf("got %v, want %v", got, tc.want)
+		}
+	}
+}
+
+func TestSelectorHasLabel(t *testing.T) {
+	labels := map[string]string{
+		"foo1": "bar1",
+		"foo2": "bar2",
+	}
+
+	cases := []struct {
+		name         string
+		labels       map[string]string
+		labelKey     string
+		wantHasLabel bool
+	}{
+		{
+			name:         "the given label key is empty",
+			labels:       labels,
+			labelKey:     "",
+			wantHasLabel: false,
+		},
+		{
+			name:         "the given selector.MatchLabels contains the given label key",
+			labels:       labels,
+			labelKey:     "foo1",
+			wantHasLabel: true,
+		},
+		{
+			name:         "the given selector.MatchLabels is nil",
+			labels:       nil,
+			labelKey:     "foo2",
+			wantHasLabel: false,
+		},
+		{
+			name:         "the given selector.MatchLabels does not contains the given label key",
+			labels:       labels,
+			labelKey:     "foo3",
+			wantHasLabel: false,
+		},
+	}
+
+	for _, tc := range cases {
+		lsInput := metav1.LabelSelector{MatchLabels: tc.labels}
+
+		got := SelectorHasLabel(&lsInput, tc.labelKey)
+		if !reflect.DeepEqual(got, tc.wantHasLabel) {
+			t.Errorf("got %v, want %v", got, tc.wantHasLabel)
 		}
 	}
 }
