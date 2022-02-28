@@ -252,15 +252,25 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 }
 
 func hasNamespace(apiPrefix string, currentParts []string) bool {
+	// if we don't have at least one remaining part, path cannot have a namespace component
 	if len(currentParts) <= 1 {
 		return false
 	}
+	// check if API prefix is "apis" where any extension APIs live. If not, we preserve existing behavior (with "api" prefix)
+	// when deciding whether a namespace component exists
 	if apiPrefix != "apis" {
 		return true
 	}
+	// if the API prefix is "apis" and we have exactly two remaining parts, then we are dealing with a cluster-scoped resource path
+	// such as "/apis/stable.example.com/v1/namespaces/example"
 	if len(currentParts) == 2 {
 		return false
 	}
+	// if the API prefix is "apis" and we have exactly three remaining parts and the last part is one the the possible
+	// CR subresource names, then we assume we are dealing with a cluster-scoped resource's subresource
+	// such as "/apis/stable.example.com/v1/namespaces/example/status"
+	// NOTE: this will incorrectly treat a namespace-scoped request for a resource with a CR subresource-named plural name,
+	// such as one with a Kind "Statu" and a plural name of "status".
 	if len(currentParts) == 3 && crSubresources.Has(currentParts[2]) {
 		return false
 	}
