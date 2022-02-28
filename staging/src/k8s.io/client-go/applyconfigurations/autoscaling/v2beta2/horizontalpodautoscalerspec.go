@@ -21,11 +21,12 @@ package v2beta2
 // HorizontalPodAutoscalerSpecApplyConfiguration represents an declarative configuration of the HorizontalPodAutoscalerSpec type for use
 // with apply.
 type HorizontalPodAutoscalerSpecApplyConfiguration struct {
-	ScaleTargetRef *CrossVersionObjectReferenceApplyConfiguration     `json:"scaleTargetRef,omitempty"`
-	MinReplicas    *int32                                             `json:"minReplicas,omitempty"`
-	MaxReplicas    *int32                                             `json:"maxReplicas,omitempty"`
-	Metrics        []MetricSpecApplyConfiguration                     `json:"metrics,omitempty"`
-	Behavior       *HorizontalPodAutoscalerBehaviorApplyConfiguration `json:"behavior,omitempty"`
+	ScaleTargetRef *CrossVersionObjectReferenceApplyConfiguration         `json:"scaleTargetRef,omitempty"`
+	MinReplicas    *int32                                                 `json:"minReplicas,omitempty"`
+	MaxReplicas    *int32                                                 `json:"maxReplicas,omitempty"`
+	Metrics        []MetricSpecApplyConfiguration                         `json:"metrics,omitempty"`
+	Behavior       *HorizontalPodAutoscalerBehaviorApplyConfiguration     `json:"behavior,omitempty"`
+	UpdatePolicy   *HorizontalPodAutoscalerUpdatePolicyApplyConfiguration `json:"updatePolicy,omitempty"`
 }
 
 // HorizontalPodAutoscalerSpecApplyConfiguration constructs an declarative configuration of the HorizontalPodAutoscalerSpec type for use with
@@ -76,5 +77,13 @@ func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithMetrics(values ...*M
 // If called multiple times, the Behavior field is set to the value of the last call.
 func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithBehavior(value *HorizontalPodAutoscalerBehaviorApplyConfiguration) *HorizontalPodAutoscalerSpecApplyConfiguration {
 	b.Behavior = value
+	return b
+}
+
+// WithUpdatePolicy sets the UpdatePolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UpdatePolicy field is set to the value of the last call.
+func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithUpdatePolicy(value *HorizontalPodAutoscalerUpdatePolicyApplyConfiguration) *HorizontalPodAutoscalerSpecApplyConfiguration {
+	b.UpdatePolicy = value
 	return b
 }
