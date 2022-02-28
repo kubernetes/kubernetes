@@ -17,8 +17,6 @@ limitations under the License.
 package v2beta2
 
 import (
-	"encoding/json"
-
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 
 	"k8s.io/apimachinery/pkg/conversion"
@@ -30,23 +28,24 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutosca
 		return err
 	}
 	// v2beta2 round-trips to internal without any serialized annotations, make sure any from other versions don't get serialized
-	annotations, copiedAnnotations := autoscaling.DropRoundTripHorizontalPodAutoscalerAnnotations(out.Annotations)
+	annotations, _ := autoscaling.DropRoundTripHorizontalPodAutoscalerAnnotations(out.Annotations)
 	out.Annotations = annotations
 
-	if in.Spec.UpdatePolicy != nil {
-		// TODO: this is marshaling an internal type. Fix this without breaking backwards compatibility with n-1 API servers.
-		updatePolicyEnc, err := json.Marshal(in.Spec.UpdatePolicy)
-		if err != nil {
-			return err
-		}
-		// copy before mutating
-		if !copiedAnnotations {
-			//nolint:ineffassign
-			copiedAnnotations = true
-			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
-		}
-		out.Annotations[autoscaling.UpdatePolicySpecsAnnotation] = string(updatePolicyEnc)
-	}
+	// TODO: v2beta2 should not have update policy so we should do this.
+	// if in.Spec.UpdatePolicy != nil {
+	// 	// TODO: this is marshaling an internal type. Fix this without breaking backwards compatibility with n-1 API servers.
+	// 	updatePolicyEnc, err := json.Marshal(in.Spec.UpdatePolicy)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	// copy before mutating
+	// 	if !copiedAnnotations {
+	// 		//nolint:ineffassign
+	// 		copiedAnnotations = true
+	// 		out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+	// 	}
+	// 	out.Annotations[autoscaling.UpdatePolicySpecsAnnotation] = string(updatePolicyEnc)
+	// }
 
 	return nil
 }
@@ -56,14 +55,15 @@ func Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutosca
 		return err
 	}
 
-	if updatePolicyEnc, hasUpdatePolicys := out.Annotations[autoscaling.UpdatePolicySpecsAnnotation]; hasUpdatePolicys {
-		// TODO: this is unmarshaling an internal type. Fix this without breaking backwards compatibility with n-1 API servers.
-		var updatePolicy autoscaling.HorizontalPodAutoscalerUpdatePolicy
-		if err := json.Unmarshal([]byte(updatePolicyEnc), &updatePolicy); err == nil && updatePolicy != (autoscaling.HorizontalPodAutoscalerUpdatePolicy{}) {
-			// only move well-formed data from annotations to fields
-			out.Spec.UpdatePolicy = &updatePolicy
-		}
-	}
+	// TODO: v2beta2 should not have update policy so we should do this.
+	// if updatePolicyEnc, hasUpdatePolicys := out.Annotations[autoscaling.UpdatePolicySpecsAnnotation]; hasUpdatePolicys {
+	// 	// TODO: this is unmarshaling an internal type. Fix this without breaking backwards compatibility with n-1 API servers.
+	// 	var updatePolicy autoscaling.HorizontalPodAutoscalerUpdatePolicy
+	// 	if err := json.Unmarshal([]byte(updatePolicyEnc), &updatePolicy); err == nil && updatePolicy != (autoscaling.HorizontalPodAutoscalerUpdatePolicy{}) {
+	// 		// only move well-formed data from annotations to fields
+	// 		out.Spec.UpdatePolicy = &updatePolicy
+	// 	}
+	// }
 
 	// drop round-tripping annotations after converting to internal
 	// v2beta2 round-trips to internal without any serialized annotations, make sure any from other versions don't get serialized
