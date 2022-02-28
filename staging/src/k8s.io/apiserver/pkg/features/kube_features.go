@@ -128,13 +128,6 @@ const (
 	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
 	SelectorIndex featuregate.Feature = "SelectorIndex"
 
-	// owner: @liggitt
-	// beta: v1.19
-	// GA: v1.22
-	//
-	// Allows sending warning headers in API responses.
-	WarningHeaders featuregate.Feature = "WarningHeaders"
-
 	// owner: @wojtek-t
 	// alpha: v1.20
 	// beta: v1.21
@@ -205,7 +198,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIPriorityAndFairness:              {Default: true, PreRelease: featuregate.Beta},
 	RemoveSelfLink:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SelectorIndex:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	WarningHeaders:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	EfficientWatchResumption:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	APIServerIdentity:                   {Default: false, PreRelease: featuregate.Alpha},
 	APIServerTracing:                    {Default: false, PreRelease: featuregate.Alpha},
