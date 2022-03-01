@@ -209,7 +209,6 @@ type volumeBinder struct {
 
 	translator InTreeToCSITranslator
 
-	capacityCheckEnabled     bool
 	csiDriverLister          storagelisters.CSIDriverLister
 	csiStorageCapacityLister storagelistersv1beta1.CSIStorageCapacityLister
 }
@@ -224,7 +223,7 @@ type CapacityCheck struct {
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
 //
-// capacityCheck determines whether storage capacity is checked (CSIStorageCapacity feature).
+// capacityCheck determines how storage capacity is checked (CSIStorageCapacity feature).
 func NewVolumeBinder(
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
@@ -233,7 +232,7 @@ func NewVolumeBinder(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
-	capacityCheck *CapacityCheck,
+	capacityCheck CapacityCheck,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
 	b := &volumeBinder{
 		kubeClient:    kubeClient,
@@ -247,11 +246,8 @@ func NewVolumeBinder(
 		translator:    csitrans.New(),
 	}
 
-	if capacityCheck != nil {
-		b.capacityCheckEnabled = true
-		b.csiDriverLister = capacityCheck.CSIDriverInformer.Lister()
-		b.csiStorageCapacityLister = capacityCheck.CSIStorageCapacityInformer.Lister()
-	}
+	b.csiDriverLister = capacityCheck.CSIDriverInformer.Lister()
+	b.csiStorageCapacityLister = capacityCheck.CSIStorageCapacityInformer.Lister()
 
 	return b
 }
@@ -922,12 +918,6 @@ func (b *volumeBinder) revertAssumedPVCs(claims []*v1.PersistentVolumeClaim) {
 // hasEnoughCapacity checks whether the provisioner has enough capacity left for a new volume of the given size
 // that is available from the node.
 func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.PersistentVolumeClaim, storageClass *storagev1.StorageClass, node *v1.Node) (bool, error) {
-	// This is an optional feature. If disabled, we assume that
-	// there is enough storage.
-	if !b.capacityCheckEnabled {
-		return true, nil
-	}
-
 	quantity, ok := claim.Spec.Resources.Requests[v1.ResourceStorage]
 	if !ok {
 		// No capacity to check for.

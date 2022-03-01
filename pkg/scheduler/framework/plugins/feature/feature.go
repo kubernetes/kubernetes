@@ -25,6 +25,5 @@ type Features struct {
 	EnablePodOverhead                   bool
 	EnableReadWriteOncePod              bool
 	EnableVolumeCapacityPriority        bool
-	EnableCSIStorageCapacity            bool
 	EnableMinDomainsInPodTopologySpread bool
 }
