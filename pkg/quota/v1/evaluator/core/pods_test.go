@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +46,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{{
+						Name: "dummy",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
@@ -55,12 +55,34 @@ func TestPodConstraintsFunc(t *testing.T) {
 				},
 			},
 			required: []corev1.ResourceName{corev1.ResourceMemory},
-			err:      `must specify memory`,
+			err:      `must specify memory for: dummy`,
+		},
+		"multiple init container resource missing": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Name: "foo",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
+						},
+					}, {
+						Name: "bar",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
+						},
+					}},
+				},
+			},
+			required: []corev1.ResourceName{corev1.ResourceMemory},
+			err:      `must specify memory for: bar,foo`,
 		},
 		"container resource missing": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{{
+						Name: "dummy",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
@@ -69,7 +91,43 @@ func TestPodConstraintsFunc(t *testing.T) {
 				},
 			},
 			required: []corev1.ResourceName{corev1.ResourceMemory},
-			err:      `must specify memory`,
+			err:      `must specify memory for: dummy`,
+		},
+		"multiple container resource missing": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name: "foo",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
+						},
+					}, {
+						Name: "bar",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
+						},
+					}},
+				},
+			},
+			required: []corev1.ResourceName{corev1.ResourceMemory},
+			err:      `must specify memory for: bar,foo`,
+		},
+		"container resource missing multiple": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}, {
+						Name:      "bar",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required: []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
+			err:      `must specify cpu for: bar,foo; memory for: bar,foo`,
 		},
 	}
 	evaluator := NewPodEvaluator(nil, clock.RealClock{})
@@ -79,7 +137,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 		case err != nil && len(test.err) == 0,
 			err == nil && len(test.err) != 0,
 			err != nil && test.err != err.Error():
-			t.Errorf("%s unexpected error: %v", testName, err)
+			t.Errorf("%s want: %v,got: %v", testName, test.err, err)
 		}
 	}
 }
@@ -518,10 +576,9 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 	evaluator := NewPodEvaluator(nil, fakeClock)
 	activeDeadlineSeconds := int64(30)
 	testCases := map[string]struct {
-		pod                      *api.Pod
-		selectors                []corev1.ScopedResourceSelectorRequirement
-		wantSelectors            []corev1.ScopedResourceSelectorRequirement
-		disableNamespaceSelector bool
+		pod           *api.Pod
+		selectors     []corev1.ScopedResourceSelectorRequirement
+		wantSelectors []corev1.ScopedResourceSelectorRequirement
 	}{
 		"EmptyPod": {
 			pod: &api.Pod{},
@@ -704,29 +761,9 @@ func TestPodEvaluatorMatchingScopes(t *testing.T) {
 				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
 			},
 		},
-		"NamespaceSelectorFeatureDisabled": {
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					ActiveDeadlineSeconds: &activeDeadlineSeconds,
-					Affinity: &api.Affinity{
-						PodAntiAffinity: &api.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-								{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}},
-							},
-						},
-					},
-				},
-			},
-			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
-				{ScopeName: corev1.ResourceQuotaScopeTerminating},
-				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
-			},
-			disableNamespaceSelector: true,
-		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, !testCase.disableNamespaceSelector)()
 			if testCase.selectors == nil {
 				testCase.selectors = []corev1.ScopedResourceSelectorRequirement{
 					{ScopeName: corev1.ResourceQuotaScopeTerminating},

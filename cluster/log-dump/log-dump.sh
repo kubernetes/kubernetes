@@ -199,7 +199,7 @@ function save-logs() {
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
 
         for svc in "${services[@]}"; do
-            log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u ${svc}.service" > "${dir}/${svc}.log" || true
+            log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u ${svc}.service" > "${dir}/${svc}.log" || true
         done
 
         if [[ "$dump_systemd_journal" == "true" ]]; then
@@ -212,6 +212,10 @@ function save-logs() {
 	    files+=("${tmpfiles[@]}")
         done
     fi
+
+    # log where we pull the images from
+    log-dump-ssh "${node_name}" "sudo ctr -n k8s.io images ls" > "${dir}/images-containerd.log" || true
+    log-dump-ssh "${node_name}" "sudo docker images --all" > "${dir}/images-docker.log" || true
 
     # Try dumping coverage profiles, if it looks like coverage is enabled in the first place.
     if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then

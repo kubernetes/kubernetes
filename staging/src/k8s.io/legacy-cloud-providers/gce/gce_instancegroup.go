@@ -50,6 +50,16 @@ func (g *Cloud) DeleteInstanceGroup(name string, zone string) error {
 	return mc.Observe(g.c.InstanceGroups().Delete(ctx, meta.ZonalKey(name, zone)))
 }
 
+// FilterInstanceGroupsByName lists all InstanceGroups in the project and
+// zone that match the name regexp.
+func (g *Cloud) FilterInstanceGroupsByNamePrefix(namePrefix, zone string) ([]*compute.InstanceGroup, error) {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+	mc := newInstanceGroupMetricContext("filter", zone)
+	v, err := g.c.InstanceGroups().List(ctx, zone, filter.Regexp("name", namePrefix+".*"))
+	return v, mc.Observe(err)
+}
+
 // ListInstanceGroups lists all InstanceGroups in the project and
 // zone.
 func (g *Cloud) ListInstanceGroups(zone string) ([]*compute.InstanceGroup, error) {

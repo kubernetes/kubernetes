@@ -25,7 +25,7 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -336,16 +336,4 @@ func GetKubeletContainer(kubeletCgroups string) (string, error) {
 		return cont, nil
 	}
 	return kubeletCgroups, nil
-}
-
-// GetRuntimeContainer returns the cgroup used by the container runtime
-func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
-	if containerRuntime == "docker" {
-		cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to get container name for docker process: %v", err)
-		}
-		return cont, nil
-	}
-	return runtimeCgroups, nil
 }

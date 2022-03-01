@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/batch/v1";
 
 // CronJob represents the configuration of a single cron job.
 message CronJob {
@@ -261,9 +261,6 @@ message JobSpec {
   // with this Job. Users must design their workload to gracefully handle this.
   // Suspending a Job will reset the StartTime field of the Job, effectively
   // resetting the ActiveDeadlineSeconds timer too. Defaults to false.
-  //
-  // This field is beta-level, gated by SuspendJob feature flag (enabled by
-  // default).
   //
   // +optional
   optional bool suspend = 10;

@@ -2,12 +2,12 @@
   "kind": "APIVersions",
   "apiVersion": "v1",
   "versions": [
-    "2"
+    "versionsValue"
   ],
   "serverAddressByClientCIDRs": [
     {
-      "clientCIDR": "3",
-      "serverAddress": "4"
+      "clientCIDR": "clientCIDRValue",
+      "serverAddress": "serverAddressValue"
     }
   ]
 }

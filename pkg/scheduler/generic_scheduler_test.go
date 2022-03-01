@@ -285,7 +285,8 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			name: "error",
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
 				},
 			},
 			nodes:                 makeNodeList([]string{"a"}),
@@ -296,7 +297,8 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			name: "success",
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 				},
 			},
 			nodes:                 makeNodeList([]string{"a"}),
@@ -309,6 +311,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			name: "unschedulable",
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
 						if node.Name == "a" {
 							return framework.NewStatus(framework.Success)
@@ -329,6 +332,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			name: "unschedulable and unresolvable",
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
 						if node.Name == "a" {
 							return framework.NewStatus(framework.Success)
@@ -353,6 +357,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			name: "extender may overwrite the statuses",
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
 						if node.Name == "a" {
 							return framework.NewStatus(framework.Success)
@@ -379,6 +384,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			name: "multiple extenders",
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
 						if node.Name == "a" {
 							return framework.NewStatus(framework.Success)
@@ -390,6 +396,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 					}},
 				},
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
 						if node.Name == "a" {
 							return framework.NewStatus(framework.Success)

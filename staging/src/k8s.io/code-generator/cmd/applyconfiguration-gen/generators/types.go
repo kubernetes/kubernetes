@@ -21,6 +21,7 @@ import "k8s.io/gengo/types"
 var (
 	applyConfiguration = types.Ref("k8s.io/apimachinery/pkg/runtime", "ApplyConfiguration")
 	groupVersionKind   = types.Ref("k8s.io/apimachinery/pkg/runtime/schema", "GroupVersionKind")
+	typeMeta           = types.Ref("k8s.io/apimachinery/pkg/apis/meta/v1", "TypeMeta")
 	objectMeta         = types.Ref("k8s.io/apimachinery/pkg/apis/meta/v1", "ObjectMeta")
 	rawExtension       = types.Ref("k8s.io/apimachinery/pkg/runtime", "RawExtension")
 	unknown            = types.Ref("k8s.io/apimachinery/pkg/runtime", "Unknown")

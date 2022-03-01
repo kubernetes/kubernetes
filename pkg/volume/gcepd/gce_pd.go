@@ -354,17 +354,10 @@ var _ volume.Mounter = &gcePersistentDiskMounter{}
 
 func (b *gcePersistentDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: true,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *gcePersistentDiskMounter) CanMount() error {
-	return nil
 }
 
 // SetUp bind mounts the disk global mount to the volume path.

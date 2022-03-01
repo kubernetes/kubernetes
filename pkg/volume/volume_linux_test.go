@@ -43,10 +43,6 @@ func (l *localFakeMounter) GetAttributes() Attributes {
 	return l.attributes
 }
 
-func (l *localFakeMounter) CanMount() error {
-	return nil
-}
-
 func (l *localFakeMounter) SetUp(mounterArgs MounterArgs) error {
 	return nil
 }

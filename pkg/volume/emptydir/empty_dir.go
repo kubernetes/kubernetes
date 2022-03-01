@@ -219,17 +219,10 @@ type emptyDir struct {
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        false,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       false,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (ed *emptyDir) CanMount() error {
-	return nil
 }
 
 // SetUp creates new directory.

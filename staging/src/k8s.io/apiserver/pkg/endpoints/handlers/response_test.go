@@ -77,11 +77,6 @@ type mockNamer struct{}
 func (*mockNamer) Namespace(_ *http.Request) (string, error)           { return "", nil }
 func (*mockNamer) Name(_ *http.Request) (string, string, error)        { return "", "", nil }
 func (*mockNamer) ObjectName(_ runtime.Object) (string, string, error) { return "", "", nil }
-func (*mockNamer) SetSelfLink(_ runtime.Object, _ string) error        { return nil }
-func (*mockNamer) GenerateLink(_ *request.RequestInfo, _ runtime.Object) (string, error) {
-	return "", nil
-}
-func (*mockNamer) GenerateListLink(_ *http.Request) (string, error) { return "", nil }
 
 func TestCacheableObject(t *testing.T) {
 	pomGVK := metav1.SchemeGroupVersion.WithKind("PartialObjectMetadata")
@@ -176,7 +171,6 @@ func TestAsPartialObjectMetadataList(t *testing.T) {
 	var remainingItemCount int64 = 10
 	pods := &examplev1.PodList{
 		ListMeta: metav1.ListMeta{
-			SelfLink:           "/test/link",
 			ResourceVersion:    "10",
 			Continue:           "continuetoken",
 			RemainingItemCount: &remainingItemCount,

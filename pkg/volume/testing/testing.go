@@ -686,14 +686,10 @@ func getUniqueVolumeName(spec *Spec) (string, error) {
 
 func (_ *FakeVolume) GetAttributes() Attributes {
 	return Attributes{
-		ReadOnly:        false,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       false,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
-}
-
-func (fv *FakeVolume) CanMount() error {
-	return nil
 }
 
 func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {

@@ -2,80 +2,83 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    "9": "10"
-  clusterName: "15"
-  creationTimestamp: "2061-09-19T18:13:36Z"
-  deletionGracePeriodSeconds: -4955867275792137171
+    annotationsKey: annotationsValue
+  clusterName: clusterNameValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
   finalizers:
-  - "14"
-  generateName: "3"
-  generation: 8071137005907523419
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
   labels:
-    "7": "8"
+    labelsKey: labelsValue
   managedFields:
-  - apiVersion: "17"
-    fieldsType: "18"
-    manager: "16"
-    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
-    subresource: "19"
-  name: "2"
-  namespace: "4"
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
   ownerReferences:
-  - apiVersion: "11"
+  - apiVersion: apiVersionValue
     blockOwnerDeletion: true
-    controller: false
-    kind: "12"
-    name: "13"
-    uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
-  selfLink: "5"
-  uid: "7"
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
 spec:
   allocateLoadBalancerNodePorts: true
-  clusterIP: "25"
+  clusterIP: clusterIPValue
   clusterIPs:
-  - "26"
+  - clusterIPsValue
   externalIPs:
-  - "27"
-  externalName: "30"
-  externalTrafficPolicy: ƏS$+½H牗洝尿
-  healthCheckNodePort: -1965738697
-  internalTrafficPolicy: hDrȮO励鹗
+  - externalIPsValue
+  externalName: externalNameValue
+  externalTrafficPolicy: externalTrafficPolicyValue
+  healthCheckNodePort: 12
+  internalTrafficPolicy: internalTrafficPolicyValue
   ipFamilies:
-  - x
-  ipFamilyPolicy: '%a鯿rŎǀ朲^苣f'
-  loadBalancerClass: "31"
-  loadBalancerIP: "28"
+  - ipFamiliesValue
+  ipFamilyPolicy: ipFamilyPolicyValue
+  loadBalancerClass: loadBalancerClassValue
+  loadBalancerIP: loadBalancerIPValue
   loadBalancerSourceRanges:
-  - "29"
+  - loadBalancerSourceRangesValue
   ports:
-  - appProtocol: "21"
-    name: "20"
-    nodePort: -474380055
-    port: 202283346
-    protocol: '@Hr鯹)晿'
-    targetPort: "22"
+  - appProtocol: appProtocolValue
+    name: nameValue
+    nodePort: 5
+    port: 3
+    protocol: protocolValue
+    targetPort: targetPortValue
   publishNotReadyAddresses: true
   selector:
-    "23": "24"
-  sessionAffinity: 甞谐颋ǅS
+    selectorKey: selectorValue
+  sessionAffinity: sessionAffinityValue
   sessionAffinityConfig:
     clientIP:
-      timeoutSeconds: 2072604405
-  type: 鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ
+      timeoutSeconds: 1
+  type: typeValue
 status:
   conditions:
-  - lastTransitionTime: "2256-09-10T15:38:25Z"
-    message: "37"
-    observedGeneration: 3519145202439908029
-    reason: "36"
-    status: 尷ȸd賑
-    type: "35"
+  - lastTransitionTime: "2004-01-01T01:01:01Z"
+    message: messageValue
+    observedGeneration: 3
+    reason: reasonValue
+    status: statusValue
+    type: typeValue
   loadBalancer:
     ingress:
-    - hostname: "33"
-      ip: "32"
+    - hostname: hostnameValue
+      ip: ipValue
       ports:
-      - error: "34"
-        port: 165528693
-        protocol: UɦOŖ
+      - error: errorValue
+        port: 1
+        protocol: protocolValue

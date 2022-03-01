@@ -68,11 +68,11 @@ func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeapi.Ver
 	return out, err
 }
 
-func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
+func (in instrumentedRuntimeService) Status(verbose bool) (*runtimeapi.StatusResponse, error) {
 	const operation = "status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.Status()
+	out, err := in.service.Status(verbose)
 	recordError(operation, err)
 	return out, err
 }
@@ -122,11 +122,11 @@ func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.Container
 	return out, err
 }
 
-func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error) {
+func (in instrumentedRuntimeService) ContainerStatus(containerID string, verbose bool) (*runtimeapi.ContainerStatusResponse, error) {
 	const operation = "container_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ContainerStatus(containerID)
+	out, err := in.service.ContainerStatus(containerID, verbose)
 	recordError(operation, err)
 	return out, err
 }
@@ -208,11 +208,11 @@ func (in instrumentedRuntimeService) RemovePodSandbox(podSandboxID string) error
 	return err
 }
 
-func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error) {
+func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error) {
 	const operation = "podsandbox_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.PodSandboxStatus(podSandboxID)
+	out, err := in.service.PodSandboxStatus(podSandboxID, verbose)
 	recordError(operation, err)
 	return out, err
 }
@@ -289,11 +289,11 @@ func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFil
 	return out, err
 }
 
-func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
 	const operation = "image_status"
 	defer recordOperation(operation, time.Now())
 
-	out, err := in.service.ImageStatus(image)
+	out, err := in.service.ImageStatus(image, verbose)
 	recordError(operation, err)
 	return out, err
 }

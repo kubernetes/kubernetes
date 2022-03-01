@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/networking/v1beta1";
 
 // HTTPIngressPath associates a path with a backend. Incoming urls matching the
 // path are forwarded to the backend.

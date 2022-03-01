@@ -767,7 +767,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		}
 		if complete {
 			finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, "", "")
-		} else if feature.DefaultFeatureGate.Enabled(features.SuspendJob) && manageJobCalled {
+		} else if manageJobCalled {
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
 			// updates.
@@ -1257,7 +1257,7 @@ func getStatus(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPod
 // jobSuspended returns whether a Job is suspended while taking the feature
 // gate into account.
 func jobSuspended(job *batch.Job) bool {
-	return feature.DefaultFeatureGate.Enabled(features.SuspendJob) && job.Spec.Suspend != nil && *job.Spec.Suspend
+	return job.Spec.Suspend != nil && *job.Spec.Suspend
 }
 
 // manageJob is the core method responsible for managing the number of running

@@ -18,6 +18,7 @@ package validation
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	asserttestify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -4931,7 +4933,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 		Spec: spec,
 	}
 
-	if errs := ValidateResourceQuota(resourceQuota, ResourceQuotaValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -16210,10 +16212,9 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		rq                       core.ResourceQuota
-		errDetail                string
-		errField                 string
-		disableNamespaceSelector bool
+		rq        core.ResourceQuota
+		errDetail string
+		errField  string
 	}{
 		"no-scope": {
 			rq: core.ResourceQuota{
@@ -16331,17 +16332,10 @@ func TestValidateResourceQuota(t *testing.T) {
 			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
 			errDetail: "must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
 		},
-		"cross-namespace-affinity-disabled": {
-			rq:                       core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: crossNamespaceAffinitySpec},
-			errDetail:                "unsupported scope",
-			disableNamespaceSelector: true,
-		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateResourceQuota(&tc.rq, ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: !tc.disableNamespaceSelector,
-			})
+			errs := ValidateResourceQuota(&tc.rq)
 			if len(tc.errDetail) == 0 && len(tc.errField) == 0 && len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			} else if (len(tc.errDetail) != 0 || len(tc.errField) != 0) && len(errs) == 0 {
@@ -20132,5 +20126,28 @@ func TestValidateOS(t *testing.T) {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
+	}
+}
+
+func TestValidateAppArmorProfileFormat(t *testing.T) {
+	tests := []struct {
+		profile     string
+		expectValid bool
+	}{
+		{"", true},
+		{v1.AppArmorBetaProfileRuntimeDefault, true},
+		{v1.AppArmorBetaProfileNameUnconfined, true},
+		{"baz", false}, // Missing local prefix.
+		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
+		{v1.AppArmorBetaProfileNamePrefix + "foo-bar", true},
+	}
+
+	for _, test := range tests {
+		err := ValidateAppArmorProfileFormat(test.profile)
+		if test.expectValid {
+			assert.NoError(t, err, "Profile %s should be valid", test.profile)
+		} else {
+			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
+		}
 	}
 }

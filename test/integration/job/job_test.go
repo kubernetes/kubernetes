@@ -607,32 +607,18 @@ func TestSuspendJob(t *testing.T) {
 		// Exhaustively test all combinations other than trivial true->true and
 		// false->false cases.
 		{
-			featureGate: true,
-			create:      step{flag: false, wantActive: 2},
-			update:      step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
+			create: step{flag: false, wantActive: 2},
+			update: step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
 		},
 		{
-			featureGate: true,
-			create:      step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
-			update:      step{flag: false, wantActive: 2, wantStatus: v1.ConditionFalse, wantReason: "Resumed"},
-		},
-		{
-			featureGate: false,
-			create:      step{flag: false, wantActive: 2},
-			update:      step{flag: true, wantActive: 2},
-		},
-		{
-			featureGate: false,
-			create:      step{flag: true, wantActive: 2},
-			update:      step{flag: false, wantActive: 2},
+			create: step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
+			update: step{flag: false, wantActive: 2, wantStatus: v1.ConditionFalse, wantReason: "Resumed"},
 		},
 	}
 
 	for _, tc := range testCases {
 		name := fmt.Sprintf("feature=%v,create=%v,update=%v", tc.featureGate, tc.create.flag, tc.update.flag)
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.featureGate)()
-
 			closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 			defer closeFn()
 			ctx, cancel := startJobController(restConfig, clientSet)
@@ -683,8 +669,6 @@ func TestSuspendJob(t *testing.T) {
 }
 
 func TestSuspendJobControllerRestart(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, true)()
-
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 	defer closeFn()
 	ctx, cancel := startJobController(restConfig, clientSet)
@@ -704,18 +688,6 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 		Active: 0,
-	}, true)
-
-	// Disable feature gate and restart controller to test that pods get created.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, false)()
-	cancel()
-	ctx, cancel = startJobController(restConfig, clientSet)
-	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get Job: %v", err)
-	}
-	validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
-		Active: 2,
 	}, true)
 }
 

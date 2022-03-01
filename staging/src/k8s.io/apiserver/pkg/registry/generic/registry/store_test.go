@@ -2156,6 +2156,51 @@ func TestStoreDeleteCollectionWorkDistributorExited(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteCollectionWithContextCancellation(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	for i := 0; i < 100; i++ {
+		if _, err := registry.Create(
+			testContext,
+			&example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("foo-%d", i),
+				},
+			},
+			rest.ValidateAllObjectFunc,
+			&metav1.CreateOptions{},
+		); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(testContext)
+
+	lock := sync.Mutex{}
+	called := false
+
+	// We rely on the fact that there is exactly one worker, so it should exit after
+	// getting context canceled error on the first Delete call to etcd.
+	// With multiple workers, each of them would be calling Delete once.
+	_, err := registry.DeleteCollection(ctx, func(ctx context.Context, obj runtime.Object) error {
+		lock.Lock()
+		defer lock.Unlock()
+		if called {
+			t.Errorf("Delete called more than once, so context cancellation didn't work")
+		} else {
+			cancel()
+			called = true
+		}
+		return nil
+	}, nil, &metainternalversion.ListOptions{})
+	if err != context.Canceled {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 // Test whether objects deleted with DeleteCollection are correctly delivered
 // to watchers.
 func TestStoreDeleteCollectionWithWatch(t *testing.T) {

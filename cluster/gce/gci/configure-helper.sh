@@ -2179,7 +2179,7 @@ function start-kube-controller-manager {
   local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
   local config_path='/etc/srv/kubernetes/kube-controller-manager/kubeconfig'
   params+=("--use-service-account-credentials")
-  params+=("--cloud-provider=gce")
+  params+=("--cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}")
   params+=("--kubeconfig=${config_path}" "--authentication-kubeconfig=${config_path}" "--authorization-kubeconfig=${config_path}")
   params+=("--root-ca-file=${CA_CERT_BUNDLE_PATH}")
   params+=("--service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}")
@@ -2596,12 +2596,6 @@ function update-event-exporter {
     sed -i -e "s@{{ exporter_sd_endpoint }}@${STACKDRIVER_ENDPOINT:-}@g" "$1"
 }
 
-function update-dashboard-deployment {
-  if [ -n "${CUSTOM_KUBE_DASHBOARD_BANNER:-}" ]; then
-    sed -i -e "s@\( \+\)# PLATFORM-SPECIFIC ARGS HERE@\1- --system-banner=${CUSTOM_KUBE_DASHBOARD_BANNER}\n\1- --system-banner-severity=WARNING@" "$1"
-  fi
-}
-
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
   setup-addon-manifests "addons" "0-dns/coredns"
@@ -2827,11 +2821,6 @@ EOF
     local -r event_exporter_yaml="${dst_dir}/fluentd-gcp/event-exporter.yaml"
     update-event-exporter ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
-  fi
-  if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "dashboard"
-    local -r dashboard_deployment_yaml="${dst_dir}/dashboard/dashboard-deployment.yaml"
-    update-dashboard-deployment ${dashboard_deployment_yaml}
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
@@ -3453,7 +3442,12 @@ function main() {
     # stop docker if it is present as we want to use just containerd
     log-wrap 'StopDocker' systemctl stop docker || echo "unable to stop docker"
   fi
-  log-wrap 'SetupContainerd' setup-containerd
+
+  if [[ ! -e "/etc/profile.d/containerd_env.sh" ]]; then
+    log-wrap 'SetupContainerd' setup-containerd
+  else
+    echo "Skipping SetupContainerd step because containerd has already been setup by containerd's configure.sh script"
+  fi
 
   log-start 'SetupKubePodLogReadersGroupDir'
   if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then

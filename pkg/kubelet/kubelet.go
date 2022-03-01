@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/opencontainers/selinux/go-selinux"
 	"k8s.io/client-go/informers"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -109,7 +110,6 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	sysctlallowlist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -284,21 +284,11 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 // PreInitRuntimeService will init runtime service before RunKubelet.
 func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
-	crOptions *config.ContainerRuntimeOptions,
-	containerRuntime string,
-	runtimeCgroups string,
 	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
-	nonMasqueradeCIDR string) error {
-	if remoteRuntimeEndpoint != "" {
-		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
-		if remoteImageEndpoint == "" {
-			remoteImageEndpoint = remoteRuntimeEndpoint
-		}
-	}
-
-	if containerRuntime != kubetypes.RemoteContainerRuntime {
-		return fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
+	remoteImageEndpoint string) error {
+	// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
+	if remoteRuntimeEndpoint != "" && remoteImageEndpoint == "" {
+		remoteImageEndpoint = remoteRuntimeEndpoint
 	}
 
 	var err error
@@ -309,7 +299,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return err
 	}
 
-	kubeDeps.useLegacyCadvisorStats = cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint)
+	kubeDeps.useLegacyCadvisorStats = cadvisor.UsingLegacyCadvisorStats(remoteRuntimeEndpoint)
 
 	return nil
 }
@@ -319,7 +309,6 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
-	containerRuntime string,
 	hostname string,
 	hostnameOverridden bool,
 	nodeName types.NodeName,
@@ -335,7 +324,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	allowedUnsafeSysctls []string,
 	experimentalMounterPath string,
 	kernelMemcgNotification bool,
-	experimentalCheckNodeCapabilitiesBeforeMount bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
 	minimumGCAge metav1.Duration,
 	maxPerPodContainerCount int32,
@@ -525,7 +513,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		syncLoopMonitor:                         atomic.Value{},
 		daemonEndpoints:                         daemonEndpoints,
 		containerManager:                        kubeDeps.ContainerManager,
-		containerRuntimeName:                    containerRuntime,
 		nodeIPs:                                 nodeIPs,
 		nodeIPValidator:                         validateNodeIP,
 		clock:                                   clock.RealClock{},
@@ -598,21 +585,17 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
 	}
 
-	if containerRuntime == kubetypes.RemoteContainerRuntime {
-		// setup containerLogManager for CRI container runtime
-		containerLogManager, err := logs.NewContainerLogManager(
-			klet.runtimeService,
-			kubeDeps.OSInterface,
-			kubeCfg.ContainerLogMaxSize,
-			int(kubeCfg.ContainerLogMaxFiles),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
-		}
-		klet.containerLogManager = containerLogManager
-	} else {
-		klet.containerLogManager = logs.NewStubContainerLogManager()
+	// setup containerLogManager for CRI container runtime
+	containerLogManager, err := logs.NewContainerLogManager(
+		klet.runtimeService,
+		kubeDeps.OSInterface,
+		kubeCfg.ContainerLogMaxSize,
+		int(kubeCfg.ContainerLogMaxFiles),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
 	}
+	klet.containerLogManager = containerLogManager
 
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
@@ -671,8 +654,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.runtimeCache = runtimeCache
 
 	// common provider to get host file system usage associated with a pod managed by kubelet
-	hostStatsProvider := stats.NewHostStatsProvider(kubecontainer.RealOS{}, func(podUID types.UID) (string, bool) {
-		return getEtcHostsPath(klet.getPodDir(podUID)), klet.containerRuntime.SupportsSingleFileMapping()
+	hostStatsProvider := stats.NewHostStatsProvider(kubecontainer.RealOS{}, func(podUID types.UID) string {
+		return getEtcHostsPath(klet.getPodDir(podUID))
 	})
 	if kubeDeps.useLegacyCadvisorStats {
 		klet.StatsProvider = stats.NewCadvisorStatsProvider(
@@ -762,7 +745,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
 	if len(experimentalMounterPath) != 0 {
-		experimentalCheckNodeCapabilitiesBeforeMount = false
 		// Replace the nameserver in containerized-mounter's rootfs/etc/resolv.conf with kubelet.ClusterDNS
 		// so that service name could be resolved
 		klet.dnsConfigurer.SetupDNSinContainerizedMounter(experimentalMounterPath)
@@ -781,7 +763,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.HostUtil,
 		klet.getPodsDir(),
 		kubeDeps.Recorder,
-		experimentalCheckNodeCapabilitiesBeforeMount,
 		keepTerminatedPodVolumes,
 		volumepathhandler.NewBlockVolumePathHandler())
 
@@ -1000,9 +981,6 @@ type Kubelet struct {
 	externalCloudProvider bool
 	// Reference to this node.
 	nodeRef *v1.ObjectReference
-
-	// The name of the container runtime
-	containerRuntimeName string
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
@@ -1270,7 +1248,7 @@ func (kl *Kubelet) setupDataDirs() error {
 	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
 		return fmt.Errorf("error creating podresources directory: %v", err)
 	}
-	if selinux.SELinuxEnabled() {
+	if selinux.GetEnabled() {
 		err := selinux.SetFileLabel(pluginRegistrationDir, config.KubeletPluginsDirSELinuxLabel)
 		if err != nil {
 			klog.InfoS("Unprivileged containerized plugins might not work, could not set selinux context on plugin registration dir", "path", pluginRegistrationDir, "err", err)

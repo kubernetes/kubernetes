@@ -58,13 +58,7 @@ type TypeMeta struct {
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 type ListMeta struct {
-	// selfLink is a URL representing this object.
-	// Populated by the system.
-	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
+	// Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
 
@@ -152,13 +146,7 @@ type ObjectMeta struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
-	// SelfLink is a URL representing this object.
-	// Populated by the system.
-	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
+	// Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,4,opt,name=selfLink"`
 
@@ -1243,7 +1231,11 @@ type ManagedFieldsEntry struct {
 	// APIVersion field. It is necessary to track the version of a field
 	// set because it cannot be automatically converted.
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
-	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
+	// Time is the timestamp of when the ManagedFields entry was added. The
+	// timestamp will also be updated if a field is added, the manager
+	// changes any of the owned fields value or removes a field. The
+	// timestamp does not update when a field is removed from the entry
+	// because another manager took it over.
 	// +optional
 	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
 

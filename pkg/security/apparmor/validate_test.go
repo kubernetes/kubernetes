@@ -46,29 +46,6 @@ func TestValidateHost(t *testing.T) {
 	assert.NoError(t, validateHost())
 }
 
-func TestValidateProfileFormat(t *testing.T) {
-	tests := []struct {
-		profile     string
-		expectValid bool
-	}{
-		{"", true},
-		{v1.AppArmorBetaProfileRuntimeDefault, true},
-		{v1.AppArmorBetaProfileNameUnconfined, true},
-		{"baz", false}, // Missing local prefix.
-		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
-		{v1.AppArmorBetaProfileNamePrefix + "foo-bar", true},
-	}
-
-	for _, test := range tests {
-		err := ValidateProfileFormat(test.profile)
-		if test.expectValid {
-			assert.NoError(t, err, "Profile %s should be valid", test.profile)
-		} else {
-			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
-		}
-	}
-}
-
 func TestValidateBadHost(t *testing.T) {
 	hostErr := errors.New("expected host error")
 	v := &validator{
@@ -109,6 +86,8 @@ func TestValidateValidHost(t *testing.T) {
 		{v1.AppArmorBetaProfileNamePrefix + "foo-container", true},
 		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
 		{"docker-default", false},
+		{v1.AppArmorBetaProfileNamePrefix + "", false}, // Empty profile explicitly forbidden.
+		{v1.AppArmorBetaProfileNamePrefix + " ", false},
 	}
 
 	for _, test := range tests {

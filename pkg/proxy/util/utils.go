@@ -78,6 +78,37 @@ func BuildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]string {
 	return portsToEndpoints
 }
 
+// ContainsIPv4Loopback returns true if the input is empty or one of the CIDR contains an IPv4 loopback address.
+func ContainsIPv4Loopback(cidrStrings []string) bool {
+	if len(cidrStrings) == 0 {
+		return true
+	}
+	// RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
+	ipv4LoopbackStart := netutils.ParseIPSloppy("127.0.0.0")
+	for _, cidr := range cidrStrings {
+		if IsZeroCIDR(cidr) {
+			return true
+		}
+
+		ip, ipnet, err := netutils.ParseCIDRSloppy(cidr)
+		if err != nil {
+			continue
+		}
+
+		if netutils.IsIPv6CIDR(ipnet) {
+			continue
+		}
+
+		if ip.IsLoopback() {
+			return true
+		}
+		if ipnet.Contains(ipv4LoopbackStart) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
 func IsZeroCIDR(cidr string) bool {
@@ -490,7 +521,8 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 }
 
 type LineBuffer struct {
-	b bytes.Buffer
+	b     bytes.Buffer
+	lines int
 }
 
 // Write takes a list of arguments, each a string or []string, joins all the
@@ -516,20 +548,32 @@ func (buf *LineBuffer) Write(args ...interface{}) {
 		}
 	}
 	buf.b.WriteByte('\n')
+	buf.lines++
 }
 
 // WriteBytes writes bytes to buffer, and terminates with newline.
 func (buf *LineBuffer) WriteBytes(bytes []byte) {
 	buf.b.Write(bytes)
 	buf.b.WriteByte('\n')
+	buf.lines++
 }
 
+// Reset clears buf
 func (buf *LineBuffer) Reset() {
 	buf.b.Reset()
+	buf.lines = 0
 }
 
+// Bytes returns the contents of buf as a []byte
 func (buf *LineBuffer) Bytes() []byte {
 	return buf.b.Bytes()
+}
+
+// Lines returns the number of lines in buf. Note that more precisely, this returns the
+// number of times Write() or WriteBytes() was called; it assumes that you never wrote
+// any newlines to the buffer yourself.
+func (buf *LineBuffer) Lines() int {
+	return buf.lines
 }
 
 // RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
@@ -542,9 +586,4 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 			v.Close()
 		}
 	}
-}
-
-// CountBytesLines counts the number of lines in a bytes slice
-func CountBytesLines(b []byte) int {
-	return bytes.Count(b, []byte{'\n'})
 }

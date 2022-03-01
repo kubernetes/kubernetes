@@ -66,6 +66,11 @@ var _ volume.Detacher = &csiAttacher{}
 var _ volume.DeviceMounter = &csiAttacher{}
 
 func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+	_, ok := c.plugin.host.(volume.KubeletVolumeHost)
+	if ok {
+		return "", errors.New("attaching volumes from the kubelet is not supported")
+	}
+
 	if spec == nil {
 		klog.Error(log("attacher.Attach missing volume.Spec"))
 		return "", errors.New("missing spec")
@@ -404,6 +409,11 @@ var _ volume.Detacher = &csiAttacher{}
 var _ volume.DeviceUnmounter = &csiAttacher{}
 
 func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
+	_, ok := c.plugin.host.(volume.KubeletVolumeHost)
+	if ok {
+		return errors.New("detaching volumes from the kubelet is not supported")
+	}
+
 	var attachID string
 	var volID string
 

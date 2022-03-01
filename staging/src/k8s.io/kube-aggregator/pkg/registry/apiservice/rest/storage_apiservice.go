@@ -33,11 +33,15 @@ import (
 func NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, shouldServeBeta bool) genericapiserver.APIGroupInfo {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, aggregatorscheme.Scheme, metav1.ParameterCodec, aggregatorscheme.Codecs)
 
-	if apiResourceConfigSource.VersionEnabled(v1.SchemeGroupVersion) {
-		storage := map[string]rest.Storage{}
+	storage := map[string]rest.Storage{}
+
+	if resource := "apiservices"; apiResourceConfigSource.ResourceEnabled(v1.SchemeGroupVersion.WithResource(resource)) {
 		apiServiceREST := apiservicestorage.NewREST(aggregatorscheme.Scheme, restOptionsGetter)
-		storage["apiservices"] = apiServiceREST
-		storage["apiservices/status"] = apiservicestorage.NewStatusREST(aggregatorscheme.Scheme, apiServiceREST)
+		storage[resource] = apiServiceREST
+		storage[resource+"/status"] = apiservicestorage.NewStatusREST(aggregatorscheme.Scheme, apiServiceREST)
+	}
+
+	if len(storage) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
 	}
 

@@ -157,9 +157,9 @@ var _ volume.Mounter = &configMapVolumeMounter{}
 
 func (sv *configMapVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
 }
 
@@ -171,13 +171,6 @@ func wrappedVolumeSpec() volume.Spec {
 		// this a tmpfs when we can do the accounting correctly.
 		Volume: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *configMapVolumeMounter) CanMount() error {
-	return nil
 }
 
 func (b *configMapVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {

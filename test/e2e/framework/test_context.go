@@ -82,8 +82,7 @@ type TestContextType struct {
 	Host               string
 	BearerToken        string `datapolicy:"token"`
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
-	RepoRoot                string
-	DockershimCheckpointDir string
+	RepoRoot string
 	// ListImages will list off all images that are used then quit
 	ListImages bool
 
@@ -108,7 +107,6 @@ type TestContextType struct {
 	EtcdUpgradeStorage          string
 	EtcdUpgradeVersion          string
 	GCEUpgradeScript            string
-	ContainerRuntime            string
 	ContainerRuntimeEndpoint    string
 	ContainerRuntimeProcessName string
 	ContainerRuntimePidFile     string
@@ -307,15 +305,18 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flags.Var(cliflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
-	flags.StringVar(&TestContext.ContainerRuntime, "container-runtime", "remote", "The container runtime of cluster VM instances (remote).")
 	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
 	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
 	flags.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
-	flags.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
-	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
+	// TODO: remove the node-role.kubernetes.io/master taint in 1.25 or later.
+	// The change will likely require an action for some users that do not
+	// use k8s originated tools like kubeadm or kOps for creating clusters
+	// and taint their control plane nodes with "master", expecting the test
+	// suite to work with this legacy non-blocking taint.
+	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane,node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests. The default taint 'node-role.kubernetes.io/master' is DEPRECATED and will be removed from the list in a future release.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 	flags.BoolVar(&TestContext.ListConformanceTests, "list-conformance-tests", false, "If true, will show list of conformance tests.")
@@ -483,12 +484,6 @@ func AfterReadingAllFlags(t *TestContextType) {
 		// We need to support that, changing it would break those usages.
 		Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
 		TestContext.Provider = "skeleton"
-	}
-
-	// Make sure that container runtime is valid
-	if TestContext.ContainerRuntime != "remote" {
-		klog.Errorf("Unsupported CRI container runtime: %q", TestContext.ContainerRuntime)
-		os.Exit(1)
 	}
 
 	var err error

@@ -18,6 +18,7 @@ package encryptionconfig
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -184,7 +185,8 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	secretboxFirstTransformer := secretboxFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	kmsFirstTransformer := kmsFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 
-	context := value.DefaultContext([]byte(sampleContextText))
+	ctx := context.Background()
+	dataCtx := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
 
 	transformers := []struct {
@@ -199,13 +201,13 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	}
 
 	for _, testCase := range transformers {
-		transformedData, err := testCase.Transformer.TransformToStorage(originalText, context)
+		transformedData, err := testCase.Transformer.TransformToStorage(ctx, originalText, dataCtx)
 		if err != nil {
 			t.Fatalf("%s: error while transforming data to storage: %s", testCase.Name, err)
 		}
 
 		for _, transformer := range transformers {
-			untransformedData, stale, err := transformer.Transformer.TransformFromStorage(transformedData, context)
+			untransformedData, stale, err := transformer.Transformer.TransformFromStorage(ctx, transformedData, dataCtx)
 			if err != nil {
 				t.Fatalf("%s: error while reading using %s transformer: %s", testCase.Name, transformer.Name, err)
 			}
@@ -347,16 +349,17 @@ func TestCBCKeyRotationWithoutOverlappingProviders(t *testing.T) {
 func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstPrefix, secondEncryptionConfig, secondPrefix string) {
 	p := getTransformerFromEncryptionConfig(t, firstEncryptionConfig)
 
-	context := value.DefaultContext([]byte("authenticated_data"))
+	ctx := context.Background()
+	dataCtx := value.DefaultContext([]byte("authenticated_data"))
 
-	out, err := p.TransformToStorage([]byte("firstvalue"), context)
+	out, err := p.TransformToStorage(ctx, []byte("firstvalue"), dataCtx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.HasPrefix(out, []byte(firstPrefix)) {
 		t.Fatalf("unexpected prefix: %q", out)
 	}
-	from, stale, err := p.TransformFromStorage(out, context)
+	from, stale, err := p.TransformFromStorage(ctx, out, dataCtx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,14 +368,14 @@ func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstP
 	}
 
 	// verify changing the context fails storage
-	_, _, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
+	_, _, err = p.TransformFromStorage(ctx, out, value.DefaultContext([]byte("incorrect_context")))
 	if err != nil {
 		t.Fatalf("CBC mode does not support authentication: %v", err)
 	}
 
 	// reverse the order, use the second key
 	p = getTransformerFromEncryptionConfig(t, secondEncryptionConfig)
-	from, stale, err = p.TransformFromStorage(out, context)
+	from, stale, err = p.TransformFromStorage(ctx, out, dataCtx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,14 +383,14 @@ func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstP
 		t.Fatalf("unexpected data: %t %q", stale, from)
 	}
 
-	out, err = p.TransformToStorage([]byte("firstvalue"), context)
+	out, err = p.TransformToStorage(ctx, []byte("firstvalue"), dataCtx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.HasPrefix(out, []byte(secondPrefix)) {
 		t.Fatalf("unexpected prefix: %q", out)
 	}
-	from, stale, err = p.TransformFromStorage(out, context)
+	from, stale, err = p.TransformFromStorage(ctx, out, dataCtx)
 	if err != nil {
 		t.Fatal(err)
 	}

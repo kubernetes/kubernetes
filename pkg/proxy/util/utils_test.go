@@ -1185,6 +1185,9 @@ func TestLineBufferWrite(t *testing.T) {
 			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
 				t.Fatalf("write word is %v\n expected: %q, got: %q", testCase.input, want, got)
 			}
+			if testBuffer.Lines() != 1 {
+				t.Fatalf("expected 1 line, got: %d", testBuffer.Lines())
+			}
 		})
 	}
 }
@@ -1267,7 +1270,7 @@ func TestWriteCountLines(t *testing.T) {
 			for i := 0; i < testCase.expected; i++ {
 				testBuffer.Write(randSeq())
 			}
-			n := CountBytesLines(testBuffer.Bytes())
+			n := testBuffer.Lines()
 			if n != testCase.expected {
 				t.Fatalf("lines expected: %d, got: %d", testCase.expected, n)
 			}
@@ -1399,5 +1402,70 @@ func TestAddressSet(t *testing.T) {
 		if !tc.expected.Equal(AddressSet(tc.validator, tc.input)) {
 			t.Errorf("%s", tc.name)
 		}
+	}
+}
+
+func TestContainsIPv4Loopback(t *testing.T) {
+	tests := []struct {
+		name        string
+		cidrStrings []string
+		want        bool
+	}{
+		{
+			name: "empty",
+			want: true,
+		},
+		{
+			name:        "all zeros ipv4",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
+			want:        true,
+		},
+		{
+			name:        "all zeros ipv4 and invalid cidr",
+			cidrStrings: []string{"invalid.cidr", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
+			want:        true,
+		},
+		{
+			name:        "all zeros ipv6", // interpret all zeros equal for IPv4 and IPv6 as Golang stdlib
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::/0"},
+			want:        true,
+		},
+		{
+			name:        "ipv4 loopback",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.0.0/8"},
+			want:        true,
+		},
+		{
+			name:        "ipv6 loopback",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::1/128"},
+			want:        false,
+		},
+		{
+			name:        "ipv4 loopback smaller range",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.2.0/28"},
+			want:        true,
+		},
+		{
+			name:        "ipv4 loopback within larger range",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "64.0.0.0/2"},
+			want:        true,
+		},
+		{
+			name:        "non loop loopback",
+			cidrStrings: []string{"128.0.2.0/28", "224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64"},
+			want:        false,
+		},
+		{
+			name:        "invalid cidr",
+			cidrStrings: []string{"invalid.ip/invalid.mask"},
+			want:        false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ContainsIPv4Loopback(tt.cidrStrings); got != tt.want {
+				t.Errorf("ContainLoopback() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

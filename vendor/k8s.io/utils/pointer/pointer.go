@@ -19,6 +19,7 @@ package pointer
 import (
 	"fmt"
 	"reflect"
+	"time"
 )
 
 // AllPtrFieldsNil tests whether all pointer fields in a struct are nil.  This is useful when,
@@ -184,7 +185,7 @@ func StringEqual(a, b *string) bool {
 	return *a == *b
 }
 
-// Float32 returns a pointer to the a float32.
+// Float32 returns a pointer to a float32.
 func Float32(i float32) *float32 {
 	return &i
 }
@@ -214,7 +215,7 @@ func Float32Equal(a, b *float32) bool {
 	return *a == *b
 }
 
-// Float64 returns a pointer to the a float64.
+// Float64 returns a pointer to a float64.
 func Float64(i float64) *float64 {
 	return &i
 }
@@ -235,6 +236,32 @@ var Float64PtrDerefOr = Float64Deref // for back-compat
 // Float64Equal returns true if both arguments are nil or both arguments
 // dereference to the same value.
 func Float64Equal(a, b *float64) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
+// Duration returns a pointer to a time.Duration.
+func Duration(d time.Duration) *time.Duration {
+	return &d
+}
+
+// DurationDeref dereferences the time.Duration ptr and returns it if not nil, or else
+// returns def.
+func DurationDeref(ptr *time.Duration, def time.Duration) time.Duration {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+// DurationEqual returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func DurationEqual(a, b *time.Duration) bool {
 	if (a == nil) != (b == nil) {
 		return false
 	}

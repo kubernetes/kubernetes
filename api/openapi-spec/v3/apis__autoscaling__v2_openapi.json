@@ -1144,7 +1144,7 @@
             "type": "string"
           },
           "selfLink": {
-            "description": "selfLink is a URL representing this object. Populated by the system. Read-only.\n\nDEPRECATED Kubernetes will stop propagating this field in 1.20 release and the field is planned to be removed in 1.21 release.",
+            "description": "Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.",
             "type": "string"
           }
         },
@@ -1179,7 +1179,7 @@
           },
           "time": {
             "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
-            "description": "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'"
+            "description": "Time is the timestamp of when the ManagedFields entry was added. The timestamp will also be updated if a field is added, the manager changes any of the owned fields value or removes a field. The timestamp does not update when a field is removed from the entry because another manager took it over."
           }
         },
         "type": "object"
@@ -1270,7 +1270,7 @@
             "type": "string"
           },
           "selfLink": {
-            "description": "SelfLink is a URL representing this object. Populated by the system. Read-only.\n\nDEPRECATED Kubernetes will stop propagating this field in 1.20 release and the field is planned to be removed in 1.21 release.",
+            "description": "Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.",
             "type": "string"
           },
           "uid": {

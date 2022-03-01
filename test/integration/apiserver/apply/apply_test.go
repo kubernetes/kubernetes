@@ -682,16 +682,10 @@ func TestApplyManagedFields(t *testing.T) {
 		t.Fatalf("Failed to marshal object: %v", err)
 	}
 
-	selfLink := ""
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RemoveSelfLink) {
-		selfLink = `
-			"selfLink": "` + accessor.GetSelfLink() + `",`
-	}
-
 	expected := []byte(`{
 		"metadata": {
 			"name": "test-cm",
-			"namespace": "default",` + selfLink + `
+			"namespace": "default",
 			"uid": "` + string(accessor.GetUID()) + `",
 			"resourceVersion": "` + accessor.GetResourceVersion() + `",
 			"creationTimestamp": "` + accessor.GetCreationTimestamp().UTC().Format(time.RFC3339) + `",
@@ -2565,7 +2559,6 @@ func benchAll(b *testing.B, client kubernetes.Interface, pod v1.Pod) {
 	pod.ObjectMeta.CreationTimestamp = metav1.Time{}
 	pod.ObjectMeta.ResourceVersion = ""
 	pod.ObjectMeta.UID = ""
-	pod.ObjectMeta.SelfLink = ""
 
 	// Create pod for repeated-updates
 	pod.Name = "repeated-pod"

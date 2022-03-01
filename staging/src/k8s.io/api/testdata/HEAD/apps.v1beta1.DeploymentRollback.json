@@ -1,11 +1,11 @@
 {
   "kind": "DeploymentRollback",
   "apiVersion": "apps/v1beta1",
-  "name": "2",
+  "name": "nameValue",
   "updatedAnnotations": {
-    "3": "4"
+    "updatedAnnotationsKey": "updatedAnnotationsValue"
   },
   "rollbackTo": {
-    "revision": 4518808233936994290
+    "revision": 1
   }
 }

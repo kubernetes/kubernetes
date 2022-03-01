@@ -28,10 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta3"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -176,7 +173,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 }
 
 // TestNodeAffinityScoring verifies that scheduler's node affinity priority function
-// works correctly.s
+// works correctly.
 func TestNodeAffinityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
@@ -298,7 +295,6 @@ func TestPodAffinityScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, true)()
 			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
 			defer testutils.CleanupTest(t, testCtx)
 			// Add a few nodes.

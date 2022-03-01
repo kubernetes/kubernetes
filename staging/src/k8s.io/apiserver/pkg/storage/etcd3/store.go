@@ -136,7 +136,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	}
 	kv := getResp.Kvs[0]
 
-	data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(key))
+	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(key))
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -163,7 +163,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		return err
 	}
 
-	newData, err := s.transformer.TransformToStorage(data, authenticatedDataString(key))
+	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(key))
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -211,7 +211,7 @@ func (s *store) conditionalDelete(
 		if err != nil {
 			return nil, err
 		}
-		return s.getState(getResp, key, v, false)
+		return s.getState(ctx, getResp, key, v, false)
 	}
 
 	var origState *objState
@@ -296,7 +296,7 @@ func (s *store) conditionalDelete(
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(getResp, key, v, false)
+			origState, err = s.getState(ctx, getResp, key, v, false)
 			if err != nil {
 				return err
 			}
@@ -327,7 +327,7 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			return nil, err
 		}
-		return s.getState(getResp, key, v, ignoreNotFound)
+		return s.getState(ctx, getResp, key, v, ignoreNotFound)
 	}
 
 	var origState *objState
@@ -415,7 +415,7 @@ func (s *store) GuaranteedUpdate(
 			}
 		}
 
-		newData, err := s.transformer.TransformToStorage(data, transformContext)
+		newData, err := s.transformer.TransformToStorage(ctx, data, transformContext)
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
@@ -442,7 +442,7 @@ func (s *store) GuaranteedUpdate(
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(getResp, key, v, ignoreNotFound)
+			origState, err = s.getState(ctx, getResp, key, v, ignoreNotFound)
 			if err != nil {
 				return err
 			}
@@ -454,11 +454,6 @@ func (s *store) GuaranteedUpdate(
 
 		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
 	}
-}
-
-// GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, key string, listOpts storage.ListOptions, listObj runtime.Object) error {
-	return s.list(ctx, key, listOpts, listObj, false)
 }
 
 func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Object {
@@ -557,12 +552,9 @@ func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 	return base64.RawURLEncoding.EncodeToString(out), nil
 }
 
-// List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	return s.list(ctx, key, opts, listObj, true)
-}
-
-func (s *store) list(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, recursive bool) error {
+// GetList implements storage.Interface.
+func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	recursive := opts.Recursive
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
 	pred := opts.Predicate
@@ -728,7 +720,7 @@ func (s *store) list(ctx context.Context, key string, opts storage.ListOptions, 
 			}
 			lastKey = kv.Key
 
-			data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
+			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
 				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
@@ -828,7 +820,7 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 	return s.watcher.Watch(ctx, key, int64(rev), opts.Recursive, opts.ProgressNotify, opts.Predicate)
 }
 
-func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
+func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
 	state := &objState{
 		meta: &storage.ResponseMeta{},
 	}
@@ -847,7 +839,7 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 			return nil, err
 		}
 	} else {
-		data, stale, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, authenticatedDataString(key))
+		data, stale, err := s.transformer.TransformFromStorage(ctx, getResp.Kvs[0].Value, authenticatedDataString(key))
 		if err != nil {
 			return nil, storage.NewInternalError(err.Error())
 		}

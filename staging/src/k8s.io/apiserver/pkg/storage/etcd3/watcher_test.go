@@ -19,14 +19,14 @@ package etcd3
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,14 +56,17 @@ func testWatch(t *testing.T, recursive bool) {
 	podBar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 
 	tests := []struct {
+		name       string
 		key        string
 		pred       storage.SelectionPredicate
 		watchTests []*testWatchStruct
-	}{{ // create a key
+	}{{
+		name:       "create a key",
 		key:        "/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
 		pred:       storage.Everything,
-	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
+	}, {
+		name:       "key updated to match predicate",
 		key:        "/somekey-3",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
 		pred: storage.SelectionPredicate{
@@ -74,11 +77,13 @@ func testWatch(t *testing.T, recursive bool) {
 				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		},
-	}, { // update
+	}, {
+		name:       "update",
 		key:        "/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
 		pred:       storage.Everything,
-	}, { // delete because of being filtered
+	}, {
+		name:       "delete because of being filtered",
 		key:        "/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
 		pred: storage.SelectionPredicate{
@@ -90,37 +95,39 @@ func testWatch(t *testing.T, recursive bool) {
 			},
 		},
 	}}
-	for i, tt := range tests {
-		w, err := store.Watch(ctx, tt.key, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred, Recursive: recursive})
-		if err != nil {
-			t.Fatalf("Watch failed: %v", err)
-		}
-		var prevObj *example.Pod
-		for _, watchTest := range tt.watchTests {
-			out := &example.Pod{}
-			key := tt.key
-			if recursive {
-				key = key + "/item"
-			}
-			err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-				func(runtime.Object) (runtime.Object, error) {
-					return watchTest.obj, nil
-				}), nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, err := store.Watch(ctx, tt.key, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred, Recursive: recursive})
 			if err != nil {
-				t.Fatalf("GuaranteedUpdate failed: %v", err)
+				t.Fatalf("Watch failed: %v", err)
 			}
-			if watchTest.expectEvent {
-				expectObj := out
-				if watchTest.watchType == watch.Deleted {
-					expectObj = prevObj
-					expectObj.ResourceVersion = out.ResourceVersion
+			var prevObj *example.Pod
+			for _, watchTest := range tt.watchTests {
+				out := &example.Pod{}
+				key := tt.key
+				if recursive {
+					key = key + "/item"
 				}
-				testCheckResult(t, i, watchTest.watchType, w, expectObj)
+				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+					func(runtime.Object) (runtime.Object, error) {
+						return watchTest.obj, nil
+					}), nil)
+				if err != nil {
+					t.Fatalf("GuaranteedUpdate failed: %v", err)
+				}
+				if watchTest.expectEvent {
+					expectObj := out
+					if watchTest.watchType == watch.Deleted {
+						expectObj = prevObj
+						expectObj.ResourceVersion = out.ResourceVersion
+					}
+					testCheckResult(t, watchTest.watchType, w, expectObj)
+				}
+				prevObj = out
 			}
-			prevObj = out
-		}
-		w.Stop()
-		testCheckStop(t, i, w)
+			w.Stop()
+			testCheckStop(t, w)
+		})
 	}
 }
 
@@ -148,7 +155,7 @@ func TestWatchFromZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 0, watch.Added, w, storedObj)
+	testCheckResult(t, watch.Added, w, storedObj)
 	w.Stop()
 
 	// Update
@@ -166,7 +173,7 @@ func TestWatchFromZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 1, watch.Added, w, out)
+	testCheckResult(t, watch.Added, w, out)
 	w.Stop()
 
 	// Update again
@@ -194,7 +201,7 @@ func TestWatchFromZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 2, watch.Added, w, out)
+	testCheckResult(t, watch.Added, w, out)
 }
 
 // TestWatchFromNoneZero tests that
@@ -212,23 +219,27 @@ func TestWatchFromNoneZero(t *testing.T) {
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
 		}), nil)
-	testCheckResult(t, 0, watch.Modified, w, out)
+	testCheckResult(t, watch.Modified, w, out)
 }
 
 func TestWatchError(t *testing.T) {
-	codec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	// this codec fails on decodes, which will bubble up so we can verify the behavior
+	invalidCodec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
 	client := testserver.RunEtcd(t, nil)
-	invalidStore := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte("test!")}, true, NewDefaultLeaseManagerConfig())
+	invalidStore := newStore(client, invalidCodec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte("test!")}, true, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 	w, err := invalidStore.Watch(ctx, "/abc", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	validStore := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte("test!")}, true, NewDefaultLeaseManagerConfig())
-	validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
+	if err := validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
-		}), nil)
+		}), nil); err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
 	testCheckEventType(t, watch.Error, w)
 }
 
@@ -344,7 +355,7 @@ func TestProgressNotify(t *testing.T) {
 		t.Fatalf("Watch failed: %v", err)
 	}
 	result := &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: out.ResourceVersion}}
-	testCheckResult(t, 0, watch.Bookmark, w, result)
+	testCheckResult(t, watch.Bookmark, w, result)
 }
 
 type testWatchStruct struct {
@@ -372,22 +383,22 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func testCheckResult(t *testing.T, i int, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
+func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
-			t.Errorf("#%d: event type want=%v, get=%v", i, expectEventType, res.Type)
+			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
 			return
 		}
-		if !reflect.DeepEqual(expectObj, res.Object) {
-			t.Errorf("#%d: obj want=\n%#v\nget=\n%#v", i, expectObj, res.Object)
+		if diff := cmp.Diff(expectObj, res.Object); diff != "" {
+			t.Errorf("incorrect obj: %s", diff)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("#%d: time out after waiting %v on ResultChan", i, wait.ForeverTestTimeout)
+		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
 	}
 }
 
-func testCheckStop(t *testing.T, i int, w watch.Interface) {
+func testCheckStop(t *testing.T, w watch.Interface) {
 	select {
 	case e, ok := <-w.ResultChan():
 		if ok {
@@ -398,9 +409,9 @@ func testCheckStop(t *testing.T, i int, w watch.Interface) {
 			case *metav1.Status:
 				obj = e.Object.(*metav1.Status).Message
 			}
-			t.Errorf("#%d: ResultChan should have been closed. Event: %s. Object: %s", i, e.Type, obj)
+			t.Errorf("ResultChan should have been closed. Event: %s. Object: %s", e.Type, obj)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("#%d: time out after waiting 1s on ResultChan", i)
+		t.Errorf("time out after waiting 1s on ResultChan")
 	}
 }

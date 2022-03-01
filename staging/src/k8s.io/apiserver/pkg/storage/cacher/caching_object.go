@@ -60,8 +60,7 @@ type serializationsCache map[runtime.Identifier]*serializationResult
 // so that each of those is computed exactly once.
 //
 // cachingObject implements the metav1.Object interface (accessors for
-// all metadata fields). However, setters for all fields except from
-// SelfLink (which is set lately in the path) are ignored.
+// all metadata fields).
 type cachingObject struct {
 	lock sync.RWMutex
 

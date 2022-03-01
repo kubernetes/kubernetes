@@ -373,7 +373,7 @@
       initPods: 2000
       measurePods: 1000
 
-- name: Preemption
+- name: PreemptionBasic
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes

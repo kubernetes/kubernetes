@@ -80,7 +80,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.17.6
+    version: 1.18rc1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: staging/publishing/rules.yaml
@@ -94,11 +94,12 @@ dependencies:
   # This entry is a stub of the major version to allow dependency checks to
   # pass when building Kubernetes using a pre-release of Golang.
   - name: "golang: 1.<major>"
-    version: 1.17
+    version: 1.18
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: hack/lib/golang.sh
-      match: minimum_go_version=go([0-9]+\.[0-9]+)
+    # TODO(go118): Uncomment once ready to transition presubmits to go118
+    #- path: hack/lib/golang.sh
+    #  match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "golang: etcd release version"
     version: 1.16.12
@@ -107,7 +108,7 @@ dependencies:
       match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.24.0-go1.17.6-bullseye.0
+    version: v1.24.0-go1.18rc1-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -137,7 +138,7 @@ dependencies:
       match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: v2.3.1-go1.17.6-bullseye.0
+    version: v2.3.1-go1.18rc1-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=

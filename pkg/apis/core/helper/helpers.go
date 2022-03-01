@@ -123,9 +123,8 @@ var standardResourceQuotaScopes = sets.NewString(
 )
 
 // IsStandardResourceQuotaScope returns true if the scope is a standard value
-func IsStandardResourceQuotaScope(str string, allowNamespaceAffinityScope bool) bool {
-	return standardResourceQuotaScopes.Has(str) ||
-		(allowNamespaceAffinityScope && str == string(core.ResourceQuotaScopeCrossNamespacePodAffinity))
+func IsStandardResourceQuotaScope(str string) bool {
+	return standardResourceQuotaScopes.Has(str) || str == string(core.ResourceQuotaScopeCrossNamespacePodAffinity)
 }
 
 var podObjectCountQuotaResources = sets.NewString(

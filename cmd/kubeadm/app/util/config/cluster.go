@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 )
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
@@ -81,6 +83,12 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	clusterConfigurationData, ok := configMap.Data[constants.ClusterConfigurationConfigMapKey]
 	if !ok {
 		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
+	}
+	// If ClusterConfiguration was patched by something other than kubeadm, it may have errors. Warn about them.
+	if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme},
+		kubeadmapiv1.SchemeGroupVersion.WithKind(constants.ClusterConfigurationKind),
+		[]byte(clusterConfigurationData)); err != nil {
+		klog.Warning(err.Error())
 	}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterConfigurationData), &initcfg.ClusterConfiguration); err != nil {
 		return nil, errors.Wrap(err, "failed to decode cluster configuration data")

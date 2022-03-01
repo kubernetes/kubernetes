@@ -196,9 +196,11 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	if status, ok := obj.(*metav1.Status); ok {
 		// selectively copy the bounded fields.
 		ae.ResponseStatus = &metav1.Status{
-			Status: status.Status,
-			Reason: status.Reason,
-			Code:   status.Code,
+			Status:  status.Status,
+			Message: status.Message,
+			Reason:  status.Reason,
+			Details: status.Details,
+			Code:    status.Code,
 		}
 	}
 

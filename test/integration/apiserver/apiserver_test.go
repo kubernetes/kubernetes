@@ -561,7 +561,7 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	}
 	count := int64(len(items))
 
-	// Cacher.GetToList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
 	// the limit is respected when testing here.
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(opts.Continue) > 0

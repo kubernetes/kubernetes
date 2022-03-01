@@ -18,9 +18,7 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"reflect"
 	"sync"
 	"testing"
@@ -29,11 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
-
 	"k8s.io/client-go/tools/cache"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -811,8 +809,8 @@ func Test_ExecPluginEnvVars(t *testing.T) {
 
 func validate(expected, actual []string) error {
 	if len(actual) != len(expected) {
-		return errors.New(fmt.Sprintf("actual env var length [%d] and expected env var length [%d] don't match",
-			len(actual), len(expected)))
+		return fmt.Errorf("actual env var length [%d] and expected env var length [%d] don't match",
+			len(actual), len(expected))
 	}
 
 	for i := range actual {

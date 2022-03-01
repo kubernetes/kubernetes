@@ -28,7 +28,7 @@ TODO: include field paths in reflect-based unit test
 func init() {
 
 	fixtureData_1_0 := fixtureGenerator{
-		expectErrorSubstring: "hostPath volumes",
+		expectErrorSubstring: "hostPath",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			// minimal valid pod already captures all valid combinations
 			return nil

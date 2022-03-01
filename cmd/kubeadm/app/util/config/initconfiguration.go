@@ -106,7 +106,7 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 	// Only if the slice is nil, we should append the control-plane taint. This allows the user to specify an empty slice for no default control-plane taint
 	if controlPlaneTaint && cfg.Taints == nil {
 		// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-		cfg.Taints = []v1.Taint{kubeadmconstants.OldControlPlaneTaint}
+		cfg.Taints = []v1.Taint{kubeadmconstants.OldControlPlaneTaint, kubeadmconstants.ControlPlaneTaint}
 	}
 
 	if cfg.CRISocket == "" {
@@ -302,7 +302,9 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 		}
 
 		// verify the validity of the YAML
-		strict.VerifyUnmarshalStrict(fileContent, gvk)
+		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme, componentconfigs.Scheme}, gvk, fileContent); err != nil {
+			klog.Warning(err.Error())
+		}
 
 		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {
 			// Set initcfg to an empty struct value the deserializer will populate

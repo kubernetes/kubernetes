@@ -2,6 +2,8 @@
   "kind": "PodAttachOptions",
   "apiVersion": "v1",
   "stdin": true,
+  "stdout": true,
   "stderr": true,
-  "container": "2"
+  "tty": true,
+  "container": "containerValue"
 }

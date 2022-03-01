@@ -24,7 +24,11 @@ ifeq ($(MAKECMDGOALS),)
 endif
 
 ifeq ($(DBG_MAKEFILE),1)
-    $(warning ***** starting Makefile.generated_files for goal(s) "$(MAKECMDGOALS)")
+    ifeq ($(MAKE_RESTARTS),)
+        $(warning ***** starting Makefile.generated_files for goal(s) "$(MAKECMDGOALS)")
+    else
+        $(warning ***** restarting Makefile.generated_files for goal(s) "$(MAKECMDGOALS)")
+    endif
     $(warning ***** $(shell date))
 endif
 
@@ -59,6 +63,10 @@ GO_PKGDEPS_FILE = go-pkgdeps.mk
 # reload the updated deps.
 sinclude $(META_DIR)/$(GO_PKGDEPS_FILE)
 
+# Only build and run go2make on the first pass.  If that generates a new
+# GO_PKGDEPS_FILE, make will restart the whole process and set MAKE_RESTARTS to
+# a numeric value.
+ifeq ($(MAKE_RESTARTS),)
 # Update the set of Go deps for our project.  This will let us determine if
 # we really need to do expensive codegen.  We use FORCE because it is not a
 # PHONY file, but we do want it to be re-evaluated every time make is run.  The
@@ -67,7 +75,8 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
 	    echo "DBG: calculating Go dependencies";  \
 	fi
-	hack/run-in-gopath.sh go install ./hack/make-rules/helpers/go2make
+	KUBE_BUILD_PLATFORMS="" \
+	    hack/make-rules/build.sh hack/make-rules/helpers/go2make
 	hack/run-in-gopath.sh go2make                       \
 	    k8s.io/kubernetes/...                           \
 	    --prune  k8s.io/kubernetes/staging              \
@@ -81,6 +90,7 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    cat $@.tmp > $@;                                \
 	fi
 	rm -f $@.tmp
+endif # MAKE_RESTARTS
 
 .PHONY: FORCE
 FORCE:
@@ -162,7 +172,7 @@ gen_prerelease_lifecycle: $(PRERELEASE_LIFECYCLE_GEN) $(META_DIR)/$(PRERELEASE_L
 	        echo "DBG: running $(PRERELEASE_LIFECYCLE_GEN) for $$pkgs";            \
 	    fi;                                                                        \
 	    N=$$(cat $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo | wc -l);            \
-	    echo "Generating prerelease lifecycle code for $$N targets";               \
+	    kube::log::status "Generating prerelease lifecycle code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(PRERELEASE_LIFECYCLE_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                                    \
 	        --logtostderr                                                          \
@@ -205,7 +215,8 @@ $(PRERELEASE_LIFECYCLE_FILES): $(PRERELEASE_LIFECYCLE_GEN)
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
 $(PRERELEASE_LIFECYCLE_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen
+	KUBE_BUILD_PLATFORMS="" \
+	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 	touch $@
 
 
@@ -255,7 +266,7 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 	        echo "DBG: running $(DEEPCOPY_GEN) for $$pkgs";            \
 	    fi;                                                            \
 	    N=$$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | wc -l);            \
-	    echo "Generating deepcopy code for $$N targets";               \
+	    kube::log::status "Generating deepcopy code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                        \
 	        --logtostderr                                              \
@@ -299,7 +310,8 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
 $(DEEPCOPY_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/deepcopy-gen
+	KUBE_BUILD_PLATFORMS="" \
+	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	touch $@
 
 
@@ -357,7 +369,7 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 	        echo "DBG: running $(DEFAULTER_GEN) for $$pkgs";            \
 	    fi;                                                             \
 	    N=$$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | wc -l);            \
-	    echo "Generating defaulter code for $$N targets";               \
+	    kube::log::status "Generating defaulter code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                         \
 	        --logtostderr                                               \
@@ -399,7 +411,8 @@ $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
 $(DEFAULTER_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/defaulter-gen
+	KUBE_BUILD_PLATFORMS="" \
+	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/defaulter-gen
 	touch $@
 
 
@@ -469,7 +482,7 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 	        echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
 	    fi;                                                              \
 	    N=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | wc -l);            \
-	    echo "Generating conversion code for $$N targets";               \
+	    kube::log::status "Generating conversion code for $$N targets";  \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                        \
 	        --extra-peer-dirs $$(echo $(CONVERSION_EXTRA_PEER_PKGS) | sed 's/ /,/g') \
 	        --extra-dirs $$(echo $(CONVERSION_EXTRA_PKGS) | sed 's/ /,/g') \
@@ -512,7 +525,8 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(CONVERSION_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
+	KUBE_BUILD_PLATFORMS="" \
+	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/conversion-gen
 	touch $@
 
 
@@ -606,7 +620,7 @@ endif
 # checked-in violation file, and prints error message to request developer to
 # fix either the API source code, or the known API rule violation file.
 $$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME)
-	echo "Generating openapi code for $(prefix)";                                              \
+	kube::log::status "Generating openapi code for $(prefix)";                                 \
 	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                                     \
 	    --v $(KUBE_VERBOSE)                                                                    \
 	    --logtostderr                                                                          \
@@ -636,5 +650,6 @@ gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(AGGREGATOR_OPENAPI_OUTFILE
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
 $(OPENAPI_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/kube-openapi/cmd/openapi-gen
+	KUBE_BUILD_PLATFORMS="" \
+	    hack/make-rules/build.sh vendor/k8s.io/kube-openapi/cmd/openapi-gen
 	touch $@

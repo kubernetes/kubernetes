@@ -105,9 +105,6 @@ func (t *Tester) TestNamespace() string {
 // TestContext returns a namespaced context that will be used when making storage calls.
 // Namespace is determined by TestNamespace()
 func (t *Tester) TestContext() context.Context {
-	if t.clusterScope {
-		return genericapirequest.NewContext()
-	}
 	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
 }
 
@@ -1456,13 +1453,12 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	}
 	m.SetContinue("continuetoken")
 	m.SetResourceVersion("11")
-	m.SetSelfLink("/list/link")
 
 	table, err := t.storage.(rest.TableConvertor).ConvertToTable(ctx, listObj, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if table.ResourceVersion != "11" || table.SelfLink != "/list/link" || table.Continue != "continuetoken" {
+	if table.ResourceVersion != "11" || table.Continue != "continuetoken" {
 		t.Errorf("printer lost list meta: %#v", table.ListMeta)
 	}
 	if len(table.Rows) != len(items) {

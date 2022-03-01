@@ -363,7 +363,6 @@ func newTestKubeletWithImageList(
 		kubelet.hostutil,
 		kubelet.getPodsDir(),
 		kubelet.recorder,
-		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
 		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
@@ -2353,13 +2352,6 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, pod, v1.PodFailed)
-}
-
-func TestPreInitRuntimeService(t *testing.T) {
-	err := PreInitRuntimeService(nil, nil, nil, "", "", "", "", "")
-	if err == nil {
-		t.Fatal("PreInitRuntimeService should fail when not configured with a container runtime")
-	}
 }
 
 func TestSyncLabels(t *testing.T) {

@@ -44,9 +44,12 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	vmwaretypes "github.com/vmware/govmomi/vim25/types"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
@@ -62,6 +65,9 @@ import (
 // VSphere Cloud Provider constants
 const (
 	ProviderName                  = "vsphere"
+	providerIDPrefix              = "vsphere://"
+	updateNodeRetryCount          = 3
+	zoneLabelsResyncPeriod        = 5 * time.Minute
 	VolDir                        = "kubevols"
 	RoundTripperDefaultCount      = 3
 	DummyVMPrefixName             = "vsphere-k8s"
@@ -95,8 +101,9 @@ var _ cloudprovider.PVLabeler = (*VSphere)(nil)
 
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
-	cfg      *VSphereConfig
-	hostName string
+	cfg        *VSphereConfig
+	kubeClient clientset.Interface
+	hostName   string
 	// Maps the VSphere IP address to VSphereInstance
 	vsphereInstanceMap map[string]*VSphereInstance
 	vsphereVolumeMap   *VsphereVolumeMap
@@ -268,6 +275,7 @@ func init() {
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (vs *VSphere) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	vs.kubeClient = clientBuilder.ClientOrDie("vsphere-legacy-cloud-provider")
 }
 
 // Initialize Node Informers
@@ -305,6 +313,11 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 		AddFunc:    vs.NodeAdded,
 		DeleteFunc: vs.NodeDeleted,
 	})
+	// Register sync function for node zone/region labels
+	nodeInformer.AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{UpdateFunc: vs.syncNodeZoneLabels},
+		zoneLabelsResyncPeriod,
+	)
 	klog.V(4).Infof("Node informers in vSphere cloud provider initialized")
 
 }
@@ -896,7 +909,16 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 }
 
 func (vs *VSphere) isZoneEnabled() bool {
-	return vs.cfg != nil && vs.cfg.Labels.Zone != "" && vs.cfg.Labels.Region != ""
+	isEnabled := vs.cfg != nil && vs.cfg.Labels.Zone != "" && vs.cfg.Labels.Region != ""
+	// Return false within kubelet in case of credentials stored in secret.
+	// Otherwise kubelet will not be able to obtain zone labels from vSphere and create initial node
+	// due to no credentials at this step.
+	// See https://github.com/kubernetes/kubernetes/blob/b960f7a0e04687c17e0b0801e17e7cab89f273cc/pkg/kubelet/kubelet_node_status.go#L384-L386
+	if isEnabled && vs.isSecretInfoProvided && vs.nodeManager.credentialManager == nil {
+		klog.V(1).Info("Zones can not be populated now due to credentials in Secret, skip.")
+		return false
+	}
+	return isEnabled
 }
 
 // Zones returns an implementation of Zones for vSphere.
@@ -1525,6 +1547,76 @@ func (vs *VSphere) NodeAdded(obj interface{}) {
 	if err := vs.nodeManager.RegisterNode(node); err != nil {
 		klog.Errorf("failed to add node %+v: %v", node, err)
 	}
+	vs.setNodeZoneLabels(node)
+}
+
+// Node zone labels sync function, intended to be called periodically within kube-controller-manager.
+func (vs *VSphere) syncNodeZoneLabels(_ interface{}, newObj interface{}) {
+	node, ok := newObj.(*v1.Node)
+	if node == nil || !ok {
+		klog.Warningf("NodeUpdated: unrecognized object %+v", newObj)
+		return
+	}
+
+	// Populate zone and region labels if needed.
+	// This logic engages only if credentials provided via secret.
+	// Returns early if topology labels are already presented.
+	// https://github.com/kubernetes/kubernetes/issues/75175
+	if vs.isSecretInfoProvided && vs.isZoneEnabled() {
+		labels := node.GetLabels()
+		_, zoneOk := labels[v1.LabelTopologyZone]
+		_, regionOk := labels[v1.LabelTopologyRegion]
+		if zoneOk && regionOk {
+			klog.V(6).Infof("Node topology labels are already populated")
+			return
+		}
+		klog.V(4).Infof("Topology labels was not found, trying to populate for node %s", node.Name)
+		vs.setNodeZoneLabels(node)
+	}
+}
+
+func (vs *VSphere) setNodeZoneLabels(node *v1.Node) {
+	nodeZone := node.ObjectMeta.Labels[v1.LabelTopologyZone]
+	nodeRegion := node.ObjectMeta.Labels[v1.LabelTopologyRegion]
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if vs.isSecretInfoProvided && vs.isZoneEnabled() {
+		zone, err := vs.GetZoneByProviderID(ctx, node.Spec.ProviderID)
+		if err != nil {
+			klog.Warningf("Can not get Zones from vCenter: %v", err)
+		}
+
+		if zone.FailureDomain != nodeZone || zone.Region != nodeRegion {
+			updatedNode := node.DeepCopy()
+			labels := updatedNode.ObjectMeta.Labels
+			if labels == nil {
+				labels = make(map[string]string)
+			}
+			labels[v1.LabelTopologyZone] = zone.FailureDomain
+			labels[v1.LabelTopologyRegion] = zone.Region
+
+			err = tryUpdateNode(ctx, vs.kubeClient, updatedNode)
+			if err != nil {
+				klog.Errorf("vSphere cloud provider can not update node with zones info: %v", err)
+			} else {
+				klog.V(4).Infof("Node %s updated with zone and region labels", updatedNode.Name)
+			}
+		}
+	}
+}
+
+func tryUpdateNode(ctx context.Context, client clientset.Interface, updatedNode *v1.Node) error {
+	for i := 0; i < updateNodeRetryCount; i++ {
+		_, err := client.CoreV1().Nodes().Update(ctx, updatedNode, metav1.UpdateOptions{})
+		if err != nil {
+			if !apierrors.IsConflict(err) {
+				return fmt.Errorf("vSphere cloud provider can not update node with zones info: %v", err)
+			}
+		} else {
+			return nil
+		}
+	}
+	return fmt.Errorf("update node exceeds retry count")
 }
 
 // Notification handler when node is removed from k8s cluster.
@@ -1620,14 +1712,9 @@ func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f 
 	return f(c)
 }
 
-// GetZone implements Zones.GetZone
-func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
-	nodeName, err := vs.CurrentNodeName(ctx, vs.hostName)
-	if err != nil {
-		klog.Errorf("Cannot get node name.")
-		return cloudprovider.Zone{}, err
-	}
+func (vs *VSphere) getZoneByVmUUIDAndNodeName(ctx context.Context, vmUUID string, nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
 	zone := cloudprovider.Zone{}
+
 	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
 	if err != nil {
 		klog.Errorf("Cannot connect to vsphere. Get zone for node %s error", nodeName)
@@ -1638,7 +1725,7 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		klog.Errorf("Cannot connect to datacenter. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
 	}
-	vmHost, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)
+	vmHost, err := dc.GetHostByVMUUID(ctx, vmUUID)
 	if err != nil {
 		klog.Errorf("Cannot find VM runtime host. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
@@ -1656,12 +1743,12 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		// search the hierarchy, example order: ["Host", "Cluster", "Datacenter", "Folder"]
 		for i := range objects {
 			obj := objects[len(objects)-1-i]
-			tags, err := client.ListAttachedTags(ctx, obj)
+			attachedTags, err := client.ListAttachedTags(ctx, obj)
 			if err != nil {
 				klog.Errorf("Cannot list attached tags. Get zone for node %s: %s", nodeName, err)
 				return err
 			}
-			for _, value := range tags {
+			for _, value := range attachedTags {
 				tag, err := client.GetTag(ctx, value)
 				if err != nil {
 					klog.Errorf("Get tag %s: %s", value, err)
@@ -1674,7 +1761,7 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 				}
 
 				found := func() {
-					klog.Errorf("Found %q tag (%s) for %s attached to %s", category.Name, tag.Name, vs.vmUUID, obj.Reference())
+					klog.Errorf("Found %q tag (%s) for %s attached to %s", category.Name, tag.Name, vmUUID, obj.Reference())
 				}
 				switch {
 				case category.Name == vs.cfg.Labels.Zone:
@@ -1692,10 +1779,10 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		}
 
 		if zone.Region == "" {
-			return fmt.Errorf("vSphere region category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Region, nodeName, vs.vmUUID)
+			return fmt.Errorf("vSphere region category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Region, nodeName, vmUUID)
 		}
 		if zone.FailureDomain == "" {
-			return fmt.Errorf("vSphere zone category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Zone, nodeName, vs.vmUUID)
+			return fmt.Errorf("vSphere zone category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Zone, nodeName, vmUUID)
 		}
 
 		return nil
@@ -1707,12 +1794,32 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	return zone, nil
 }
 
+// GetZone implements Zones.GetZone
+func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
+	nodeName, err := vs.CurrentNodeName(ctx, vs.hostName)
+	if err != nil {
+		klog.Errorf("Cannot get node name.")
+		return cloudprovider.Zone{}, err
+	}
+	return vs.getZoneByVmUUIDAndNodeName(ctx, vs.vmUUID, nodeName)
+}
+
 func (vs *VSphere) GetZoneByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{}, cloudprovider.NotImplemented
 }
 
 func (vs *VSphere) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, cloudprovider.NotImplemented
+	var nodeName k8stypes.NodeName
+	vmUUID := strings.Replace(providerID, providerIDPrefix, "", 1)
+
+	for nName, nInfo := range vs.nodeManager.nodeInfoMap {
+		if nInfo.vmUUID == vmUUID {
+			nodeName = convertToK8sType(nName)
+			break
+		}
+	}
+
+	return vs.getZoneByVmUUIDAndNodeName(ctx, vmUUID, nodeName)
 }
 
 // GetLabelsForVolume implements the PVLabeler interface for VSphere

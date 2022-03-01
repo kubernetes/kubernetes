@@ -287,13 +287,6 @@ func createHTTPProbe(host, path string, port int, scheme v1.URIScheme, initialDe
 
 // GetAPIServerProbeAddress returns the probe address for the API server
 func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
-	// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,
-	// will generate a DaemonSet with a nodeSelector such that all nodes with the label
-	// node-role.kubernetes.io/master='' will have the API server deployed to it. Since the init
-	// is run only once on an initial host, the API advertise address will be invalid for any
-	// future hosts that do not have the same address. Furthermore, since liveness and readiness
-	// probes do not support the Downward API we cannot dynamically set the advertise address to
-	// the node's IP. The only option then is to use localhost.
 	if endpoint != nil && endpoint.AdvertiseAddress != "" {
 		return getProbeAddress(endpoint.AdvertiseAddress)
 	}

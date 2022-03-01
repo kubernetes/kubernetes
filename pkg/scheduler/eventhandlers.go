@@ -21,20 +21,20 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic/dynamicinformer"
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
-	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
@@ -67,7 +67,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 		return
 	}
 
-	nodeInfo := sched.SchedulerCache.AddNode(node)
+	nodeInfo := sched.Cache.AddNode(node)
 	klog.V(3).InfoS("Add event for node", "node", klog.KObj(node))
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd, preCheckForNode(nodeInfo))
 }
@@ -84,7 +84,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 		return
 	}
 
-	nodeInfo := sched.SchedulerCache.UpdateNode(oldNode, newNode)
+	nodeInfo := sched.Cache.UpdateNode(oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
 	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != nil {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(*event, preCheckForNode(nodeInfo))
@@ -108,7 +108,7 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		return
 	}
 	klog.V(3).InfoS("Delete event for node", "node", klog.KObj(node))
-	if err := sched.SchedulerCache.RemoveNode(node); err != nil {
+	if err := sched.Cache.RemoveNode(node); err != nil {
 		klog.ErrorS(err, "Scheduler cache RemoveNode failed")
 	}
 }
@@ -129,7 +129,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		return
 	}
 
-	isAssumed, err := sched.SchedulerCache.IsAssumedPod(newPod)
+	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", newPod.Namespace, newPod.Name, err))
 	}
@@ -185,7 +185,7 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 	}
 	klog.V(3).InfoS("Add event for scheduled pod", "pod", klog.KObj(pod))
 
-	if err := sched.SchedulerCache.AddPod(pod); err != nil {
+	if err := sched.Cache.AddPod(pod); err != nil {
 		klog.ErrorS(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
 
@@ -205,7 +205,7 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	}
 	klog.V(4).InfoS("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 
-	if err := sched.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
+	if err := sched.Cache.UpdatePod(oldPod, newPod); err != nil {
 		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
@@ -229,7 +229,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		return
 	}
 	klog.V(3).InfoS("Delete event for scheduled pod", "pod", klog.KObj(pod))
-	if err := sched.SchedulerCache.RemovePod(pod); err != nil {
+	if err := sched.Cache.RemovePod(pod); err != nil {
 		klog.ErrorS(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
@@ -470,37 +470,62 @@ func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 }
 
 func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
-	// In addition to the checks in kubelet (pkg/kubelet/lifecycle/predicate.go#GeneralPredicates),
-	// the following logic appends a taint/toleration check.
-	// TODO: verify if kubelet should also apply the taint/toleration check, and then unify the
-	// logic with kubelet and move to a shared place.
-	//
 	// Note: the following checks doesn't take preemption into considerations, in very rare
 	// cases (e.g., node resizing), "pod" may still fail a check but preemption helps. We deliberately
 	// chose to ignore those cases as unschedulable pods will be re-queued eventually.
 	return func(pod *v1.Pod) bool {
-		if len(noderesources.Fits(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead))) != 0 {
+		admissionResults := AdmissionCheck(pod, nodeInfo, false)
+		if len(admissionResults) != 0 {
 			return false
 		}
-
-		// Ignore parsing errors for backwards compatibility.
-		matches, _ := nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node())
-		if !matches {
-			return false
-		}
-
-		if !nodename.Fits(pod, nodeInfo) {
-			return false
-		}
-
-		if !nodeports.Fits(pod, nodeInfo) {
-			return false
-		}
-
-		_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
-			// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
-			return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+			return t.Effect == v1.TaintEffectNoSchedule
 		})
 		return !isUntolerated
 	}
+}
+
+// AdmissionCheck calls the filtering logic of noderesources/nodeport/nodeAffinity/nodename
+// and returns the failure reasons. It's used in kubelet(pkg/kubelet/lifecycle/predicate.go) and scheduler.
+// It returns the first failure if `includeAllFailures` is set to false; otherwise
+// returns all failures.
+func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
+	var admissionResults []AdmissionResult
+	insufficientResources := noderesources.Fits(pod, nodeInfo, feature.DefaultFeatureGate.Enabled(features.PodOverhead))
+	if len(insufficientResources) != 0 {
+		for i := range insufficientResources {
+			admissionResults = append(admissionResults, AdmissionResult{InsufficientResource: &insufficientResources[i]})
+		}
+		if !includeAllFailures {
+			return admissionResults
+		}
+	}
+
+	if matches, _ := corev1nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node()); !matches {
+		admissionResults = append(admissionResults, AdmissionResult{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod})
+		if !includeAllFailures {
+			return admissionResults
+		}
+	}
+	if !nodename.Fits(pod, nodeInfo) {
+		admissionResults = append(admissionResults, AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason})
+		if !includeAllFailures {
+			return admissionResults
+		}
+	}
+	if !nodeports.Fits(pod, nodeInfo) {
+		admissionResults = append(admissionResults, AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason})
+		if !includeAllFailures {
+			return admissionResults
+		}
+	}
+	return admissionResults
+}
+
+// AdmissionResult describes the reason why Scheduler can't admit the pod.
+// If the reason is a resource fit one, then AdmissionResult.InsufficientResource includes the details.
+type AdmissionResult struct {
+	Name                 string
+	Reason               string
+	InsufficientResource *noderesources.InsufficientResource
 }

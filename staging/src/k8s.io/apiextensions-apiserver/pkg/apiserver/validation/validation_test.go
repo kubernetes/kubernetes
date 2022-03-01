@@ -18,7 +18,14 @@ package validation
 
 import (
 	"math/rand"
+	"os"
+	"strconv"
 	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+
+	kjson "sigs.k8s.io/json"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
@@ -46,12 +53,21 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	seed := rand.Int63()
-	t.Logf("seed: %d", seed)
+	seed := int64(time.Now().Nanosecond())
+	if override := os.Getenv("TEST_RAND_SEED"); len(override) > 0 {
+		overrideSeed, err := strconv.Atoi(override)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seed = int64(overrideSeed)
+		t.Logf("using overridden seed: %d", seed)
+	} else {
+		t.Logf("seed (override with TEST_RAND_SEED if desired): %d", seed)
+	}
 	fuzzerFuncs := fuzzer.MergeFuzzerFuncs(apiextensionsfuzzer.Funcs)
 	f := fuzzer.FuzzerFor(fuzzerFuncs, rand.NewSource(seed), codecs)
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		// fuzz internal types
 		internal := &apiextensions.JSONSchemaProps{}
 		f.Fuzz(internal)
@@ -70,8 +86,10 @@ func TestRoundTrip(t *testing.T) {
 
 		// JSON -> in-memory JSON => convertNullTypeToNullable => JSON
 		var j interface{}
-		if err := json.Unmarshal(openAPIJSON, &j); err != nil {
+		if strictErrs, err := kjson.UnmarshalStrict(openAPIJSON, &j); err != nil {
 			t.Fatal(err)
+		} else if len(strictErrs) > 0 {
+			t.Fatal(strictErrs)
 		}
 		j = stripIntOrStringType(j)
 		openAPIJSON, err = json.Marshal(j)
@@ -81,8 +99,10 @@ func TestRoundTrip(t *testing.T) {
 
 		// JSON -> external
 		external := &apiextensionsv1.JSONSchemaProps{}
-		if err := json.Unmarshal(openAPIJSON, external); err != nil {
+		if strictErrs, err := kjson.UnmarshalStrict(openAPIJSON, external); err != nil {
 			t.Fatal(err)
+		} else if len(strictErrs) > 0 {
+			t.Fatal(strictErrs)
 		}
 
 		// external -> internal
@@ -92,7 +112,8 @@ func TestRoundTrip(t *testing.T) {
 		}
 
 		if !apiequality.Semantic.DeepEqual(internal, internalRoundTripped) {
-			t.Fatalf("%d: expected\n\t%#v, got \n\t%#v", i, internal, internalRoundTripped)
+			t.Log(string(openAPIJSON))
+			t.Fatalf("%d: unexpected diff\n\t%s", i, cmp.Diff(internal, internalRoundTripped))
 		}
 	}
 }

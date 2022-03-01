@@ -677,14 +677,14 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-
-		l := klog.Level(1)
-		l.Set("1")
-		tmpWriteBuffer := bytes.NewBuffer(nil)
-		klog.SetOutput(tmpWriteBuffer)
-		klog.LogToStderr(false)
-
 		t.Run(tt.name, func(t *testing.T) {
+			l := klog.Level(1)
+			l.Set("1")
+			// hijack the klog output
+			tmpWriteBuffer := bytes.NewBuffer(nil)
+			klog.SetOutput(tmpWriteBuffer)
+			klog.LogToStderr(false)
+
 			m := &managerImpl{
 				recorder:                         tt.fields.recorder,
 				nodeRef:                          tt.fields.nodeRef,

@@ -328,7 +328,11 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods
 
 	// verify service from pod
 	cmdFunc := func(podName string) string {
-		wgetCmd := "wget -q -T 1 -O -"
+		wgetCmd := "wget -q -O -"
+		// Command 'wget' in Windows image may not support option 'T'
+		if !framework.NodeOSDistroIs("windows") {
+			wgetCmd += " -T 1"
+		}
 		serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 		cmd := fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
 			50*len(expectedPods), wgetCmd, serviceIPPort)

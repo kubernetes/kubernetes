@@ -406,14 +406,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/node/v1alpha1
-		gvr("node.k8s.io", "v1alpha1", "runtimeclasses"): {
-			Stub:             `{"metadata": {"name": "rc1"}, "spec": {"runtimeHandler": "h1"}}`,
-			ExpectedEtcdPath: "/registry/runtimeclasses/rc1",
-			ExpectedGVK:      gvkP("node.k8s.io", "v1", "RuntimeClass"),
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/node/v1beta1
 		gvr("node.k8s.io", "v1beta1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc2"}, "handler": "h2"}`,

@@ -370,7 +370,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
 func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 	schedulerCacheIsEmpty := func() (bool, error) {
-		dump := sched.SchedulerCache.Dump()
+		dump := sched.Cache.Dump()
 
 		return len(dump.Nodes) == 0 && len(dump.AssumedPods) == 0, nil
 	}

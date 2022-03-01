@@ -96,10 +96,6 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 // volume.Mounter methods
 var _ volume.Mounter = &csiMountMgr{}
 
-func (c *csiMountMgr) CanMount() error {
-	return nil
-}
-
 func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 	return c.SetUpAt(c.GetPath(), mounterArgs)
 }
@@ -352,9 +348,9 @@ func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, error) {
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        c.readOnly,
-		Managed:         !c.readOnly,
-		SupportsSELinux: c.supportsSELinux,
+		ReadOnly:       c.readOnly,
+		Managed:        !c.readOnly,
+		SELinuxRelabel: c.supportsSELinux,
 	}
 }
 
